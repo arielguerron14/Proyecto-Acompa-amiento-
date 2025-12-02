@@ -35,6 +35,10 @@ npm install --prefix micro-maestros
 npm install --prefix micro-estudiantes
 npm install --prefix micro-reportes-estudiantes
 npm install --prefix micro-reportes-maestros
+npm install --prefix micro-auth
+npm install --prefix micro-notificaciones
+npm install --prefix micro-analytics
+npm install --prefix micro-soap-bridge
 npm install --prefix api-gateway
 npm install --prefix frontend-web
 
@@ -46,12 +50,17 @@ npm start --prefix micro-maestros
 npm start --prefix micro-estudiantes
 npm start --prefix micro-reportes-estudiantes
 npm start --prefix micro-reportes-maestros
+npm start --prefix micro-auth
+npm start --prefix micro-notificaciones
+npm start --prefix micro-analytics
+npm start --prefix micro-soap-bridge
 npm start --prefix api-gateway
 npm start --prefix frontend-web
 ```
 
 ## 📋 Servicios
 
+### Servicios Core (6)
 | Servicio | Puerto | Descripción |
 |----------|--------|-------------|
 | **MongoDB** | 27017 | Base de datos principal |
@@ -60,6 +69,18 @@ npm start --prefix frontend-web
 | **micro-reportes-estudiantes** | 5003 | Reportes de estudiantes |
 | **micro-reportes-maestros** | 5004 | Reportes de maestros |
 | **API Gateway** | 8080 | Router central de la aplicación |
+
+### Nuevos Servicios (4)
+| Servicio | Puerto | Descripción |
+|----------|--------|-------------|
+| **micro-auth** | 5005 | Autenticación, autorización y RBAC centralizado |
+| **micro-notificaciones** | 5006 | Notificaciones: email, SMS, push |
+| **micro-analytics** | 5007 | Analytics en tiempo real, Kafka consumer |
+| **micro-soap-bridge** | 5008 | Integración con servicios SOAP legacy |
+
+### Frontend
+| Servicio | Puerto | Descripción |
+|----------|--------|-------------|
 | **Frontend Web** | 5500 | Interfaz web estática |
 
 ## 🏗️ Arquitectura
@@ -84,6 +105,22 @@ maestros    estudiantes    estudiantes      maestros
                     │
                     ▼
               MongoDB (27017)
+
+        ┌─────────────────────────────────┐
+        │    SHARED AUTH MODULE (DRY)     │
+        │  - Roles & Permissions Matrix   │
+        │  - JWT Service                  │
+        │  - Auth Middleware              │
+        └────────┬────────────────────────┘
+                 │
+   ┌─────────────┼─────────────┬──────────────┐
+   ▼             ▼             ▼              ▼
+micro-auth  micro-notif  micro-analytics  micro-soap
+ (5005)      (5006)        (5007)        bridge(5008)
+             
+- RBAC      - Email       - Kafka       - SOAP
+- JWT       - SMS         - Events      - Legacy
+- Tokens    - Push        - Real-time   - Adapter
 ```
 
 ## 📝 Variables de Entorno
@@ -137,10 +174,14 @@ Verifica que todos los servicios están activos:
 
 ```bash
 # Directamente
-curl http://localhost:5001/health
-curl http://localhost:5002/health
-curl http://localhost:5003/health
-curl http://localhost:5004/health
+curl http://localhost:5001/health       # micro-maestros
+curl http://localhost:5002/health       # micro-estudiantes
+curl http://localhost:5003/health       # micro-reportes-estudiantes
+curl http://localhost:5004/health       # micro-reportes-maestros
+curl http://localhost:5005/health       # micro-auth
+curl http://localhost:5006/health       # micro-notificaciones
+curl http://localhost:5007/health       # micro-analytics
+curl http://localhost:5008/health       # micro-soap-bridge
 
 # A través del gateway
 curl http://localhost:8080/maestros/health
@@ -162,10 +203,21 @@ Proyecto-Acompa-amiento-/
 │       ├── index.html
 │       ├── estudiante.html
 │       └── styles.css
+├── shared-auth/              # Módulo compartido de autenticación
+│   ├── src/
+│   │   ├── constants/
+│   │   ├── services/
+│   │   ├── middlewares/
+│   │   └── index.js (barrel export)
+│   └── package.json
 ├── micro-maestros/           # Microservicio de maestros
 ├── micro-estudiantes/        # Microservicio de estudiantes
 ├── micro-reportes-estudiantes/
 ├── micro-reportes-maestros/
+├── micro-auth/               # Autenticación centralizada (NUEVO)
+├── micro-notificaciones/     # Notificaciones email/SMS/push (NUEVO)
+├── micro-analytics/          # Analytics y Kafka consumer (NUEVO)
+├── micro-soap-bridge/        # Integración SOAP legacy (NUEVO)
 ├── docker-compose.yml        # Orquestación Docker
 └── README.md                 # Este archivo
 ```
@@ -214,6 +266,11 @@ Para desarrollo local sin Docker:
 - **http-proxy-middleware**: Middleware de proxy para el gateway
 - **http-server**: Servidor estático para frontend
 - **dotenv**: Gestión de variables de entorno
+- **jsonwebtoken**: Autenticación JWT
+- **bcryptjs**: Hash de contraseñas
+- **nodemailer**: Envío de emails
+- **kafkajs**: Cliente Kafka para streaming de eventos
+- **soap**: Integración con servicios SOAP
 
 ## 📞 Contacto y Soporte
 

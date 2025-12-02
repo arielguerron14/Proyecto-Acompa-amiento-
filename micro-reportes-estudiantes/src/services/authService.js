@@ -117,4 +117,4 @@ class AuthService {
   }
 }
 
-module.exports = AuthService;
+module.exports = require('../../../shared-auth/src/services/authService');

@@ -1,0 +1,15 @@
+{
+  "name": "@proyecto/shared-auth",
+  "version": "1.0.0",
+  "description": "Shared authentication and RBAC module for all microservices",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["auth", "jwt", "rbac", "shared"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2"
+  }
+}

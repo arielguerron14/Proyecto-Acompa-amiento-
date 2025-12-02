@@ -1,0 +1,28 @@
+{
+  "name": "micro-analytics",
+  "version": "1.0.0",
+  "description": "Microservicio de analytics: Kafka consumer para procesamiento de eventos",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "keywords": [
+    "analytics",
+    "kafka",
+    "eventos",
+    "big-data"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "dotenv": "^16.0.3",
+    "kafkajs": "^2.2.4",
+    "mongoose": "^7.5.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}

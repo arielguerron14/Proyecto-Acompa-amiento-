@@ -1,0 +1,28 @@
+{
+  "name": "micro-soap-bridge",
+  "version": "1.0.0",
+  "description": "Microservicio puente para integración con servicios SOAP legacy",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "keywords": [
+    "soap",
+    "legacy",
+    "integration",
+    "bridge"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "dotenv": "^16.0.3",
+    "soap": "^0.12.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}

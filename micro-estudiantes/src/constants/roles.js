@@ -48,4 +48,4 @@ const ROLE_PERMISSIONS = {
   ],
 };
 
-module.exports = { ROLES, ROLE_PERMISSIONS };
+module.exports = require('../../../shared-auth/src/constants/roles');

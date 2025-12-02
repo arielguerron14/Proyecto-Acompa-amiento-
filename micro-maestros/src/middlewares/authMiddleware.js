@@ -128,10 +128,4 @@ function optionalAuth(req, res, next) {
   next();
 }
 
-module.exports = {
-  authenticateToken,
-  requirePermission,
-  requireAnyPermission,
-  requireRole,
-  optionalAuth,
-};
+module.exports = require('../../../shared-auth/src/middlewares/authMiddleware');
