@@ -1,20 +1,20 @@
 # Micro-Reportes-Maestros Service
 
-This microservice manages teacher reports and analytics.
+Microservicio para la generación de reportes y análisis de maestros.
 
-## Overview
+## 🎯 Descripción
 
-The **Micro-Reportes-Maestros** service handles all teacher report generation and data retrieval related to teaching activities and performance.
+El servicio **Micro-Reportes-Maestros** maneja toda la funcionalidad de generación de reportes y recuperación de datos relacionados con actividades docentes y desempeño de maestros.
 
-## Technologies
+## 🛠️ Tecnologías
 
 - **Node.js** 18+
-- **Express.js** - Web framework
-- **MongoDB** - Database
+- **Express.js** - Framework web
+- **MongoDB** - Base de datos
 - **Mongoose** - ODM
-- **CORS** - Cross-origin resource sharing
-- **Body Parser** - Request body parsing
-- **Dotenv** - Environment variable management
+- **CORS** - Soporte para CORS
+- **Body Parser** - Parser de cuerpo de solicitudes
+- **Dotenv** - Gestión de variables de entorno
 
 ## Project Structure
 

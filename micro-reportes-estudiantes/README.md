@@ -1,20 +1,20 @@
 # Micro-Reportes-Estudiantes Service
 
-This microservice manages student reports and analytics.
+Microservicio para la generación de reportes y análisis de estudiantes.
 
-## Overview
+## 🎯 Descripción
 
-The **Micro-Reportes-Estudiantes** service handles all student report generation and data retrieval related to student performance and activities.
+El servicio **Micro-Reportes-Estudiantes** maneja toda la funcionalidad de generación de reportes y recuperación de datos relacionados con el desempeño y actividades de estudiantes.
 
-## Technologies
+## 🛠️ Tecnologías
 
 - **Node.js** 18+
-- **Express.js** - Web framework
-- **MongoDB** - Database
+- **Express.js** - Framework web
+- **MongoDB** - Base de datos
 - **Mongoose** - ODM
-- **CORS** - Cross-origin resource sharing
-- **Body Parser** - Request body parsing
-- **Dotenv** - Environment variable management
+- **CORS** - Soporte para CORS
+- **Body Parser** - Parser de cuerpo de solicitudes
+- **Dotenv** - Gestión de variables de entorno
 
 ## Project Structure
 

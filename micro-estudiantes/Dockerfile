@@ -2,16 +2,14 @@ FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
-# copy package manifests first for better caching
+# copy package manifests and install
 COPY package*.json ./
+RUN npm ci --only=production --silent || npm install --production --silent
 
-# install only production deps
-RUN npm install --production
-
-# copy app sources
+# copy sources
 COPY . .
 
-# default port (can be overridden at runtime)
+ENV NODE_ENV=production
 ENV PORT=5002
 EXPOSE 5002
 

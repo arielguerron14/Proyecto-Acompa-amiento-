@@ -1,17 +1,17 @@
 # API Gateway
 
-Central routing hub for the microservices architecture.
+Centro de enrutamiento central para la arquitectura de microservicios.
 
-## Overview
+## 🎯 Descripción
 
-The **API Gateway** serves as the single entry point for all client requests, routing them to the appropriate microservices and serving the frontend static files.
+El **API Gateway** actúa como punto de entrada único para todas las solicitudes de clientes, enrutándolas a los microservicios apropiados y sirviendo archivos estáticos del frontend.
 
-## Technologies
+## 🛠️ Tecnologías
 
 - **Node.js** 18+
-- **Express.js** - Web framework
-- **http-proxy-middleware** - Request proxying
-- **Dotenv** - Environment variable management
+- **Express.js** - Framework web
+- **http-proxy-middleware** - Middleware de proxy para solicitudes
+- **Dotenv** - Gestión de variables de entorno
 
 ## Project Structure
 

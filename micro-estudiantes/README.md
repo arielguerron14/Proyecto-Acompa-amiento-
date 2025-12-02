@@ -1,20 +1,20 @@
 # Micro-Estudiantes Service
 
-This microservice manages student reservations and related operations.
+Microservicio para la gestión de reservas y operaciones de estudiantes.
 
-## Overview
+## 🎯 Descripción
 
-The **Micro-Estudiantes** service handles all student-related functionality, including creating, reading, and managing reservations.
+El servicio **Micro-Estudiantes** maneja toda la funcionalidad relacionada con estudiantes, incluyendo la creación, lectura y gestión de reservas.
 
-## Technologies
+## 🛠️ Tecnologías
 
 - **Node.js** 18+
-- **Express.js** - Web framework
-- **MongoDB** - Database
+- **Express.js** - Framework web
+- **MongoDB** - Base de datos
 - **Mongoose** - ODM
-- **CORS** - Cross-origin resource sharing
-- **Body Parser** - Request body parsing
-- **Dotenv** - Environment variable management
+- **CORS** - Soporte para CORS
+- **Body Parser** - Parser de cuerpo de solicitudes
+- **Dotenv** - Gestión de variables de entorno
 
 ## Project Structure
 

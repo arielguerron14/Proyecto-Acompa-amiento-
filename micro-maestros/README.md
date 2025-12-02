@@ -1,10 +1,10 @@
 # Micro-Maestros Service
 
-This microservice manages teacher schedules and related operations.
+Microservicio para la gestión de horarios y operaciones de maestros/profesores.
 
-## Overview
+## 🎯 Descripción
 
-The **Micro-Maestros** service handles all teacher-related functionality, including creating, reading, updating, and managing schedules (horarios).
+El servicio **Micro-Maestros** maneja toda la funcionalidad relacionada con maestros, incluyendo la creación, lectura, actualización y gestión de horarios.
 
 ## Technologies
 

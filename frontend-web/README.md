@@ -1,17 +1,17 @@
 # Frontend Web
 
-Static web interface for the accompaniment platform.
+Interfaz web estática para la plataforma de acompañamiento.
 
-## Overview
+## 🎯 Descripción
 
-The **Frontend Web** service provides the user interface for interacting with the student accompaniment system. It serves static HTML, CSS, and JavaScript files.
+El servicio **Frontend Web** proporciona la interfaz de usuario para interactuar con el sistema de acompañamiento de estudiantes. Sirve archivos HTML, CSS y JavaScript estáticos.
 
-## Technologies
+## 🛠️ Tecnologías
 
-- **HTML5** - Markup structure
-- **CSS3** - Styling
-- **JavaScript** - Client-side logic
-- **HTTP Server** or **Nginx** - Static file serving
+- **HTML5** - Estructura de marcado
+- **CSS3** - Estilos
+- **JavaScript** - Lógica del lado del cliente
+- **HTTP Server** - Servidor de archivos estáticos
 
 ## Project Structure
 
