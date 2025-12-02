@@ -92,6 +92,78 @@ services:
       - proyecto-network
     restart: unless-stopped
 
+  # Microservicio: auth (NUEVO)
+  micro-auth:
+    build:
+      context: ./micro-auth
+      dockerfile: Dockerfile
+    container_name: micro-auth
+    ports:
+      - "5005:5005"
+    environment:
+      - PORT=5005
+      - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+      - REFRESH_SECRET=tu-refresh-secret-cambiar-en-produccion
+    networks:
+      - proyecto-network
+    restart: unless-stopped
+
+  # Microservicio: notificaciones (NUEVO)
+  micro-notificaciones:
+    build:
+      context: ./micro-notificaciones
+      dockerfile: Dockerfile
+    container_name: micro-notificaciones
+    ports:
+      - "5006:5006"
+    environment:
+      - PORT=5006
+      - SMTP_HOST=smtp.ethereal.email
+      - SMTP_PORT=587
+      - SMTP_USER=demo@ethereal.email
+      - SMTP_PASS=demo-password
+      - SMTP_FROM=noreply@sistema.com
+      - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+    networks:
+      - proyecto-network
+    restart: unless-stopped
+
+  # Microservicio: analytics (NUEVO)
+  micro-analytics:
+    build:
+      context: ./micro-analytics
+      dockerfile: Dockerfile
+    container_name: micro-analytics
+    ports:
+      - "5007:5007"
+    environment:
+      - PORT=5007
+      - KAFKA_ENABLED=false
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_CLIENT_ID=micro-analytics
+      - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+    networks:
+      - proyecto-network
+    restart: unless-stopped
+
+  # Microservicio: soap-bridge (NUEVO)
+  micro-soap-bridge:
+    build:
+      context: ./micro-soap-bridge
+      dockerfile: Dockerfile
+    container_name: micro-soap-bridge
+    ports:
+      - "5008:5008"
+    environment:
+      - PORT=5008
+      - SOAP_ALUMNOS_URL=http://legacy-system:8080/ws/alumnos
+      - SOAP_CALIFICACIONES_URL=http://legacy-system:8080/ws/calificaciones
+      - SOAP_ASISTENCIA_URL=http://legacy-system:8080/ws/asistencia
+      - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+    networks:
+      - proyecto-network
+    restart: unless-stopped
+
   # API Gateway
   api-gateway:
     build:
@@ -106,12 +178,20 @@ services:
       - ESTUDIANTES_URL=http://micro-estudiantes:5002
       - REPORTES_EST_URL=http://micro-reportes-estudiantes:5003
       - REPORTES_MAEST_URL=http://micro-reportes-maestros:5004
+      - AUTH_URL=http://micro-auth:5005
+      - NOTIFICACIONES_URL=http://micro-notificaciones:5006
+      - ANALYTICS_URL=http://micro-analytics:5007
+      - SOAP_URL=http://micro-soap-bridge:5008
       - FRONTEND_URL=http://frontend-web:5500
     depends_on:
       - micro-maestros
       - micro-estudiantes
       - micro-reportes-estudiantes
       - micro-reportes-maestros
+      - micro-auth
+      - micro-notificaciones
+      - micro-analytics
+      - micro-soap-bridge
       - frontend-web
     networks:
       - proyecto-network
