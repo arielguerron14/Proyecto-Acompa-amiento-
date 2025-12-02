@@ -1,0 +1,27 @@
+{
+  "name": "@proyecto/message-broker",
+  "version": "1.0.0",
+  "description": "Módulo centralizado de mensajería: Kafka (EventBus), RabbitMQ (MessageQueue), MQTT (Telemetría)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "kafka",
+    "rabbitmq",
+    "mqtt",
+    "messaging",
+    "event-bus",
+    "message-queue",
+    "telemetry"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "amqplib": "^0.10.3",
+    "mqtt": "^5.0.0",
+    "dotenv": "^16.0.3"
+  }
+}

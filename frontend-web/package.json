@@ -1,10 +1,11 @@
 {
-  "name":"frontend-web",
-  "version":"1.0.0",
+  "name": "frontend-web",
+  "version": "1.0.0",
   "scripts": {
     "start": "npx http-server ./public -p 5500"
   },
   "dependencies": {
-    "http-server":"^14.1.1"
+    "@proyecto/message-broker": "file:../message-broker",
+    "http-server": "^14.1.1"
   }
 }
