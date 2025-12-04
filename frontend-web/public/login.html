@@ -408,31 +408,45 @@
       showStatus('loginStatus', 'Validando credenciales...', 'info');
 
       try {
-        // En una aplicación real, aquí irías a un endpoint de login
-        // Por ahora, simulamos con un token JWT generado
-        const response = await fetch(`${API}/auth/verify-token`, {
+        // Generar JWT temporalmente para test
+        // En producción: enviar credenciales a /auth/login que retorna JWT
+        const testPayload = {
+          userId: 'user-' + Math.random().toString(36).substr(2, 9),
+          email: email,
+          role: email.includes('teacher') ? 'maestro' : 'estudiante',
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 3600 // 1 hora
+        };
+
+        // Crear JWT de prueba (en producción sería generado por el backend)
+        // Usando un formato simple: header.payload.signature
+        const token = btoa(JSON.stringify({alg: 'HS256', typ: 'JWT'})) + '.' + 
+                      btoa(JSON.stringify(testPayload)) + '.' + 
+                      'signature';
+
+        // Verificar el token con el servidor
+        const verifyResponse = await fetch(`${API}/auth/verify-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            password
-          })
+          body: JSON.stringify({ token })
         });
 
-        if (!response.ok) {
-          throw new Error('Credenciales inválidas');
+        if (!verifyResponse.ok) {
+          throw new Error('Token inválido');
         }
 
-        const data = await response.json();
+        const verifyData = await verifyResponse.json();
 
-        if (data.valid) {
+        if (verifyData.valid) {
+          const payload = verifyData.payload;
+
           // Guardar token en localStorage
-          localStorage.setItem('token', data.payload?.token || 'token-demo');
+          localStorage.setItem('token', token);
           localStorage.setItem('user', JSON.stringify({
-            userId: data.payload?.userId || 'user-001',
-            email: data.payload?.email || email,
-            role: data.payload?.role || 'maestro',
-            name: data.payload?.name || 'Usuario'
+            userId: payload.userId,
+            email: payload.email,
+            role: payload.role,
+            name: email.split('@')[0] // Usar parte del email como nombre
           }));
 
           showStatus('loginStatus', '✓ Bienvenido! Redirigiendo...', 'success');
@@ -447,7 +461,7 @@
             }
           }, 1500);
         } else {
-          showStatus('loginStatus', 'Email o contraseña incorrectos', 'error');
+          showStatus('loginStatus', 'Token inválido', 'error');
         }
       } catch (error) {
         showStatus('loginStatus', error.message, 'error');
@@ -473,30 +487,62 @@
         return;
       }
 
-      const userData = {
-        name,
-        email,
-        password,
-        role: userType
-      };
-
       showStatus('registerStatus', 'Creando cuenta...', 'info');
 
       try {
-        // En una aplicación real, aquí irías a un endpoint de registro
-        // Por ahora, simulamos el registro
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', 'token-demo-' + Date.now());
+        // Generar JWT para el nuevo usuario
+        const testPayload = {
+          userId: 'user-' + Math.random().toString(36).substr(2, 9),
+          email: email,
+          role: userType,
+          name: name,
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 3600 // 1 hora
+        };
 
-        showStatus('registerStatus', '✓ Cuenta creada exitosamente! Redirigiendo...', 'success');
+        // Crear JWT de prueba
+        const token = btoa(JSON.stringify({alg: 'HS256', typ: 'JWT'})) + '.' + 
+                      btoa(JSON.stringify(testPayload)) + '.' + 
+                      'signature';
 
-        setTimeout(() => {
-          if (userType === 'estudiante') {
-            window.location.href = 'estudiante.html';
-          } else {
-            window.location.href = 'index.html';
-          }
-        }, 1500);
+        // Verificar el token con el servidor
+        const verifyResponse = await fetch(`${API}/auth/verify-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+
+        if (!verifyResponse.ok) {
+          throw new Error('Error al verificar token');
+        }
+
+        const verifyData = await verifyResponse.json();
+
+        if (verifyData.valid) {
+          const payload = verifyData.payload;
+
+          // Guardar usuario y token en localStorage
+          localStorage.setItem('user', JSON.stringify({
+            userId: payload.userId,
+            email: payload.email,
+            password: password, // En producción nunca guardar contraseña
+            role: payload.role,
+            name: payload.name
+          }));
+          localStorage.setItem('token', token);
+
+          showStatus('registerStatus', '✓ Cuenta creada exitosamente! Redirigiendo...', 'success');
+
+          setTimeout(() => {
+            if (userType === 'estudiante') {
+              window.location.href = 'estudiante.html';
+            } else {
+              window.location.href = 'index.html';
+            }
+          }, 1500);
+        } else {
+          showStatus('registerStatus', 'Error al verificar el token de registro', 'error');
+        }
       } catch (error) {
         showStatus('registerStatus', 'Error al crear la cuenta: ' + error.message, 'error');
       }
