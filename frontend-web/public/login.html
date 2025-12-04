@@ -408,45 +408,30 @@
       showStatus('loginStatus', 'Validando credenciales...', 'info');
 
       try {
-        // Generar JWT temporalmente para test
-        // En producción: enviar credenciales a /auth/login que retorna JWT
-        const testPayload = {
-          userId: 'user-' + Math.random().toString(36).substr(2, 9),
-          email: email,
-          role: email.includes('teacher') ? 'maestro' : 'estudiante',
-          iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 3600 // 1 hora
-        };
-
-        // Crear JWT de prueba (en producción sería generado por el backend)
-        // Usando un formato simple: header.payload.signature
-        const token = btoa(JSON.stringify({alg: 'HS256', typ: 'JWT'})) + '.' + 
-                      btoa(JSON.stringify(testPayload)) + '.' + 
-                      'signature';
-
-        // Verificar el token con el servidor
-        const verifyResponse = await fetch(`${API}/auth/verify-token`, {
+        // Llamar al endpoint de login que genera JWT válido
+        const response = await fetch(`${API}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
+          body: JSON.stringify({
+            email,
+            password
+          })
         });
 
-        if (!verifyResponse.ok) {
-          throw new Error('Token inválido');
+        if (!response.ok) {
+          throw new Error('Credenciales inválidas');
         }
 
-        const verifyData = await verifyResponse.json();
+        const data = await response.json();
 
-        if (verifyData.valid) {
-          const payload = verifyData.payload;
-
-          // Guardar token en localStorage
-          localStorage.setItem('token', token);
+        if (data.success) {
+          // Guardar token y datos del usuario
+          localStorage.setItem('token', data.accessToken);
           localStorage.setItem('user', JSON.stringify({
-            userId: payload.userId,
-            email: payload.email,
-            role: payload.role,
-            name: email.split('@')[0] // Usar parte del email como nombre
+            userId: data.user.userId,
+            email: data.user.email,
+            role: data.user.role,
+            name: data.user.email.split('@')[0]
           }));
 
           showStatus('loginStatus', '✓ Bienvenido! Redirigiendo...', 'success');
@@ -461,7 +446,7 @@
             }
           }, 1500);
         } else {
-          showStatus('loginStatus', 'Token inválido', 'error');
+          showStatus('loginStatus', 'Error al iniciar sesión', 'error');
         }
       } catch (error) {
         showStatus('loginStatus', error.message, 'error');
@@ -490,46 +475,34 @@
       showStatus('registerStatus', 'Creando cuenta...', 'info');
 
       try {
-        // Generar JWT para el nuevo usuario
-        const testPayload = {
-          userId: 'user-' + Math.random().toString(36).substr(2, 9),
-          email: email,
-          role: userType,
-          name: name,
-          iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 3600 // 1 hora
-        };
-
-        // Crear JWT de prueba
-        const token = btoa(JSON.stringify({alg: 'HS256', typ: 'JWT'})) + '.' + 
-                      btoa(JSON.stringify(testPayload)) + '.' + 
-                      'signature';
-
-        // Verificar el token con el servidor
-        const verifyResponse = await fetch(`${API}/auth/verify-token`, {
+        // Llamar al endpoint de registro
+        const response = await fetch(`${API}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
+          body: JSON.stringify({
+            email,
+            password,
+            name,
+            role: userType
+          })
         });
 
-        if (!verifyResponse.ok) {
-          throw new Error('Error al verificar token');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Error al crear la cuenta');
         }
 
-        const verifyData = await verifyResponse.json();
+        const data = await response.json();
 
-        if (verifyData.valid) {
-          const payload = verifyData.payload;
-
-          // Guardar usuario y token en localStorage
+        if (data.success) {
+          // Guardar token y datos del usuario
+          localStorage.setItem('token', data.accessToken);
           localStorage.setItem('user', JSON.stringify({
-            userId: payload.userId,
-            email: payload.email,
-            password: password, // En producción nunca guardar contraseña
-            role: payload.role,
-            name: payload.name
+            userId: data.user.userId,
+            email: data.user.email,
+            role: data.user.role,
+            name: data.user.name
           }));
-          localStorage.setItem('token', token);
 
           showStatus('registerStatus', '✓ Cuenta creada exitosamente! Redirigiendo...', 'success');
 
@@ -541,10 +514,10 @@
             }
           }, 1500);
         } else {
-          showStatus('registerStatus', 'Error al verificar el token de registro', 'error');
+          showStatus('registerStatus', 'Error al crear la cuenta', 'error');
         }
       } catch (error) {
-        showStatus('registerStatus', 'Error al crear la cuenta: ' + error.message, 'error');
+        showStatus('registerStatus', error.message, 'error');
       }
     }
 

@@ -36,6 +36,9 @@ const MOCK_USERS = {
   },
 };
 
+// Almacenamiento temporal en memoria para nuevos usuarios
+let registeredUsers = { ...MOCK_USERS };
+
 /**
  * POST /auth/login
  * Autentica un usuario y retorna accessToken y refreshToken
@@ -48,7 +51,7 @@ router.post('/login', (req, res) => {
       return res.status(400).json({ error: 'Email y contraseña son requeridos' });
     }
 
-    const user = MOCK_USERS[email];
+    const user = registeredUsers[email];
     if (!user || user.password !== password) {
       logger.warn(`Failed login attempt for email: ${email}`);
       return res.status(401).json({ error: 'Credenciales inválidas' });
@@ -148,6 +151,64 @@ router.post('/verify-token', (req, res) => {
       valid: false,
       error: 'Invalid token',
     });
+  }
+});
+
+/**
+ * POST /auth/register
+ * Registra un nuevo usuario
+ */
+router.post('/register', (req, res) => {
+  try {
+    const { email, password, name, role } = req.body;
+
+    if (!email || !password || !name || !role) {
+      return res.status(400).json({ error: 'Email, contraseña, nombre y rol son requeridos' });
+    }
+
+    if (registeredUsers[email]) {
+      return res.status(409).json({ error: 'El email ya está registrado' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    // Crear nuevo usuario
+    const userId = role === 'estudiante' ? 'est-' + Date.now() : 'mta-' + Date.now();
+    const newUser = {
+      userId,
+      email,
+      password, // En producción: hashear con bcrypt
+      role,
+      name,
+    };
+
+    registeredUsers[email] = newUser;
+
+    const { accessToken, refreshToken, expiresIn } = AuthService.generateTokenPair(
+      userId,
+      role,
+      email
+    );
+
+    logger.info(`New user registered: ${userId} (${role})`);
+
+    res.status(201).json({
+      success: true,
+      accessToken,
+      refreshToken,
+      expiresIn,
+      user: {
+        userId,
+        email,
+        role,
+        name,
+      },
+    });
+  } catch (error) {
+    logger.error(`Registration error: ${error.message}`);
+    res.status(500).json({ error: 'Error en el proceso de registro' });
   }
 });
 
