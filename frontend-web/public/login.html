@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Acompañamiento Educativo</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .auth-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      max-width: 500px;
+      overflow: hidden;
+    }
+
+    .auth-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .auth-header h1 {
+      margin: 0;
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    .auth-header p {
+      margin: 0;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .auth-tabs {
+      display: flex;
+      border-bottom: 1px solid #eee;
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 15px;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      background: none;
+      font-size: 16px;
+      font-weight: 500;
+      color: #666;
+      transition: all 0.3s ease;
+    }
+
+    .auth-tab:hover {
+      background: #f5f5f5;
+    }
+
+    .auth-tab.active {
+      color: #667eea;
+      border-bottom: 3px solid #667eea;
+      margin-bottom: -1px;
+    }
+
+    .auth-content {
+      padding: 30px 20px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+      transition: border-color 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 10px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #667eea;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .form-toggle {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .form-toggle button {
+      background: none;
+      border: none;
+      color: #667eea;
+      cursor: pointer;
+      text-decoration: underline;
+      font-size: 14px;
+    }
+
+    .form-toggle button:hover {
+      opacity: 0.8;
+    }
+
+    .status-message {
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .status-message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+      display: block;
+    }
+
+    .status-message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: block;
+    }
+
+    .status-message.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+      display: block;
+    }
+
+    .user-type-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .user-type-btn {
+      padding: 15px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+
+    .user-type-btn:hover {
+      border-color: #667eea;
+    }
+
+    .user-type-btn.active {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    .hidden-form {
+      display: none;
+    }
+
+    .hidden-form.active {
+      display: block;
+    }
+
+    @media (max-width: 480px) {
+      .auth-container {
+        max-width: 100%;
+      }
+
+      .auth-header {
+        padding: 30px 15px;
+      }
+
+      .auth-header h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-header">
+      <h1>Acompañamiento</h1>
+      <p>Sistema de Gestión Educativa</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Iniciar Sesión</button>
+      <button class="auth-tab" onclick="switchTab('register')">Registro</button>
+    </div>
+
+    <div class="auth-content">
+      <!-- LOGIN FORM -->
+      <div id="loginForm" class="hidden-form active">
+        <div class="status-message" id="loginStatus"></div>
+
+        <form onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label for="loginUserType">¿Eres...?</label>
+            <select id="loginUserType" required>
+              <option value="">Selecciona tu rol</option>
+              <option value="estudiante">Estudiante</option>
+              <option value="maestro">Maestro</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="loginEmail">Email</label>
+            <input
+              type="email"
+              id="loginEmail"
+              placeholder="tu@email.com"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="loginPassword">Contraseña</label>
+            <input
+              type="password"
+              id="loginPassword"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+        </form>
+
+        <div class="form-toggle">
+          <p>¿No tienes cuenta? <button onclick="switchTab('register')">Regístrate aquí</button></p>
+        </div>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <div id="registerForm" class="hidden-form">
+        <div class="status-message" id="registerStatus"></div>
+
+        <form onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label>¿Qué tipo de usuario eres?</label>
+            <div class="user-type-selector">
+              <button
+                type="button"
+                class="user-type-btn active"
+                onclick="selectUserType('estudiante')"
+                data-type="estudiante"
+              >
+                👨‍🎓 Estudiante
+              </button>
+              <button
+                type="button"
+                class="user-type-btn"
+                onclick="selectUserType('maestro')"
+                data-type="maestro"
+              >
+                👨‍🏫 Maestro
+              </button>
+            </div>
+            <input type="hidden" id="registerUserType" value="estudiante" />
+          </div>
+
+          <div class="form-group">
+            <label for="registerName">Nombre Completo</label>
+            <input
+              type="text"
+              id="registerName"
+              placeholder="Juan Pérez"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="registerEmail">Email</label>
+            <input
+              type="email"
+              id="registerEmail"
+              placeholder="tu@email.com"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="registerPassword">Contraseña</label>
+            <input
+              type="password"
+              id="registerPassword"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="registerPasswordConfirm">Confirmar Contraseña</label>
+            <input
+              type="password"
+              id="registerPasswordConfirm"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <!-- Campos específicos para estudiantes -->
+          <div id="estudianteFields" class="hidden-form active">
+            <div class="form-group">
+              <label for="registerMatricula">Matrícula</label>
+              <input
+                type="text"
+                id="registerMatricula"
+                placeholder="Ej. EST-2024-001"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="registerSemestre">Semestre</label>
+              <select id="registerSemestre">
+                <option value="">Selecciona semestre</option>
+                <option value="1">Primer Semestre</option>
+                <option value="2">Segundo Semestre</option>
+                <option value="3">Tercer Semestre</option>
+                <option value="4">Cuarto Semestre</option>
+                <option value="5">Quinto Semestre</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Campos específicos para maestros -->
+          <div id="maestroFields" class="hidden-form">
+            <div class="form-group">
+              <label for="registerDepartamento">Departamento/Área</label>
+              <input
+                type="text"
+                id="registerDepartamento"
+                placeholder="Ej. Matemáticas"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="registerMateria">Materia Principal</label>
+              <input
+                type="text"
+                id="registerMateria"
+                placeholder="Ej. Cálculo I"
+              />
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Crear Cuenta</button>
+        </form>
+
+        <div class="form-toggle">
+          <p>¿Ya tienes cuenta? <button onclick="switchTab('login')">Inicia sesión</button></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:8080';
+
+    function switchTab(tab) {
+      document.getElementById('loginForm').classList.remove('active');
+      document.getElementById('registerForm').classList.remove('active');
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+
+      if (tab === 'login') {
+        document.getElementById('loginForm').classList.add('active');
+        document.querySelectorAll('.auth-tab')[0].classList.add('active');
+      } else {
+        document.getElementById('registerForm').classList.add('active');
+        document.querySelectorAll('.auth-tab')[1].classList.add('active');
+      }
+    }
+
+    function selectUserType(type) {
+      document.getElementById('registerUserType').value = type;
+      document.querySelectorAll('.user-type-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelector(`[data-type="${type}"]`).classList.add('active');
+
+      if (type === 'estudiante') {
+        document.getElementById('estudianteFields').classList.add('active');
+        document.getElementById('maestroFields').classList.remove('active');
+      } else {
+        document.getElementById('estudianteFields').classList.remove('active');
+        document.getElementById('maestroFields').classList.add('active');
+      }
+    }
+
+    function showStatus(elementId, message, type) {
+      const el = document.getElementById(elementId);
+      el.textContent = message;
+      el.className = `status-message ${type}`;
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      const role = document.getElementById('loginUserType').value;
+
+      showStatus('loginStatus', 'Validando credenciales...', 'info');
+
+      try {
+        // En una aplicación real, aquí irías a un endpoint de login
+        // Por ahora, simulamos con un token JWT generado
+        const response = await fetch(`${API}/auth/verify-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            role
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Credenciales inválidas');
+        }
+
+        const data = await response.json();
+
+        if (data.valid) {
+          // Guardar token en localStorage
+          localStorage.setItem('token', data.payload?.token || 'token-demo');
+          localStorage.setItem('user', JSON.stringify({
+            userId: data.payload?.userId || 'user-001',
+            email: data.payload?.email || email,
+            role: data.payload?.role || role,
+            name: data.payload?.name || 'Usuario'
+          }));
+
+          showStatus('loginStatus', '✓ Bienvenido! Redirigiendo...', 'success');
+
+          // Redirigir después de 1.5 segundos
+          setTimeout(() => {
+            if (role === 'estudiante') {
+              window.location.href = 'estudiante.html';
+            } else {
+              window.location.href = 'index.html';
+            }
+          }, 1500);
+        } else {
+          showStatus('loginStatus', 'Email o contraseña incorrectos', 'error');
+        }
+      } catch (error) {
+        showStatus('loginStatus', error.message, 'error');
+      }
+    }
+
+    async function handleRegister(event) {
+      event.preventDefault();
+
+      const name = document.getElementById('registerName').value;
+      const email = document.getElementById('registerEmail').value;
+      const password = document.getElementById('registerPassword').value;
+      const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+      const userType = document.getElementById('registerUserType').value;
+
+      if (password !== passwordConfirm) {
+        showStatus('registerStatus', 'Las contraseñas no coinciden', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        showStatus('registerStatus', 'La contraseña debe tener al menos 6 caracteres', 'error');
+        return;
+      }
+
+      const userData = {
+        name,
+        email,
+        password,
+        role: userType
+      };
+
+      if (userType === 'estudiante') {
+        userData.matricula = document.getElementById('registerMatricula').value;
+        userData.semestre = document.getElementById('registerSemestre').value;
+      } else {
+        userData.departamento = document.getElementById('registerDepartamento').value;
+        userData.materia = document.getElementById('registerMateria').value;
+      }
+
+      showStatus('registerStatus', 'Creando cuenta...', 'info');
+
+      try {
+        // En una aplicación real, aquí irías a un endpoint de registro
+        // Por ahora, simulamos el registro
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('token', 'token-demo-' + Date.now());
+
+        showStatus('registerStatus', '✓ Cuenta creada exitosamente! Redirigiendo...', 'success');
+
+        setTimeout(() => {
+          if (userType === 'estudiante') {
+            window.location.href = 'estudiante.html';
+          } else {
+            window.location.href = 'index.html';
+          }
+        }, 1500);
+      } catch (error) {
+        showStatus('registerStatus', 'Error al crear la cuenta: ' + error.message, 'error');
+      }
+    }
+
+    // Verificar si el usuario ya está logueado
+    window.addEventListener('load', () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.role === 'estudiante') {
+          window.location.href = 'estudiante.html';
+        } else {
+          window.location.href = 'index.html';
+        }
+      }
+    });
+  </script>
+</body>
+</html>
