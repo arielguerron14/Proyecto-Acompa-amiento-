@@ -255,15 +255,6 @@
 
         <form onsubmit="handleLogin(event)">
           <div class="form-group">
-            <label for="loginUserType">¿Eres...?</label>
-            <select id="loginUserType" required>
-              <option value="">Selecciona tu rol</option>
-              <option value="estudiante">Estudiante</option>
-              <option value="maestro">Maestro</option>
-            </select>
-          </div>
-
-          <div class="form-group">
             <label for="loginEmail">Email</label>
             <input
               type="email"
@@ -359,51 +350,6 @@
             />
           </div>
 
-          <!-- Campos específicos para estudiantes -->
-          <div id="estudianteFields" class="hidden-form active">
-            <div class="form-group">
-              <label for="registerMatricula">Matrícula</label>
-              <input
-                type="text"
-                id="registerMatricula"
-                placeholder="Ej. EST-2024-001"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="registerSemestre">Semestre</label>
-              <select id="registerSemestre">
-                <option value="">Selecciona semestre</option>
-                <option value="1">Primer Semestre</option>
-                <option value="2">Segundo Semestre</option>
-                <option value="3">Tercer Semestre</option>
-                <option value="4">Cuarto Semestre</option>
-                <option value="5">Quinto Semestre</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Campos específicos para maestros -->
-          <div id="maestroFields" class="hidden-form">
-            <div class="form-group">
-              <label for="registerDepartamento">Departamento/Área</label>
-              <input
-                type="text"
-                id="registerDepartamento"
-                placeholder="Ej. Matemáticas"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="registerMateria">Materia Principal</label>
-              <input
-                type="text"
-                id="registerMateria"
-                placeholder="Ej. Cálculo I"
-              />
-            </div>
-          </div>
-
           <button type="submit" class="btn btn-primary">Crear Cuenta</button>
         </form>
 
@@ -458,7 +404,6 @@
 
       const email = document.getElementById('loginEmail').value;
       const password = document.getElementById('loginPassword').value;
-      const role = document.getElementById('loginUserType').value;
 
       showStatus('loginStatus', 'Validando credenciales...', 'info');
 
@@ -470,8 +415,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email,
-            password,
-            role
+            password
           })
         });
 
@@ -487,7 +431,7 @@
           localStorage.setItem('user', JSON.stringify({
             userId: data.payload?.userId || 'user-001',
             email: data.payload?.email || email,
-            role: data.payload?.role || role,
+            role: data.payload?.role || 'maestro',
             name: data.payload?.name || 'Usuario'
           }));
 
@@ -495,7 +439,8 @@
 
           // Redirigir después de 1.5 segundos
           setTimeout(() => {
-            if (role === 'estudiante') {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.role === 'estudiante') {
               window.location.href = 'estudiante.html';
             } else {
               window.location.href = 'index.html';
@@ -534,14 +479,6 @@
         password,
         role: userType
       };
-
-      if (userType === 'estudiante') {
-        userData.matricula = document.getElementById('registerMatricula').value;
-        userData.semestre = document.getElementById('registerSemestre').value;
-      } else {
-        userData.departamento = document.getElementById('registerDepartamento').value;
-        userData.materia = document.getElementById('registerMateria').value;
-      }
 
       showStatus('registerStatus', 'Creando cuenta...', 'info');
 
