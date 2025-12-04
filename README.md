@@ -133,9 +133,6 @@ MONGO_URI=mongodb://localhost:27017/nombre_db
 PORT=5001  # Varía según el servicio
 ```
 
-### API Gateway
-```env
-PORT=8080
 MAESTROS_URL=http://localhost:5001
 ESTUDIANTES_URL=http://localhost:5002
 REPORTES_EST_URL=http://localhost:5003
@@ -149,17 +146,9 @@ FRONTEND_URL=http://localhost:5500
 # Ver estado de contenedores
 docker-compose ps
 
-# Ver logs de un servicio específico
-docker-compose logs -f api-gateway
 
 # Reiniciar todos los servicios
-docker-compose restart
-
-# Detener todo
 docker-compose down
-
-# Detener y eliminar volúmenes de datos
-docker-compose down -v
 
 # Ejecutar un comando dentro de un contenedor
 docker-compose exec api-gateway npm test

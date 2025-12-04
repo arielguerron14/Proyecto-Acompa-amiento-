@@ -4,7 +4,7 @@ Centro de enrutamiento central para la arquitectura de microservicios.
 
 ## 🎯 Descripción
 
-El **API Gateway** actúa como punto de entrada único para todas las solicitudes de clientes, enrutándolas a los microservicios apropiados y sirviendo archivos estáticos del frontend.
+El **API Gateway** actúa como punto de entrada único (single entry point) para todas las solicitudes de clientes, enrutándolas a los microservicios apropiados y sirviendo archivos estáticos del frontend. Implementa autenticación centralizada y manejo de CORS.
 
 ## 🛠️ Tecnologías
 
@@ -12,149 +12,227 @@ El **API Gateway** actúa como punto de entrada único para todas las solicitude
 - **Express.js** - Framework web
 - **http-proxy-middleware** - Middleware de proxy para solicitudes
 - **Dotenv** - Gestión de variables de entorno
+- **CORS** - Soporte para múltiples orígenes
 
-## Project Structure
+## 📁 Estructura del Proyecto
 
 ```
 api-gateway/
-├── server.js                   # Main gateway server
-├── Dockerfile                  # Docker image definition
-├── .dockerignore               # Docker build exclusions
-├── package.json                # Dependencies
-└── README.md                   # This file
+├── server.js                   # Configuración del gateway
+├── Dockerfile                  # Imagen Docker
+├── .dockerignore               # Exclusiones build
+├── package.json                # Dependencias
+└── README.md                   # Este archivo
+```
+
+## 🏗️ Arquitectura
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  Cliente Web / Móvil                 │
+│             (navegador, app, API)                    │
+└─────────────────────────┬────────────────────────────┘
+                          │ http/https
+        ┌─────────────────▼────────────────────┐
+        │    API Gateway (puerto 8080)         │
+        │  - Autenticación                     │
+        │  - Enrutamiento                      │
+        │  - Rate limiting                     │
+        │  - CORS                              │
+        └─┬────────┬───────────┬──────────┬────┘
+          │        │           │          │
+  ┌───────▼─┐  ┌──▼────────┐ ┌▼────────┐ │
+  │Frontend  │  │Maestros   │ │Estudiantes │
+  │(5500)    │  │(5001)     │ │(5002)    │
+  └──────────┘  └───────────┘ └──────────┘
 ```
 
 ## Installation
 
 ### Prerequisites
 
-- Node.js 18+ or Docker
-- Running microservices on the configured URLs
+- Node.js 18+ o Docker
+- Microservicios corriendo en los puertos configurados
 
 ### Local Setup
 
 ```bash
-# Install dependencies
+# Instalar dependencias
 npm install
 
-# Set environment variables (create .env file)
+# Establecer variables de entorno (crear archivo .env)
 PORT=8080
 MAESTROS_URL=http://localhost:5001
 ESTUDIANTES_URL=http://localhost:5002
 REPORTES_EST_URL=http://localhost:5003
 REPORTES_MAEST_URL=http://localhost:5004
+AUTH_URL=http://localhost:5005
+NOTIFICACIONES_URL=http://localhost:5006
+ANALYTICS_URL=http://localhost:5007
+SOAP_BRIDGE_URL=http://localhost:5008
 FRONTEND_URL=http://localhost:5500
 
-# Run the gateway
+# Ejecutar el gateway
 npm start
+
+# El gateway estará disponible en http://localhost:8080
 ```
 
 ### Docker Setup
 
 ```bash
-# Build the image
+# Construir la imagen
 docker build -t api-gateway:local .
 
-# Run the container (ensure microservices are accessible)
+# Ejecutar el contenedor
 docker run -d \
   --name api-gateway \
   -p 8080:8080 \
-  -e MAESTROS_URL=http://host.docker.internal:5001 \
-  -e ESTUDIANTES_URL=http://host.docker.internal:5002 \
-  -e REPORTES_EST_URL=http://host.docker.internal:5003 \
-  -e REPORTES_MAEST_URL=http://host.docker.internal:5004 \
+  -e MAESTROS_URL=http://micro-maestros:5001 \
+  -e ESTUDIANTES_URL=http://micro-estudiantes:5002 \
+  -e REPORTES_EST_URL=http://micro-reportes-estudiantes:5003 \
+  -e REPORTES_MAEST_URL=http://micro-reportes-maestros:5004 \
+  -e AUTH_URL=http://micro-auth:5005 \
+  -e NOTIFICACIONES_URL=http://micro-notificaciones:5006 \
+  -e ANALYTICS_URL=http://micro-analytics:5007 \
+  -e SOAP_BRIDGE_URL=http://micro-soap-bridge:5008 \
+  -e FRONTEND_URL=http://frontend-web:5500 \
   api-gateway:local
 ```
 
-## API Routes
+## 📡 Rutas del Gateway
 
-The gateway proxies requests to microservices and serves the frontend:
+### Frontend (Archivos Estáticos)
 
-### Microservice Routes
+| Ruta | Destino | Descripción |
+|------|---------|-------------|
+| `/` | Frontend Static Files | Página de inicio |
+| `/estudiante.html` | Frontend Static Files | Interfaz estudiante |
+| `/styles.css` | Frontend Static Files | Estilos |
+| `/*.js` | Frontend Static Files | JavaScript |
 
-| Route | Target | Port |
-|-------|--------|------|
-| `/maestros/*` | Micro-Maestros | 5001 |
-| `/estudiantes/*` | Micro-Estudiantes | 5002 |
-| `/reportes/estudiantes/*` | Micro-Reportes-Estudiantes | 5003 |
-| `/reportes/maestros/*` | Micro-Reportes-Maestros | 5004 |
-| `/` | Frontend Static Files (from `../frontend-web/public`) | - |
+### Microservicios
 
-### Examples
+| Ruta | Destino | Puerto |
+|------|---------|--------|
+| `/maestros/*` | micro-maestros | 5001 |
+| `/estudiantes/*` | micro-estudiantes | 5002 |
+| `/reportes/estudiantes/*` | micro-reportes-estudiantes | 5003 |
+| `/reportes/maestros/*` | micro-reportes-maestros | 5004 |
+| `/auth/*` | micro-auth | 5005 |
+| `/notificaciones/*` | micro-notificaciones | 5006 |
+| `/analytics/*` | micro-analytics | 5007 |
+| `/soap/*` | micro-soap-bridge | 5008 |
+
+## 🧪 Testing con cURL
 
 ```bash
-# Teachers schedules
+# Health check del gateway
+curl http://localhost:8080/
+
+# Obtener horarios (maestros)
 curl http://localhost:8080/maestros/horarios
 
-# Student reservations
+# Obtener reservas (estudiantes)
 curl http://localhost:8080/estudiantes/reservas
 
-# Student reports
-curl http://localhost:8080/reportes/estudiantes
+# Crear horario
+curl -X POST http://localhost:8080/maestros/horarios \
+  -H "Content-Type: application/json" \
+  -d '{
+    "maestroId": "MAE-001",
+    "diaSemana": "lunes",
+    "horaInicio": "09:00",
+    "horaFin": "10:00",
+    "aula": "Aula 101"
+  }'
 
-# Teacher reports
-curl http://localhost:8080/reportes/maestros
+# Crear reserva
+curl -X POST http://localhost:8080/estudiantes/reservas \
+  -H "Content-Type: application/json" \
+  -d '{
+    "estudianteId": "EST-001",
+    "horarioId": "HORARIO-001"
+  }'
 
-# Frontend
-curl http://localhost:8080/
+# Obtener estadísticas
+curl "http://localhost:8080/analytics/stats?period=7d"
+
+# Verificar token de autenticación
+curl -X POST http://localhost:8080/auth/verify-token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "eyJhbGc..."
+  }'
 ```
+
+## 🔄 Orden de Inicialización Recomendado
+
+Para evitar errores de conexión, iniciar en este orden:
+
+1. **Infraestructura**: MongoDB, Kafka, Zookeeper, RabbitMQ, MQTT
+2. **Microservicios base**: micro-maestros, micro-estudiantes, micro-reportes-*
+3. **Microservicios auxiliares**: micro-auth, micro-notificaciones, micro-analytics
+4. **API Gateway**
+5. **Frontend Web**
+
+```bash
+# Con Docker Compose (hace todo automáticamente)
+docker-compose up -d
+
+# Verificar estado
+docker-compose ps
+```
+
+## ✅ Health Checks
+
+```bash
+# Verificar que el gateway está activo
+curl -i http://localhost:8080/
+
+# Debería responder con 200 OK
+# HTTP/1.1 200 OK
+```
+
+## 🔐 Consideraciones de Seguridad
+
+- ✅ CORS habilitado para desarrollo
+- ⚠️ En producción: Configurar CORS específico
+- ⚠️ En producción: Agregar Rate Limiting
+- ⚠️ En producción: Usar HTTPS/TLS
 
 ## Environment Variables
 
-| Variable | Description | Default |
+| Variable | Descripción | Ejemplo |
 |----------|-------------|---------|
-| `PORT` | Gateway port | `8080` |
-| `MAESTROS_URL` | Teachers microservice URL | `http://localhost:5001` |
-| `ESTUDIANTES_URL` | Students microservice URL | `http://localhost:5002` |
-| `REPORTES_EST_URL` | Student reports microservice URL | `http://localhost:5003` |
-| `REPORTES_MAEST_URL` | Teacher reports microservice URL | `http://localhost:5004` |
-| `FRONTEND_URL` | Frontend service URL (if proxying) | `http://localhost:5500` |
+| `PORT` | Puerto del gateway | `8080` |
+| `MAESTROS_URL` | URL de micro-maestros | `http://micro-maestros:5001` |
+| `ESTUDIANTES_URL` | URL de micro-estudiantes | `http://micro-estudiantes:5002` |
+| `REPORTES_EST_URL` | URL de reportes estudiantes | `http://micro-reportes-estudiantes:5003` |
+| `REPORTES_MAEST_URL` | URL de reportes maestros | `http://micro-reportes-maestros:5004` |
+| `AUTH_URL` | URL de autenticación | `http://micro-auth:5005` |
+| `NOTIFICACIONES_URL` | URL de notificaciones | `http://micro-notificaciones:5006` |
+| `ANALYTICS_URL` | URL de analytics | `http://micro-analytics:5007` |
+| `SOAP_BRIDGE_URL` | URL del puente SOAP | `http://micro-soap-bridge:5008` |
+| `FRONTEND_URL` | URL del frontend | `http://frontend-web:5500` |
 
-## Features
+## 📊 Monitoreo
 
-- **Request Routing**: Automatically routes to appropriate microservices
-- **Static File Serving**: Serves frontend from `../frontend-web/public`
-- **CORS Handling**: Manages cross-origin requests
-- **Path Rewriting**: Cleans up URLs before forwarding to microservices
+- Logs en tiempo real: `docker-compose logs -f api-gateway`
+- Verificar rutas: `curl -v http://localhost:8080/maestros/horarios`
+- Dashboard Kafka: http://localhost:8081
 
-## Deployment
+## 🚀 Performance
 
-### Using Docker Compose
+- **Connection Pooling**: Habilitado por defecto
+- **Timeout**: 30s (configurable)
+- **Buffer**: 16MB (configurable)
 
-See the root `README.md` for instructions on deploying the entire stack.
+Para ajustar en producción, editar `server.js`:
 
-### Standalone Docker
-
-```bash
-docker build -t api-gateway:1.0.0 .
-docker run -d --name api-gateway -p 8080:8080 api-gateway:1.0.0
+```javascript
+const gateway = createProxyMiddleware({
+  timeout: 60000,  // 60 segundos
+  maxBodySize: '50mb'
+});
 ```
-
-## Testing the Gateway
-
-```bash
-# Health check (returns frontend HTML)
-curl http://localhost:8080/
-
-# Test a microservice route
-curl http://localhost:8080/maestros/horarios
-
-# Create a new resource (example)
-curl -X POST http://localhost:8080/maestros/horarios \
-  -H "Content-Type: application/json" \
-  -d '{"nombre":"Horario 1"}'
-```
-
-## Troubleshooting
-
-- **502 Bad Gateway**: Check that all microservices are running on their configured URLs
-- **Port already in use**: Change the `PORT` environment variable or kill the process using port 8080
-- **Frontend not loading**: Verify `../frontend-web/public` path exists relative to the gateway
-
-## License
-
-MIT
-
-## Support
-
-For issues or questions, please contact the development team.

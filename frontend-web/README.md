@@ -1,171 +1,255 @@
 # Frontend Web
 
-Interfaz web estática para la plataforma de acompañamiento.
+Interfaz web estática para la plataforma de acompañamiento educativo.
 
 ## 🎯 Descripción
 
-El servicio **Frontend Web** proporciona la interfaz de usuario para interactuar con el sistema de acompañamiento de estudiantes. Sirve archivos HTML, CSS y JavaScript estáticos.
+El servicio **Frontend Web** proporciona la interfaz de usuario para interactuar con el sistema de acompañamiento de estudiantes. Sirve archivos HTML, CSS y JavaScript estáticos desde un servidor HTTP.
 
 ## 🛠️ Tecnologías
 
 - **HTML5** - Estructura de marcado
-- **CSS3** - Estilos
-- **JavaScript** - Lógica del lado del cliente
-- **HTTP Server** - Servidor de archivos estáticos
+- **CSS3** - Estilos y diseño responsive
+- **JavaScript (Vanilla)** - Lógica del lado del cliente
+- **HTTP Server** - Servidor de archivos estáticos (Node.js o Nginx)
 
-## Project Structure
+## 📁 Estructura del Proyecto
 
 ```
 frontend-web/
 ├── public/
-│   ├── index.html              # Main landing page
-│   ├── estudiante.html         # Student interface
-│   ├── styles.css              # Global styles
-│   └── curriculum.js           # Curriculum data/utilities
+│   ├── index.html              # Página de inicio
+│   ├── estudiante.html         # Interfaz de estudiante
+│   ├── maestro.html            # Interfaz de maestro (futuro)
+│   ├── styles.css              # Estilos globales
+│   ├── curriculum.js           # Datos/utilidades de currículo
+│   └── images/                 # Imágenes
 ├── src/
-│   ├── estudiante.js           # Student page logic
-│   └── maestro.js              # Teacher page logic
+│   ├── estudiante.js           # Lógica de página estudiante
+│   ├── maestro.js              # Lógica de página maestro
+│   └── common.js               # Lógica compartida
 ├── styles/
-│   └── styles.css              # Additional styles
-├── Dockerfile                  # Docker image definition (nginx)
-├── .dockerignore               # Docker build exclusions
-├── package.json                # Dependencies (http-server)
-└── README.md                   # This file
+│   ├── styles.css              # Estilos adicionales
+│   └── responsive.css          # Media queries
+├── Dockerfile                  # Imagen Docker (nginx)
+├── .dockerignore               # Exclusiones build
+├── package.json                # Dependencias (http-server)
+└── README.md                   # Este archivo
 ```
 
 ## Installation
 
 ### Prerequisites
 
-- Node.js 18+ (for local development with http-server) or Docker
+- Node.js 18+ (para desarrollo con http-server) o Docker
 
-### Local Setup with HTTP Server
+### Local Setup con HTTP Server
 
 ```bash
-# Install dependencies
+# Instalar dependencias
 npm install
 
-# Run the development server on port 5500
+# Ejecutar servidor de desarrollo en puerto 5500
 npm start
+
+# El frontend estará disponible en http://localhost:5500
 ```
 
-Access the application at `http://localhost:5500`
-
-### Docker Setup with Nginx
+### Docker Setup (Nginx - Recomendado)
 
 ```bash
-# Build the image
+# Construir la imagen
 docker build -t frontend-web:local .
 
-# Run the container (serves on port 80)
+# Ejecutar el contenedor
 docker run -d \
   --name frontend-web \
   -p 5500:80 \
   frontend-web:local
 ```
 
-Access the application at `http://localhost:5500`
-
-## Pages
+## 🎨 Páginas Disponibles
 
 ### index.html
-Main landing page with navigation and overview.
-
-**Available from:**
-- Local: `http://localhost:5500/index.html`
-- Via Gateway: `http://localhost:8080/index.html`
+Página de inicio con:
+- Presentación de la plataforma
+- Links de navegación a estudiantes y maestros
+- Información general
 
 ### estudiante.html
-Student-facing interface for managing reservations and viewing reports.
+Interfaz de estudiante con:
+- Visualización de horarios disponibles
+- Creación de reservas
+- Listado de mis reservas
+- Visualización de reportes personales
 
-**Available from:**
-- Local: `http://localhost:5500/estudiante.html`
-- Via Gateway: `http://localhost:8080/estudiante.html`
+### maestro.html (Futuro)
+Interfaz de maestro con:
+- Gestión de horarios
+- Visualización de reservas
+- Reportes de estudiantes
 
-## API Integration
+## 🔗 API Endpoints Consumidos
 
-The frontend communicates with the API Gateway at port `8080`:
-
-- **Teachers Schedules**: `GET http://localhost:8080/maestros/horarios`
-- **Student Reservations**: `GET http://localhost:8080/estudiantes/reservas`
-- **Student Reports**: `GET http://localhost:8080/reportes/estudiantes`
-- **Teacher Reports**: `GET http://localhost:8080/reportes/maestros`
-
-### Example API Call
+El frontend se comunica con el API Gateway en `http://localhost:8080`:
 
 ```javascript
-// From browser console
+// Maestros
+GET  /maestros/horarios              // Obtener horarios
+POST /maestros/horarios              // Crear horario
+DELETE /maestros/horarios/:id        // Eliminar horario
+
+// Estudiantes
+GET  /estudiantes/reservas           // Obtener mis reservas
+POST /estudiantes/reservas           // Crear reserva
+DELETE /estudiantes/reservas/:id     // Cancelar reserva
+
+// Reportes
+GET  /reportes/estudiantes           // Mi reporte
+GET  /reportes/maestros              // Reportes (maestros)
+```
+
+## 🚀 Funcionalidades Principales
+
+### Estudiante - Crear Reserva
+```javascript
+// src/estudiante.js
+async function crearReserva(horarioId) {
+  const response = await fetch(
+    'http://localhost:8080/estudiantes/reservas',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        estudianteId: localStorage.getItem('userId'),
+        horarioId: horarioId
+      })
+    }
+  );
+  return response.json();
+}
+```
+
+### Estudiante - Listar Reservas
+```javascript
+async function obtenerReservas() {
+  const response = await fetch(
+    'http://localhost:8080/estudiantes/reservas'
+  );
+  return response.json();
+}
+```
+
+## 🎯 Variables Globales
+
+**localStorage:**
+```javascript
+localStorage.userId        // ID del usuario actual
+localStorage.userRole      // Rol del usuario (estudiante/maestro)
+localStorage.userEmail     // Email del usuario
+```
+
+## 📱 Responsive Design
+
+- **Mobile First** - Diseño adaptable
+- **Breakpoints:**
+  - `mobile`: < 768px
+  - `tablet`: 768px - 1024px
+  - `desktop`: > 1024px
+
+## 🔧 Configuración
+
+### Variables de Entorno (en Dockerfile)
+
+```dockerfile
+ENV API_GATEWAY_URL=http://api-gateway:8080
+ENV PORT=5500
+```
+
+### Para modificar URL del API Gateway
+
+Editar en `public/index.html` o `src/common.js`:
+
+```javascript
+const API_GATEWAY = 'http://localhost:8080';
+```
+
+## 📦 Dependencies
+
+```json
+{
+  "http-server": "^14.1.1"
+}
+```
+
+## ⚡ Desarrollo
+
+### Modo desarrollo con hot-reload (opcional)
+
+```bash
+# Con nodemon (requiere instalación global)
+npx nodemon -e "html,css,js" --exec "npm start"
+```
+
+### Browser DevTools
+
+Abrir: **F12** o **Ctrl+Shift+I**
+
+### Debugging
+
+```javascript
+// En consola del navegador
+console.log('Datos:', data);
 fetch('http://localhost:8080/maestros/horarios')
-  .then(res => res.json())
-  .then(data => console.log(data))
-  .catch(err => console.error(err));
+  .then(r => r.json())
+  .then(data => console.table(data))
 ```
 
-## Environment
+## 🔒 Seguridad
 
-The frontend is entirely client-side and requires no environment variables. Configure API endpoints in the JavaScript files as needed.
+- ✅ CORS habilitado (API Gateway maneja)
+- ✅ Tokens almacenados en localStorage (en desarrollo)
+- ⚠️ IMPORTANTE: En producción usar httpOnly cookies
 
-## Development
+## 📊 Testing
 
-### Structure
+Para probar endpoints desde la consola:
 
-- **`public/`**: Files served directly to clients
-- **`src/`**: JavaScript logic for different pages
-- **`styles/`**: CSS stylesheets
+```javascript
+// Test: Obtener horarios
+fetch('http://localhost:8080/maestros/horarios')
+  .then(r => r.json())
+  .then(console.log)
 
-### Browser Developer Tools
+// Test: Crear reserva
+fetch('http://localhost:8080/estudiantes/reservas', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    estudianteId: 'EST-001',
+    horarioId: 'HORARIO-001'
+  })
+}).then(r => r.json()).then(console.log)
+```
 
-Open DevTools (F12) to:
-- Inspect Network requests to the API Gateway
-- Debug JavaScript
-- Check Console for errors
+## 🌐 URLs de Acceso
 
-## Deployment
+- **Frontend**: http://localhost:5500
+- **API Gateway**: http://localhost:8080
+- **Kafka UI**: http://localhost:8081
+- **MongoDB**: mongodb://localhost:27017
 
-### Using Docker Compose
-
-See the root `README.md` for instructions on deploying the entire stack.
-
-### Standalone Docker (Nginx)
+## 📝 Build para Producción
 
 ```bash
-docker build -t frontend-web:1.0.0 .
-docker run -d --name frontend-web -p 5500:80 frontend-web:1.0.0
+# No requiere build (es estático)
+# Solo copiar archivos de public/ al servidor
 ```
 
-### Standalone (HTTP Server)
+## 🐳 Docker Multi-stage Build
 
-```bash
-npm install
-npm start
+```dockerfile
+# Stage 1: Copy static files
+FROM nginx:alpine
+COPY public/ /usr/share/nginx/html/
 ```
-
-## Testing
-
-Access the frontend and check:
-- [ ] Main page loads (`/`)
-- [ ] Student page loads (`/estudiante.html`)
-- [ ] Styles are applied correctly
-- [ ] Console has no errors
-- [ ] API calls from browser reach the gateway
-
-### Example Test
-
-```bash
-curl -s http://localhost:5500/index.html | head -20
-```
-
-## Troubleshooting
-
-- **404 Not Found**: Ensure files are in the `public/` directory
-- **Port already in use**: Change the port in `npm start` or use Docker
-- **API calls failing**: Verify the API Gateway is running on `http://localhost:8080`
-- **CORS errors**: Check API Gateway CORS configuration
-
-## License
-
-MIT
-
-## Support
-
-For issues or questions, please contact the development team.

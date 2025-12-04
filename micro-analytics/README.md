@@ -2,18 +2,49 @@
 
 Microservicio de analytics: Kafka consumer para procesamiento de eventos en tiempo real.
 
-## Características
+## 🎯 Descripción
+
+El servicio **micro-analytics** actúa como consumidor de Kafka para procesar eventos en tiempo real, generar estadísticas agregadas y proporcionar dashboards de analytics para toda la plataforma.
+
+## ✨ Características
+
 - ✅ Kafka consumer para consumir eventos
 - ✅ Almacenamiento de eventos
-- ✅ Estadísticas agregadas
+- ✅ Estadísticas agregadas en tiempo real
 - ✅ Generación de reportes
 - ✅ Integración con shared-auth
-- ✅ Health check
+- ✅ Health check / Ping
 
-## API Endpoints
+## 🛠️ Tecnologías
 
-### `GET /analytics/events`
-Retorna los eventos registrados.
+- **Node.js** 18+
+- **Express.js** - Framework web
+- **Apache Kafka** - Event streaming
+- **Dotenv** - Gestión de variables de entorno
+
+## 📁 Estructura del Proyecto
+
+```
+micro-analytics/
+├── src/
+│   ├── app.js                      # Express app setup (standardized)
+│   ├── controllers/
+│   │   └── analyticsController.js  # HTTP handlers
+│   ├── routes/
+│   │   └── analyticsRoutes.js      # Rutas HTTP
+│   ├── kafka/
+│   │   └── consumer.js             # Kafka consumer
+├── Dockerfile                  # Imagen Docker
+├── .dockerignore               # Exclusiones build
+├── package.json                # Dependencias
+└── README.md                   # Este archivo
+```
+
+## 📡 API Endpoints
+
+### Obtener Eventos
+
+- `GET /analytics/events` - Retorna los eventos registrados
 
 **Query Parameters:**
 - `limit` - Número de eventos a retornar (default: 50)
@@ -37,11 +68,12 @@ Retorna los eventos registrados.
 }
 ```
 
-### `GET /analytics/stats`
-Retorna estadísticas agregadas.
+### Obtener Estadísticas
+
+- `GET /analytics/stats` - Retorna estadísticas agregadas
 
 **Query Parameters:**
-- `period` - Período de tiempo (default: 7d)
+- `period` - Período de tiempo (default: 7d, opciones: 1d, 7d, 30d)
 
 **Response:**
 ```json
@@ -49,68 +81,133 @@ Retorna estadísticas agregadas.
   "success": true,
   "period": "7d",
   "stats": {
-    "totalEvents": 125,
+    "totalEvents": 1250,
     "eventsByType": {
-      "reservas": 75,
-      "horarios": 30,
-      "reportes": 20
+      "reservas": 450,
+      "horarios": 350,
+      "reportes": 450
     },
-    "eventsByUser": {...}
+    "activeUsers": 145,
+    "topUsers": [...]
   }
 }
 ```
 
-### `POST /analytics/events`
-Registra un evento manualmente.
+### Health Check
 
-**Request:**
+- `GET /ping` - Verifica que el servicio está activo
+
+**Response:**
 ```json
 {
-  "eventType": "reservas",
-  "userId": "user-001",
-  "metadata": {
-    "reservaId": "RES-123",
-    "action": "created"
-  }
+  "status": "ok",
+  "service": "micro-analytics",
+  "kafkaConsumer": "connected"
 }
 ```
 
-### `GET /analytics/report`
-Genera un reporte de analytics (admin only).
+## Ejemplos cURL
 
-**Query Parameters:**
-- `startDate` - Fecha inicial
-- `endDate` - Fecha final
-- `format` - Formato de respuesta: json o csv (default: json)
-
-## Kafka Configuration
-- **Topics**: reservas, horarios, reportes
-- **Consumer Group**: analytics-group
-- **KAFKA_ENABLED**: true para habilitar consumer
-- **KAFKA_BROKERS**: localhost:9092 (default)
-
-## Environment Variables
-- `PORT` - Puerto en el que escucha (default: 5007)
-- `KAFKA_ENABLED` - Habilitar Kafka consumer (true/false)
-- `KAFKA_BROKERS` - Brokers de Kafka (comma-separated)
-- `KAFKA_CLIENT_ID` - ID del cliente Kafka
-- `JWT_SECRET` - Secreto para validar JWT
-
-## Instalación
 ```bash
-npm install
+# Obtener eventos de los últimos 7 días
+curl "http://localhost:5007/analytics/events?limit=100&offset=0"
+
+# Obtener eventos filtrados por tipo
+curl "http://localhost:5007/analytics/events?type=reservas&limit=50"
+
+# Obtener estadísticas de 30 días
+curl "http://localhost:5007/analytics/stats?period=30d"
+
+# Health check
+curl http://localhost:5007/ping
 ```
 
-## Ejecución
+## Installation
+
+### Prerequisites
+
+- Node.js 18+ o Docker
+- Apache Kafka 7.5.0+ corriendo en localhost:9092
+
+### Local Setup
+
 ```bash
+# Instalar dependencias
+npm install
+
+# Establecer variables de entorno (crear archivo .env)
+PORT=5007
+KAFKA_BROKER=kafka:9092
+KAFKA_CONSUMER_GROUP=micro-analytics-group
+
+# Ejecutar el servicio
 npm start
 ```
 
-## Docker
+### Docker Setup
+
 ```bash
-docker build -t micro-analytics .
-docker run -p 5007:5007 \
-  -e KAFKA_ENABLED=true \
-  -e KAFKA_BROKERS=kafka:9092 \
-  micro-analytics
+# Construir la imagen
+docker build -t micro-analytics:local .
+
+# Ejecutar el contenedor
+docker run -d \
+  --name micro-analytics \
+  -p 5007:5007 \
+  -e PORT=5007 \
+  -e KAFKA_BROKER=kafka:9092 \
+  micro-analytics:local
 ```
+
+## 🏛️ Patrones Implementados
+
+- **Kafka Consumer**: Consume eventos de múltiples tópicos
+- **Thin Controllers**: Solo orquestación HTTP, sin lógica
+- **Centralized Logger**: Logging consistente
+- **Event Processing**: Procesa eventos en tiempo real
+
+## 🎯 Eventos Consumidos de Kafka
+
+El servicio consume eventos de los tópicos:
+
+```
+- reservas: Eventos de reservas de estudiantes
+- horarios: Eventos de horarios de maestros
+- reportes: Eventos de generación de reportes
+- usuarios: Eventos de usuarios (login, etc)
+```
+
+## Environment Variables
+
+| Variable | Descripción | Por defecto |
+|----------|-------------|-------------|
+| `PORT` | Puerto del servicio | `5007` |
+| `KAFKA_BROKER` | Broker de Kafka | `kafka:9092` |
+| `KAFKA_CONSUMER_GROUP` | Grupo de consumidor | `micro-analytics-group` |
+
+## 🔌 Integración
+
+Otros servicios publican eventos en Kafka:
+
+```javascript
+// Desde cualquier microservicio
+const kafka = require('kafkajs');
+const producer = kafka.producer();
+await producer.send({
+  topic: 'reservas',
+  messages: [
+    {
+      key: 'reserva-001',
+      value: JSON.stringify({
+        type: 'reserva_creada',
+        reservaId: 'RESERVA-001',
+        timestamp: new Date()
+      })
+    }
+  ]
+});
+```
+
+## 📊 Dashboard Kafka UI
+
+Monitorizar eventos en tiempo real en: **http://localhost:8081**
