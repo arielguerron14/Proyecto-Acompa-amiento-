@@ -125,4 +125,30 @@ router.post('/logout', authenticateToken, (req, res) => {
   res.json({ success: true, message: 'Sesión cerrada exitosamente' });
 });
 
+/**
+ * POST /auth/verify-token
+ * Verifica la validez de un token JWT
+ */
+router.post('/verify-token', (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token required' });
+    }
+
+    const payload = AuthService.verifyAccessToken(token);
+    res.status(200).json({
+      valid: true,
+      payload,
+    });
+  } catch (error) {
+    logger.warn(`Token verification failed: ${error.message}`);
+    res.status(401).json({
+      valid: false,
+      error: 'Invalid token',
+    });
+  }
+});
+
 module.exports = router;
