@@ -1,56 +1,31 @@
 const express = require('express');
-const dotenv = require('dotenv');
+require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
-
-dotenv.config();
+const { requestLogger, logger } = require('../../../shared-auth/src/middlewares/logger');
+const { errorHandler, notFound } = require('../../../shared-auth/src/middlewares/errorHandler');
 
 const app = express();
-const PORT = process.env.PORT || 5005;
 
 // Middleware
 app.use(express.json());
+app.use(requestLogger);
 
-// Logger middleware
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
-});
-
-// Rutas
+// Routes
 app.use('/auth', authRoutes);
+app.get('/health', (req, res) =>
+  res.json({ status: 'healthy', service: 'micro-auth', timestamp: new Date().toISOString() })
+);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    service: 'micro-auth',
-    timestamp: new Date().toISOString(),
-  });
-});
+// Error handling
+app.use(notFound);
+app.use(errorHandler);
 
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not Found' });
-});
-
-// Error Handler
-app.use((err, req, res, next) => {
-  console.error('[ERROR]', err);
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal Server Error',
-  });
-});
-
-const server = app.listen(PORT, () => {
-  console.log(`[micro-auth] Listening on http://localhost:${PORT}`);
-});
+const PORT = process.env.PORT || 5005;
+const server = app.listen(PORT, () => logger.info(`micro-auth listening on ${PORT}`));
 
 process.on('SIGTERM', () => {
-  console.log('[micro-auth] SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('[micro-auth] Server closed');
-    process.exit(0);
-  });
+  logger.info('SIGTERM received, shutting down gracefully');
+  server.close(() => logger.info('micro-auth shutdown complete'));
 });
 
 module.exports = app;
