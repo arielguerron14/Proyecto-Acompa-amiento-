@@ -2,48 +2,17 @@ const express = require('express');
 const AuthService = require('../services/authService');
 const { authenticateToken } = require('../middlewares/authMiddleware');
 const { logger } = require('../middlewares/logger');
+const axios = require('axios');
 
 const router = express.Router();
 
-/**
- * Datos de usuarios de ejemplo (en producción, usar BD)
- * Estructura: { userId, email, password (hash), role }
- */
-const MOCK_USERS = {
-  'admin@sistema.com': {
-    userId: 'admin-001',
-    email: 'admin@sistema.com',
-    password: 'admin123', // En producción: hash con bcrypt
-    role: 'admin',
-  },
-  'maestro@sistema.com': {
-    userId: 'maestro-001',
-    email: 'maestro@sistema.com',
-    password: 'maestro123',
-    role: 'maestro',
-  },
-  'estudiante@sistema.com': {
-    userId: 'estudiante-001',
-    email: 'estudiante@sistema.com',
-    password: 'estudiante123',
-    role: 'estudiante',
-  },
-  'auditor@sistema.com': {
-    userId: 'auditor-001',
-    email: 'auditor@sistema.com',
-    password: 'auditor123',
-    role: 'auditor',
-  },
-};
-
-// Almacenamiento temporal en memoria para nuevos usuarios
-let registeredUsers = { ...MOCK_USERS };
+const MICRO_AUTH_URL = process.env.MICRO_AUTH_URL || 'http://localhost:5005';
 
 /**
  * POST /auth/login
- * Autentica un usuario y retorna accessToken y refreshToken
+ * Forwards login request to micro-auth service
  */
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -51,60 +20,77 @@ router.post('/login', (req, res) => {
       return res.status(400).json({ error: 'Email y contraseña son requeridos' });
     }
 
-    const user = registeredUsers[email];
-    if (!user || user.password !== password) {
-      logger.warn(`Failed login attempt for email: ${email}`);
-      return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
-
-    const { accessToken, refreshToken, expiresIn } = AuthService.generateTokenPair(
-      user.userId,
-      user.role,
-      user.email
-    );
-
-    logger.info(`User ${user.userId} (${user.role}) logged in successfully`);
-
-    res.json({
-      success: true,
-      accessToken,
-      refreshToken,
-      expiresIn,
-      user: {
-        userId: user.userId,
-        email: user.email,
-        role: user.role,
-      },
+    // Forward to micro-auth service
+    const response = await axios.post(`${MICRO_AUTH_URL}/auth/login`, {
+      email,
+      password,
     });
+
+    logger.info(`User ${response.data.user.userId} logged in successfully`);
+    res.json(response.data);
   } catch (error) {
     logger.error(`Login error: ${error.message}`);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
     res.status(500).json({ error: 'Error en el proceso de login' });
   }
 });
 
 /**
  * POST /auth/refresh
- * Refresca el accessToken usando el refreshToken
+ * Forwards refresh request to micro-auth service
  */
-router.post('/refresh', (req, res) => {
+router.post('/refresh', async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    const { refreshToken, oldAccessToken } = req.body;
 
     if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token requerido' });
     }
 
-    const newAccessToken = AuthService.refreshAccessToken(refreshToken);
+    // Forward to micro-auth service
+    const response = await axios.post(`${MICRO_AUTH_URL}/auth/refresh`, {
+      refreshToken,
+      oldAccessToken,
+    });
 
     logger.info('Access token refreshed successfully');
-
-    res.json({
-      success: true,
-      accessToken: newAccessToken,
-    });
+    res.json(response.data);
   } catch (error) {
     logger.warn(`Refresh token error: ${error.message}`);
-    res.status(401).json({ error: error.message });
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(401).json({ error: 'Error al refrescar token' });
+  }
+});
+
+/**
+ * POST /auth/logout
+ * Forwards logout request to micro-auth service
+ */
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Access token required' });
+    }
+
+    // Forward to micro-auth service
+    const response = await axios.post(`${MICRO_AUTH_URL}/auth/logout`, {
+      accessToken,
+    });
+
+    logger.info(`User ${req.user.userId} logged out`);
+    res.json(response.data);
+  } catch (error) {
+    logger.error(`Logout error: ${error.message}`);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({ error: 'Error en el proceso de logout' });
   }
 });
 
@@ -120,19 +106,10 @@ router.get('/me', authenticateToken, (req, res) => {
 });
 
 /**
- * POST /auth/logout
- * Desautentica el usuario (en producción, blacklistear el token)
- */
-router.post('/logout', authenticateToken, (req, res) => {
-  logger.info(`User ${req.user.userId} logged out`);
-  res.json({ success: true, message: 'Sesión cerrada exitosamente' });
-});
-
-/**
  * POST /auth/verify-token
- * Verifica la validez de un token JWT
+ * Forwards token verification to micro-auth service
  */
-router.post('/verify-token', (req, res) => {
+router.post('/verify-token', async (req, res) => {
   try {
     const { token } = req.body;
 
@@ -140,13 +117,17 @@ router.post('/verify-token', (req, res) => {
       return res.status(400).json({ error: 'Token required' });
     }
 
-    const payload = AuthService.verifyAccessToken(token);
-    res.status(200).json({
-      valid: true,
-      payload,
+    // Forward to micro-auth service
+    const response = await axios.post(`${MICRO_AUTH_URL}/auth/verify-token`, {
+      token,
     });
+
+    res.json(response.data);
   } catch (error) {
     logger.warn(`Token verification failed: ${error.message}`);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
     res.status(401).json({
       valid: false,
       error: 'Invalid token',
@@ -156,9 +137,9 @@ router.post('/verify-token', (req, res) => {
 
 /**
  * POST /auth/register
- * Registra un nuevo usuario
+ * Registra un nuevo usuario en micro-auth
  */
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
 
@@ -166,48 +147,25 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ error: 'Email, contraseña, nombre y rol son requeridos' });
     }
 
-    if (registeredUsers[email]) {
-      return res.status(409).json({ error: 'El email ya está registrado' });
-    }
-
     if (password.length < 6) {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
     }
 
-    // Crear nuevo usuario
-    const userId = role === 'estudiante' ? 'est-' + Date.now() : 'mta-' + Date.now();
-    const newUser = {
-      userId,
+    // Forward to micro-auth service for registration
+    const response = await axios.post(`${MICRO_AUTH_URL}/auth/register`, {
       email,
-      password, // En producción: hashear con bcrypt
-      role,
+      password,
       name,
-    };
-
-    registeredUsers[email] = newUser;
-
-    const { accessToken, refreshToken, expiresIn } = AuthService.generateTokenPair(
-      userId,
       role,
-      email
-    );
-
-    logger.info(`New user registered: ${userId} (${role})`);
-
-    res.status(201).json({
-      success: true,
-      accessToken,
-      refreshToken,
-      expiresIn,
-      user: {
-        userId,
-        email,
-        role,
-        name,
-      },
     });
+
+    logger.info(`New user registered: ${response.data.user.userId} (${role})`);
+    res.status(201).json(response.data);
   } catch (error) {
     logger.error(`Registration error: ${error.message}`);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
     res.status(500).json({ error: 'Error en el proceso de registro' });
   }
 });

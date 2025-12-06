@@ -11,11 +11,8 @@ const PORT = process.env.PORT || 8080;
 const app = express();
 
 app.use(express.json());
-app.use(requestLogger);
 
-// Rutas de autenticación (públicas)
-app.use('/auth', authRoutes);
-
+// APLICAR SEGURIDAD Y CORS PRIMERO (antes que cualquier ruta)
 const maestros = process.env.MAESTROS_URL || 'http://micro-maestros:5001';
 const estudiantes = process.env.ESTUDIANTES_URL || 'http://micro-estudiantes:5002';
 const reportesEst = process.env.REPORTES_EST_URL || 'http://micro-reportes-estudiantes:5003';
@@ -23,6 +20,11 @@ const reportesMaest = process.env.REPORTES_MAEST_URL || 'http://micro-reportes-m
 const frontend = process.env.FRONTEND_URL || 'http://frontend-web:5500';
 
 applySecurity(app, { whitelist: [frontend] });
+
+app.use(requestLogger);
+
+// Rutas de autenticación (públicas)
+app.use('/auth', authRoutes);
 
 app.use('/maestros', createProxyMiddleware({ target: maestros, changeOrigin: true, pathRewrite: {'^/maestros': ''} }));
 app.use('/estudiantes', createProxyMiddleware({ target: estudiantes, changeOrigin: true, pathRewrite: {'^/estudiantes': ''} }));
@@ -38,4 +40,14 @@ setupSwagger(app);
 app.use(notFound);
 app.use(errorHandler);
 
-app.listen(PORT, ()=> logger.info(`API Gateway listening on ${PORT}`));
+process.on('uncaughtException', (err) => {
+	logger.error('API Gateway Uncaught Exception:', err);
+	process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+	logger.error('API Gateway Unhandled Rejection at:', promise, 'reason:', reason);
+	process.exit(1);
+});
+
+app.listen(PORT, '0.0.0.0', ()=> logger.info(`API Gateway listening on port ${PORT} (0.0.0.0)`));

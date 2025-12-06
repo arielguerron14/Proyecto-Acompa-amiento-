@@ -264,47 +264,48 @@
       summaryId: 'plannerSummaryEstudiantes',
       buttonId: 'plannerAssignBtnEstudiantes'
     });
-  </script>
-  async function verificarTokenFrontend(e) {
-    e.preventDefault();
-    const token = document.getElementById('jwtInput').value;
-    const resultArea = document.getElementById('jwtResult');
-    resultArea.textContent = 'Verificando...';
-    try {
-      const res = await fetch('http://localhost:8080/auth/verify-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      });
-      const data = await res.json();
-      resultArea.textContent = JSON.stringify(data, null, 2);
-    } catch (err) {
-      resultArea.textContent = 'Error: ' + err.message;
+
+    async function verificarTokenFrontend(e) {
+      e.preventDefault();
+      const token = document.getElementById('jwtInput').value;
+      const resultArea = document.getElementById('jwtResult');
+      resultArea.textContent = 'Verificando...';
+      try {
+        const res = await fetch('http://localhost:8080/auth/verify-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        const data = await res.json();
+        resultArea.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        resultArea.textContent = 'Error: ' + err.message;
+      }
     }
-  }
 
-  // Funciones de autenticación
-  function handleLogout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = 'login.html';
-  }
-
-  function checkAuth() {
-    const token = localStorage.getItem('token');
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    
-    if (!token || !user.email) {
+    // Funciones de autenticación
+    function handleLogout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       window.location.href = 'login.html';
-      return;
     }
 
-    document.getElementById('userName').textContent = user.name || 'Estudiante';
-    document.getElementById('userEmail').textContent = user.email;
-  }
+    function checkAuth() {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      if (!token || !user.email) {
+        window.location.href = 'login.html';
+        return;
+      }
 
-  window.addEventListener('load', () => {
-    checkAuth();
-  });
+      document.getElementById('userName').textContent = user.name || 'Estudiante';
+      document.getElementById('userEmail').textContent = user.email;
+    }
+
+    window.addEventListener('load', () => {
+      checkAuth();
+    });
+  </script>
 </body>
 </html>

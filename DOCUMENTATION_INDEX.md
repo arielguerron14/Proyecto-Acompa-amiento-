@@ -11,10 +11,14 @@ Guía de navegación completa de toda la documentación del proyecto.
 2. 🚀 [QUICKSTART_NEW_SERVICES.md](./QUICKSTART_NEW_SERVICES.md) - Ejemplos prácticos de los nuevos servicios
 
 **Luego, según tu necesidad:**
-- Si quieres entender la arquitectura → [ARCHITECTURE_DIAGRAMS.md](#-arquitectura)
-- Si necesitas detalles de servicios → [MICROSERVICES_GUIDE.md](#-detalle-de-servicios)
-- Si quieres verificar el proyecto → [CHECKLIST.md](#-listados-y-verificación)
 
+## 🚀 Inicio Rápido
+
+| Documento | Descripción | Tiempo |
+|-----------|-------------|--------|
+| **[QUICKSTART.md](./QUICKSTART.md)** | Guía para empezar en 5 minutos | ⏱️ 5 min |
+| **[README.md](./README.md)** | Documentación principal del proyecto | 📖 10 min |
+| **[TESTING.md](./TESTING.md)** | Guía completa de testing manual y automatizado | 🧪 15 min |
 ---
 
 ## 📁 Estructura de Documentación

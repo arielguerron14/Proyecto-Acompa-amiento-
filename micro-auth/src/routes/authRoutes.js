@@ -5,8 +5,32 @@ const { authenticateToken } = require('../../../shared-auth/src/middlewares/auth
 const router = express.Router();
 
 /**
+ * POST /auth/login
+ * Autentica un usuario y retorna accessToken y refreshToken
+ */
+router.post('/login', authController.login);
+
+/**
+ * POST /auth/refresh
+ * Refresca el accessToken usando el refreshToken
+ */
+router.post('/refresh', authController.refresh);
+
+/**
+ * POST /auth/logout
+ * Desautentica el usuario y elimina el token del cache
+ */
+router.post('/logout', authController.logout);
+
+/**
+ * POST /auth/register
+ * Registra un nuevo usuario
+ */
+router.post('/register', authController.register);
+
+/**
  * POST /auth/verify-token
- * Verifica la validez de un token JWT
+ * Verifica la validez de un token JWT (contra cache + JWT)
  */
 router.post('/verify-token', authController.verifyToken);
 

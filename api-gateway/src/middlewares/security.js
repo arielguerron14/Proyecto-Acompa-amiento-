@@ -6,22 +6,18 @@ function applySecurity(app, { whitelist = [] } = {}) {
   app.use(helmet());
 
   const corsOptions = {
-    origin: function (origin, callback) {
-      // Permitir requests sin origin (como from same-origin) y desarrollo local
-      if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
-        return callback(null, true);
-      }
-      if (whitelist.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: true, // Permitir cualquier origen en desarrollo
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    maxAge: 3600,
   };
+  
+  // Aplicar CORS globalmente ANTES que cualquier middleware
   app.use(cors(corsOptions));
+  
+  // Manejar preflight requests explícitamente
+  app.options('*', cors(corsOptions));
 
   const limiter = rateLimit({ windowMs: 60 * 1000, max: 100 });
   app.use(limiter);

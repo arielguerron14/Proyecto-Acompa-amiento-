@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { logger } = require('../middlewares/logger');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'desarrollo-secret-key-cambiar-en-produccion';
-const REFRESH_SECRET = process.env.REFRESH_SECRET || 'refresh-secret-key-cambiar-en-produccion';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret';
+const REFRESH_SECRET = process.env.REFRESH_SECRET || 'dev-refresh-secret';
 const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY || '15m';
 const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY || '7d';
 

@@ -2,60 +2,74 @@
 
 Sistema de microservicios para la gestión de estudiantes, maestros, horarios y reportes de acompañamiento educativo.
 
-## 🚀 Inicio Rápido
+## 🚀 Inicio Rápido (Desarrollo Local)
 
 ### Requisitos
-- **Docker** y **Docker Compose** instalados
-- **Node.js** 18+ (solo si ejecutas localmente sin Docker)
+- **Node.js** 18+
+- **npm** 9+
+- **Git**
 
-### Opción 1: Con Docker Compose (Recomendado)
+### Instalación y Ejecución
 
+#### 1. Clonar el repositorio
 ```bash
-# Clonar el repositorio
 git clone <repo-url>
 cd Proyecto-Acompa-amiento-
-
-# Levantar todos los servicios
-docker-compose up -d
-
-# Ver estado
-docker-compose ps
-
-# Ver logs en tiempo real
-docker-compose logs -f
 ```
 
-El proyecto estará disponible en: **http://localhost:8080/**
-
-### Opción 2: Instalación Local (Sin Docker)
-
+#### 2. Instalar dependencias
 ```bash
-# Instalar dependencias en cada servicio
-npm install --prefix micro-maestros
-npm install --prefix micro-estudiantes
-npm install --prefix micro-reportes-estudiantes
-npm install --prefix micro-reportes-maestros
-npm install --prefix micro-auth
-npm install --prefix micro-notificaciones
-npm install --prefix micro-analytics
-npm install --prefix micro-soap-bridge
-npm install --prefix api-gateway
-npm install --prefix frontend-web
+# Instalar en api-gateway (puerta de entrada principal)
+cd api-gateway
+npm install
+cd ..
 
-# Iniciar MongoDB (local o Docker)
-docker run -d --name proyecto-mongo -p 27017:27017 mongo:6.0
+# Instalar en shared-auth (dependencia compartida)
+cd shared-auth
+npm install
+cd ..
 
-# Iniciar cada servicio (en terminales separadas)
-npm start --prefix micro-maestros
-npm start --prefix micro-estudiantes
-npm start --prefix micro-reportes-estudiantes
-npm start --prefix micro-reportes-maestros
-npm start --prefix micro-auth
-npm start --prefix micro-notificaciones
-npm start --prefix micro-analytics
-npm start --prefix micro-soap-bridge
-npm start --prefix api-gateway
-npm start --prefix frontend-web
+# Instalar frontend
+cd frontend-web
+npm install
+cd ..
+```
+
+#### 3. Arrancar los servicios
+
+**En Windows (PowerShell o CMD):**
+
+```powershell
+# Terminal 1: API Gateway (puerto 8080)
+cd api-gateway
+npm start
+
+# Terminal 2: Frontend Web (puerto 5500)
+cd frontend-web
+npm install -g http-server
+http-server ./public -p 5500 -c-1
+```
+
+O más fácil, usa los scripts batch incluidos:
+
+```batch
+REM Terminal 1
+start-gateway.bat
+
+REM Terminal 2
+start-frontend.bat
+```
+
+### 4. Acceder a la aplicación
+
+**Frontend Web:**
+```
+http://localhost:5500/login.html
+```
+
+**API Gateway:**
+```
+http://localhost:8080
 ```
 
 ## 📋 Servicios

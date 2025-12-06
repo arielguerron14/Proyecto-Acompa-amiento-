@@ -49,6 +49,180 @@ api-gateway/
 
 ## Installation
 
+```bash
+# Instalar dependencias
+npm install
+
+# Ejecutar en desarrollo
+npm start
+
+# El servidor estará disponible en http://localhost:8080
+```
+
+## 📝 Variables de Entorno
+
+Crear un archivo `.env`:
+
+```env
+PORT=8080
+NODE_ENV=development
+JWT_SECRET=tu-secret-key-cambiar-en-produccion
+REFRESH_SECRET=tu-refresh-secret-cambiar-en-produccion
+
+# URLs de microservicios
+MAESTROS_URL=http://localhost:5001
+ESTUDIANTES_URL=http://localhost:5002
+REPORTES_EST_URL=http://localhost:5003
+REPORTES_MAEST_URL=http://localhost:5004
+AUTH_URL=http://localhost:5005
+NOTIFICACIONES_URL=http://localhost:5006
+ANALYTICS_URL=http://localhost:5007
+SOAP_URL=http://localhost:5008
+FRONTEND_URL=http://localhost:5500
+```
+
+## 🔑 Rutas Públicas
+
+### Autenticación
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/auth/login` | Iniciar sesión |
+| POST | `/auth/register` | Registrar nuevo usuario |
+| POST | `/auth/verify-token` | Verificar JWT válido |
+| POST | `/auth/refresh` | Renovar access token |
+| GET | `/auth/me` | Obtener usuario autenticado |
+| POST | `/auth/logout` | Cerrar sesión |
+| GET | `/auth/roles` | Listar roles disponibles |
+
+### Ejemplos de uso
+
+**Login:**
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@sistema.com",
+    "password": "admin123"
+  }'
+```
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": "15m",
+  "user": {
+    "userId": "admin-001",
+    "email": "admin@sistema.com",
+    "role": "admin"
+  }
+}
+```
+
+**Registro:**
+```bash
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "nuevo@ejemplo.com",
+    "password": "password123",
+    "name": "Nuevo Usuario",
+    "role": "estudiante"
+  }'
+```
+
+**Verificar Token:**
+```bash
+curl -X POST http://localhost:8080/auth/verify-token \
+  -H "Content-Type: application/json" \
+  -d '{"token": "eyJhbGc..."}'
+```
+
+**Renovar Token:**
+```bash
+curl -X POST http://localhost:8080/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken": "eyJhbGc..."}'
+```
+
+## 🔒 Rutas Protegidas
+
+Todas las rutas de microservicios requieren token JWT en el header:
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Ejemplo:
+```bash
+curl -X GET http://localhost:8080/maestros/list \
+  -H "Authorization: Bearer eyJhbGc..."
+```
+
+## ⚙️ Configuración CORS
+
+El gateway está configurado con CORS habilitado para desarrollo:
+
+**Headers permitidos:**
+- `Content-Type`
+- `Authorization`
+- `X-Requested-With`
+
+**Métodos permitidos:**
+- `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`, `HEAD`
+
+**En producción**, modificar `src/middlewares/security.js` para usar whitelist específico.
+
+## 🚀 Despliegue con Docker
+
+```bash
+# Construir imagen
+docker build -t api-gateway .
+
+# Ejecutar contenedor
+docker run -d --name api-gateway \
+  -p 8080:8080 \
+  -e JWT_SECRET=prod-secret \
+  api-gateway
+
+# Con docker-compose
+docker-compose up -d api-gateway
+```
+
+## 📊 Middleware Implementado
+
+- **express.json()** - Parser de JSON
+- **cors()** - CORS habilitado
+- **helmet()** - Headers de seguridad
+- **rate-limiter** - Limitación de velocidad (100 req/min)
+- **requestLogger** - Logging de solicitudes
+- **errorHandler** - Manejo centralizado de errores
+
+## 🧪 Testing
+
+```bash
+# Test de login
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@sistema.com","password":"admin123"}'
+```
+
+## 🐛 Resolución de Problemas
+
+### Puerto 8080 ya en uso
+```bash
+netstat -ano | findstr :8080
+taskkill /PID <PID> /F
+```
+
+### CORS rechazando solicitudes
+- Verifica que usas `http://localhost` (no `127.0.0.1`)
+- Recarga el navegador con Ctrl+Shift+R
+- Revisa los headers en DevTools (F12)
+
 ### Prerequisites
 
 - Node.js 18+ o Docker

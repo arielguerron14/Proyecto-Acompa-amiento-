@@ -1,8 +1,8 @@
 const express = require('express');
 require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
-const { requestLogger, logger } = require('../../../shared-auth/src/middlewares/logger');
-const { errorHandler, notFound } = require('../../../shared-auth/src/middlewares/errorHandler');
+const { requestLogger, logger } = require('../../shared-auth/src/middlewares/logger');
+const { errorHandler, notFound } = require('../../shared-auth/src/middlewares/errorHandler');
 
 const app = express();
 
@@ -26,6 +26,16 @@ const server = app.listen(PORT, () => logger.info(`micro-auth listening on ${POR
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
   server.close(() => logger.info('micro-auth shutdown complete'));
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
 
 module.exports = app;
