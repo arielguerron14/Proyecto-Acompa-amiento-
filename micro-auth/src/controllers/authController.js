@@ -13,7 +13,7 @@ let registeredUsers = {
  * Autentica un usuario y retorna accessToken y refreshToken
  * Cache: Stores accessToken -> user payload mapping for session validation
  */
-exports.login = (req, res) => {
+exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -33,7 +33,7 @@ exports.login = (req, res) => {
     );
 
     // Cache the active token with user info for session validation
-    TokenCache.set(accessToken, {
+    await TokenCache.set(accessToken, {
       userId: user.userId,
       role: user.role,
       email: user.email,
@@ -63,7 +63,7 @@ exports.login = (req, res) => {
  * Refresca el accessToken usando el refreshToken
  * Cache: Stores new accessToken and removes old one
  */
-exports.refresh = (req, res) => {
+exports.refresh = async (req, res) => {
   try {
     const { refreshToken, oldAccessToken } = req.body;
 
@@ -76,11 +76,11 @@ exports.refresh = (req, res) => {
 
     // Remove old token from cache if provided
     if (oldAccessToken) {
-      TokenCache.delete(oldAccessToken);
+      await TokenCache.delete(oldAccessToken);
     }
 
     // Cache the new token
-    TokenCache.set(newAccessToken, {
+    await TokenCache.set(newAccessToken, {
       userId: payload.userId,
       role: payload.role,
       email: payload.email,
@@ -104,7 +104,7 @@ exports.refresh = (req, res) => {
  * Logout: Removes token from cache (simple implementation)
  * In production, this could also blacklist the token in a database
  */
-exports.logout = (req, res) => {
+exports.logout = async (req, res) => {
   try {
     const { accessToken } = req.body;
 
@@ -113,7 +113,7 @@ exports.logout = (req, res) => {
     }
 
     // Remove token from cache
-    TokenCache.delete(accessToken);
+    await TokenCache.delete(accessToken);
 
     console.log(`[authController.logout] User logged out and token removed from cache`);
 
@@ -131,7 +131,7 @@ exports.logout = (req, res) => {
  * Verifica la validez de un token JWT
  * Cache: Checks if token is in active session cache before verifying JWT
  */
-exports.verifyToken = (req, res) => {
+exports.verifyToken = async (req, res) => {
   try {
     const { token } = req.body;
 
@@ -140,7 +140,7 @@ exports.verifyToken = (req, res) => {
     }
 
     // Check if token is in cache (active session)
-    const cachedUser = TokenCache.get(token);
+    const cachedUser = await TokenCache.get(token);
     if (!cachedUser) {
       return res.status(401).json({
         valid: false,
