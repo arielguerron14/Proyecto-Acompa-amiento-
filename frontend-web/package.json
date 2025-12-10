@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "@proyecto/message-broker": "file:../message-broker",
+    "express": "^5.2.1",
     "http-server": "^14.1.1"
   }
 }

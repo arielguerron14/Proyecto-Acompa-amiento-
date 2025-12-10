@@ -73,23 +73,11 @@ start-frontend.bat
 http://localhost:5500/login.html
 ```
 
-**Funcionalidades:**
-- ✅ Login con email y contraseña
-- ✅ Registro de nuevos usuarios
-- ✅ Validación de credenciales
-- ✅ Almacenamiento de JWT en localStorage
+**Funcionalidad actual (simplificada):**
+- ✅ Inicia sesión pegando un token JWT válido (testing/dev)
+- ✅ El frontend valida el token consultando `GET /auth/me` y guarda el payload en `localStorage`
 
-**Credenciales de prueba:**
-```
-Email: admin@sistema.com
-Password: admin123
-
-Email: estudiante@sistema.com
-Password: estudiante123
-
-Email: maestro@sistema.com
-Password: maestro123
-```
+Nota: Los endpoints de login/register/refresh/logout han sido eliminados del servicio de autenticación en esta rama; para pruebas pega un JWT válido en la página de login.
 
 ### 2. Panel de Maestros (index.html)
 ```
@@ -112,22 +100,18 @@ http://localhost:5500/estudiante.html
 - Visualizar currículo
 - Verificar tokens JWT
 
-## 🔄 Flujo de Autenticación
+## 🔄 Flujo de Autenticación (actualizado)
 
 ```
 1. Usuario accede a login.html
-   ↓
-2. Ingresa email y contraseña
-   ↓
-3. Frontend envía POST a http://localhost:8080/auth/login
-   ↓
-4. API retorna accessToken y refreshToken
-   ↓
-5. Token se almacena en localStorage
-   ↓
-6. Frontend redirige al dashboard (index.html o estudiante.html)
-   ↓
-7. Cada request incluye: Authorization: Bearer <token>
+  ↓
+2. Pega un token JWT válido en el campo de login
+  ↓
+3. Frontend guarda el token en `localStorage` y llama `GET http://localhost:8080/auth/me` con `Authorization: Bearer <token>`
+  ↓
+4. Si el token es válido, se guarda el payload (`user`) en `localStorage` y se redirige al dashboard correspondiente
+  ↓
+5. Cada request posterior incluye: `Authorization: Bearer <token>`
 ```
 
 ## 📝 Archivo de Configuración
@@ -185,21 +169,14 @@ frontend-web/public/
 ### Ejemplo de Solicitud HTTP
 
 ```javascript
-// Login
-fetch(`${API}/auth/login`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    email: 'admin@sistema.com',
-    password: 'admin123'
-  })
-})
-.then(res => res.json())
-.then(data => {
-  localStorage.setItem('token', data.accessToken);
-  localStorage.setItem('user', JSON.stringify(data.user));
-  window.location.href = 'index.html';
-});
+// Guardar token (desde login.html) y obtener perfil
+localStorage.setItem('token', '<ACCESS_TOKEN>');
+fetch(`${API}/auth/me`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
+  .then(res => res.json())
+  .then(data => {
+    localStorage.setItem('user', JSON.stringify(data.user));
+    window.location.href = 'index.html';
+  });
 
 // Request autenticado
 fetch(`${API}/maestros/list`, {

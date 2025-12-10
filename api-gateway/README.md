@@ -87,65 +87,22 @@ FRONTEND_URL=http://localhost:5500
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| POST | `/auth/login` | Iniciar sesión |
-| POST | `/auth/register` | Registrar nuevo usuario |
 | POST | `/auth/verify-token` | Verificar JWT válido |
-| POST | `/auth/refresh` | Renovar access token |
-| GET | `/auth/me` | Obtener usuario autenticado |
-| POST | `/auth/logout` | Cerrar sesión |
-| GET | `/auth/roles` | Listar roles disponibles |
+| GET | `/auth/me` | Obtener usuario autenticado (payload desde JWT) |
 
 ### Ejemplos de uso
 
-**Login:**
-```bash
-curl -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@sistema.com",
-    "password": "admin123"
-  }'
-```
-
-**Respuesta:**
-```json
-{
-  "success": true,
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": "15m",
-  "user": {
-    "userId": "admin-001",
-    "email": "admin@sistema.com",
-    "role": "admin"
-  }
-}
-```
-
-**Registro:**
-```bash
-curl -X POST http://localhost:8080/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "nuevo@ejemplo.com",
-    "password": "password123",
-    "name": "Nuevo Usuario",
-    "role": "estudiante"
-  }'
-```
-
-**Verificar Token:**
+**Verificar Token (ejemplo):**
 ```bash
 curl -X POST http://localhost:8080/auth/verify-token \
   -H "Content-Type: application/json" \
   -d '{"token": "eyJhbGc..."}'
 ```
 
-**Renovar Token:**
+**Obtener perfil del usuario autenticado:**
 ```bash
-curl -X POST http://localhost:8080/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refreshToken": "eyJhbGc..."}'
+curl -X GET http://localhost:8080/auth/me \
+  -H "Authorization: Bearer eyJhbGc..."
 ```
 
 ## 🔒 Rutas Protegidas

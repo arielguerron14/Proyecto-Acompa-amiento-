@@ -1,6 +1,8 @@
-# 🧪 Guía de Testing - Proyecto Acompañamiento
+# 🧪 Testing Guide - Proyecto Acompañamiento (UPDATED)
 
-Documentación completa para testing manual y automatizado del sistema.
+⚠️ **UPDATED FOR JWT-ONLY FLOW**: No session cache. Frontend now accepts pasted JWT for login.
+
+Documentation for manual and automated testing.
 
 ---
 

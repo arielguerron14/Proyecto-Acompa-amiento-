@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Panel de Maestros</title>
   <link rel="stylesheet" href="styles.css">
+  <script>
+    // Suppress browser extension errors
+    window.addEventListener('error', function(event) {
+      const msg = String(event.message || '');
+      if (msg.includes('message channel') || msg.includes('asynchronous response')) {
+        event.preventDefault();
+      }
+    }, true);
+    
+    window.addEventListener('unhandledrejection', function(event) {
+      const msg = String(event.reason || '');
+      if (msg.includes('message channel') || msg.includes('asynchronous response')) {
+        event.preventDefault();
+      }
+    });
+  </script>
   <style>
     .user-header {
       display: flex;
@@ -41,17 +57,6 @@
       </div>
       <button class="logout-btn" onclick="handleLogout()">Cerrar Sesión</button>
     </div>
-    <section class="card" style="margin-bottom:2em;">
-      <h2>Prueba de Login (JWT)</h2>
-      <form id="loginTestForm" onsubmit="verificarTokenFrontend(event)">
-        <label class="field">
-          <span>Token JWT</span>
-          <input id="jwtInput" type="text" required placeholder="Pega aquí tu token JWT">
-        </label>
-        <button type="submit" class="btn primary">Verificar Token</button>
-      </form>
-      <pre id="jwtResult" class="code-block" style="margin-top:1em;">Resultado aquí...</pre>
-    </section>
     <header class="hero">
       <p class="eyebrow">Panel de gestión</p>
       <h1>Horarios y reportes de maestros</h1>
@@ -164,29 +169,8 @@
       </div>
     </section>
   </main>
-
+  <script src="js/auth.js?v=2"></script>
   <script src="curriculum.js"></script>
-  </main>
-
-  <script>
-  async function verificarTokenFrontend(e) {
-    e.preventDefault();
-    const token = document.getElementById('jwtInput').value;
-    const resultArea = document.getElementById('jwtResult');
-    resultArea.textContent = 'Verificando...';
-    try {
-      const res = await fetch('http://localhost:8080/auth/verify-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      });
-      const data = await res.json();
-      resultArea.textContent = JSON.stringify(data, null, 2);
-    } catch (err) {
-      resultArea.textContent = 'Error: ' + err.message;
-    }
-  }
-  </script>
   <script>
     const API = location.origin.replace(/:[0-9]+$/, '') + ':8080';
     let resetHorarioSelects;
@@ -507,27 +491,36 @@
     }
 
     // Funciones de autenticación
-    function handleLogout() {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+    async function handleLogout() {
+      if (window.AuthClient) {
+        await window.AuthClient.logout();
+      } else {
+        localStorage.removeItem('acomp_jwt_token_v1');
+        localStorage.removeItem('user');
+      }
       window.location.href = 'login.html';
     }
 
     function checkAuth() {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const token = window.AuthClient?.getToken?.() || localStorage.getItem('acomp_jwt_token_v1');
       
-      if (!token || !user.email) {
+      if (!token) {
         window.location.href = 'login.html';
         return;
       }
 
+      const user = window.currentUser || JSON.parse(localStorage.getItem('user') || '{}');
       document.getElementById('userName').textContent = user.name || 'Maestro';
-      document.getElementById('userEmail').textContent = user.email;
+      document.getElementById('userEmail').textContent = user.email || 'email@example.com';
     }
 
     window.addEventListener('load', () => {
-      checkAuth();
+      try {
+        checkAuth();
+      } catch (err) {
+        console.error('Auth check error:', err);
+        window.location.href = 'login.html';
+      }
     });
   </script>
 </body>

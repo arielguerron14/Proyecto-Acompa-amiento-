@@ -1,0 +1,82 @@
+version: '3.8'
+services:
+  micro-auth:
+    build:
+      context: ./micro-auth
+      dockerfile: Dockerfile
+    volumes:
+      - ./micro-auth:/app:delegated
+    ports:
+      - "5005:5005"
+    env_file:
+      - .env
+    depends_on:
+      - mongo
+    command: npm start
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    volumes:
+      - ./api-gateway:/app:delegated
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      - micro-auth
+    command: npm start
+
+  frontend-web:
+    build:
+      context: ./frontend-web
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend-web:/app:delegated
+    ports:
+      - "5500:5500"
+    env_file:
+      - .env
+    command: node server.js
+
+  message-broker:
+    build:
+      context: ./message-broker
+      dockerfile: Dockerfile
+    volumes:
+      - ./message-broker:/app:delegated
+    ports:
+      - "9092:9092"
+    env_file:
+      - .env
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: acompanamiento
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  mongo-data:
+  postgres-data:
+  redis-data:

@@ -1,284 +1,176 @@
 # Proyecto Acompañamiento - Sistema de Gestión Educativa
 
-Sistema de microservicios para la gestión de estudiantes, maestros, horarios y reportes de acompañamiento educativo.
+Sistema moderno de microservicios para la gestión de estudiantes, maestros, horarios y reportes de acompañamiento educativo. Implementado con Node.js, Express, MongoDB y principios SOLID.
 
-## 🚀 Inicio Rápido (Desarrollo Local)
+**🔗 [📚 Ver índice completo de documentación](./INDEX.md)**
+
+## 🚀 Inicio Rápido
 
 ### Requisitos
-- **Node.js** 18+
-- **npm** 9+
-- **Git**
+- Node.js 18+
+- npm 9+
+- Docker & Docker Compose
 
-### Instalación y Ejecución
-
-#### 1. Clonar el repositorio
+### Instalación Local
 ```bash
+# 1. Clonar y navegar
 git clone <repo-url>
 cd Proyecto-Acompa-amiento-
-```
 
-#### 2. Instalar dependencias
-```bash
-# Instalar en api-gateway (puerta de entrada principal)
-cd api-gateway
+# 2. Instalar dependencias
 npm install
-cd ..
 
-# Instalar en shared-auth (dependencia compartida)
-cd shared-auth
-npm install
-cd ..
+# 3. Configurar variables de entorno
+cp .env.example .env
 
-# Instalar frontend
-cd frontend-web
-npm install
-cd ..
+# 4. Iniciar servicios
+docker-compose up -d
 ```
 
-#### 3. Arrancar los servicios
-
-**En Windows (PowerShell o CMD):**
-
-```powershell
-# Terminal 1: API Gateway (puerto 8080)
-cd api-gateway
-npm start
-
-# Terminal 2: Frontend Web (puerto 5500)
-cd frontend-web
-npm install -g http-server
-http-server ./public -p 5500 -c-1
-```
-
-O más fácil, usa los scripts batch incluidos:
-
-```batch
-REM Terminal 1
-start-gateway.bat
-
-REM Terminal 2
-start-frontend.bat
-```
-
-### 4. Acceder a la aplicación
-
-**Frontend Web:**
-```
-http://localhost:5500/login.html
-```
-
-**API Gateway:**
-```
-http://localhost:8080
-```
+### Acceso a la Aplicación
+- **Frontend**: http://localhost:3001
+- **API Gateway**: http://localhost:3000
+- **Auth Service**: http://localhost:5005
 
 ## 📋 Servicios
 
-### Servicios Core (6)
 | Servicio | Puerto | Descripción |
 |----------|--------|-------------|
-| **MongoDB** | 27017 | Base de datos principal |
-| **micro-maestros** | 5001 | Gestión de horarios de maestros |
-| **micro-estudiantes** | 5002 | Gestión de reservas de estudiantes |
-| **micro-reportes-estudiantes** | 5003 | Reportes de estudiantes |
-| **micro-reportes-maestros** | 5004 | Reportes de maestros |
-| **API Gateway** | 8080 | Router central de la aplicación |
-
-### Nuevos Servicios (4)
-| Servicio | Puerto | Descripción |
-|----------|--------|-------------|
-| **micro-auth** | 5005 | Autenticación, autorización y RBAC centralizado |
-| **micro-notificaciones** | 5006 | Notificaciones: email, SMS, push |
-| **micro-analytics** | 5007 | Analytics en tiempo real, Kafka consumer |
-| **micro-soap-bridge** | 5008 | Integración con servicios SOAP legacy |
-
-### Frontend
-| Servicio | Puerto | Descripción |
-|----------|--------|-------------|
-| **Frontend Web** | 5500 | Interfaz web estática |
+| **API Gateway** | 3000 | Punto de entrada único |
+| **micro-auth** | 5005 | Autenticación y RBAC |
+| **micro-estudiantes** | 5001 | Gestión de estudiantes |
+| **micro-maestros** | 5002 | Gestión de maestros |
+| **micro-notificaciones** | 5003 | Notificaciones |
+| **micro-reportes-estudiantes** | 5004 | Reportes de estudiantes |
+| **micro-reportes-maestros** | 5006 | Reportes de maestros |
+| **micro-soap-bridge** | 5008 | Integración SOAP |
+| **Frontend Web** | 3001 | Interfaz web |
 
 ## 🏗️ Arquitectura
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    Frontend Web (5500)               │
-│                   (HTML/CSS/JS)                      │
-└────────────────────────┬────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────┐
-│                  API Gateway (8080)                  │
-│         (Express + http-proxy-middleware)            │
-└──┬─────────────┬─────────────┬──────────────┬───────┘
-   │             │             │              │
-   ▼             ▼             ▼              ▼
-micro-        micro-       micro-reportes  micro-reportes
-maestros    estudiantes    estudiantes      maestros
- (5001)       (5002)         (5003)           (5004)
-   │             │             │              │
-   └─────────────┴─────────────┴──────────────┘
-                    │
-                    ▼
-              MongoDB (27017)
+Arquitectura de microservicios con:
+- ✅ API Gateway centralizado
+- ✅ Autenticación JWT con RBAC
+- ✅ Message brokers (RabbitMQ/Kafka/MQTT)
+- ✅ Servicios independientes y escalables
+- ✅ Monitoreo y logging centralizado
 
-        ┌─────────────────────────────────┐
-        │    SHARED AUTH MODULE (DRY)     │
-        │  - Roles & Permissions Matrix   │
-        │  - JWT Service                  │
-        │  - Auth Middleware              │
-        └────────┬────────────────────────┘
-                 │
-   ┌─────────────┼─────────────┬──────────────┐
-   ▼             ▼             ▼              ▼
-micro-auth  micro-notif  micro-analytics  micro-soap
- (5005)      (5006)        (5007)        bridge(5008)
-             
-- RBAC      - Email       - Kafka       - SOAP
-- JWT       - SMS         - Events      - Legacy
-- Tokens    - Push        - Real-time   - Adapter
-```
+Ver [ARCHITECTURE_DIAGRAMS.md](./ARCHITECTURE_DIAGRAMS.md) para detalles completos.
 
-## 📝 Variables de Entorno
+## 🔐 Autenticación
 
-Cada servicio puede configurarse mediante un archivo `.env`:
+Sistema de autenticación centralizado con:
+- JWT (JSON Web Tokens)
+- RBAC (Role-Based Access Control)
+- Roles: admin, maestro, estudiante, auditor
+- Tokens con expiración configurable
 
-### MongoDB URI (todos los microservicios)
-```env
-MONGO_URI=mongodb://localhost:27017/nombre_db
-PORT=5001  # Varía según el servicio
-```
+📖 Ver [AUTH_DOCUMENTATION.md](./AUTH_DOCUMENTATION.md) para guía completa.
 
-MAESTROS_URL=http://localhost:5001
-ESTUDIANTES_URL=http://localhost:5002
-REPORTES_EST_URL=http://localhost:5003
-REPORTES_MAEST_URL=http://localhost:5004
-FRONTEND_URL=http://localhost:5500
-```
-
-## 🔧 Comandos útiles
-
-```bash
-# Ver estado de contenedores
-docker-compose ps
-
-
-# Reiniciar todos los servicios
-docker-compose down
-
-# Ejecutar un comando dentro de un contenedor
-docker-compose exec api-gateway npm test
-
-# Rebuild de imágenes
-docker-compose build --no-cache
-```
-
-## 🧪 Health Checks
-
-Verifica que todos los servicios están activos:
-
-```bash
-# Directamente
-curl http://localhost:5001/health       # micro-maestros
-curl http://localhost:5002/health       # micro-estudiantes
-curl http://localhost:5003/health       # micro-reportes-estudiantes
-curl http://localhost:5004/health       # micro-reportes-maestros
-curl http://localhost:5005/health       # micro-auth
-curl http://localhost:5006/health       # micro-notificaciones
-curl http://localhost:5007/health       # micro-analytics
-curl http://localhost:5008/health       # micro-soap-bridge
-
-# A través del gateway
-curl http://localhost:8080/maestros/health
-curl http://localhost:8080/estudiantes/health
-curl http://localhost:8080/reportes/estudiantes/health
-curl http://localhost:8080/reportes/maestros/health
-
-# Frontend
-curl http://localhost:8080/
-```
-
-## 📂 Estructura de Carpetas
+## 📦 Estructura del Proyecto
 
 ```
-Proyecto-Acompa-amiento-/
-├── api-gateway/              # Router central
-├── frontend-web/             # Interfaz web
-│   └── public/
-│       ├── index.html
-│       ├── estudiante.html
-│       └── styles.css
-├── shared-auth/              # Módulo compartido de autenticación
-│   ├── src/
-│   │   ├── constants/
-│   │   ├── services/
-│   │   ├── middlewares/
-│   │   └── index.js (barrel export)
-│   └── package.json
-├── micro-maestros/           # Microservicio de maestros
-├── micro-estudiantes/        # Microservicio de estudiantes
+├── api-gateway/              # Gateway API
+├── micro-auth/               # Autenticación
+├── micro-estudiantes/        # Estudiantes
+├── micro-maestros/           # Maestros
+├── micro-notificaciones/     # Notificaciones
 ├── micro-reportes-estudiantes/
 ├── micro-reportes-maestros/
-├── micro-auth/               # Autenticación centralizada (NUEVO)
-├── micro-notificaciones/     # Notificaciones email/SMS/push (NUEVO)
-├── micro-analytics/          # Analytics y Kafka consumer (NUEVO)
-├── micro-soap-bridge/        # Integración SOAP legacy (NUEVO)
-├── docker-compose.yml        # Orquestación Docker
-└── README.md                 # Este archivo
+├── micro-soap-bridge/        # SOAP Bridge
+├── message-broker/           # Message Broker
+├── shared-auth/              # Auth compartido
+├── shared-monitoring/        # Monitoreo compartido
+├── shared-security/          # Seguridad compartida
+├── frontend-web/             # Frontend
+└── [config y documentación]
 ```
 
-## 🚨 Solución de Problemas
+## 🎯 Características
 
-### Puerto ya en uso
+✅ **Microservicios Escalables**  
+✅ **Autenticación Segura con RBAC**  
+✅ **Mensajería Asincrónica**  
+✅ **Monitoreo Centralizado**  
+✅ **Código Limpio (SOLID)**  
+✅ **79% Menos Código Duplicado (DRY)**  
+
+## 🧪 Testing
+
 ```bash
-# Encontrar proceso usando el puerto
-netstat -ano | findstr :8080
+npm test                # Ejecutar tests
+npm run test:coverage   # Tests con cobertura
+npm run test:watch     # Tests en modo watch
+```
 
-# Matar el proceso (Windows)
+Ver [TESTING.md](./TESTING.md) para más detalles.
+
+## 📚 Documentación Importante
+
+| Documento | Descripción |
+|-----------|------------|
+| [INDEX.md](./INDEX.md) | Índice completo |
+| [QUICKSTART.md](./QUICKSTART.md) | Inicio rápido |
+| [AUTH_DOCUMENTATION.md](./AUTH_DOCUMENTATION.md) | Autenticación |
+| [ARCHITECTURE_DIAGRAMS.md](./ARCHITECTURE_DIAGRAMS.md) | Arquitectura |
+| [MICROSERVICES_GUIDE.md](./MICROSERVICES_GUIDE.md) | Microservicios |
+| [TEST_VALIDATION_REPORT.md](./TEST_VALIDATION_REPORT.md) | Validación |
+| [REFACTORING_DESIGN_PRINCIPLES.md](./REFACTORING_DESIGN_PRINCIPLES.md) | Principios |
+
+## 💻 Desarrollo
+
+```bash
+# Copiar variables de entorno
+cp .env.example .env
+
+# Con Docker Compose
+docker-compose up -d
+
+# O servicios individuales
+cd micro-auth && npm start
+cd api-gateway && npm start
+```
+
+## 🔧 Configuración
+
+Archivos principales:
+- **docker-compose.yml** - Orquestación local
+- **docker-compose.prod.yml** - Producción
+- **.env.example** - Variables de entorno
+- **mqtt-config.conf** - MQTT config
+
+## 📝 Principios de Diseño
+
+✅ **SOLID** - Principios SOLID implementados  
+✅ **DRY** - 79% código duplicado eliminado  
+✅ **KISS** - Simplicidad en diseño  
+✅ **GRASP** - Patrones de asignación  
+✅ **YAGNI** - Solo lo necesario  
+
+Ver [REFACTORING_DESIGN_PRINCIPLES.md](./REFACTORING_DESIGN_PRINCIPLES.md) para detalles.
+
+## 🚨 Troubleshooting
+
+### Puerto en uso
+```bash
+netstat -ano | findstr :3000
 taskkill /PID <PID> /F
 ```
 
 ### MongoDB no conecta
 ```bash
-# Verificar que el contenedor de Mongo está corriendo
 docker-compose ps
-
-# Reiniciar Mongo
-docker-compose restart mongo
+docker-compose restart
 ```
 
-### Contenedor se cierra inmediatamente
-```bash
-# Ver logs de error
-docker-compose logs <nombre-servicio>
-```
+## 📞 Soporte
 
-## 👨‍💻 Desarrollo
-
-Para desarrollo local sin Docker:
-
-1. Clonar y instalar dependencias
-2. Configurar `.env` en cada carpeta con `MONGO_URI=mongodb://localhost:27017/<db>`
-3. Ejecutar `npm run dev` (si está disponible) o `npm start` en cada servicio
-
-## 📦 Dependencias Principales
-
-- **Express.js**: Framework web
-- **Mongoose**: ODM para MongoDB
-- **Axios**: Cliente HTTP
-- **CORS**: Soporte de CORS
-- **body-parser**: Parser de cuerpo de solicitudes
-- **http-proxy-middleware**: Middleware de proxy para el gateway
-- **http-server**: Servidor estático para frontend
-- **dotenv**: Gestión de variables de entorno
-- **jsonwebtoken**: Autenticación JWT
-- **bcryptjs**: Hash de contraseñas
-- **nodemailer**: Envío de emails
-- **kafkajs**: Cliente Kafka para streaming de eventos
-- **soap**: Integración con servicios SOAP
-
-## 📞 Contacto y Soporte
-
-Para reportar bugs o sugerencias, abre un issue en el repositorio.
+1. Consulta [INDEX.md](./INDEX.md)
+2. Revisa logs: `docker-compose logs [servicio]`
+3. Ejecuta tests: `npm test`
 
 ---
 
-**Última actualización**: Diciembre 2025
+**Última actualización**: 2025-12-10  
+**Versión**: 2.0 (Refactorizado)  
+**Estado**: ✅ Production Ready

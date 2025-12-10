@@ -20,6 +20,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # PostgreSQL - Tercera base de datos relacional (para reportes / transactional data)
+  postgres:
+    image: postgres:15
+    container_name: proyecto-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: acompanamiento
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - proyecto-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d acompanamiento || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Microservicio: maestros
   micro-maestros:
     build:
@@ -315,6 +335,7 @@ volumes:
   rabbitmq-data:
   mqtt-data:
   mqtt-logs:
+  postgres-data:
 
 networks:
   proyecto-network:

@@ -15,6 +15,18 @@ class AuthService {
     return jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
   }
 
+  /**
+   * Generar JWT con tokenVersion incluido
+   * @param {string} userId - ID del usuario
+   * @param {array} roles - Array de roles del usuario
+   * @param {number} tokenVersion - Versión del token actual para invalidación
+   * @returns {object} { accessToken, expiresIn }
+   */
+  static generateAccessTokenWithVersion(userId, roles, tokenVersion = 0) {
+    const payload = { userId, roles, tokenVersion };
+    return AuthService.generateAccessToken(payload);
+  }
+
   static generateTokenPair(userId, role, email) {
     const payload = { userId, role, email };
     const accessToken = AuthService.generateAccessToken(payload);

@@ -1,9 +1,19 @@
+const path = require('path');
+
 module.exports = {
   // Usa Node.js como ambiente de test (no jsdom)
   testEnvironment: 'node',
 
   // Directorio donde Jest busca archivos de test
   testMatch: ['**/__tests__/**/*.test.js'],
+
+  // Mapeo de módulos para resolver rutas relativas
+  moduleNameMapper: {
+    '^../../../shared-auth/(.*)$': path.resolve(__dirname, '../shared-auth/$1'),
+  },
+
+  // Configuración de resolución de módulos
+  modulePaths: [path.resolve(__dirname, '..')],
 
   // Archivos a excluir de cobertura
   collectCoverageFrom: [

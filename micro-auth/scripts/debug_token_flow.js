@@ -41,17 +41,13 @@ function request(path, method = 'POST', body = null, extraHeaders = {}) {
 
 (async () => {
   try {
-    const resp = await request('/auth/login', 'POST', { email: 'estudiante@example.com', password: 'pass123' });
-    const token = resp.body && resp.body.accessToken;
-    if (!token) {
-      console.error('Login did not return token', resp);
-      process.exit(2);
-    }
-    console.log('Obtained token:', token);
+    // Generate token locally using shared-auth
+    const { accessToken } = sharedAuth.generateTokenPair('EST001', 'estudiante', 'estudiante@example.com');
+    console.log('Generated token (truncated):', accessToken.slice(0, 30) + '...');
 
     console.log('\nVerify with shared-auth:');
     try {
-      const s = sharedAuth.verifyAccessToken(token);
+      const s = sharedAuth.verifyAccessToken(accessToken);
       console.log('shared-auth ok ->', s);
     } catch (e) {
       console.error('shared-auth error ->', e.message);
@@ -59,7 +55,7 @@ function request(path, method = 'POST', body = null, extraHeaders = {}) {
 
     console.log('\nVerify with gateway auth service:');
     try {
-      const g = gatewayAuth.verifyAccessToken(token);
+      const g = gatewayAuth.verifyAccessToken(accessToken);
       console.log('gateway ok ->', g);
     } catch (e) {
       console.error('gateway error ->', e.message);

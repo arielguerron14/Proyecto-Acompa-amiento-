@@ -50,84 +50,12 @@ Acceso de solo lectura:
 ## 🚀 Endpoints de Autenticación
 
 Todos en `/auth` (gateway):
+### Endpoints disponibles (actualizados)
 
-### 1. Login
-```bash
-POST /auth/login
-Content-Type: application/json
+- `POST /auth/verify-token` - Verifica la validez de un token JWT
+- `GET /auth/me` - Retorna el payload del JWT enviado en `Authorization: Bearer <token>`
 
-{
-  "email": "maestro@sistema.com",
-  "password": "maestro123"
-}
-```
-
-**Respuesta:**
-```json
-{
-  "success": true,
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": "15m",
-  "user": {
-    "userId": "maestro-001",
-    "email": "maestro@sistema.com",
-    "role": "maestro"
-  }
-}
-```
-
-### 2. Obtener Usuario Actual
-```bash
-GET /auth/me
-Authorization: Bearer <accessToken>
-```
-
-**Respuesta:**
-```json
-{
-  "success": true,
-  "user": {
-    "userId": "maestro-001",
-    "role": "maestro",
-    "email": "maestro@sistema.com",
-    "iat": 1764640417,
-    "exp": 1764641317
-  }
-}
-```
-
-### 3. Refrescar Token de Acceso
-```bash
-POST /auth/refresh
-Content-Type: application/json
-
-{
-  "refreshToken": "<refreshToken>"
-}
-```
-
-**Respuesta:**
-```json
-{
-  "success": true,
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-### 4. Cerrar Sesión
-```bash
-POST /auth/logout
-Authorization: Bearer <accessToken>
-```
-
-**Respuesta:**
-```json
-{
-  "success": true,
-  "message": "Sesión cerrada exitosamente"
-}
-```
+Nota: En la rama actual los endpoints de login/register/refresh/logout han sido retirados; el frontend de desarrollo espera que pegues un JWT válido en `login.html` para pruebas.
 
 ---
 

@@ -43,33 +43,21 @@ async function run() {
   try {
     console.log('Gateway URL:', GATEWAY);
 
-    console.log('\n1) LOGIN via gateway');
-    const loginResp = await request('/auth/login', 'POST', { email: 'estudiante@example.com', password: 'pass123' });
-    console.log('Login status:', loginResp.status);
-    console.log('Login body:', JSON.stringify(loginResp.body, null, 2));
+    console.log('\n1) GENERATE TOKEN (locally)');
+    // Generate a token using shared-auth so tests don't rely on removed login endpoint
+    const AuthService = require('../../shared-auth/src/services/authService');
+    const { accessToken } = AuthService.generateTokenPair('EST001', 'estudiante', 'estudiante@example.com');
+    console.log('Generated access token (truncated):', accessToken.slice(0, 30) + '...');
 
-    if (!loginResp.body || !loginResp.body.accessToken) throw new Error('Login did not return accessToken');
-    const access = loginResp.body.accessToken;
+    console.log('\n2) VERIFY token via gateway');
+    const verifyBefore = await request('/auth/verify-token', 'POST', { token: accessToken });
+    console.log('Verify status:', verifyBefore.status);
+    console.log('Verify body:', JSON.stringify(verifyBefore.body, null, 2));
 
-    console.log('\n2) VERIFY before logout');
-    const verifyBefore = await request('/auth/verify-token', 'POST', { token: access });
-    console.log('Verify-before status:', verifyBefore.status);
-    console.log('Verify-before body:', JSON.stringify(verifyBefore.body, null, 2));
-
-    console.log('\n3) LOGOUT');
-    // The gateway requires Authorization header for protected routes (logout)
-    const logout = await request('/auth/logout', 'POST', { accessToken: access }, { Authorization: `Bearer ${access}` });
-    console.log('Logout status:', logout.status);
-    console.log('Logout body:', JSON.stringify(logout.body, null, 2));
-
-    console.log('\n4) VERIFY after logout (should be invalid)');
-    try {
-      const verifyAfter = await request('/auth/verify-token', 'POST', { token: access });
-      console.log('Verify-after status:', verifyAfter.status);
-      console.log('Verify-after body:', JSON.stringify(verifyAfter.body, null, 2));
-    } catch (err) {
-      console.error('Verify-after failed as expected:', err.message);
-    }
+    console.log('\n3) GET /auth/me via gateway (Authorization header)');
+    const me = await request('/auth/me', 'GET', null, { Authorization: `Bearer ${accessToken}` });
+    console.log('Me status:', me.status);
+    console.log('Me body:', JSON.stringify(me.body, null, 2));
 
     console.log('\nFinished flow');
     process.exit(0);

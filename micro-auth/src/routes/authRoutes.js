@@ -1,55 +1,46 @@
 const express = require('express');
 const authController = require('../controllers/authController');
-const { authenticateToken } = require('../../../shared-auth/src/middlewares/authMiddleware');
+const userController = require('../controllers/userController');
+const { authenticateToken } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
 /**
- * POST /auth/login
- * Autentica un usuario y retorna accessToken y refreshToken
+ * Rutas públicas
  */
-router.post('/login', authController.login);
-
-/**
- * POST /auth/refresh
- * Refresca el accessToken usando el refreshToken
- */
-router.post('/refresh', authController.refresh);
-
-/**
- * POST /auth/logout
- * Desautentica el usuario y elimina el token del cache
- */
-router.post('/logout', authController.logout);
 
 /**
  * POST /auth/register
- * Registra un nuevo usuario
+ * Registra un nuevo usuario (sin generar token)
  */
-router.post('/register', authController.register);
+router.post('/register', userController.register);
+
+/**
+ * POST /auth/login
+ * Autentica usuario y genera JWT con tokenVersion
+ */
+router.post('/login', userController.login);
 
 /**
  * POST /auth/verify-token
- * Verifica la validez de un token JWT (contra cache + JWT)
+ * Verifica la validez de un token JWT
  */
 router.post('/verify-token', authController.verifyToken);
 
 /**
- * POST /auth/validate-permission
- * Valida si un usuario tiene un permiso específico
+ * Rutas protegidas
  */
-router.post('/validate-permission', authenticateToken, authController.validatePermission);
 
 /**
- * GET /auth/roles
- * Retorna la lista de roles disponibles
+ * POST /auth/logout
+ * Invalida el JWT actual
  */
-router.get('/roles', authController.getRoles);
+router.post('/logout', authenticateToken, userController.logout);
 
 /**
- * GET /auth/roles/:roleId/permissions
- * Retorna los permisos de un rol específico
+ * GET /auth/me
+ * Obtiene datos del usuario autenticado
  */
-router.get('/roles/:roleId/permissions', authController.getRolePermissions);
+router.get('/me', authenticateToken, userController.me);
 
 module.exports = router;

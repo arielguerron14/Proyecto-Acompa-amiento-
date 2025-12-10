@@ -1,11 +1,16 @@
+const AuthService = require('../../shared-auth/src/services/authService');
 const request = require('supertest');
 const app = require('../src/app');
 
 (async () => {
   try {
+    // Generate a test token locally using shared-auth
+    const { accessToken } = AuthService.generateTokenPair('EST001', 'estudiante', 'estudiante@example.com');
+
+    // Verify via local endpoint
     const res = await request(app)
-      .post('/auth/login')
-      .send({ email: 'estudiante@example.com', password: 'pass123' })
+      .post('/auth/verify-token')
+      .send({ token: accessToken })
       .set('Accept', 'application/json');
 
     console.log('status:', res.status);

@@ -24,6 +24,21 @@ connectDB()
 app.use('/', reportesRoutes);
 app.get('/health', (req, res) => res.json({ service: 'micro-reportes-estudiantes', status: 'ok' }));
 
+// Health endpoint for Postgres (optional)
+try {
+  const db = require('./config/postgres');
+  app.get('/health/db', async (req, res) => {
+    try {
+      const result = await db.query('SELECT 1 as ok');
+      res.json({ postgres: 'ok', rows: result.rowCount });
+    } catch (e) {
+      res.status(500).json({ postgres: 'error', message: e.message });
+    }
+  });
+} catch (e) {
+  // postgres helper not present or pg not installed
+}
+
 app.use(notFound);
 app.use(errorHandler);
 
