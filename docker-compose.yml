@@ -61,8 +61,8 @@ services:
   # Microservicio: estudiantes
   micro-estudiantes:
     build:
-      context: ./micro-estudiantes
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: micro-estudiantes/Dockerfile
     container_name: micro-estudiantes
     ports:
       - "5002:5002"
@@ -79,8 +79,8 @@ services:
   # Microservicio: reportes-estudiantes
   micro-reportes-estudiantes:
     build:
-      context: ./micro-reportes-estudiantes
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: micro-reportes-estudiantes/Dockerfile
     container_name: micro-reportes-estudiantes
     ports:
       - "5003:5003"
@@ -97,8 +97,8 @@ services:
   # Microservicio: reportes-maestros
   micro-reportes-maestros:
     build:
-      context: ./micro-reportes-maestros
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: micro-reportes-maestros/Dockerfile
     container_name: micro-reportes-maestros
     ports:
       - "5004:5004"
