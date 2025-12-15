@@ -41,6 +41,9 @@ module.exports = {
   // Timeout por defecto para tests (10 segundos)
   testTimeout: 10000,
 
+  // Setup files
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+
   // Reporters (salida de tests)
   reporters: ['default', 'summary'],
 

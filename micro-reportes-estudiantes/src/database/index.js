@@ -1,9 +1,9 @@
-const mongoose = require('mongoose');
-const { MONGO_URI } = require('../config');
+const pg = require('../config/postgres');
 
 async function connectDB() {
-  await mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-  return mongoose.connection;
+  // Verify Postgres connection by performing a simple query
+  const res = await pg.query('SELECT 1 as ok');
+  return pg.pool;
 }
 
 module.exports = { connectDB };

@@ -1,5 +1,6 @@
 const AuthService = require('../../../shared-auth/src/services/authService');
 const SessionService = require('../services/sessionService');
+const User = require('../models/User');
 const { logger } = require('../../../shared-auth/src/middlewares/logger');
 
 /**
@@ -22,25 +23,37 @@ exports.register = async (req, res) => {
       });
     }
 
-    // TODO: Guardar usuario en base de datos
-    // Por ahora, simular que se guardó correctamente
-    // En producción, verificar si el usuario ya existe y guardarlo en BD
+    // Verificar si el usuario ya existe
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        error: 'El email ya está registrado'
+      });
+    }
 
-    const userId = `user_${Date.now()}`; // Simular generación de ID
-    const userRole = role || 'estudiante';
+    // Crear nuevo usuario
+    const user = new User({
+      email: email.toLowerCase(),
+      password,
+      name,
+      role: role || 'estudiante'
+    });
+
+    await user.save();
 
     // Inicializar sesión con tokenVersion = 0
-    await SessionService.setTokenVersion(userId, 0);
+    await SessionService.setTokenVersion(user._id.toString(), 0);
 
-    // NO generar token aquí, solo guardar datos del usuario
+    // NO generar token aquí, solo confirmar registro
     return res.status(201).json({
       success: true,
       message: 'Usuario creado exitosamente',
       user: {
-        userId,
-        email,
-        name,
-        role: userRole
+        userId: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role
       }
     });
   } catch (error) {
@@ -67,15 +80,34 @@ exports.login = async (req, res) => {
       });
     }
 
-    // TODO: Validar credenciales contra base de datos
-    // Por ahora, simular un login exitoso
-    // En producción: buscar usuario en BD y verificar contraseña con bcrypt
+    // Buscar usuario en la base de datos
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Credenciales inválidas'
+      });
+    }
 
-    // Simular búsqueda de usuario
-    const userId = `user_${email.split('@')[0]}_${Date.now()}`;
-    const roles = ['estudiante']; // Simulado; en producción, obtener de BD
+    // Verificar si el usuario está activo
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        error: 'Cuenta desactivada'
+      });
+    }
+
+    // Verificar contraseña
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: 'Credenciales inválidas'
+      });
+    }
 
     // Obtener o inicializar tokenVersion en Redis
+    const userId = user._id.toString();
     let tokenVersion = await SessionService.getTokenVersion(userId);
     if (tokenVersion === null) {
       tokenVersion = 0;
@@ -83,16 +115,21 @@ exports.login = async (req, res) => {
     }
 
     // Generar JWT con tokenVersion incluido
-    const token = AuthService.generateAccessTokenWithVersion(userId, roles, tokenVersion);
+    const token = AuthService.generateAccessTokenWithVersion(userId, [user.role], tokenVersion);
+
+    // Generar refresh token
+    const refreshToken = AuthService.generateRefreshToken({ userId, role: user.role, email: user.email });
 
     return res.status(200).json({
       success: true,
       message: 'Login exitoso',
       token,
+      refreshToken,
       user: {
         userId,
-        email,
-        roles
+        email: user.email,
+        name: user.name,
+        role: user.role
       }
     });
   } catch (error) {
@@ -147,7 +184,7 @@ exports.logout = async (req, res) => {
  * GET /auth/me
  * Retorna los datos del usuario actual
  */
-exports.me = (req, res) => {
+exports.me = async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -156,9 +193,25 @@ exports.me = (req, res) => {
       });
     }
 
+    // Obtener datos completos del usuario desde BD
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      user: req.user
+      user: {
+        userId: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt
+      }
     });
   } catch (error) {
     logger.error(`[userController.me] ${error.message}`);

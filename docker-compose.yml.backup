@@ -1,29 +1,31 @@
+version: '3.8'
+
 services:
-  # MongoDB - custom image built from databases/mongodb
+  # MongoDB database
   mongo:
-    build:
-      context: ./databases/mongodb
-      dockerfile: Dockerfile
-    image: my-mongo:1.0
+    image: mongo:6.0
+    container_name: proyecto-mongo
+    ports:
+      - "27017:27017"
     volumes:
       - mongo-data:/data/db
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: password
     networks:
-      - internal-network
+      - proyecto-network
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # PostgreSQL - custom image built from databases/postgres
+  # PostgreSQL - Tercera base de datos relacional (para reportes / transactional data)
   postgres:
-    build:
-      context: ./databases/postgres
-      dockerfile: Dockerfile
-    image: my-postgres:1.0
+    image: postgres:15
+    container_name: proyecto-postgres
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -31,25 +33,9 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
-      - internal-network
+      - proyecto-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d acompanamiento || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Redis - custom image built from databases/redis
-  redis:
-    build:
-      context: ./databases/redis
-      dockerfile: Dockerfile
-    image: my-redis:1.0
-    volumes:
-      - redis-data:/data
-    networks:
-      - internal-network
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -64,14 +50,12 @@ services:
       - "5001:5001"
     environment:
       - PORT=5001
-      - DB_HOST=mongo
-      - DB_PORT=27017
       - MONGO_URI=mongodb://mongo:27017/maestrosdb
     depends_on:
       mongo:
         condition: service_healthy
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # Microservicio: estudiantes
@@ -84,14 +68,12 @@ services:
       - "5002:5002"
     environment:
       - PORT=5002
-      - DB_HOST=mongo
-      - DB_PORT=27017
       - MONGO_URI=mongodb://mongo:27017/estudiantesdb
     depends_on:
       mongo:
         condition: service_healthy
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # Microservicio: reportes-estudiantes
@@ -104,14 +86,12 @@ services:
       - "5003:5003"
     environment:
       - PORT=5003
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=acompanamiento
+      - MONGO_URI=mongodb://mongo:27017/reportesestdb
     depends_on:
       mongo:
         condition: service_healthy
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # Microservicio: reportes-maestros
@@ -124,21 +104,19 @@ services:
       - "5004:5004"
     environment:
       - PORT=5004
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=acompanamiento
+      - MONGO_URI=mongodb://mongo:27017/reportesmaestdb
     depends_on:
       mongo:
         condition: service_healthy
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # Microservicio: auth (NUEVO)
   micro-auth:
     build:
-      context: .
-      dockerfile: micro-auth/Dockerfile
+      context: ./micro-auth
+      dockerfile: Dockerfile
     container_name: micro-auth
     ports:
       - "5005:5005"
@@ -146,19 +124,15 @@ services:
       - PORT=5005
       - JWT_SECRET=tu-secret-key-cambiar-en-produccion
       - REFRESH_SECRET=tu-refresh-secret-cambiar-en-produccion
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - DB_HOST=mongo
-      - DB_PORT=27017
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # Microservicio: notificaciones (NUEVO)
   micro-notificaciones:
     build:
-      context: .
-      dockerfile: micro-notificaciones/Dockerfile
+      context: ./micro-notificaciones
+      dockerfile: Dockerfile
     container_name: micro-notificaciones
     ports:
       - "5006:5006"
@@ -171,14 +145,14 @@ services:
       - SMTP_FROM=noreply@sistema.com
       - JWT_SECRET=tu-secret-key-cambiar-en-produccion
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # Microservicio: analytics (NUEVO)
   micro-analytics:
     build:
-      context: .
-      dockerfile: micro-analytics/Dockerfile
+      context: ./micro-analytics
+      dockerfile: Dockerfile
     container_name: micro-analytics
     ports:
       - "5007:5007"
@@ -189,14 +163,14 @@ services:
       - KAFKA_CLIENT_ID=micro-analytics
       - JWT_SECRET=tu-secret-key-cambiar-en-produccion
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # Microservicio: soap-bridge (NUEVO)
   micro-soap-bridge:
     build:
-      context: .
-      dockerfile: micro-soap-bridge/Dockerfile
+      context: ./micro-soap-bridge
+      dockerfile: Dockerfile
     container_name: micro-soap-bridge
     ports:
       - "5008:5008"
@@ -207,7 +181,7 @@ services:
       - SOAP_ASISTENCIA_URL=http://legacy-system:8080/ws/asistencia
       - JWT_SECRET=tu-secret-key-cambiar-en-produccion
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # API Gateway
@@ -240,7 +214,7 @@ services:
       - micro-soap-bridge
       - frontend-web
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # Frontend web (static server)
@@ -254,7 +228,7 @@ services:
       - "5500:5500"
     command: sh -c "npm install -g http-server && http-server ./public -p 5500 -c-1"
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # ====== MESSAGING INFRASTRUCTURE ======
@@ -277,7 +251,7 @@ services:
     depends_on:
       - zookeeper
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
     healthcheck:
       test: kafka-broker-api-versions.sh --bootstrap-server kafka:9092
@@ -295,7 +269,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
   # RabbitMQ - MessageQueue global
@@ -311,7 +285,7 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
     healthcheck:
       test: rabbitmq-diagnostics -q ping
@@ -329,9 +303,9 @@ services:
     volumes:
       - mqtt-data:/mosquitto/data
       - mqtt-logs:/mosquitto/log
-      - ./mqtt-config.conf:/mosquitto/config/mosquitto.conf
+      - ./mqtt-config.conf:/mosquitto/config/mosquitto.conf:ro
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
     healthcheck:
       test: mosquitto_sub -h mqtt -t '$$SYS/broker/clients/active' | grep -q '.'
@@ -353,7 +327,7 @@ services:
       - kafka
       - zookeeper
     networks:
-      - internal-network
+      - proyecto-network
     restart: unless-stopped
 
 volumes:
@@ -362,8 +336,7 @@ volumes:
   mqtt-data:
   mqtt-logs:
   postgres-data:
-  redis-data:
 
 networks:
-  internal-network:
+  proyecto-network:
     driver: bridge

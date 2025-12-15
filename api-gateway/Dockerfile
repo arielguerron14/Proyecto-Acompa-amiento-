@@ -8,7 +8,7 @@ COPY package*.json ./
 # Install production dependencies
 RUN npm install --production
 
-# Copy entire project (includes frontend-web for static serving)
+# Copy entire project
 COPY . .
 
 # Expose gateway port

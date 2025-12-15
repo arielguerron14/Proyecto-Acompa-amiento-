@@ -1,12 +1,19 @@
 FROM node:18-alpine
 
-WORKDIR /app
+WORKDIR /usr/src
 
-COPY package*.json ./
-RUN npm ci --only=production
+# copy shared modules and helpers from repo root
+COPY shared-auth ./shared-auth
+COPY message-broker ./message-broker
 
-COPY . .
+# copy this service and install dependencies
+COPY micro-auth ./app
+WORKDIR /usr/src/app
+RUN npm ci --only=production --silent || npm install --production --silent
 
+# copy full app (ensure sources are present)
+COPY micro-auth ./app
+ENV NODE_ENV=production
+ENV PORT=5005
 EXPOSE 5005
-
-CMD ["npm", "start"]
+CMD ["node", "src/app.js"]

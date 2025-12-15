@@ -2,20 +2,27 @@ const express = require('express');
 require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
 const { initRedis } = require('./services/redisClient');
-const { requestLogger, logger } = require('../../shared-auth/src/middlewares/logger');
-const { errorHandler, notFound } = require('../../shared-auth/src/middlewares/errorHandler');
+const mongoose = require('mongoose');
+const { MONGO_URI } = require('./config');
+const { requestLogger, logger } = require('@proyecto/shared-auth/src/middlewares/logger');
+const { errorHandler, notFound } = require('@proyecto/shared-auth/src/middlewares/errorHandler');
+const promClient = require('prom-client');
+const { createMetrics } = require('@proyecto/shared-monitoring/src/metrics');
+const { metricsMiddleware, metricsRoute } = createMetrics(promClient);
 
 const app = express();
 
 // Middleware
 app.use(express.json());
 app.use(requestLogger);
+app.use(metricsMiddleware());
 
 // Routes
 app.use('/auth', authRoutes);
 app.get('/health', (req, res) =>
   res.json({ status: 'healthy', service: 'micro-auth', timestamp: new Date().toISOString() })
 );
+app.get('/metrics', metricsRoute);
 
 // Error handling
 app.use(notFound);
@@ -28,6 +35,10 @@ async function startServer() {
   try {
     // Try to initialize Redis (optional, falls back to memory cache)
     await initRedis();
+
+    // Initialize MongoDB connection for auth (required)
+    await mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+    logger.info(`Mongo connected for micro-auth`);
     
     const server = app.listen(PORT, () => logger.info(`micro-auth listening on ${PORT}`));
 

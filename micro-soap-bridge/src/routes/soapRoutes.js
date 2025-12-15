@@ -1,6 +1,8 @@
 const express = require('express');
 const soapController = require('../handlers/soapHandler');
-const { authenticateToken } = require('../../../shared-auth/src/middlewares/authMiddleware');
+// When running inside the container the shared package is copied to /usr/shared-auth
+// Use absolute path here so Docker builds can resolve it reliably.
+const { authenticateToken } = require('/usr/shared-auth/src/middlewares/authMiddleware');
 
 const router = express.Router();
 

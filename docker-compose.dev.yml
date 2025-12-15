@@ -52,14 +52,20 @@ services:
       - .env
 
   mongo:
-    image: mongo:6.0
+    build:
+      context: .
+      dockerfile: databases/mongodb/Dockerfile
+    image: my-mongo:1.0
     ports:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
 
   postgres:
-    image: postgres:15
+    build:
+      context: .
+      dockerfile: databases/postgres/Dockerfile
+    image: my-postgres:1.0
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -70,7 +76,10 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   redis:
-    image: redis:7
+    build:
+      context: .
+      dockerfile: databases/redis/Dockerfile
+    image: my-redis:1.0
     ports:
       - "6379:6379"
     volumes:

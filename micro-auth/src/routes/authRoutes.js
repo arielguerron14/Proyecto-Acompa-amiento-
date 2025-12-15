@@ -28,6 +28,12 @@ router.post('/login', userController.login);
 router.post('/verify-token', authController.verifyToken);
 
 /**
+ * POST /auth/refresh
+ * Refresca el access token usando refresh token
+ */
+router.post('/refresh', authController.refreshToken);
+
+/**
  * Rutas protegidas
  */
 

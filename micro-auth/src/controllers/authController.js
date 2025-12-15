@@ -25,3 +25,8 @@ exports.verifyToken = (req, res) => {
   }
 };
 
+    // Dummy refreshToken handler (implementa lógica real según sea necesario)
+    exports.refreshToken = (req, res) => {
+      return res.status(501).json({ success: false, error: 'Not implemented' });
+    };
+
