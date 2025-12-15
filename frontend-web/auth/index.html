@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Acompañamiento Académico - Autenticación</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .tabs-container {
+            display: flex;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 16px;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            font-weight: 500;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .tab-button.active {
+            color: #2563eb;
+            background: white;
+        }
+
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #2563eb;
+        }
+
+        .form-container {
+            padding: 32px;
+        }
+
+        .form-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .form-header h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .form-header p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-group input.error {
+            border-color: #ef4444;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .role-selector {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .role-option {
+            flex: 1;
+            padding: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .role-option:hover {
+            border-color: #2563eb;
+        }
+
+        .role-option.active {
+            border-color: #2563eb;
+            background: #eff6ff;
+        }
+
+        .role-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .role-title {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .role-description {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            position: relative;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #1d4ed8;
+        }
+
+        .btn-primary:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        @keyframes spin {
+            0% { transform: translateY(-50%) rotate(0deg); }
+            100% { transform: translateY(-50%) rotate(360deg); }
+        }
+
+        .message-container {
+            margin-bottom: 20px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .message-container.success {
+            background: #dcfce7;
+            border: 1px solid #16a34a;
+            color: #166534;
+        }
+
+        .message-container.error {
+            background: #fef2f2;
+            border: 1px solid #dc2626;
+            color: #991b1b;
+        }
+
+        @media (max-width: 480px) {
+            .auth-container {
+                margin: 10px;
+                max-width: none;
+            }
+
+            .form-container {
+                padding: 24px;
+            }
+
+            .role-selector {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <!-- Tabs de navegación -->
+        <div class="tabs-container">
+            <button class="tab-button active" data-tab="login">
+                Iniciar Sesión
+            </button>
+            <button class="tab-button" data-tab="register">
+                Registrarse
+            </button>
+        </div>
+
+        <!-- Contenedor de mensajes -->
+        <div id="message-container" class="message-container">
+            <div id="message-content"></div>
+        </div>
+
+        <div class="form-container">
+            <!-- Formulario de Login -->
+            <form id="login-form" class="auth-form active">
+                <div class="form-header">
+                    <h2>Bienvenido</h2>
+                    <p>Ingresa tus credenciales para continuar</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="login-email">Correo electrónico</label>
+                    <input
+                        type="email"
+                        id="login-email"
+                        name="email"
+                        required
+                        placeholder="tu@email.com"
+                        autocomplete="email"
+                    >
+                    <div class="error-message" id="login-email-error"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="login-password">Contraseña</label>
+                    <input
+                        type="password"
+                        id="login-password"
+                        name="password"
+                        required
+                        placeholder="••••••••"
+                        autocomplete="current-password"
+                    >
+                    <div class="error-message" id="login-password-error"></div>
+                </div>
+
+                <button type="submit" class="btn-primary" id="login-submit">
+                    <span class="btn-text">Iniciar Sesión</span>
+                    <div class="loading-spinner"></div>
+                </button>
+            </form>
+
+            <!-- Formulario de Registro -->
+            <form id="register-form" class="auth-form">
+                <div class="form-header">
+                    <h2>Crear Cuenta</h2>
+                    <p>Selecciona tu tipo de usuario y registra tus datos</p>
+                </div>
+
+                <!-- Selección de Rol -->
+                <div class="form-group">
+                    <label>Tipo de usuario</label>
+                    <div class="role-selector">
+                        <button type="button" class="role-option active" data-role="estudiante">
+                            <div class="role-icon">🎓</div>
+                            <div class="role-title">Estudiante</div>
+                            <div class="role-description">Acceso a reportes</div>
+                        </button>
+                        <button type="button" class="role-option" data-role="maestro">
+                            <div class="role-icon">👨‍🏫</div>
+                            <div class="role-title">Maestro</div>
+                            <div class="role-description">Gestión académica</div>
+                        </button>
+                    </div>
+                    <input type="hidden" id="register-role" name="rol" value="estudiante">
+                </div>
+
+                <div class="form-group">
+                    <label for="register-nombre">Nombre completo</label>
+                    <input
+                        type="text"
+                        id="register-nombre"
+                        name="nombre"
+                        required
+                        placeholder="Juan Pérez"
+                        autocomplete="name"
+                    >
+                    <div class="error-message" id="register-nombre-error"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="register-email">Correo electrónico</label>
+                    <input
+                        type="email"
+                        id="register-email"
+                        name="email"
+                        required
+                        placeholder="tu@email.com"
+                        autocomplete="email"
+                    >
+                    <div class="error-message" id="register-email-error"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="register-password">Contraseña</label>
+                    <input
+                        type="password"
+                        id="register-password"
+                        name="password"
+                        required
+                        placeholder="••••••••"
+                        autocomplete="new-password"
+                    >
+                    <div class="error-message" id="register-password-error"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="register-confirm-password">Confirmar contraseña</label>
+                    <input
+                        type="password"
+                        id="register-confirm-password"
+                        name="confirmPassword"
+                        required
+                        placeholder="••••••••"
+                        autocomplete="new-password"
+                    >
+                    <div class="error-message" id="register-confirm-password-error"></div>
+                </div>
+
+                <button type="submit" class="btn-primary" id="register-submit">
+                    <span class="btn-text">Crear Cuenta</span>
+                    <div class="loading-spinner"></div>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Sistema de Autenticación - Frontend
+         * Proyecto: Sistema de Acompañamiento Académico
+         */
+
+        class AuthSystem {
+            constructor() {
+                this.currentTab = 'login';
+                this.selectedRole = 'estudiante';
+                this.apiUrl = 'http://localhost:8080';
+
+                // Elementos DOM
+                this.loginForm = document.getElementById('login-form');
+                this.registerForm = document.getElementById('register-form');
+                this.tabButtons = document.querySelectorAll('.tab-button');
+                this.roleButtons = document.querySelectorAll('.role-option');
+                this.submitButtons = document.querySelectorAll('.btn-primary');
+
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.checkExistingSession();
+            }
+
+            setupEventListeners() {
+                // Cambio de pestañas
+                this.tabButtons.forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        this.switchTab(e.target.dataset.tab);
+                    });
+                });
+
+                // Selección de roles
+                this.roleButtons.forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        this.selectRole(e.target.closest('.role-option').dataset.role);
+                    });
+                });
+
+                // Formularios
+                this.loginForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.handleLogin();
+                });
+
+                this.registerForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.handleRegister();
+                });
+
+                // Validación en tiempo real
+                document.querySelectorAll('input').forEach(input => {
+                    input.addEventListener('blur', () => this.validateField(input));
+                    input.addEventListener('input', () => this.clearFieldError(input));
+                });
+            }
+
+            checkExistingSession() {
+                const token = localStorage.getItem('authToken');
+                const userData = localStorage.getItem('userData');
+
+                if (token && userData) {
+                    try {
+                        const user = JSON.parse(userData);
+                        this.showMessage('Sesión existente encontrada. Redirigiendo...', 'success');
+                        setTimeout(() => this.redirectByRole(user), 1500);
+                    } catch (e) {
+                        localStorage.removeItem('authToken');
+                        localStorage.removeItem('userData');
+                    }
+                }
+            }
+
+            switchTab(tab) {
+                this.currentTab = tab;
+
+                // Actualizar botones
+                this.tabButtons.forEach(button => {
+                    button.classList.toggle('active', button.dataset.tab === tab);
+                });
+
+                // Mostrar/ocultar formularios
+                this.loginForm.classList.toggle('active', tab === 'login');
+                this.registerForm.classList.toggle('active', tab === 'register');
+
+                // Limpiar mensajes
+                this.clearMessages();
+            }
+
+            selectRole(role) {
+                this.selectedRole = role;
+
+                // Actualizar botones visuales
+                this.roleButtons.forEach(button => {
+                    button.classList.toggle('active', button.dataset.role === role);
+                });
+
+                // Actualizar campo oculto
+                document.getElementById('register-role').value = role;
+            }
+
+            async handleLogin() {
+                if (!this.validateLoginForm()) return;
+
+                this.setLoading(true, 'login-submit');
+
+                try {
+                    const formData = new FormData(this.loginForm);
+                    const response = await this.apiRequest('/auth/login', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            email: formData.get('email'),
+                            password: formData.get('password')
+                        })
+                    });
+
+                    // Guardar datos de sesión
+                    localStorage.setItem('authToken', response.token);
+                    localStorage.setItem('userData', JSON.stringify(response.user));
+
+                    this.showMessage('¡Inicio de sesión exitoso! Redirigiendo...', 'success');
+                    setTimeout(() => this.redirectByRole(response.user), 1500);
+
+                } catch (error) {
+                    this.showMessage(error.message || 'Error al iniciar sesión', 'error');
+                } finally {
+                    this.setLoading(false, 'login-submit');
+                }
+            }
+
+            async handleRegister() {
+                if (!this.validateRegisterForm()) return;
+
+                this.setLoading(true, 'register-submit');
+
+                try {
+                    const formData = new FormData(this.registerForm);
+                    const userData = {
+                        nombre: formData.get('nombre'),
+                        email: formData.get('email'),
+                        password: formData.get('password'),
+                        rol: this.selectedRole
+                    };
+
+                    const response = await this.apiRequest('/auth/register', {
+                        method: 'POST',
+                        body: JSON.stringify(userData)
+                    });
+
+                    this.showMessage('¡Registro exitoso! Puedes iniciar sesión ahora.', 'success');
+
+                    // Cambiar a login después de 2 segundos
+                    setTimeout(() => {
+                        this.switchTab('login');
+                        this.registerForm.reset();
+                        this.selectRole('estudiante'); // Resetear rol
+                    }, 2000);
+
+                } catch (error) {
+                    this.showMessage(error.message || 'Error al registrar usuario', 'error');
+                } finally {
+                    this.setLoading(false, 'register-submit');
+                }
+            }
+
+            validateLoginForm() {
+                const email = document.getElementById('login-email');
+                const password = document.getElementById('login-password');
+
+                let isValid = true;
+                if (!this.validateField(email)) isValid = false;
+                if (!this.validateField(password)) isValid = false;
+
+                return isValid;
+            }
+
+            validateRegisterForm() {
+                const fields = ['register-nombre', 'register-email', 'register-password', 'register-confirm-password'];
+                let isValid = true;
+
+                fields.forEach(fieldId => {
+                    const field = document.getElementById(fieldId);
+                    if (!this.validateField(field)) isValid = false;
+                });
+
+                // Validar contraseñas coincidan
+                const password = document.getElementById('register-password');
+                const confirmPassword = document.getElementById('register-confirm-password');
+
+                if (password.value !== confirmPassword.value) {
+                    this.showFieldError(confirmPassword, 'Las contraseñas no coinciden');
+                    isValid = false;
+                }
+
+                return isValid;
+            }
+
+            validateField(field) {
+                const value = field.value.trim();
+                let error = null;
+
+                switch (field.name) {
+                    case 'email':
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        if (!emailRegex.test(value)) error = 'Correo electrónico inválido';
+                        break;
+                    case 'password':
+                        if (value.length < 6) error = 'La contraseña debe tener al menos 6 caracteres';
+                        break;
+                    case 'confirmPassword':
+                        // Se valida en validateRegisterForm
+                        break;
+                    case 'nombre':
+                        if (value.length < 2) error = 'El nombre debe tener al menos 2 caracteres';
+                        break;
+                }
+
+                if (error) {
+                    this.showFieldError(field, error);
+                    return false;
+                } else {
+                    this.clearFieldError(field);
+                    return true;
+                }
+            }
+
+            showFieldError(field, message) {
+                const errorElement = field.parentElement.querySelector('.error-message');
+                if (errorElement) {
+                    errorElement.textContent = message;
+                    errorElement.style.display = 'block';
+                }
+                field.classList.add('error');
+            }
+
+            clearFieldError(field) {
+                const errorElement = field.parentElement.querySelector('.error-message');
+                if (errorElement) {
+                    errorElement.style.display = 'none';
+                }
+                field.classList.remove('error');
+            }
+
+            showMessage(message, type) {
+                const container = document.getElementById('message-container');
+                const content = document.getElementById('message-content');
+
+                content.textContent = message;
+                container.className = `message-container ${type}`;
+                container.style.display = 'block';
+
+                // Auto-ocultar después de 5 segundos para errores, mantener para éxito
+                if (type === 'error') {
+                    setTimeout(() => {
+                        container.style.display = 'none';
+                    }, 5000);
+                }
+            }
+
+            clearMessages() {
+                document.getElementById('message-container').style.display = 'none';
+            }
+
+            setLoading(loading, buttonId) {
+                const button = document.getElementById(buttonId);
+                const spinner = button.querySelector('.loading-spinner');
+                const text = button.querySelector('.btn-text');
+
+                button.disabled = loading;
+                spinner.style.display = loading ? 'block' : 'none';
+                if (text) text.textContent = loading ? 'Procesando...' : (buttonId === 'login-submit' ? 'Iniciar Sesión' : 'Crear Cuenta');
+            }
+
+            async apiRequest(endpoint, options = {}) {
+                const url = `${this.apiUrl}${endpoint}`;
+                const config = {
+                    method: options.method || 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                };
+
+                // Agregar token si existe
+                const token = localStorage.getItem('authToken');
+                if (token) {
+                    config.headers.Authorization = `Bearer ${token}`;
+                }
+
+                try {
+                    const response = await fetch(url, config);
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
+                    }
+
+                    return data;
+                } catch (error) {
+                    if (error.name === 'TypeError') {
+                        throw new Error('Error de conexión. Verifica que el servidor esté ejecutándose.');
+                    }
+                    throw error;
+                }
+            }
+
+            redirectByRole(user) {
+                const routes = {
+                    estudiante: '/estudiante/dashboard',
+                    maestro: '/maestro/dashboard',
+                    admin: '/admin/dashboard'
+                };
+
+                const route = routes[user.rol] || '/dashboard';
+                window.location.href = route;
+            }
+        }
+
+        // Inicializar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            window.authSystem = new AuthSystem();
+        });
+    </script>
+</body>
+</html>

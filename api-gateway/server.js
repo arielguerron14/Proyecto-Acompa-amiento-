@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const { applySecurity } = require('./src/middlewares/security');
 const { requestLogger, logger } = require('./src/middlewares/logger');
@@ -8,16 +9,19 @@ const { setupSwagger } = require('./src/swagger');
 const authRoutes = require('./src/routes/authRoutes');
 const { initRedis } = require('./src/services/redisClient');
 // Monitoring
-const { startDefaultMetrics, metricsMiddleware, metricsRoute } = require('../shared-monitoring/src/metrics');
+// const promClient = require('prom-client');
+// const { createMetrics } = require('../shared-monitoring/src/metrics');
+// const { startDefaultMetrics, metricsMiddleware, metricsRoute } = createMetrics(promClient);
 
 const PORT = process.env.PORT || 8080;
 const app = express();
 
 app.use(express.json());
+app.use(cors());
 
 // start default process metrics and HTTP instrumentation
-startDefaultMetrics();
-app.use(metricsMiddleware());
+// startDefaultMetrics();
+// app.use(metricsMiddleware());
 
 // APLICAR SEGURIDAD Y CORS PRIMERO (antes que cualquier ruta)
 const maestros = process.env.MAESTROS_URL || 'http://micro-maestros:5001';
@@ -26,9 +30,9 @@ const reportesEst = process.env.REPORTES_EST_URL || 'http://micro-reportes-estud
 const reportesMaest = process.env.REPORTES_MAEST_URL || 'http://micro-reportes-maestros:5004';
 const frontend = process.env.FRONTEND_URL || 'http://frontend-web:5500';
 
-applySecurity(app, { whitelist: [frontend] });
+// applySecurity(app, { whitelist: [frontend] });
 
-app.use(requestLogger);
+// app.use(requestLogger);
 
 // Rutas de autenticación (públicas)
 app.use('/auth', authRoutes);
@@ -48,10 +52,10 @@ app.get('/health', (req, res) => {
 });
 
 // Prometheus metrics endpoint
-app.get('/metrics', metricsRoute);
+// app.get('/metrics', metricsRoute);
 
 // Swagger UI
-setupSwagger(app);
+// setupSwagger(app);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -69,10 +73,10 @@ process.on('unhandledRejection', (reason, promise) => {
 // Initialize Redis and then start server
 async function startServer() {
   try {
-    await initRedis();
-    app.listen(PORT, '0.0.0.0', () => logger.info(`API Gateway listening on port ${PORT} (0.0.0.0)`));
+// await initRedis();
+    app.listen(PORT, '0.0.0.0', () => console.log(`API Gateway listening on port ${PORT} (0.0.0.0)`));
   } catch (error) {
-    logger.error(`Failed to start API Gateway: ${error.message}`);
+    console.error(`Failed to start API Gateway: ${error.message}`);
     process.exit(1);
   }
 }

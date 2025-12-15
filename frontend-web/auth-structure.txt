@@ -1,0 +1,16 @@
+frontend-web/
+├── auth/
+│   ├── index.html          # Página principal de autenticación
+│   ├── css/
+│   │   ├── styles.css      # Estilos principales
+│   │   └── responsive.css  # Estilos responsive
+│   └── js/
+│       ├── auth.js         # Lógica de autenticación
+│       ├── validation.js   # Validaciones de formulario
+│       └── api.js          # Integración con API
+├── assets/
+│   └── images/
+│       └── branding.png    # Logo institucional
+└── components/
+    └── shared/
+        └── loading-spinner.html  # Componente de loading

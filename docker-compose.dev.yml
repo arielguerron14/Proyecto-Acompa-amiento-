@@ -22,8 +22,13 @@ services:
       - ./api-gateway:/app:delegated
     ports:
       - "8080:8080"
-    env_file:
-      - .env
+    environment:
+      - AUTH_URL=http://micro-auth:5005
+      - MAESTROS_URL=http://micro-maestros:5001
+      - ESTUDIANTES_URL=http://micro-estudiantes:5002
+      - REPORTES_EST_URL=http://micro-reportes-estudiantes:5003
+      - REPORTES_MAEST_URL=http://micro-reportes-maestros:5004
+      - FRONTEND_URL=http://frontend-web:5500
     depends_on:
       - micro-auth
     command: npm start
@@ -53,8 +58,8 @@ services:
 
   mongo:
     build:
-      context: .
-      dockerfile: databases/mongodb/Dockerfile
+      context: ./databases/mongodb
+      dockerfile: Dockerfile
     image: my-mongo:1.0
     ports:
       - "27017:27017"
@@ -63,8 +68,8 @@ services:
 
   postgres:
     build:
-      context: .
-      dockerfile: databases/postgres/Dockerfile
+      context: ./databases/postgres
+      dockerfile: Dockerfile
     image: my-postgres:1.0
     environment:
       POSTGRES_USER: postgres
@@ -77,8 +82,8 @@ services:
 
   redis:
     build:
-      context: .
-      dockerfile: databases/redis/Dockerfile
+      context: ./databases/redis
+      dockerfile: Dockerfile
     image: my-redis:1.0
     ports:
       - "6379:6379"

@@ -67,6 +67,8 @@ services:
       - DB_HOST=mongo
       - DB_PORT=27017
       - MONGO_URI=mongodb://mongo:27017/maestrosdb
+    volumes:
+      - ./shared-auth:/usr/src/shared-auth:delegated
     depends_on:
       mongo:
         condition: service_healthy
@@ -87,6 +89,8 @@ services:
       - DB_HOST=mongo
       - DB_PORT=27017
       - MONGO_URI=mongodb://mongo:27017/estudiantesdb
+    volumes:
+      - ./shared-auth:/usr/src/shared-auth:delegated
     depends_on:
       mongo:
         condition: service_healthy
@@ -107,6 +111,8 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=acompanamiento
+    volumes:
+      - ./shared-auth:/usr/src/shared-auth:delegated
     depends_on:
       mongo:
         condition: service_healthy
@@ -127,6 +133,8 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=acompanamiento
+    volumes:
+      - ./shared-auth:/usr/src/shared-auth:delegated
     depends_on:
       mongo:
         condition: service_healthy
@@ -150,6 +158,9 @@ services:
       - REDIS_PORT=6379
       - DB_HOST=mongo
       - DB_PORT=27017
+    volumes:
+      - ./shared-auth:/usr/src/shared-auth:delegated
+      - ./shared-monitoring:/usr/src/shared-monitoring:delegated
     networks:
       - internal-network
     restart: unless-stopped
@@ -170,6 +181,8 @@ services:
       - SMTP_PASS=demo-password
       - SMTP_FROM=noreply@sistema.com
       - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+    volumes:
+      - ./shared-auth:/usr/src/shared-auth:delegated
     networks:
       - internal-network
     restart: unless-stopped
@@ -188,6 +201,8 @@ services:
       - KAFKA_BROKERS=kafka:9092
       - KAFKA_CLIENT_ID=micro-analytics
       - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+    volumes:
+      - ./shared-auth:/usr/src/shared-auth:delegated
     networks:
       - internal-network
     restart: unless-stopped
@@ -206,6 +221,8 @@ services:
       - SOAP_CALIFICACIONES_URL=http://legacy-system:8080/ws/calificaciones
       - SOAP_ASISTENCIA_URL=http://legacy-system:8080/ws/asistencia
       - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+    volumes:
+      - ./shared-auth:/usr/src/shared-auth:delegated
     networks:
       - internal-network
     restart: unless-stopped
@@ -229,6 +246,9 @@ services:
       - ANALYTICS_URL=http://micro-analytics:5007
       - SOAP_URL=http://micro-soap-bridge:5008
       - FRONTEND_URL=http://frontend-web:5500
+    volumes:
+      - ./shared-auth:/usr/src/shared-auth:delegated
+      - ./shared-monitoring:/usr/src/shared-monitoring:delegated
     depends_on:
       - micro-maestros
       - micro-estudiantes
@@ -252,7 +272,7 @@ services:
       - ./frontend-web:/app
     ports:
       - "5500:5500"
-    command: sh -c "npm install -g http-server && http-server ./public -p 5500 -c-1"
+    command: sh -c "npm install -g http-server && http-server . -p 5500 -c-1"
     networks:
       - internal-network
     restart: unless-stopped
@@ -356,6 +376,44 @@ services:
       - internal-network
     restart: unless-stopped
 
+  # Prometheus - Sistema de monitoreo y alertas
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - internal-network
+    restart: unless-stopped
+
+  # Grafana - Dashboard de visualización
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./monitoring/alert-rules.yml:/etc/grafana/provisioning/alerting/alert-rules.yml
+    networks:
+      - internal-network
+    restart: unless-stopped
+
 volumes:
   mongo-data:
   rabbitmq-data:
@@ -363,6 +421,8 @@ volumes:
   mqtt-logs:
   postgres-data:
   redis-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   internal-network:

@@ -3,7 +3,7 @@ const { authenticateToken } = require('../middlewares/authMiddleware');
 const HttpForwarder = require('../utils/httpForward');
 
 const router = express.Router();
-const microAuth = process.env.MICRO_AUTH_URL || 'http://localhost:5005';
+const microAuth = process.env.AUTH_URL || 'http://localhost:5005';
 
 router.post('/register', async (req, res) => {
   try {

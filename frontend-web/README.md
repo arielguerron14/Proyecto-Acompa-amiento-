@@ -1,53 +1,114 @@
-# Frontend Web
+# Frontend - Acompañamiento Educativo
 
-Interfaz web estática para la plataforma de acompañamiento educativo.
+Aplicación React + TypeScript para la interfaz de usuario del sistema de acompañamiento educativo.
 
-## 🎯 Descripción
+## Arquitectura
 
-El servicio **Frontend Web** proporciona la interfaz de usuario para interactuar con el sistema de acompañamiento de estudiantes. Sirve archivos HTML, CSS y JavaScript estáticos desde un servidor HTTP.
-
-## 🛠️ Tecnologías
-
-- **HTML5** - Estructura de marcado
-- **CSS3** - Estilos y diseño responsive
-- **JavaScript (Vanilla)** - Lógica del lado del cliente
-- **HTTP Server** - Servidor de archivos estáticos (Node.js o Nginx)
-
-## 📁 Estructura del Proyecto
-
+### Estructura de Carpetas
 ```
-frontend-web/
-├── public/
-│   ├── index.html              # Página de inicio
-│   ├── estudiante.html         # Interfaz de estudiante
-│   ├── maestro.html            # Interfaz de maestro (futuro)
-│   ├── styles.css              # Estilos globales
-│   ├── curriculum.js           # Datos/utilidades de currículo
-│   └── images/                 # Imágenes
-├── src/
-│   ├── estudiante.js           # Lógica de página estudiante
-│   ├── maestro.js              # Lógica de página maestro
-│   └── common.js               # Lógica compartida
-├── styles/
-│   ├── styles.css              # Estilos adicionales
-│   └── responsive.css          # Media queries
-├── Dockerfile                  # Imagen Docker (nginx)
-├── .dockerignore               # Exclusiones build
-├── package.json                # Dependencias (http-server)
-└── README.md                   # Este archivo
+src/
+├── components/     # Componentes UI reutilizables
+├── pages/         # Páginas principales (feature-based)
+├── services/      # Servicios API desacoplados
+├── store/         # State management (Zustand)
+├── guards/        # Guards de autenticación y autorización
+├── hooks/         # Custom hooks
+├── types/         # Definiciones TypeScript
+└── utils/         # Utilidades
 ```
 
-## Installation
+### Tecnologías
+- **React 18** - Framework UI
+- **TypeScript** - Type safety
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **React Router** - Routing
+- **Zustand** - State management
+- **Axios** - HTTP client
 
-### Requisitos
+## Autenticación y Seguridad
 
-- Node.js 18+ (para desarrollo con http-server) o Docker
-- npm 9+
+### JWT Management
+- Tokens almacenados de forma segura
+- Refresh token automático
+- Interceptors para manejo de errores 401/403
 
-### Setup Local con HTTP Server
+### RBAC (Role-Based Access Control)
+- Roles: admin, maestro, estudiante, auditor
+- Guards de ruta por rol
+- Renderizado condicional
 
+## Integración con Backend
+
+### API Gateway
+Todo el tráfico pasa por `http://localhost:3000` (API Gateway).
+
+### Servicios API
+- Capa desacoplada con Axios
+- Timeouts y retries configurables
+- Manejo centralizado de errores
+
+## Desarrollo
+
+### Instalación
 ```bash
-# Instalar http-server globalmente (solo una vez)
+npm install
+```
+
+### Desarrollo
+```bash
+npm run dev
+```
+
+### Build
+```bash
+npm run build
+```
+
+### Linting
+```bash
+npm run lint
+```
+
+## Variables de Entorno
+
+```env
+VITE_API_BASE_URL=http://localhost:3000
+VITE_APP_NAME=Acompañamiento Educativo
+```
+
+## Flujo de Autenticación
+
+1. Usuario ingresa credenciales
+2. POST /auth/login → API Gateway
+3. Validación JWT en micro-auth
+4. Token almacenado en Zustand + localStorage
+5. Interceptors agregan Authorization header
+6. Refresh automático en caso de expiración
+7. Logout limpia estado y redirige
+
+## Roles y Permisos
+
+| Rol | Permisos |
+|-----|----------|
+| admin | CRUD completo, gestión usuarios |
+| maestro | Gestión estudiantes, reportes |
+| estudiante | Ver reportes propios |
+| auditor | Solo lectura, reportes |
+
+## Rendimiento
+
+- Lazy loading de rutas
+- Code splitting automático
+- Optimización de renders con React.memo
+- Tailwind CSS para estilos eficientes
+
+## Accesibilidad
+
+- ARIA labels
+- Navegación por teclado
+- Contraste de colores
+- Screen reader support
 npm install -g http-server
 
 # Navegar a la carpeta del proyecto

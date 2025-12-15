@@ -1,0 +1,140 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Microservices Monitoring Dashboard",
+    "tags": ["microservices", "monitoring"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "CPU Usage by Service",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_user_seconds_total{job=~\"$service\"}[5m]) * 100",
+            "legendFormat": "{{job}} CPU User %"
+          },
+          {
+            "expr": "rate(process_cpu_system_seconds_total{job=~\"$service\"}[5m]) * 100",
+            "legendFormat": "{{job}} CPU System %"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Memory Usage by Service",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=~\"$service\"} / 1024 / 1024",
+            "legendFormat": "{{job}} Memory (MB)"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "HTTP Request Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m]))",
+            "legendFormat": "{{job}} 95th percentile latency"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m]))",
+            "legendFormat": "{{job}} 50th percentile latency"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "HTTP Errors",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{code=~\"4..\", job=~\"$service\"}[5m])",
+            "legendFormat": "{{job}} 4xx errors"
+          },
+          {
+            "expr": "rate(http_requests_total{code=~\"5..\", job=~\"$service\"}[5m])",
+            "legendFormat": "{{job}} 5xx errors"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Service Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "up{job=~\"$service\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Value"
+              },
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "options": {
+                        "0": {
+                          "text": "DOWN",
+                          "color": "red"
+                        },
+                        "1": {
+                          "text": "UP",
+                          "color": "green"
+                        }
+                      },
+                      "type": "value"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(job)",
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    },
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}
