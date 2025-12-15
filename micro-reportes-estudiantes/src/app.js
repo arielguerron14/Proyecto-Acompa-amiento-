@@ -4,7 +4,7 @@ const { connectDB } = require('./database');
 const { applySecurity } = require('./middlewares/security');
 const { requestLogger, logger } = require('./middlewares/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
-const { optionalAuth } = require('./middlewares/authMiddleware');
+const { optionalAuth } = require('../../../shared-auth/src/middlewares/authMiddleware');
 const reportesRoutes = require('./routes/reportesEstRoutes');
 
 const app = express();

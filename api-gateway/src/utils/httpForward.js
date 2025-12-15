@@ -1,3 +1,5 @@
+
+const axios = require('axios');
 const { logger } = require('../middlewares/logger');
 
 /**
@@ -17,32 +19,36 @@ class HttpForwarder {
    */
   static async forward(baseUrl, path, method, body = null, headers = {}) {
     try {
-      const options = {
+      const config = {
         method,
+        url: `${baseUrl}${path}`,
         headers: {
           'Content-Type': 'application/json',
           ...headers
-        }
+        },
+        timeout: 10000 // 10 second timeout
       };
 
       if (body) {
-        options.body = JSON.stringify(body);
+        config.data = body;
       }
 
-      const response = await fetch(`${baseUrl}${path}`, options);
-      const text = await response.text();
-
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = text;
-      }
-
-      return { status: response.status, data };
+      const response = await axios(config);
+      return { status: response.status, data: response.data };
     } catch (err) {
       logger.error(`[HttpForwarder] Failed to forward to ${path}:`, err.message);
-      throw err;
+
+      // Handle axios errors
+      if (err.response) {
+        // Server responded with error status
+        return { status: err.response.status, data: err.response.data };
+      } else if (err.request) {
+        // Request was made but no response received
+        throw new Error(`Service unavailable: ${baseUrl}${path}`);
+      } else {
+        // Something else happened
+        throw err;
+      }
     }
   }
 
