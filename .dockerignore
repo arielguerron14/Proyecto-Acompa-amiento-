@@ -1,0 +1,29 @@
+# Repository-level .dockerignore to reduce build context
+
+# VCS and editor
+.git
+.vscode
+.idea
+
+# Node artifacts
+node_modules
+**/node_modules
+npm-debug.log
+# package-lock.json - needed for npm ci
+
+# Env and secrets (except for build-time needed files)
+# .env - needed for frontend build
+.env.*
+!.env
+
+# Logs and caches
+*.log
+docker-startup.log
+dist
+build
+coverage
+.DS_Store
+Thumbs.db
+
+# OS files
+__pycache__/

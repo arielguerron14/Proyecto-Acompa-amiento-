@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const ReservaSchema = new Schema({
-  estudianteId: { type: Number, required: true },
+  estudianteId: { type: String, required: true },
   estudianteName: { type: String, required: true },
   maestroId: { type: Number, required: true },
   maestroName: { type: String, required: true },

@@ -57,8 +57,8 @@ services:
   # Microservicio: maestros
   micro-maestros:
     build:
-      context: ./micro-maestros
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./micro-maestros/Dockerfile
     container_name: micro-maestros
     ports:
       - "5001:5001"
@@ -158,6 +158,8 @@ services:
       - REDIS_PORT=6379
       - DB_HOST=mongo
       - DB_PORT=27017
+      - DB_USER=root
+      - DB_PASS=password
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
       - ./shared-monitoring:/usr/src/shared-monitoring:delegated

@@ -12,7 +12,7 @@ module.exports = {
 
   getReservasByEstudiante: async (req, res) => {
     try {
-      const estudianteId = Number(req.params.id);
+      const estudianteId = req.params.id; // Keep as string
       const list = await reservasService.getByEstudiante(estudianteId);
       res.json(list);
     } catch (err) {

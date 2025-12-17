@@ -1,13 +1,16 @@
 FROM node:18-alpine
 
+WORKDIR /usr/src
+
+# copy shared modules first
+COPY message-broker ./message-broker
+
+# copy this service
+COPY micro-maestros ./app
 WORKDIR /usr/src/app
 
-# copy package manifests and install (production)
-COPY package*.json ./
+# install dependencies (production)
 RUN npm ci --only=production --silent || npm install --production --silent
-
-# copy sources
-COPY . .
 
 ENV NODE_ENV=production
 ENV PORT=5001

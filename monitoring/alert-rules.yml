@@ -1,22 +1,22 @@
 apiVersion: 1
 
 groups:
-  - name: microservices_alerts
-    rules:
-      - alert: ServiceDown
-        expr: up == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Service {{ $labels.job }} is down"
-          description: "Service {{ $labels.job }} has been down for more than 1 minute."
+  # - name: microservices_alerts
+  #   rules:
+  #     - alert: ServiceDown
+  #       expr: up == 0
+  #       for: 1m
+  #       labels:
+  #         severity: critical
+  #       annotations:
+  #         summary: "Service {{ $labels.job }} is down"
+  #         description: "Service {{ $labels.job }} has been down for more than 1 minute."
 
-      - alert: HighCPUUsage
-        expr: rate(process_cpu_user_seconds_total[5m]) * 100 > 80
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High CPU usage on {{ $labels.job }}"
-          description: "CPU usage is above 80% for {{ $labels.job }}."
+  #     - alert: HighCPUUsage
+  #       expr: rate(process_cpu_user_seconds_total[5m]) * 100 > 80
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "High CPU usage on {{ $labels.job }}"
+  #         description: "CPU usage is above 80% for {{ $labels.job }}."

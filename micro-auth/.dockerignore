@@ -1,0 +1,7 @@
+# micro-auth ignores
+node_modules
+npm-debug.log
+.env
+dist
+coverage
+.DS_Store

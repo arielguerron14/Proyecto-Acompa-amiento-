@@ -12,8 +12,6 @@ COPY micro-soap-bridge /usr/src/app
 WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent
 
-# ensure app files are present
-COPY micro-soap-bridge /usr/src/app
 ENV NODE_ENV=production
 ENV PORT=5008
 EXPOSE 5008
