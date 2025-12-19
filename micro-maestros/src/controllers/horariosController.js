@@ -12,11 +12,21 @@ module.exports = {
 
   getHorariosByMaestro: async (req, res) => {
     try {
-      const maestroId = Number(req.params.id);
+      const maestroId = req.params.id; // Keep as string/ObjectId
       const list = await horariosService.getByMaestro(maestroId);
-      res.json(list);
+      res.json({ success: true, horarios: list });
     } catch (err) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+
+  getHorariosReportes: async (req, res) => {
+    try {
+      const maestroId = req.params.maestroId;
+      const reportes = await horariosService.getReportesByMaestro(maestroId);
+      res.json({ success: true, reportes });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
     }
   },
 
