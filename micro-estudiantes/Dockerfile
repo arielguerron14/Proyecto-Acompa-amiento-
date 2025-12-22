@@ -1,16 +1,18 @@
 FROM node:18-alpine
 
-WORKDIR /usr/src
-
-# copy shared modules and helpers from repo root
-COPY shared-auth ./shared-auth
-COPY shared-monitoring ./shared-monitoring
-COPY message-broker ./message-broker
-
-# copy this service and install dependencies
-COPY micro-estudiantes ./app
 WORKDIR /usr/src/app
-RUN npm ci --only=production --silent || npm install --production --silent
+
+# Copy package manifests
+COPY package*.json ./
+
+# Install production dependencies
+RUN npm install --production
+
+# Copy entire project
+COPY . .
+
+# install dependencies (production)
+RUN npm install --production
 
 ENV NODE_ENV=production
 ENV PORT=5002

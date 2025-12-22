@@ -7,7 +7,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const server = http.createServer((req, res) => {
-    let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
+    // Remover parámetros de query de la URL
+    const urlPath = req.url.split('?')[0];
+    let filePath = path.join(__dirname, urlPath === '/' ? 'index.html' : urlPath);
 
     // Si no tiene extensión, asumir .html
     if (!path.extname(filePath)) {
@@ -41,6 +43,7 @@ const server = http.createServer((req, res) => {
     });
 });
 
-server.listen(8003, () => {
-    console.log('Server running at http://localhost:8003/');
+const PORT = process.env.FRONTEND_PORT || 5500;
+server.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}/`);
 });

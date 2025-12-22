@@ -4,10 +4,23 @@ const { connectDB } = require('./database');
 const { applySecurity } = require('./middlewares/security');
 const { requestLogger, logger } = require('./middlewares/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
-const { optionalAuth } = require('../../../shared-auth/src/middlewares/authMiddleware');
+let optionalAuth;
+try {
+  optionalAuth = require('/usr/src/shared-auth/src/middlewares/authMiddleware').optionalAuth;
+} catch (e) {
+  // Fallback to local path when running outside container
+  optionalAuth = require('../../shared-auth/src/middlewares/authMiddleware').optionalAuth;
+}
 const horariosRoutes = require('./routes/horariosRoutes');
 
 const app = express();
+
+// Connect to database
+connectDB().then(() => {
+  logger.info('Mongo connected');
+}).catch(err => {
+  logger.error('Mongo connection failed:', err);
+});
 
 // Core middleware
 app.use(express.json());

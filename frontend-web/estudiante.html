@@ -132,7 +132,13 @@
                         <!-- HORARIOS DISPONIBLES -->
                         <div class="horarios-section">
                             <div class="module-card">
-                                <h3>📅 Horarios Disponibles</h3>
+                                <div class="horarios-header">
+                                    <h3>📅 Horarios Disponibles</h3>
+                                    <button id="refresh-horarios" class="btn-refresh" title="Actualizar horarios">
+                                        <span class="refresh-icon">🔄</span>
+                                        Actualizar
+                                    </button>
+                                </div>
                                 <div id="horarios-loading" class="loading-message">Cargando horarios...</div>
                                 <div id="horarios-empty" class="empty-message" style="display: none;">
                                     <div class="empty-icon">⏰</div>
@@ -201,12 +207,12 @@
     </main>
 
     <!-- SCRIPTS -->
-    <script src="js/estudiante-auth.js"></script>
-    <script src="js/dashboard.js"></script>
-    <script src="js/reservas.js"></script>
-    <script src="js/reservar.js"></script>
-    <script src="js/reportes.js"></script>
-    <script src="js/notificaciones.js"></script>
-    <script src="js/estudiante.js"></script>
+    <script src="js/estudiante-auth.js?v=1.1"></script>
+    <script src="js/dashboard.js?v=1.1"></script>
+    <script src="js/reservas.js?v=1.1"></script>
+    <script src="js/reservar.js?v=1.1"></script>
+    <script src="js/reportes.js?v=1.1"></script>
+    <script src="js/notificaciones.js?v=1.1"></script>
+    <script src="js/estudiante.js?v=1.1"></script>
 </body>
 </html>

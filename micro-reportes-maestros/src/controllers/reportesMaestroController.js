@@ -34,12 +34,12 @@ module.exports = {
     } catch(err){ console.error(err); res.status(500).json({ message: 'Server error' }); }
   },
 
-  getReporteByMaestro: async (req, res) => {
+  getReportesByMaestro: async (req, res) => {
     try {
-      const id = Number(req.params.id);
-      const rep = await Reporte.findOne({ maestroId: id });
-      if (!rep) return res.status(404).json({ message: 'Reporte no encontrado' });
-      res.json(rep);
+      const maestroId = req.params.maestroId;
+      const reportes = await Reporte.findOne({ maestroId });
+      if (!reportes) return res.status(404).json({ message: 'No reportes found' });
+      res.json(reportes);
     } catch(err){ console.error(err); res.status(500).json({ message: 'Server error' }); }
   }
 };

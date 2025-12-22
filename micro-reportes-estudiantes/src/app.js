@@ -4,7 +4,7 @@ const { connectDB } = require('./database');
 const { applySecurity } = require('./middlewares/security');
 const { requestLogger, logger } = require('./middlewares/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
-const { optionalAuth } = require('../../../shared-auth/src/middlewares/authMiddleware');
+const { optionalAuth } = require('/usr/src/shared-auth/src/middlewares/authMiddleware');
 const reportesRoutes = require('./routes/reportesEstRoutes');
 
 const app = express();
@@ -15,7 +15,7 @@ app.use(optionalAuth);
 applySecurity(app);
 
 connectDB()
-  .then(() => logger.info('Mongo connected'))
+  .then(() => logger.info('MongoDB connected'))
   .catch(e => {
     logger.error(e);
     process.exit(1);

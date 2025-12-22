@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # MongoDB - custom image built from databases/mongodb
   mongo:
@@ -5,15 +7,14 @@ services:
       context: ./databases/mongodb
       dockerfile: Dockerfile
     image: my-mongo:1.0
+    env_file:
+      - .env
     volumes:
       - mongo-data:/data/db
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: password
     networks:
       - internal-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,16 +25,14 @@ services:
       context: ./databases/postgres
       dockerfile: Dockerfile
     image: my-postgres:1.0
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: acompanamiento
+    env_file:
+      - .env
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
       - internal-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d acompanamiento || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,16 +56,13 @@ services:
   # Microservicio: maestros
   micro-maestros:
     build:
-      context: .
-      dockerfile: ./micro-maestros/Dockerfile
+      context: ./micro-maestros
+      dockerfile: Dockerfile
     container_name: micro-maestros
     ports:
       - "5001:5001"
-    environment:
-      - PORT=5001
-      - DB_HOST=mongo
-      - DB_PORT=27017
-      - MONGO_URI=mongodb://mongo:27017/maestrosdb
+    env_file:
+      - ./micro-maestros/.env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
     depends_on:
@@ -79,16 +75,13 @@ services:
   # Microservicio: estudiantes
   micro-estudiantes:
     build:
-      context: .
-      dockerfile: micro-estudiantes/Dockerfile
+      context: ./micro-estudiantes
+      dockerfile: Dockerfile
     container_name: micro-estudiantes
     ports:
       - "5002:5002"
-    environment:
-      - PORT=5002
-      - DB_HOST=mongo
-      - DB_PORT=27017
-      - MONGO_URI=mongodb://mongo:27017/estudiantesdb
+    env_file:
+      - ./micro-estudiantes/.env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
     depends_on:
@@ -106,15 +99,12 @@ services:
     container_name: micro-reportes-estudiantes
     ports:
       - "5003:5003"
-    environment:
-      - PORT=5003
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=acompanamiento
+    env_file:
+      - ./micro-reportes-estudiantes/.env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
     networks:
       - internal-network
@@ -128,21 +118,18 @@ services:
     container_name: micro-reportes-maestros
     ports:
       - "5004:5004"
-    environment:
-      - PORT=5004
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=acompanamiento
+    env_file:
+      - ./micro-reportes-maestros/.env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
     networks:
       - internal-network
     restart: unless-stopped
 
-  # Microservicio: auth (NUEVO)
+  # Microservicio: auth
   micro-auth:
     build:
       context: .
@@ -150,24 +137,21 @@ services:
     container_name: micro-auth
     ports:
       - "5005:5005"
-    environment:
-      - PORT=5005
-      - JWT_SECRET=tu-secret-key-cambiar-en-produccion
-      - REFRESH_SECRET=tu-refresh-secret-cambiar-en-produccion
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - DB_HOST=mongo
-      - DB_PORT=27017
-      - DB_USER=root
-      - DB_PASS=password
+    env_file:
+      - .env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
       - ./shared-monitoring:/usr/src/shared-monitoring:delegated
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - internal-network
     restart: unless-stopped
 
-  # Microservicio: notificaciones (NUEVO)
+  # Microservicio: notificaciones
   micro-notificaciones:
     build:
       context: .
@@ -175,21 +159,15 @@ services:
     container_name: micro-notificaciones
     ports:
       - "5006:5006"
-    environment:
-      - PORT=5006
-      - SMTP_HOST=smtp.ethereal.email
-      - SMTP_PORT=587
-      - SMTP_USER=demo@ethereal.email
-      - SMTP_PASS=demo-password
-      - SMTP_FROM=noreply@sistema.com
-      - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+    env_file:
+      - .env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
     networks:
       - internal-network
     restart: unless-stopped
 
-  # Microservicio: analytics (NUEVO)
+  # Microservicio: analytics
   micro-analytics:
     build:
       context: .
@@ -197,19 +175,18 @@ services:
     container_name: micro-analytics
     ports:
       - "5007:5007"
-    environment:
-      - PORT=5007
-      - KAFKA_ENABLED=false
-      - KAFKA_BROKERS=kafka:9092
-      - KAFKA_CLIENT_ID=micro-analytics
-      - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+    env_file:
+      - .env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
+    depends_on:
+      kafka:
+        condition: service_healthy
     networks:
       - internal-network
     restart: unless-stopped
 
-  # Microservicio: soap-bridge (NUEVO)
+  # Microservicio: soap-bridge
   micro-soap-bridge:
     build:
       context: .
@@ -217,12 +194,8 @@ services:
     container_name: micro-soap-bridge
     ports:
       - "5008:5008"
-    environment:
-      - PORT=5008
-      - SOAP_ALUMNOS_URL=http://legacy-system:8080/ws/alumnos
-      - SOAP_CALIFICACIONES_URL=http://legacy-system:8080/ws/calificaciones
-      - SOAP_ASISTENCIA_URL=http://legacy-system:8080/ws/asistencia
-      - JWT_SECRET=tu-secret-key-cambiar-en-produccion
+    env_file:
+      - .env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
     networks:
@@ -237,67 +210,63 @@ services:
     container_name: api-gateway
     ports:
       - "8080:8080"
-    environment:
-      - PORT=8080
-      - MAESTROS_URL=http://micro-maestros:5001
-      - ESTUDIANTES_URL=http://micro-estudiantes:5002
-      - REPORTES_EST_URL=http://micro-reportes-estudiantes:5003
-      - REPORTES_MAEST_URL=http://micro-reportes-maestros:5004
-      - AUTH_URL=http://micro-auth:5005
-      - NOTIFICACIONES_URL=http://micro-notificaciones:5006
-      - ANALYTICS_URL=http://micro-analytics:5007
-      - SOAP_URL=http://micro-soap-bridge:5008
-      - FRONTEND_URL=http://frontend-web:5500
+    env_file:
+      - .env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
       - ./shared-monitoring:/usr/src/shared-monitoring:delegated
     depends_on:
-      - micro-maestros
-      - micro-estudiantes
-      - micro-reportes-estudiantes
-      - micro-reportes-maestros
-      - micro-auth
-      - micro-notificaciones
-      - micro-analytics
-      - micro-soap-bridge
-      - frontend-web
+      micro-maestros:
+        condition: service_started
+      micro-estudiantes:
+        condition: service_started
+      micro-reportes-estudiantes:
+        condition: service_started
+      micro-reportes-maestros:
+        condition: service_started
+      micro-auth:
+        condition: service_started
+      micro-notificaciones:
+        condition: service_started
+      micro-analytics:
+        condition: service_started
+      micro-soap-bridge:
+        condition: service_started
+      frontend-web:
+        condition: service_started
     networks:
       - internal-network
     restart: unless-stopped
 
-  # Frontend web (static server)
+  # Frontend web
   frontend-web:
-    image: node:18-alpine
+    build:
+      context: ./frontend-web
+      dockerfile: Dockerfile
     container_name: frontend-web
-    working_dir: /app
-    volumes:
-      - ./frontend-web:/app
     ports:
       - "5500:5500"
-    command: sh -c "npm install -g http-server && http-server . -p 5500 -c-1"
+    env_file:
+      - .env
+    volumes:
+      - ./frontend-web:/app:delegated
+      - /app/node_modules
     networks:
       - internal-network
     restart: unless-stopped
 
-  # ====== MESSAGING INFRASTRUCTURE ======
-
-  # Apache Kafka - EventBus global
+  # Apache Kafka
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: proyecto-kafka
     ports:
       - "9092:9092"
       - "29092:29092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://kafka:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    env_file:
+      - .env
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_started
     networks:
       - internal-network
     restart: unless-stopped
@@ -307,29 +276,27 @@ services:
       timeout: 5s
       retries: 5
 
-  # Zookeeper - Coordinador de Kafka
+  # Zookeeper
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: proyecto-zookeeper
     ports:
       - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+    env_file:
+      - .env
     networks:
       - internal-network
     restart: unless-stopped
 
-  # RabbitMQ - MessageQueue global
+  # RabbitMQ
   rabbitmq:
     image: rabbitmq:3.12-management
     container_name: proyecto-rabbitmq
     ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # Management UI
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      - "5672:5672"
+      - "15672:15672"
+    env_file:
+      - .env
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
@@ -341,17 +308,16 @@ services:
       timeout: 5s
       retries: 5
 
-  # MQTT Broker - Telemetría en tiempo real
+  # MQTT Broker
   mqtt:
     image: eclipse-mosquitto:2.0
     container_name: proyecto-mqtt
     ports:
-      - "1883:1883"     # MQTT
-      - "9001:9001"     # WebSocket
+      - "1883:1883"
+      - "9001:9001"
     volumes:
       - mqtt-data:/mosquitto/data
       - mqtt-logs:/mosquitto/log
-      - ./mqtt-config.conf:/mosquitto/config/mosquitto.conf
     networks:
       - internal-network
     restart: unless-stopped
@@ -361,24 +327,24 @@ services:
       timeout: 5s
       retries: 5
 
-  # Kafka UI - Interfaz visual para Kafka (opcional)
+  # Kafka UI
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: proyecto-kafka-ui
     ports:
       - "8081:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    env_file:
+      - .env
     depends_on:
-      - kafka
-      - zookeeper
+      kafka:
+        condition: service_healthy
+      zookeeper:
+        condition: service_started
     networks:
       - internal-network
     restart: unless-stopped
 
-  # Prometheus - Sistema de monitoreo y alertas
+  # Prometheus
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -398,15 +364,14 @@ services:
       - internal-network
     restart: unless-stopped
 
-  # Grafana - Dashboard de visualización
+  # Grafana
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
       - "3001:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+    env_file:
+      - .env
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/dashboards:/var/lib/grafana/dashboards
@@ -418,11 +383,11 @@ services:
 
 volumes:
   mongo-data:
+  postgres-data:
+  redis-data:
   rabbitmq-data:
   mqtt-data:
   mqtt-logs:
-  postgres-data:
-  redis-data:
   prometheus-data:
   grafana-data:
 

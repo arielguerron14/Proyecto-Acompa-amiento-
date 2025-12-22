@@ -4,7 +4,6 @@ WORKDIR /usr/src
 
 # copy shared modules first
 COPY shared-auth ./shared-auth
-COPY message-broker ./message-broker
 
 # copy this service
 COPY micro-reportes-estudiantes ./app

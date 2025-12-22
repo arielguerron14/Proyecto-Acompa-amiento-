@@ -44,13 +44,13 @@
                             <div class="module-content">
                                 <form id="horario-form" class="horario-form">
                                     <!-- Sección: Información Académica -->
-                                    <div class="form-section">
+                                    <div class="form-section academic-section">
                                         <h3 class="section-title">📚 Información Académica</h3>
                                         <div class="form-row">
                                             <div class="form-group">
-                                                <label for="semestre">Semestre *</label>
+                                                <label for="semestre">SEMESTRE *</label>
                                                 <select id="semestre" name="semestre" required>
-                                                    <option value="">Seleccione semestre</option>
+                                                    <option value="">Seleccione semestre académico</option>
                                                     <option value="1">1er Semestre</option>
                                                     <option value="2">2do Semestre</option>
                                                     <option value="3">3er Semestre</option>
@@ -62,22 +62,32 @@
                                                 </select>
                                             </div>
                                             <div class="form-group">
-                                                <label for="materia">Materia *</label>
+                                                <label for="materia">MATERIA *</label>
                                                 <select id="materia" name="materia" required>
                                                     <option value="">Seleccione una materia</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="paralelo">PARALELO *</label>
+                                                <select id="paralelo" name="paralelo" required>
+                                                    <option value="">Seleccione paralelo</option>
+                                                    <option value="A">A</option>
+                                                    <option value="B">B</option>
+                                                    <option value="C">C</option>
+                                                    <option value="D">D</option>
                                                 </select>
                                             </div>
                                         </div>
                                     </div>
 
                                     <!-- Sección: Información de Horario -->
-                                    <div class="form-section">
+                                    <div class="form-section schedule-section">
                                         <h3 class="section-title">⏰ Información de Horario</h3>
                                         <div class="form-row">
                                             <div class="form-group">
-                                                <label for="dia">Día de la Semana *</label>
+                                                <label for="dia">DÍA DE LA SEMANA *</label>
                                                 <select id="dia" name="dia" required>
-                                                    <option value="">Seleccione día</option>
+                                                    <option value="">Seleccione día de la semana</option>
                                                     <option value="Lunes">Lunes</option>
                                                     <option value="Martes">Martes</option>
                                                     <option value="Miércoles">Miércoles</option>
@@ -86,28 +96,28 @@
                                                 </select>
                                             </div>
                                             <div class="form-group">
-                                                <label for="hora-inicio">Hora Inicio *</label>
+                                                <label for="hora-inicio">HORA INICIO *</label>
                                                 <input type="time" id="hora-inicio" name="hora-inicio" min="07:00" max="20:00" required>
                                             </div>
                                             <div class="form-group">
-                                                <label for="hora-fin">Hora Fin *</label>
+                                                <label for="hora-fin">HORA FIN *</label>
                                                 <input type="time" id="hora-fin" name="hora-fin" min="07:00" max="20:00" required>
                                             </div>
                                         </div>
                                         <div class="form-row">
                                             <div class="form-group full-width">
-                                                <label>Duración Calculada</label>
+                                                <label>DURACIÓN CALCULADA</label>
                                                 <div id="duracion-display" class="duracion-display">0 minutos</div>
                                             </div>
                                         </div>
                                     </div>
 
                                     <!-- Sección: Modalidad y Cupo -->
-                                    <div class="form-section">
+                                    <div class="form-section modality-section">
                                         <h3 class="section-title">🏫 Modalidad y Cupo</h3>
                                         <div class="form-row">
                                             <div class="form-group">
-                                                <label for="modalidad">Modalidad *</label>
+                                                <label for="modalidad">MODALIDAD *</label>
                                                 <select id="modalidad" name="modalidad" required>
                                                     <option value="">Seleccione modalidad</option>
                                                     <option value="Presencial">Presencial</option>
@@ -116,24 +126,24 @@
                                                 </select>
                                             </div>
                                             <div class="form-group">
-                                                <label for="cupo">Cupo Máximo *</label>
-                                                <input type="number" id="cupo" name="cupo" min="1" max="50" required>
+                                                <label for="cupo">CUPO MÁXIMO *</label>
+                                                <input type="number" id="cupo" name="cupo" min="1" max="50" placeholder="Ej: 25" required>
                                             </div>
                                         </div>
                                         <div class="form-row">
                                             <div class="form-group full-width">
-                                                <label for="lugar">Lugar de Atención *</label>
-                                                <input type="text" id="lugar" name="lugar" placeholder="Aula 101, Laboratorio 5, Zoom Meeting, etc." required>
+                                                <label for="lugar">LUGAR DE ATENCIÓN *</label>
+                                                <input type="text" id="lugar" name="lugar" placeholder="Ej: Aula 101, Laboratorio 5, Zoom Meeting, etc." required>
                                             </div>
                                         </div>
                                     </div>
 
                                     <!-- Sección: Estado y Observaciones -->
-                                    <div class="form-section">
+                                    <div class="form-section status-section">
                                         <h3 class="section-title">📝 Estado y Observaciones</h3>
                                         <div class="form-row">
                                             <div class="form-group">
-                                                <label for="estado">Estado</label>
+                                                <label for="estado">ESTADO</label>
                                                 <select id="estado" name="estado">
                                                     <option value="Activo">Activo</option>
                                                     <option value="Inactivo">Inactivo</option>
@@ -142,8 +152,8 @@
                                         </div>
                                         <div class="form-row">
                                             <div class="form-group full-width">
-                                                <label for="observaciones">Observaciones</label>
-                                                <textarea id="observaciones" name="observaciones" rows="2" placeholder="Información adicional..."></textarea>
+                                                <label for="observaciones">OBSERVACIONES</label>
+                                                <textarea id="observaciones" name="observaciones" rows="2" placeholder="Información adicional sobre el horario, restricciones especiales, etc."></textarea>
                                             </div>
                                         </div>
                                     </div>
@@ -271,6 +281,24 @@
             localStorage.removeItem('token');
             window.location.href = '/';
         });
+
+        // Auto-login para desarrollo - guardar token válido automáticamente
+        (function() {
+            // Limpiar cualquier token anterior
+            localStorage.removeItem('token');
+            
+            const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OTQ2MmNiYTA2ZWU0N2JmMjBjZTVmNDciLCJyb2xlIjoibWFlc3RybyIsImVtYWlsIjoibWFlc3Ryb0B0ZXN0LmNvbSIsImlhdCI6MTc2NjIxMTc4MSwiZXhwIjoxNzY2Mjk4MTgxfQ.flXgWbrvTnTyuUWOjPMw9N-oir9z1CWJFGrw2w-aJJY';
+            localStorage.setItem('token', token);
+            console.log('Token de desarrollo guardado automáticamente');
+            
+            // Verificar que se guardó correctamente
+            const savedToken = localStorage.getItem('token');
+            if (savedToken === token) {
+                console.log('✅ Token guardado correctamente');
+            } else {
+                console.error('❌ Error al guardar el token');
+            }
+        })();
     </script>
 </body>
 </html>

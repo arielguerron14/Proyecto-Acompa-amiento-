@@ -2,7 +2,7 @@
 
 **Proyecto**: Sistema de Acompañamiento Académico Basado en Microservicios  
 **Versión**: 2.2  
-**Fecha**: Diciembre 2025  
+**Fecha**: 17 de diciembre de 2025  
 **Autor**: Arquitecto de Software Senior  
 
 ---

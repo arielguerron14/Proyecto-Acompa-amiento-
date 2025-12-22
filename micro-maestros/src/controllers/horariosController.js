@@ -47,4 +47,13 @@ module.exports = {
       res.status(err.status || 500).json({ message: err.message });
     }
   },
+
+  updateHorario: async (req, res) => {
+    try {
+      const horario = await horariosService.update(req.params.id, req.body);
+      res.json({ success: true, horario });
+    } catch (err) {
+      res.status(err.status || 500).json({ success: false, error: err.message });
+    }
+  },
 };

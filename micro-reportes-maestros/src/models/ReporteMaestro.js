@@ -6,11 +6,11 @@ const HoraSchema = new Schema({
   inicio: String,
   fin: String,
   alumnosAtendidos: { type: Number, default: 0 },
-  alumnos: [{ estudianteId: Number, estudianteName: String }]
+  alumnos: [{ estudianteId: String, estudianteName: String }]
 });
 
 const ReporteMaestroSchema = new Schema({
-  maestroId: { type: Number, required: true },
+  maestroId: { type: String, required: true },
   maestroName: String,
   horas: [HoraSchema],
   updatedAt: { type: Date, default: Date.now }

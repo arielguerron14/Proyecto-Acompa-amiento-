@@ -1,13 +1,21 @@
 const express = require('express');
 const cors = require('cors');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+require('dotenv').config();
 
 console.log('🚀 Starting API Gateway server...');
 
 const app = express();
 
+// Log all requests FIRST
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.url}`);
+  next();
+});
+
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080'],
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080', 'http://localhost:5500'],
   credentials: true
 }));
 app.use(express.json());
@@ -16,12 +24,87 @@ app.use(express.json());
 const authRoutes = require('./src/routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
+// Test route
+app.get('/test', (req, res) => {
+  res.json({ message: 'Test route working' });
+});
+
 // APLICAR SEGURIDAD Y CORS PRIMERO (antes que cualquier ruta)
-const maestros = process.env.MAESTROS_URL || 'http://micro-maestros:5001';
-const estudiantes = process.env.ESTUDIANTES_URL || 'http://micro-estudiantes:5002';
-const reportesEst = process.env.REPORTES_EST_URL || 'http://micro-reportes-estudiantes:5003';
-const reportesMaest = process.env.REPORTES_MAEST_URL || 'http://micro-reportes-maestros:5004';
+const maestros = 'http://micro-maestros:5001';
+const estudiantes = 'http://micro-estudiantes:5002';
+const reportesEst = 'http://micro-reportes-estudiantes:5003';
+const reportesMaest = 'http://micro-reportes-maestros:5004';
 const frontend = process.env.FRONTEND_URL || 'http://frontend-web:5500';
+
+// Proxy middleware for microservices
+
+// Handle preflight requests for horarios
+app.options('/api/horarios', cors());
+
+// Handle preflight requests for estudiantes
+app.options('/estudiantes', cors());
+app.options('/estudiantes/*', cors());
+
+// Proxy to micro-maestros for horarios
+app.use('/api/horarios', createProxyMiddleware({
+  target: maestros,
+  changeOrigin: true,
+  secure: false,
+  ws: false,
+  logLevel: 'debug',
+  pathRewrite: { '^/api/horarios': '/horarios' },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log('Proxying request to /api/horarios:', req.method, req.url);
+    // Forward Authorization header
+    if (req.headers.authorization) {
+      proxyReq.setHeader('Authorization', req.headers.authorization);
+      console.log('Forwarding Authorization header');
+    }
+    if (req.body && Object.keys(req.body).length > 0) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+      console.log('Forwarding body:', bodyData);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log('Proxy response for /api/horarios:', proxyRes.statusCode, req.method, req.url);
+  },
+  onError: (err, req, res) => {
+    console.log('Proxy error for /api/horarios:', err.message, req.method, req.url);
+  }
+}));
+
+// Handle preflight requests for horarios
+app.options('/horarios', cors());
+
+// Handle preflight requests for auth endpoints
+app.options('/auth', cors());
+app.options('/auth/*', cors());
+
+// Proxy to micro-maestros for horarios (alternative path)
+app.use('/horarios', createProxyMiddleware({
+  target: maestros,
+  changeOrigin: true,
+  secure: false,
+  ws: false,
+  logLevel: 'debug',
+  onProxyReq: (proxyReq, req, res) => {
+    console.log('Proxying request to /horarios:', req.method, req.url);
+    // Forward Authorization header
+    if (req.headers.authorization) {
+      proxyReq.setHeader('Authorization', req.headers.authorization);
+      console.log('Forwarding Authorization header');
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log('Proxy response for /horarios:', proxyRes.statusCode, req.method, req.url);
+  },
+  onError: (err, req, res) => {
+    console.log('Proxy error for /horarios:', err.message, req.method, req.url);
+  }
+}));
 
 // applySecurity(app, { whitelist: [frontend] });
 
@@ -31,7 +114,45 @@ const frontend = process.env.FRONTEND_URL || 'http://frontend-web:5500';
 app.use('/auth', authRoutes);
 
 app.use('/maestros', createProxyMiddleware({ target: maestros, changeOrigin: true, pathRewrite: {'^/maestros': ''} }));
-app.use('/estudiantes', createProxyMiddleware({ target: estudiantes, changeOrigin: true, pathRewrite: {'^/estudiantes': ''} }));
+app.use('/estudiantes', (req, res, next) => {
+  // Skip proxy for OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+  // Use proxy for other requests
+  createProxyMiddleware({
+    target: estudiantes,
+    changeOrigin: true,
+    secure: false,
+    ws: false,
+    logLevel: 'debug',
+    pathRewrite: {'^/estudiantes': ''},
+    onProxyReq: (proxyReq, req, res) => {
+      console.log('Proxying request to /estudiantes:', req.method, req.url);
+      console.log('req.body:', JSON.stringify(req.body));
+      console.log('req.body keys length:', req.body ? Object.keys(req.body).length : 'undefined');
+      // Forward Authorization header
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+        console.log('Forwarding Authorization header');
+      }
+      // Forward the request body for POST/PUT/PATCH requests
+      if ((req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') && req.body) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+        console.log('Forwarding body data');
+      }
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      console.log('Proxy response for /estudiantes:', proxyRes.statusCode, req.method, req.url);
+    },
+    onError: (err, req, res) => {
+      console.log('Proxy error for /estudiantes:', err.message, req.method, req.url);
+    }
+  })(req, res, next);
+});
 app.use('/reportes/estudiantes', createProxyMiddleware({ target: reportesEst, changeOrigin: true, pathRewrite: {'^/reportes/estudiantes': ''} }));
 app.use('/reportes/maestros', createProxyMiddleware({ target: reportesMaest, changeOrigin: true, pathRewrite: {'^/reportes/maestros': ''} }));
 
@@ -127,181 +248,7 @@ let horariosAtencion = [
   }
 ]; // Array en memoria para simplicidad
 
-// GET /horarios - Listar todos los horarios activos
-app.get('/horarios', (req, res) => {
-  try {
-    const horariosActivos = horariosAtencion.filter(h => h.estado === 'Activo');
-    res.json({ success: true, horarios: horariosActivos });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error al obtener horarios' });
-  }
-});
-
-// POST /horarios - Crear horario
-app.post('/horarios', (req, res) => {
-  try {
-    const { maestroId, carrera, semestre, materiaCodigo, materiaNombre, dia, horaInicio, horaFin, duracionMinutos, modalidad, lugarAtencion, cupoMaximo, estado, observaciones } = req.body;
-    
-    // Validaciones básicas
-    if (!maestroId || !carrera || !semestre || !materiaCodigo || !dia || !horaInicio || !horaFin || !modalidad || !lugarAtencion || !cupoMaximo) {
-      return res.status(400).json({ success: false, error: 'Campos obligatorios faltantes' });
-    }
-    
-    // Validar no cruces de horarios
-    const conflicto = horariosAtencion.find(h => 
-      h.maestroId === maestroId && 
-      h.dia === dia && 
-      h.estado === 'Activo' &&
-      ((horaInicio >= h.horaInicio && horaInicio < h.horaFin) || 
-       (horaFin > h.horaInicio && horaFin <= h.horaFin) ||
-       (horaInicio <= h.horaInicio && horaFin >= h.horaFin))
-    );
-    
-    if (conflicto) {
-      return res.status(409).json({ success: false, error: 'Conflicto de horario detectado' });
-    }
-    
-    const nuevoHorario = {
-      id: Date.now().toString(),
-      maestroId,
-      carrera,
-      semestre,
-      materiaCodigo,
-      materiaNombre,
-      dia,
-      horaInicio,
-      horaFin,
-      duracionMinutos,
-      modalidad,
-      lugarAtencion,
-      cupoMaximo,
-      estado: estado || 'Activo',
-      observaciones: observaciones || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: maestroId
-    };
-    
-    horariosAtencion.push(nuevoHorario);
-    res.status(201).json({ success: true, horario: nuevoHorario });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error al crear horario' });
-  }
-});
-
-// GET /horarios/maestro/:id - Listar horarios del maestro
-app.get('/horarios/maestro/:id', (req, res) => {
-  try {
-    const maestroId = req.params.id;
-    const horarios = horariosAtencion.filter(h => h.maestroId === maestroId);
-    res.json({ success: true, horarios });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error al obtener horarios' });
-  }
-});
-
-// PUT /horarios/:id - Actualizar horario
-app.put('/horarios/:id', (req, res) => {
-  try {
-    const id = req.params.id;
-    const index = horariosAtencion.findIndex(h => h.id === id);
-    
-    if (index === -1) {
-      return res.status(404).json({ success: false, error: 'Horario no encontrado' });
-    }
-    
-    const { horaInicio, horaFin, dia, maestroId } = req.body;
-    
-    // Validar no cruces si cambian hora o día
-    if (horaInicio || horaFin || dia) {
-      const conflicto = horariosAtencion.find((h, i) => 
-        i !== index &&
-        h.maestroId === (maestroId || horariosAtencion[index].maestroId) && 
-        h.dia === (dia || horariosAtencion[index].dia) && 
-        h.estado === 'Activo' &&
-        ((horaInicio || horariosAtencion[index].horaInicio) >= h.horaInicio && (horaInicio || horariosAtencion[index].horaInicio) < h.horaFin) || 
-        ((horaFin || horariosAtencion[index].horaFin) > h.horaInicio && (horaFin || horariosAtencion[index].horaFin) <= h.horaFin) ||
-        ((horaInicio || horariosAtencion[index].horaInicio) <= h.horaInicio && (horaFin || horariosAtencion[index].horaFin) >= h.horaFin)
-      );
-      
-      if (conflicto) {
-        return res.status(409).json({ success: false, error: 'Conflicto de horario detectado' });
-      }
-    }
-    
-    horariosAtencion[index] = { ...horariosAtencion[index], ...req.body, updatedAt: new Date().toISOString() };
-    res.json({ success: true, horario: horariosAtencion[index] });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error al actualizar horario' });
-  }
-});
-
-// DELETE /horarios/:id - Eliminar horario
-app.delete('/horarios/:id', (req, res) => {
-  try {
-    const id = req.params.id;
-    const index = horariosAtencion.findIndex(h => h.id === id);
-    
-    if (index === -1) {
-      return res.status(404).json({ success: false, error: 'Horario no encontrado' });
-    }
-    
-    horariosAtencion.splice(index, 1);
-    res.json({ success: true, message: 'Horario eliminado' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error al eliminar horario' });
-  }
-});
-
-// GET /horarios/reportes/:maestroId - Reportes
-app.get('/horarios/reportes/:maestroId', (req, res) => {
-  try {
-    const maestroId = req.params.maestroId;
-    const horarios = horariosAtencion.filter(h => h.maestroId === maestroId && h.estado === 'Activo');
-    
-    const reportes = {
-      totalHorasSemana: horarios.reduce((sum, h) => sum + h.duracionMinutos, 0) / 60,
-      horasPorMateria: {},
-      horariosPorDia: {},
-      horariosPorModalidad: {},
-      cuposDisponibles: horarios.reduce((sum, h) => sum + h.cupoMaximo, 0),
-      materiasDemanda: {}
-    };
-    
-    horarios.forEach(h => {
-      // Horas por materia
-      if (!reportes.horasPorMateria[h.materiaNombre]) {
-        reportes.horasPorMateria[h.materiaNombre] = 0;
-      }
-      reportes.horasPorMateria[h.materiaNombre] += h.duracionMinutos / 60;
-      
-      // Horarios por día
-      if (!reportes.horariosPorDia[h.dia]) {
-        reportes.horariosPorDia[h.dia] = 0;
-      }
-      reportes.horariosPorDia[h.dia]++;
-      
-      // Horarios por modalidad
-      if (!reportes.horariosPorModalidad[h.modalidad]) {
-        reportes.horariosPorModalidad[h.modalidad] = 0;
-      }
-      reportes.horariosPorModalidad[h.modalidad]++;
-      
-      // Materias con mayor demanda (por cupo)
-      if (!reportes.materiasDemanda[h.materiaNombre]) {
-        reportes.materiasDemanda[h.materiaNombre] = 0;
-      }
-      reportes.materiasDemanda[h.materiaNombre] += h.cupoMaximo;
-    });
-    
-    res.json({ success: true, reportes });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error al generar reportes' });
-  }
-});
-
 // Serve simple health endpoint instead of proxying everything
->>>>>>> 6c44b93 (feat: comprehensive project cleanup and documentation updates)
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'API Gateway is running' });
 });
@@ -312,7 +259,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.API_GATEWAY_PORT || process.env.PORT || 3000;
 console.log(`🌐 Starting server on port ${PORT}...`);
 
 app.listen(PORT, () => {

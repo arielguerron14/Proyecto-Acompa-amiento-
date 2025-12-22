@@ -6,6 +6,7 @@ class ReservarManager {
         this.selectedHorario = null;
         this.materias = new Set();
         this.semestres = new Set();
+        this.isReserving = false; // Flag to prevent multiple reservations
     }
 
     // Inicializar módulo de reservar
@@ -32,6 +33,12 @@ class ReservarManager {
 
         if (filtroDia) {
             filtroDia.addEventListener('change', () => this.applyFilters());
+        }
+
+        // Botón de refrescar
+        const refreshBtn = document.getElementById('refresh-horarios');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.refreshHorarios());
         }
 
         // Modal
@@ -80,11 +87,11 @@ class ReservarManager {
 
             if (response.ok) {
                 const allHorarios = await response.json();
-                // Filtrar solo horarios activos
-                this.horarios = allHorarios.filter(h => h.estado === 'Activo');
+                // Filtrar solo horarios activos (ya filtrado en backend)
+                this.horarios = allHorarios;
 
                 // Extraer materias únicas para el filtro
-                this.materias = new Set(this.horarios.map(h => h.materiaNombre).filter(Boolean));
+                this.materias = new Set(this.horarios.map(h => h.materia).filter(Boolean));
                 this.updateFiltroMaterias();
 
                 // Extraer semestres únicos para el filtro
@@ -98,6 +105,67 @@ class ReservarManager {
             console.error('Error cargando horarios:', error);
             this.horarios = [];
         }
+    }
+
+    // Refrescar horarios disponibles
+    async refreshHorarios() {
+        const refreshBtn = document.getElementById('refresh-horarios');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<span class="refresh-icon">⏳</span> Actualizando...';
+        }
+
+        try {
+            await this.loadHorarios();
+            this.renderHorarios();
+            // Mostrar mensaje de éxito temporal
+            this.showRefreshMessage('Horarios actualizados correctamente', 'success');
+        } catch (error) {
+            console.error('Error refrescando horarios:', error);
+            this.showRefreshMessage('Error al actualizar horarios', 'error');
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<span class="refresh-icon">🔄</span> Actualizar';
+            }
+        }
+    }
+
+    // Mostrar mensaje de refresco
+    showRefreshMessage(message, type) {
+        // Crear elemento de mensaje temporal
+        const messageEl = document.createElement('div');
+        messageEl.className = `refresh-message ${type}`;
+        messageEl.textContent = message;
+        messageEl.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 6px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        `;
+
+        if (type === 'success') {
+            messageEl.style.backgroundColor = '#28a745';
+        } else {
+            messageEl.style.backgroundColor = '#dc3545';
+        }
+
+        document.body.appendChild(messageEl);
+
+        // Remover después de 3 segundos
+        setTimeout(() => {
+            messageEl.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => {
+                if (messageEl.parentNode) {
+                    messageEl.parentNode.removeChild(messageEl);
+                }
+            }, 300);
+        }, 3000);
     }
 
     // Actualizar opciones del filtro de materias
@@ -156,7 +224,7 @@ class ReservarManager {
         }
 
         if (filtroMateria) {
-            filteredHorarios = filteredHorarios.filter(h => h.materiaNombre === filtroMateria);
+            filteredHorarios = filteredHorarios.filter(h => h.materia === filtroMateria);
         }
 
         if (filtroDia) {
@@ -208,9 +276,9 @@ class ReservarManager {
     // Crear HTML para un horario
     createHorarioCard(horario) {
         return `
-            <div class="horario-card" data-horario-id="${horario.id}">
+            <div class="horario-card" data-horario-id="${horario._id}">
                 <div class="horario-header">
-                    <div class="horario-materia">${horario.materiaNombre || 'Materia no especificada'}</div>
+                    <div class="horario-materia">${horario.materia || 'Materia no especificada'}</div>
                     <div class="horario-maestro">${horario.maestroName || 'Maestro no especificado'}</div>
                 </div>
                 <div class="horario-info">
@@ -220,14 +288,14 @@ class ReservarManager {
                     </div>
                     <div class="horario-info-item">
                         <span class="info-icon">⏰</span>
-                        ${horario.horaInicio || 'N/A'} - ${horario.horaFin || 'N/A'}
+                        ${horario.inicio || 'N/A'} - ${horario.fin || 'N/A'}
                     </div>
                     <div class="horario-info-item">
-                        <span class="info-icon">📍</span>
-                        ${horario.modalidad || 'N/A'}
+                        <span class="info-icon">📚</span>
+                        Semestre ${horario.semestre || 'N/A'} - Paralelo ${horario.paralelo || 'N/A'}
                     </div>
                 </div>
-                <button class="btn-reservar" onclick="reservarManager.selectHorario('${horario.id}')">
+                <button class="btn-reservar" onclick="reservarManager.selectHorario('${horario._id}')">
                     Reservar Horario
                 </button>
             </div>
@@ -236,7 +304,7 @@ class ReservarManager {
 
     // Seleccionar horario para reserva
     selectHorario(horarioId) {
-        const horario = this.horarios.find(h => h.id === horarioId);
+        const horario = this.horarios.find(h => h._id === horarioId);
         if (!horario) return;
 
         this.selectedHorario = horario;
@@ -251,12 +319,12 @@ class ReservarManager {
         if (!modal || !detailsEl || !this.selectedHorario) return;
 
         detailsEl.innerHTML = `
-            <p><strong>Materia:</strong> ${this.selectedHorario.materiaNombre || 'N/A'}</p>
+            <p><strong>Materia:</strong> ${this.selectedHorario.materia || 'N/A'}</p>
             <p><strong>Maestro:</strong> ${this.selectedHorario.maestroName || 'N/A'}</p>
             <p><strong>Fecha:</strong> ${this.selectedHorario.dia || 'N/A'}</p>
-            <p><strong>Hora:</strong> ${this.selectedHorario.horaInicio || 'N/A'} - ${this.selectedHorario.horaFin || 'N/A'}</p>
-            <p><strong>Modalidad:</strong> ${this.selectedHorario.modalidad || 'N/A'}</p>
-            <p><strong>Lugar:</strong> ${this.selectedHorario.lugarAtencion || 'N/A'}</p>
+            <p><strong>Hora:</strong> ${this.selectedHorario.inicio || 'N/A'} - ${this.selectedHorario.fin || 'N/A'}</p>
+            <p><strong>Semestre:</strong> ${this.selectedHorario.semestre || 'N/A'}</p>
+            <p><strong>Paralelo:</strong> ${this.selectedHorario.paralelo || 'N/A'}</p>
         `;
 
         modal.style.display = 'flex';
@@ -269,11 +337,27 @@ class ReservarManager {
             modal.style.display = 'none';
         }
         this.selectedHorario = null;
+        this.isReserving = false; // Reset flag
     }
 
     // Confirmar reserva
     async confirmarReserva() {
-        if (!this.selectedHorario) return;
+        if (!this.selectedHorario || !this.selectedHorario._id) {
+            console.error('No hay horario seleccionado para reservar');
+            return;
+        }
+
+        if (this.isReserving) {
+            console.log('Reserva ya en proceso, ignorando clic adicional');
+            return;
+        }
+
+        this.isReserving = true;
+        const confirmarBtn = document.getElementById('confirmar-reserva');
+        if (confirmarBtn) {
+            confirmarBtn.disabled = true;
+            confirmarBtn.textContent = 'Reservando...';
+        }
 
         try {
             const user = await authManager.getUserData();
@@ -284,11 +368,12 @@ class ReservarManager {
                 estudianteName: user.name,
                 maestroId: this.selectedHorario.maestroId,
                 maestroName: this.selectedHorario.maestroName,
-                materia: this.selectedHorario.materiaNombre,
+                materia: this.selectedHorario.materia,
                 dia: this.selectedHorario.dia,
-                inicio: this.selectedHorario.horaInicio,
-                fin: this.selectedHorario.horaFin,
-                modalidad: this.selectedHorario.modalidad
+                inicio: this.selectedHorario.inicio,
+                fin: this.selectedHorario.fin,
+                semestre: this.selectedHorario.semestre,
+                paralelo: this.selectedHorario.paralelo
             };
 
             const response = await fetch(`${authManager.baseURL}/estudiantes/reservar`, {
@@ -299,13 +384,23 @@ class ReservarManager {
 
             if (response.ok) {
                 authManager.showMessage('Reserva creada exitosamente', 'success');
+                // Remover el horario reservado de la lista local antes de cerrar el modal
+                if (this.selectedHorario && this.selectedHorario._id) {
+                    this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
+                    this.applyFilters();
+                }
                 this.closeModal();
-                // Remover el horario reservado de la lista local
-                this.horarios = this.horarios.filter(h => h.id !== this.selectedHorario.id);
-                this.applyFilters();
                 // Refrescar datos relacionados
                 await reservasManager.refresh();
                 await dashboardManager.refresh();
+            } else if (response.status === 409) {
+                // Horario ya reservado, remover de la lista
+                authManager.showMessage('Este horario ya fue reservado por otro estudiante', 'error');
+                if (this.selectedHorario && this.selectedHorario._id) {
+                    this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
+                    this.applyFilters();
+                }
+                this.closeModal();
             } else {
                 const error = await response.json();
                 authManager.showMessage(error.message || 'Error al crear la reserva', 'error');
@@ -313,6 +408,12 @@ class ReservarManager {
         } catch (error) {
             console.error('Error creando reserva:', error);
             authManager.showMessage('Error de conexión', 'error');
+        } finally {
+            this.isReserving = false;
+            if (confirmarBtn) {
+                confirmarBtn.disabled = false;
+                confirmarBtn.textContent = 'Confirmar Reserva';
+            }
         }
     }
 

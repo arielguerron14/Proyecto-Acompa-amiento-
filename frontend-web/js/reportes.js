@@ -7,6 +7,7 @@ class ReportesManager {
 
     // Inicializar módulo de reportes
     async init() {
+        console.log('DEBUG: ReportesManager.init() called');
         await this.loadReportes();
         this.renderReportes();
     }
@@ -14,8 +15,13 @@ class ReportesManager {
     // Cargar reportes del estudiante
     async loadReportes() {
         try {
+            console.log('DEBUG: loadReportes() called');
             const user = await authManager.getUserData();
-            if (!user) return;
+            console.log('DEBUG: User data:', user);
+            if (!user) {
+                console.log('DEBUG: No user data, returning');
+                return;
+            }
 
             const loadingEl = document.getElementById('reportes-loading');
             const emptyEl = document.getElementById('reportes-empty');
@@ -28,9 +34,20 @@ class ReportesManager {
             const response = await fetch(`${authManager.baseURL}/reportes/estudiantes/reporte/${user.id}`, {
                 headers: authManager.getAuthHeaders()
             });
+            console.log('DEBUG: Fetch response status:', response.status);
+            console.log('DEBUG: Fetch response ok:', response.ok);
 
             if (response.ok) {
-                this.reportes = await response.json();
+                const reporteData = await response.json();
+                console.log('DEBUG: Reporte data received:', reporteData);
+                // El backend devuelve un objeto con items (array de reservas)
+                // Convertir cada item en un "reporte" para mostrar
+                this.reportes = reporteData && reporteData.items ? reporteData.items : [];
+                console.log('DEBUG: Processed reportes:', this.reportes);
+            } else if (response.status === 404) {
+                // 404 significa que no hay reportes para este estudiante, lo cual es válido
+                this.reportes = [];
+                console.log('DEBUG: No reportes found (404)');
             } else {
                 this.reportes = [];
                 console.error('Error cargando reportes:', response.status);
@@ -63,8 +80,17 @@ class ReportesManager {
 
     // Crear HTML para un reporte
     createReporteCard(reporte) {
+        console.log('DEBUG: Creating card for reporte:', reporte);
+        console.log('DEBUG: reporte.materia:', reporte.materia);
+        console.log('DEBUG: reporte.semestre:', reporte.semestre);
+        console.log('DEBUG: reporte.paralelo:', reporte.paralelo);
+        console.log('DEBUG: reporte.maestroName:', reporte.maestroName);
+        console.log('DEBUG: reporte.dia:', reporte.dia);
+        console.log('DEBUG: reporte.inicio:', reporte.inicio);
+        console.log('DEBUG: reporte.fin:', reporte.fin);
+
         const progreso = this.calcularProgreso(reporte);
-        const fechaFormateada = this.formatearFecha(reporte.createdAt || reporte.dia);
+        const fechaFormateada = this.formatearFecha(reporte.dia);
 
         return `
             <div class="reporte-card">
@@ -72,14 +98,11 @@ class ReportesManager {
                     <div class="reporte-materia">${reporte.materia || 'Materia no especificada'}</div>
                     <div class="reporte-fecha">${fechaFormateada}</div>
                 </div>
-                <div class="reporte-observaciones">
-                    ${reporte.observaciones || 'Sin observaciones disponibles'}
-                </div>
-                <div class="reporte-progreso">
-                    <div class="progreso-bar">
-                        <div class="progreso-fill" style="width: ${progreso.porcentaje}%"></div>
-                    </div>
-                    <div class="progreso-text">${progreso.texto}</div>
+                <div class="reporte-detalles">
+                    <div class="reporte-semestre">Semestre: ${reporte.semestre || 'N/A'}</div>
+                    <div class="reporte-paralelo">Paralelo: ${reporte.paralelo || 'N/A'}</div>
+                    <div class="reporte-horario">${reporte.dia} ${reporte.inicio}-${reporte.fin}</div>
+                    <div class="reporte-maestro">${reporte.maestroName || 'N/A'}</div>
                 </div>
             </div>
         `;
@@ -98,8 +121,8 @@ class ReportesManager {
 
         // Buscar indicadores en las observaciones
         const observaciones = (reporte.observaciones || '').toLowerCase();
-        let progreso = 75; // Default
-        let texto = 'En progreso';
+        let progreso = 100; // Default completado
+        let texto = 'Completada';
 
         if (observaciones.includes('excelente') || observaciones.includes('destacado')) {
             progreso = 90;
@@ -126,16 +149,27 @@ class ReportesManager {
 
     // Formatear fecha
     formatearFecha(fechaStr) {
+        // Si es un día de la semana, devolverlo tal cual
+        const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+        if (diasSemana.includes(fechaStr)) {
+            return fechaStr;
+        }
+
+        // Intentar formatear como fecha
         try {
             const fecha = new Date(fechaStr);
-            return fecha.toLocaleDateString('es-ES', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            if (!isNaN(fecha.getTime())) {
+                return fecha.toLocaleDateString('es-ES', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
         } catch (error) {
-            return fechaStr || 'Fecha no disponible';
+            // Ignorar error
         }
+
+        return fechaStr || 'Fecha no disponible';
     }
 
     // Refrescar reportes

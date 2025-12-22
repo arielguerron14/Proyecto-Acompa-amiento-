@@ -1,14 +1,20 @@
-# Simple static server for the frontend using nginx
-FROM nginx:stable-alpine
+# Development server using Node.js
+FROM node:18-alpine
 
-# Remove default nginx content
-RUN rm -rf /usr/share/nginx/html/*
+# Set working directory
+WORKDIR /app
 
-# Copy frontend static files
-COPY ./public /usr/share/nginx/html
+# Copy package files
+COPY package*.json ./
 
-# Expose default nginx port
-EXPOSE 80
+# Install dependencies
+RUN npm install
 
-# Run nginx in foreground
-CMD ["nginx", "-g", "daemon off;"]
+# Copy source code
+COPY . .
+
+# Expose port
+EXPOSE 5500
+
+# Start the development server
+CMD ["npm", "start"]

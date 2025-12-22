@@ -14,7 +14,7 @@ window.addEventListener('unhandledrejection', function(event) {
 });
 
 (function () {
-  const API_BASE = 'http://localhost:8080';
+  const API_BASE = 'http://localhost:3000';
   const TOKEN_KEY = 'acomp_jwt_token_v1';
 
   // Prevent multiple executions

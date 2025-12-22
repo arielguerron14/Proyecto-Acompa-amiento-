@@ -1,5 +1,25 @@
-// Gestión de Horarios de Atención - Frontend
-// Materias por semestre para Ingeniería en Sistemas de Información
+// Función para cambiar de pestaña
+function switchTab(moduleName) {
+  // Remover clase active de todas las pestañas
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.classList.remove('active');
+  });
+  // Agregar clase active a la pestaña seleccionada
+  const selectedTab = document.querySelector(`.nav-tab[data-module="${moduleName}"]`);
+  if (selectedTab) {
+    selectedTab.classList.add('active');
+  }
+
+  // Ocultar todos los módulos
+  document.querySelectorAll('.module').forEach(module => {
+    module.classList.remove('active');
+  });
+  // Mostrar el módulo seleccionado
+  const selectedModule = document.getElementById(moduleName);
+  if (selectedModule) {
+    selectedModule.classList.add('active');
+  }
+}
 const MATERIAS_POR_SEMESTRE = {
   1: [
     { codigo: 'MAT101', nombre: 'Matemáticas I' },
@@ -141,7 +161,7 @@ async function loadHorarios() {
     const payload = JSON.parse(atob(token.split('.')[1]));
     const maestroId = payload.userId;
 
-    const response = await fetch(`http://localhost:8080/horarios/maestro/${maestroId}`, {
+    const response = await fetch(`http://localhost:5001/horarios/maestro/${maestroId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
@@ -167,7 +187,7 @@ async function loadReportes() {
     const payload = JSON.parse(atob(token.split('.')[1]));
     const maestroId = payload.userId;
 
-    const response = await fetch(`http://localhost:8080/horarios/reportes/${maestroId}`, {
+    const response = await fetch(`http://localhost:5001/horarios/reportes/${maestroId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
@@ -193,17 +213,17 @@ function renderHorarios() {
     const row = document.createElement('tr');
 
     row.innerHTML = `
-      <td>${horario.materiaNombre}</td>
+      <td>${horario.materia}</td>
       <td>${horario.dia}</td>
-      <td>${horario.horaInicio} - ${horario.horaFin}</td>
-      <td>${horario.duracionMinutos} min</td>
+      <td>${horario.inicio} - ${horario.fin}</td>
+      <td>${calcularDuracionMinutos(horario.inicio, horario.fin)} min</td>
       <td>${horario.modalidad}</td>
       <td>${horario.lugarAtencion}</td>
       <td><span class="estado ${horario.estado.toLowerCase()}">${horario.estado}</span></td>
       <td class="acciones">
-        <button class="btn-editar" onclick="editarHorario('${horario.id}')">Editar</button>
-        <button class="btn-eliminar" onclick="eliminarHorario('${horario.id}')">Eliminar</button>
-        <button class="btn-estado" onclick="cambiarEstado('${horario.id}')">
+        <button class="btn-editar" onclick="editarHorario('${horario._id}')">Editar</button>
+        <button class="btn-eliminar" onclick="eliminarHorario('${horario._id}')">Eliminar</button>
+        <button class="btn-estado" onclick="cambiarEstado('${horario._id}')">
           ${horario.estado === 'Activo' ? 'Desactivar' : 'Activar'}
         </button>
       </td>
@@ -290,10 +310,18 @@ function timeToMinutes(time) {
   return hours * 60 + minutes;
 }
 
+// Calcular duración en minutos entre dos horas
+function calcularDuracionMinutos(inicio, fin) {
+  const inicioMin = timeToMinutes(inicio);
+  const finMin = timeToMinutes(fin);
+  return finMin > inicioMin ? finMin - inicioMin : 0;
+}
+
 // Validar formulario
 function validarFormulario() {
   const semestre = semestreSelect.value;
   const materia = materiaSelect.value;
+  const paralelo = document.getElementById('paralelo').value;
   const dia = document.getElementById('dia').value;
   const horaInicio = horaInicioInput.value;
   const horaFin = horaFinInput.value;
@@ -307,6 +335,7 @@ function validarFormulario() {
   // Campos obligatorios
   if (!semestre) errors.push('Semestre es obligatorio');
   if (!materia) errors.push('Materia es obligatoria');
+  if (!paralelo) errors.push('Paralelo es obligatorio');
   if (!dia) errors.push('Día es obligatorio');
   if (!horaInicio) errors.push('Hora inicio es obligatoria');
   if (!horaFin) errors.push('Hora fin es obligatoria');
@@ -360,29 +389,36 @@ async function guardarHorario() {
 
   // Obtener datos adicionales
   const materiaOption = materiaSelect.selectedOptions[0];
+  if (!materiaOption) {
+    showError('Error: Materia no válida seleccionada');
+    return;
+  }
+  
   const duracion = calcularDuracion();
 
   const horarioData = {
     maestroId: JSON.parse(atob(localStorage.getItem('token').split('.')[1])).userId,
-    carrera: CARRERA,
-    semestre: parseInt(data.semestre),
-    materiaCodigo: data.materia,
-    materiaNombre: materiaOption.dataset.nombre,
+    maestroName: 'Profesor',
+    semestre: data.semestre,
+    materia: `${data.materia} - ${materiaOption.dataset.nombre}`,
+    paralelo: data.paralelo || 'A',
     dia: data.dia,
-    horaInicio: data['hora-inicio'],
-    horaFin: data['hora-fin'],
-    duracionMinutos: duracion,
+    inicio: data['hora-inicio'],
+    fin: data['hora-fin'],
     modalidad: data.modalidad,
     lugarAtencion: data.lugar,
-    cupoMaximo: parseInt(data.cupo),
+    cupoMaximo: parseInt(data.cupo) || 30,
     estado: data.estado || 'Activo',
     observaciones: data.observaciones || ''
   };
 
   try {
     const token = localStorage.getItem('token');
-    const url = horarioEditando ? `http://localhost:8080/horarios/${horarioEditando}` : 'http://localhost:8080/horarios';
+    const url = horarioEditando ? `http://localhost:5001/horarios/${horarioEditando}` : 'http://localhost:5001/horarios';
     const method = horarioEditando ? 'PUT' : 'POST';
+
+    console.log('Enviando petición:', method, url);
+    console.log('Datos:', horarioData);
 
     const response = await fetch(url, {
       method,
@@ -393,9 +429,11 @@ async function guardarHorario() {
       body: JSON.stringify(horarioData)
     });
 
+    console.log('Respuesta recibida:', response.status, response.statusText);
+
     const result = await response.json();
 
-    if (result.success) {
+    if (response.ok && (result.success || method === 'POST')) {
       showSuccess(horarioEditando ? 'Horario actualizado' : 'Horario creado');
       horarioForm.reset();
       horarioEditando = null;
@@ -403,7 +441,14 @@ async function guardarHorario() {
       loadHorarios();
       loadReportes();
     } else {
-      showError(result.error || 'Error al guardar horario');
+      let errorMsg = result.message || result.error || 'Error al guardar horario';
+      
+      // Mensaje específico para conflicto de horarios
+      if (response.status === 409) {
+        errorMsg = 'Conflicto de horario: Ya existe un horario que se solapa con el horario que intentas crear. Por favor, elige una hora diferente o un día diferente.';
+      }
+      
+      showError(errorMsg);
     }
   } catch (error) {
     console.error('Error:', error);
@@ -413,7 +458,7 @@ async function guardarHorario() {
 
 // Editar horario
 function editarHorario(id) {
-  const horario = horarios.find(h => h.id === id);
+  const horario = horarios.find(h => h._id === id);
   if (!horario) return;
 
   horarioEditando = id;
@@ -421,10 +466,14 @@ function editarHorario(id) {
   // Llenar formulario
   semestreSelect.value = horario.semestre;
   updateMateriaOptions();
-  materiaSelect.value = horario.materiaCodigo;
+  // Para materia, necesitamos extraer el código del string "CODIGO - NOMBRE"
+  const materiaMatch = horario.materia.match(/^([A-Z0-9]+) - /);
+  if (materiaMatch) {
+    materiaSelect.value = materiaMatch[1];
+  }
   document.getElementById('dia').value = horario.dia;
-  horaInicioInput.value = horario.horaInicio;
-  horaFinInput.value = horario.horaFin;
+  horaInicioInput.value = horario.inicio;
+  horaFinInput.value = horario.fin;
   document.getElementById('modalidad').value = horario.modalidad;
   document.getElementById('lugar').value = horario.lugarAtencion;
   document.getElementById('cupo').value = horario.cupoMaximo;
@@ -436,7 +485,7 @@ function editarHorario(id) {
 
   // Cambiar a pestaña de formulario
   switchTab('horarios');
-  document.getElementById('horario-form-section').scrollIntoView();
+  document.getElementById('horarios').scrollIntoView();
 }
 
 // Eliminar horario
@@ -445,19 +494,19 @@ async function eliminarHorario(id) {
 
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`http://localhost:8080/horarios/${id}`, {
+    const response = await fetch(`http://localhost:5001/horarios/${id}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
     const result = await response.json();
 
-    if (result.success) {
+    if (response.ok && result.message === 'Horario eliminado') {
       showSuccess('Horario eliminado');
       loadHorarios();
       loadReportes();
     } else {
-      showError(result.error || 'Error al eliminar horario');
+      showError(result.message || 'Error al eliminar horario');
     }
   } catch (error) {
     console.error('Error:', error);
@@ -467,14 +516,14 @@ async function eliminarHorario(id) {
 
 // Cambiar estado del horario
 async function cambiarEstado(id) {
-  const horario = horarios.find(h => h.id === id);
+  const horario = horarios.find(h => h._id === id);
   if (!horario) return;
 
   const nuevoEstado = horario.estado === 'Activo' ? 'Inactivo' : 'Activo';
 
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`http://localhost:8080/horarios/${id}`, {
+    const response = await fetch(`http://localhost:5001/horarios/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

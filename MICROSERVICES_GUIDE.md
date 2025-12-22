@@ -370,5 +370,5 @@ Ver:
 
 ---
 
-**Última actualización:** Diciembre 2025
+**Última actualización:** 17 de diciembre de 2025
 **Versión:** 2.0 (Con 10 microservicios + Refactoring SOLID)

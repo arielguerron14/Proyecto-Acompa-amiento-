@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba Reportes</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .reporte-card { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .reporte-detalles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+        .reporte-materia, .reporte-semestre, .reporte-paralelo, .reporte-maestro, .reporte-horario { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>Prueba de Reportes</h1>
+    <div id="reportes-container"></div>
+
+    <script>
+        // Simular datos de la API
+        const mockData = {
+            "_id": "694752e8072b0f53a597b4e8",
+            "estudianteId": "694752c0293c986c2e059efe",
+            "estudianteName": "Estudiante Test",
+            "items": [
+                {
+                    "maestroId": "1",
+                    "maestroName": "Prof. García",
+                    "dia": "Lunes",
+                    "inicio": "08:00",
+                    "fin": "10:00",
+                    "duracionHoras": 2,
+                    "_id": "694752e8072b0f53a597b4e9"
+                },
+                {
+                    "maestroId": "2",
+                    "maestroName": "Prof. López",
+                    "materia": "BIO101",
+                    "semestre": "2",
+                    "paralelo": "A",
+                    "dia": "Viernes",
+                    "inicio": "10:00",
+                    "fin": "12:00",
+                    "duracionHoras": 2,
+                    "_id": "694753ad1c61be5b34afe039"
+                }
+            ],
+            "totalHoras": 10
+        };
+
+        // Función para crear tarjeta de reporte (igual que en reportes.js)
+        function createReporteCard(reporte) {
+            console.log('DEBUG: Creating card for reporte:', reporte);
+
+            const card = document.createElement('div');
+            card.className = 'reporte-card';
+
+            // Formatear fecha
+            const fecha = new Date();
+            const fechaFormateada = fecha.toLocaleDateString('es-ES', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            card.innerHTML = `
+                <div class="reporte-header">
+                    <h3>Reporte de Reserva</h3>
+                    <span class="reporte-estado estado-pendiente">Pendiente</span>
+                </div>
+                <div class="reporte-detalles">
+                    <div class="reporte-materia">
+                        <strong>Materia:</strong> ${reporte.materia || 'No especificada'}
+                    </div>
+                    <div class="reporte-semestre">
+                        <strong>Semestre:</strong> ${reporte.semestre || 'No especificado'}
+                    </div>
+                    <div class="reporte-paralelo">
+                        <strong>Paralelo:</strong> ${reporte.paralelo || 'No especificado'}
+                    </div>
+                    <div class="reporte-maestro">
+                        <strong>Maestro:</strong> ${reporte.maestroName || 'No especificado'}
+                    </div>
+                    <div class="reporte-horario">
+                        <strong>Horario:</strong> ${reporte.dia} ${reporte.inicio}-${reporte.fin}
+                    </div>
+                    <div class="reporte-fecha">
+                        <strong>Fecha:</strong> ${fechaFormateada}
+                    </div>
+                </div>
+                <div class="reporte-observaciones">
+                    <strong>Observaciones:</strong>
+                    <p>Sin observaciones disponibles</p>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Renderizar reportes
+        function renderReportes() {
+            const container = document.getElementById('reportes-container');
+            const reportes = mockData && mockData.items ? mockData.items : [];
+
+            console.log('DEBUG: Processing reportes:', reportes);
+
+            if (reportes.length === 0) {
+                container.innerHTML = '<p>No hay reportes disponibles</p>';
+                return;
+            }
+
+            container.innerHTML = reportes.map(reporte => createReporteCard(reporte).outerHTML).join('');
+        }
+
+        // Ejecutar cuando la página cargue
+        window.onload = function() {
+            console.log('Página cargada, renderizando reportes...');
+            renderReportes();
+        };
+    </script>
+</body>
+</html>

@@ -455,7 +455,7 @@ RESPUESTA HTTP
 
 ---
 
-**Diagrama Actualizado:** Diciembre 2025  
+**Diagrama Actualizado:** 17 de diciembre de 2025  
 **Arquitectura:** Microservicios (10 servicios)  
 **Patrón:** API Gateway + Shared Auth Module  
 **Protocolos:** HTTP/REST, SOAP (legacy), Kafka (streaming)

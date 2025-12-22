@@ -1,9 +1,13 @@
-const pg = require('../config/postgres');
+const mongoose = require('mongoose');
 
 async function connectDB() {
-  // Verify Postgres connection by performing a simple query
-  const res = await pg.query('SELECT 1 as ok');
-  return pg.pool;
+  try {
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://mongo:27017/micro-reportes-estudiantes');
+    console.log('MongoDB connected for micro-reportes-estudiantes');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    throw error;
+  }
 }
 
 module.exports = { connectDB };

@@ -2,13 +2,16 @@ FROM node:18-alpine
 
 WORKDIR /usr/src
 
-# copy shared modules and helpers from repo root
+# copy shared modules and service
 COPY shared-auth ./shared-auth
 COPY shared-monitoring ./shared-monitoring
-COPY message-broker ./message-broker
-
-# copy this service and install dependencies
 COPY micro-auth ./app
+
+# install dependencies for shared modules first
+WORKDIR /usr/src/shared-auth
+RUN npm ci --only=production --silent || npm install --production --silent
+
+# install dependencies for the service
 WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent
 

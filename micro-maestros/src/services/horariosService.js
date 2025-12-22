@@ -1,4 +1,5 @@
 const Horario = require('../models/Horario');
+const axios = require('axios');
 
 const REQUIRED_FIELDS = ['maestroId', 'maestroName', 'semestre', 'materia', 'paralelo', 'dia', 'inicio', 'fin'];
 
@@ -51,10 +52,87 @@ class HorariosService {
   }
 
   /**
+   * Obtiene reportes de horarios por maestro
+   */
+  async getReportesByMaestro(maestroId) {
+    const horarios = await Horario.find({ maestroId });
+
+    // Obtener reservas activas del servicio de estudiantes
+    let reservasCount = {};
+    try {
+      const estudiantesUrl = process.env.ESTUDIANTES_URL || 'http://micro-estudiantes:5002';
+      const response = await axios.get(`${estudiantesUrl}/reservas/maestro/${maestroId}`);
+      if (response.data && Array.isArray(response.data)) {
+        response.data.forEach(r => {
+          if (r.estado !== 'Cancelada') {
+            const key = `${r.dia}-${r.inicio}`;
+            reservasCount[key] = (reservasCount[key] || 0) + 1;
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error obteniendo reservas:', err.message);
+      // Continuar sin reservas
+    }
+
+    const reportes = {
+      totalHorasSemana: horarios.reduce((sum, h) => {
+        const inicio = new Date(`1970-01-01T${h.inicio}:00`);
+        const fin = new Date(`1970-01-01T${h.fin}:00`);
+        const horas = (fin - inicio) / (1000 * 60 * 60);
+        return sum + horas;
+      }, 0),
+      horasPorMateria: {},
+      horariosPorDia: {},
+      horariosPorModalidad: {},
+      cuposDisponibles: 0,
+      materiasDemanda: {}
+    };
+
+    horarios.forEach(h => {
+      const key = `${h.dia}-${h.inicio}`;
+      const reservasActivas = reservasCount[key] || 0;
+      const cupoMaximo = h.cupoMaximo || 0;
+      reportes.cuposDisponibles += Math.max(0, cupoMaximo - reservasActivas);
+
+      // Horas por materia
+      if (!reportes.horasPorMateria[h.materia]) {
+        reportes.horasPorMateria[h.materia] = 0;
+      }
+      const inicio = new Date(`1970-01-01T${h.inicio}:00`);
+      const fin = new Date(`1970-01-01T${h.fin}:00`);
+      const horas = (fin - inicio) / (1000 * 60 * 60);
+      reportes.horasPorMateria[h.materia] += horas;
+
+      // Horarios por día
+      if (!reportes.horariosPorDia[h.dia]) {
+        reportes.horariosPorDia[h.dia] = 0;
+      }
+      reportes.horariosPorDia[h.dia]++;
+
+      // Horarios por modalidad (if exists)
+      if (h.modalidad) {
+        if (!reportes.horariosPorModalidad[h.modalidad]) {
+          reportes.horariosPorModalidad[h.modalidad] = 0;
+        }
+        reportes.horariosPorModalidad[h.modalidad]++;
+      }
+
+      // Materias con mayor demanda (por cupo disponible)
+      if (!reportes.materiasDemanda[h.materia]) {
+        reportes.materiasDemanda[h.materia] = 0;
+      }
+      reportes.materiasDemanda[h.materia] += Math.max(0, cupoMaximo - reservasActivas);
+    });
+
+    return reportes;
+  }
+
+  /**
    * Obtiene todos los horarios con filtros opcionales
    */
   async getAll(filters = {}) {
-    const query = {};
+    const query = { estado: 'Activo' }; // Solo horarios activos
     if (filters.semestre) query.semestre = filters.semestre;
     if (filters.materia) query.materia = filters.materia;
     if (filters.paralelo) query.paralelo = filters.paralelo;
@@ -72,7 +150,53 @@ class HorariosService {
       error.status = 404;
       throw error;
     }
+
+    // Cancelar reservas asociadas
+    try {
+      const estudiantesUrl = process.env.ESTUDIANTES_URL || 'http://micro-estudiantes:5002';
+      await axios.post(`${estudiantesUrl}/reservas/cancel-by-horario`, {
+        maestroId: deleted.maestroId,
+        dia: deleted.dia,
+        inicio: deleted.inicio,
+        fin: deleted.fin
+      });
+    } catch (err) {
+      console.error('Error cancelando reservas:', err.message);
+      // No fallar la eliminación si falla la cancelación
+    }
+
     return deleted;
+  }
+
+  /**
+   * Actualiza un horario
+   */
+  async update(id, data) {
+    const horario = await Horario.findById(id);
+    if (!horario) {
+      const error = new Error('Horario no encontrado');
+      error.status = 404;
+      throw error;
+    }
+
+    // Si se está cambiando a inactivo, cancelar reservas
+    if (data.estado === 'Inactivo' && horario.estado === 'Activo') {
+      try {
+        const estudiantesUrl = process.env.ESTUDIANTES_URL || 'http://micro-estudiantes:5002';
+        await axios.post(`${estudiantesUrl}/reservas/cancel-by-horario`, {
+          maestroId: horario.maestroId,
+          dia: horario.dia,
+          inicio: horario.inicio,
+          fin: horario.fin
+        });
+      } catch (err) {
+        console.error('Error cancelando reservas:', err.message);
+        // No fallar la actualización si falla la cancelación
+      }
+    }
+
+    const updatedHorario = await Horario.findByIdAndUpdate(id, data, { new: true });
+    return updatedHorario;
   }
 }
 

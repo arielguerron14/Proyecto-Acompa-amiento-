@@ -1,0 +1,8 @@
+{
+  "estudianteId": "test123",
+  "estudianteName": "Test Student",
+  "maestroId": 1,
+  "dia": "lunes",
+  "inicio": "09:00",
+  "fin": "10:00"
+}

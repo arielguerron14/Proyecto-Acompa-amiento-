@@ -24,16 +24,22 @@ class ReservasService {
    * Obtiene horario disponible del maestro
    */
   async getAvailableHorario(maestroId, dia, inicio, fin) {
+    console.log('DEBUG: getAvailableHorario called with:', { maestroId, dia, inicio, fin });
     const url = `${MAESTROS_URL}/horarios/maestro/${maestroId}`;
+    console.log('DEBUG: Calling URL:', url);
     const response = await httpClient.getSafe(url);
+    console.log('DEBUG: httpClient.getSafe returned:', response ? 'response' : 'null');
 
     if (!response || response.status !== 200) {
+      console.log('DEBUG: No response or bad status:', response?.status);
       const error = new Error('Maestro not found');
       error.status = 404;
       throw error;
     }
 
-    const match = response.data.find(h => h.dia === dia && h.inicio === inicio && h.fin === fin);
+    console.log('DEBUG: Response data:', response.data);
+    const match = response.data.horarios.find(h => h.dia === dia && h.inicio === inicio && h.fin === fin);
+    console.log('DEBUG: Found match:', match);
     if (!match) {
       const error = new Error('Horario not available');
       error.status = 404;
@@ -47,7 +53,7 @@ class ReservasService {
    * Verifica que no exista reserva duplicada
    */
   async checkDuplicate(maestroId, dia, inicio) {
-    const existing = await Reserva.findOne({ maestroId, dia, inicio });
+    const existing = await Reserva.findOne({ maestroId, dia, inicio, estado: { $ne: 'Cancelada' } });
     if (existing) {
       const error = new Error('Horario ya reservado');
       error.status = 409;
@@ -59,21 +65,29 @@ class ReservasService {
    * Notifica a los servicios de reportes
    */
   async notifyReportes(reserva) {
+    console.log('DEBUG: notifyReportes called with reserva:', reserva);
     const estPayload = {
       estudianteId: reserva.estudianteId,
       estudianteName: reserva.estudianteName,
       maestroId: reserva.maestroId,
       maestroName: reserva.maestroName,
+      materia: reserva.materia,
+      semestre: reserva.semestre,
+      paralelo: reserva.paralelo,
       dia: reserva.dia,
       inicio: reserva.inicio,
       fin: reserva.fin,
+      modalidad: reserva.modalidad,
+      lugarAtencion: reserva.lugarAtencion
     };
+    console.log('DEBUG: estPayload to send:', estPayload);
 
     const maestPayload = {
       maestroId: reserva.maestroId,
       maestroName: reserva.maestroName,
       dia: reserva.dia,
       inicio: reserva.inicio,
+      fin: reserva.fin,
       estudianteId: reserva.estudianteId,
       estudianteName: reserva.estudianteName,
     };
@@ -87,29 +101,43 @@ class ReservasService {
    * Crea una nueva reserva
    */
   async create(data) {
+    console.log('DEBUG: Starting create reserva with data:', data);
     this.validateRequired(data);
     const { estudianteId, estudianteName, maestroId, dia, inicio, fin } = data;
+    console.log('DEBUG: Validation passed, maestroId:', maestroId);
 
     // Validar disponibilidad en micro-maestros
+    console.log('DEBUG: Calling getAvailableHorario');
     const horario = await this.getAvailableHorario(maestroId, dia, inicio, fin);
+    console.log('DEBUG: getAvailableHorario returned:', horario);
 
     // Validar que no esté duplicada
-    await this.checkDuplicate(maestroId, dia, inicio);
+    console.log('DEBUG: Calling checkDuplicate');
+    await this.checkDuplicate(maestroId, dia, inicio, fin);
+    console.log('DEBUG: checkDuplicate passed');
 
     // Crear reserva
+    console.log('DEBUG: Creating reserva in database');
     const reserva = await Reserva.create({
       estudianteId,
       estudianteName,
       maestroId,
       maestroName: horario.maestroName || data.maestroName || 'Sin nombre',
+      materia: horario.materia,
+      semestre: horario.semestre,
+      paralelo: horario.paralelo,
       dia,
       inicio,
       fin,
+      modalidad: horario.modalidad,
+      lugarAtencion: horario.lugarAtencion
     });
+    console.log('DEBUG: Reserva created:', reserva._id);
 
-    // Notificar a reportes (asincrónico)
-    this.notifyReportes(reserva).catch(() => {}); // Silent fail
+    // Notificar a reportes (obligatorio)
+    await this.notifyReportes(reserva);
 
+    console.log('DEBUG: Returning reserva');
     return reserva;
   }
 
@@ -117,7 +145,7 @@ class ReservasService {
    * Obtiene reservas por estudiante
    */
   async getByEstudiante(estudianteId) {
-    return Reserva.find({ estudianteId }).sort({ createdAt: -1 });
+    return Reserva.find({ estudianteId, estado: { $ne: 'Cancelada' } }).sort({ createdAt: -1 });
   }
 
   /**
@@ -125,6 +153,43 @@ class ReservasService {
    */
   async getByMaestro(maestroId) {
     return Reserva.find({ maestroId }).sort({ dia: 1, inicio: 1 });
+  }
+
+  /**
+   * Cancela una reserva por ID
+   */
+  async cancelById(id) {
+    const reserva = await Reserva.findById(id);
+    if (!reserva) {
+      const error = new Error('Reserva no encontrada');
+      error.status = 404;
+      throw error;
+    }
+    if (reserva.estado !== 'Activa') {
+      const error = new Error('La reserva ya está cancelada');
+      error.status = 400;
+      throw error;
+    }
+    reserva.estado = 'Cancelada';
+    reserva.canceladoAt = new Date();
+    reserva.motivoCancelacion = 'Cancelada por el estudiante';
+    await reserva.save();
+    return reserva;
+  }
+
+  /**
+   * Cancela reservas por horario (cuando el maestro desactiva el horario)
+   */
+  async cancelByHorario(maestroId, dia, inicio, fin) {
+    const result = await Reserva.updateMany(
+      { maestroId, dia, inicio, fin, estado: 'Activa' },
+      {
+        estado: 'Cancelada',
+        canceladoAt: new Date(),
+        motivoCancelacion: 'Horario desactivado por el maestro'
+      }
+    );
+    return result.modifiedCount;
   }
 }
 
