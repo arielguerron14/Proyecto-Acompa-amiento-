@@ -52,7 +52,12 @@ async function startServer() {
   }
 }
 
-startServer();
+// Only start the server when this file is executed directly. This prevents
+// tests (which import `app`) from auto-starting connections to Redis/Mongo
+// and keeps the test environment clean.
+if (require.main === module) {
+  startServer();
+}
 
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught Exception:', err);

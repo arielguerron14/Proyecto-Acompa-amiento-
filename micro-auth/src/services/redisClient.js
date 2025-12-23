@@ -42,15 +42,31 @@ async function initRedis() {
       // Silently handle errors - fallback to memory cache
     });
 
-    // Try to connect with a timeout
-    const connectPromise = Promise.race([
-      client.connect(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Redis connection timeout')), 2000)
-      ),
-    ]);
+    // Try to connect with a timeout. Use a cancellable timer so the timeout
+    // does not remain as an open handle after connect succeeds.
+    let timer = null;
+    const connectPromise = client.connect().then(
+      (res) => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        return res;
+      },
+      (err) => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        throw err;
+      }
+    );
 
-    await connectPromise;
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Redis connection timeout')), 2000);
+    });
+
+    await Promise.race([connectPromise, timeoutPromise]);
     logger.info(`Redis session store connected to ${REDIS_HOST}:${REDIS_PORT}`);
     return true;
   } catch (error) {
