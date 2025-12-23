@@ -14,6 +14,8 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    env:
+      REPO_PREFIX: ${{ toLower(secrets.REPO_PREFIX || 'proyecto-acomp') }}
     strategy:
       matrix:
         include:
@@ -59,11 +61,11 @@ jobs:
           file: ${{ matrix.context }}/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}-${{ matrix.name }}:${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}-${{ matrix.name }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-${{ matrix.name }}:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-${{ matrix.name }}:latest
 
       - name: Image info
         run: |
           echo "Built images for ${{ matrix.name }}:"
-          echo " - sha: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}-${{ matrix.name }}:${{ github.sha }}"
-          echo " - latest: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}-${{ matrix.name }}:latest"
+          echo " - sha: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-${{ matrix.name }}:${{ github.sha }}"
+          echo " - latest: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-${{ matrix.name }}:latest"

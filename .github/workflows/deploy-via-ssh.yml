@@ -22,6 +22,8 @@ jobs:
   deploy:
     name: Deploy services via SSH
     runs-on: ubuntu-latest
+    env:
+      REPO_PREFIX: ${{ toLower(secrets.REPO_PREFIX || 'proyecto-acomp') }}
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     strategy:
       fail-fast: false
@@ -88,8 +90,8 @@ jobs:
       - name: Set image tags
         run: |
           SHA=${{ github.event.workflow_run.head_sha || github.sha }}
-          echo "IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}-${{ matrix.name }}:$SHA" >> $GITHUB_OUTPUT
-          echo "IMAGE_LATEST=${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}-${{ matrix.name }}:latest" >> $GITHUB_OUTPUT
+          echo "IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-${{ matrix.name }}:$SHA" >> $GITHUB_OUTPUT
+          echo "IMAGE_LATEST=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-${{ matrix.name }}:latest" >> $GITHUB_OUTPUT
 
       - name: Deploy to host via SSH
         uses: appleboy/ssh-action@v0.1.9

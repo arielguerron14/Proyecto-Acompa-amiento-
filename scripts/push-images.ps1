@@ -4,7 +4,7 @@
 
 param(
     [string[]]$Services = @('micro-auth','api-gateway','frontend-web','micro-core','micro-reportes','micro-notificaciones','messaging','monitoring','databases'),
-    [string]$RepoPrefix = 'Proyecto-Acompa-amiento-'
+    [string]$RepoPrefix = 'proyecto-acomp-'
 )
 
 $user = $env:DOCKERHUB_USERNAME

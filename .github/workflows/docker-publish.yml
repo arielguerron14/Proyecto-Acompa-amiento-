@@ -10,7 +10,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     env:
-      REPO_PREFIX: ${{ secrets.REPO_PREFIX || github.event.repository.name }}
+      REPO_PREFIX: ${{ toLower(secrets.REPO_PREFIX || 'proyecto-acomp') }}
 
     steps:
       - name: Checkout

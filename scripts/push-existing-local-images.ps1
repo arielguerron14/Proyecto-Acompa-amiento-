@@ -6,7 +6,7 @@
 #   REPO_PREFIX         - prefix to apply to repository names (default: Proyecto-Acompa-amiento-)
 
 param(
-    [string]$RepoPrefix = 'Proyecto-Acompa-amiento-'
+    [string]$RepoPrefix = 'proyecto-acomp-'
 )
 
 # Determine Docker Hub username
