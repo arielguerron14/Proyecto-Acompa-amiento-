@@ -139,5 +139,24 @@ jobs:
             docker rm "${{ matrix.container }}" || true
             echo "Running new container (${matrix.container})"
             docker run -d --name "${{ matrix.container }}" --restart always -p ${{ matrix.ports }} $IMAGE
+            # Give the container a few seconds to start, then check its status and logs
+            sleep 5
+            echo "Checking container status for ${matrix.container}"
+            docker ps --filter "name=${{ matrix.container }}" --format 'table {{.Names}}\t{{.Status}}'
+            echo "Last 50 lines of ${matrix.container} logs:" 
+            docker logs --tail 50 "${{ matrix.container }}" || true
+
+            # Try a basic HTTP health check against the host port (if any)
+            HOST_PORT=$(echo "${{ matrix.ports }}" | cut -d':' -f1)
+            if command -v curl >/dev/null 2>&1; then
+              if curl -sSf --max-time 5 http://localhost:$HOST_PORT/ >/dev/null 2>&1; then
+                echo "Health check passed on port $HOST_PORT"
+              else
+                echo "Health check failed or no HTTP endpoint on port $HOST_PORT (continuing)"
+              fi
+            else
+              echo "curl not available on host; skipping HTTP health check"
+            fi
+
             echo "Cleaning up dangling images"
             docker image prune -f || true
