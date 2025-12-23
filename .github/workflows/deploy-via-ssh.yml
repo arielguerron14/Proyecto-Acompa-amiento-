@@ -1,0 +1,117 @@
+name: CD - Deploy services to EC2 via SSH
+
+# Trigger when the CI workflow completes successfully, or run manually via workflow_dispatch.
+# Uses appleboy/ssh-action to perform docker pull / stop / rm / run on each target EC2 host.
+# Requires secrets: EC2_USER, EC2_KEY, DOCKERHUB_USERNAME, and per-host secrets (e.g. FRONTEND_HOST)
+
+on:
+  workflow_run:
+    workflows: ["CI - Build and push Docker images to Docker Hub"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Comma-separated list of services to deploy (default: all)'
+        required: false
+        default: 'all'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy services via SSH
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: frontend-web
+            host: ${{ secrets.FRONTEND_HOST }}
+            dir: ./frontend-web
+            container: acomp-frontend
+            ports: "3000:3000"
+          - name: api-gateway
+            host: ${{ secrets.API_GATEWAY_HOST }}
+            dir: ./api-gateway
+            container: acomp-api-gateway
+            ports: "8080:8080"
+          - name: micro-core
+            host: ${{ secrets.MICRO_CORE_HOST }}
+            dir: ./micro-core
+            container: acomp-micro-core
+            ports: "3002:3002"
+          - name: micro-auth
+            host: ${{ secrets.MICRO_CORE_HOST }}
+            dir: ./micro-auth
+            container: acomp-micro-auth
+            ports: "3001:3001"
+          - name: micro-reportes
+            host: ${{ secrets.REPORTES_HOST }}
+            dir: ./micro-reportes
+            container: acomp-micro-reportes
+            ports: "3003:3003"
+          - name: micro-notificaciones
+            host: ${{ secrets.NOTIFICACIONES_HOST }}
+            dir: ./micro-notificaciones
+            container: acomp-micro-notificaciones
+            ports: "3004:3004"
+          - name: messaging
+            host: ${{ secrets.MESSAGING_HOST }}
+            dir: ./messaging
+            container: acomp-messaging
+            ports: "3005:3005"
+          - name: monitoring
+            host: ${{ secrets.MONITORING_HOST }}
+            dir: ./monitoring
+            container: acomp-monitoring
+            ports: "9090:9090"
+          - name: databases
+            host: ${{ secrets.DATABASES_HOST }}
+            dir: ./databases
+            container: acomp-databases
+            ports: "5432:5432"
+
+    steps:
+      - name: Check which services to run (dispatch filter)
+        id: svc-filter
+        run: |
+          echo "services_input=${{ github.event.inputs.services || 'all' }}" >> $GITHUB_OUTPUT
+
+      - name: Skip service if not selected (manual dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.services != 'all' && !(contains(toJson(split(github.event.inputs.services, ',')), matrix.name)) }}
+        run: |
+          echo "Skipping ${{ matrix.name }} as not in input services"
+          exit 78
+
+      - name: Set image tags
+        run: |
+          SHA=${{ github.event.workflow_run.head_sha || github.sha }}
+          echo "IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}-${{ matrix.name }}:$SHA" >> $GITHUB_OUTPUT
+          echo "IMAGE_LATEST=${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}-${{ matrix.name }}:latest" >> $GITHUB_OUTPUT
+
+      - name: Deploy to host via SSH
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ matrix.host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+            IMAGE="${IMAGE}"
+            IMAGE_LATEST="${IMAGE_LATEST}"
+            echo "Pulling $IMAGE on remote host ${{ matrix.host }}"
+            # login to Docker Hub on remote (non-echoing)
+            if [ -n "${DOCKERHUB_USERNAME:-}" ]; then
+              printf '%s' "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin || true
+            fi
+            docker pull "$IMAGE" || docker pull "$IMAGE_LATEST"
+            echo "Stopping old container (${matrix.container}) if exists"
+            docker stop "${{ matrix.container }}" || true
+            docker rm "${{ matrix.container }}" || true
+            echo "Running new container (${matrix.container})"
+            docker run -d --name "${{ matrix.container }}" --restart always -p ${{ matrix.ports }} $IMAGE
+            echo "Cleaning up dangling images"
+            docker image prune -f || true
