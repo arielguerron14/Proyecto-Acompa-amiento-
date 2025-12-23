@@ -1,0 +1,144 @@
+# Este pipeline es compatible con AWS Academy: no usa SSH ni despliegue directo en EC2
+# (Cumple las restricciones: NO SSH desde CI, NO modificar Security Groups desde CI, NO desplegar en EC2 desde Actions)
+name: CI/CD - tests, build and push to ECR (AWS Academy compatible)
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  # Prefijo para nombres de repositorio ECR (ajusta si quieres)
+  REPO_PREFIX: proyecto-acomp
+
+jobs:
+  test-build-push:
+    name: Test → Build → Push to Amazon ECR (compatible con AWS Academy)
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2) Setup Node.js to run tests (if services use Node)
+      - name: Setup Node.js (for running tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      # 3) Run tests per microservice when a test script exists
+      - name: Run tests for services (skip if none)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT_DIR="microservicios"
+          if [[ ! -d "$ROOT_DIR" ]]; then
+            echo "Directory '$ROOT_DIR' not found — skipping tests"
+            exit 0
+          fi
+
+          for svc in "$ROOT_DIR"/*; do
+            if [[ -d "$svc" ]]; then
+              svcname=$(basename "$svc")
+              if [[ -f "$svc/package.json" ]]; then
+                echo "=== Running tests for $svcname ==="
+                pushd "$svc" >/dev/null
+                # Prefer reproducible install; fallback to npm install if needed
+                if ! npm ci --no-audit --prefer-offline; then
+                  echo "npm ci failed for $svcname — showing npm logs and falling back to npm install"
+                  ls -la /home/runner/.npm/_logs || true
+                  for f in /home/runner/.npm/_logs/*.log; do
+                    echo "===== $f ====="; sed -n '1,200p' "$f" || true
+                  done
+                  npm install --no-audit --prefer-offline
+                fi
+
+                # Run tests only if a "test" script is defined
+                node -e "try{const p=require('./package.json'); process.exit(!(p.scripts && p.scripts.test));}catch(e){process.exit(1);}"
+                  && npm test --silent -- --detectOpenHandles --runInBand \
+                  || (echo "Tests failed in $svcname" && exit 1)
+                popd >/dev/null
+              else
+                echo "Skipping $svc (no package.json)"
+              fi
+            fi
+          done
+
+      # 4) Configure AWS credentials (required for subsequent ECR operations)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 5) Login to Amazon ECR (docker login)
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # 6) Determine AWS account id (used to build full repository names)
+      - name: Determine AWS account ID
+        id: aws-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
+      # 7) Build and push images for each microservice found in /microservicios
+      - name: Build Docker images and push to ECR
+        env:
+          ACCOUNT_ID: ${{ steps.aws-account.outputs.account_id }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          REPO_PREFIX: ${{ env.REPO_PREFIX }}
+          GIT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT_DIR="microservicios"
+          if [[ ! -d "$ROOT_DIR" ]]; then
+            echo "Directory '$ROOT_DIR' not found — nothing to build"
+            exit 0
+          fi
+
+          for svc in "$ROOT_DIR"/*; do
+            if [[ -d "$svc" ]]; then
+              svcname=$(basename "$svc")
+              DOCKERFILE_PATH="$svc/Dockerfile"
+              if [[ ! -f "$DOCKERFILE_PATH" ]]; then
+                echo "Skipping $svcname: no Dockerfile at $DOCKERFILE_PATH"
+                continue
+              fi
+
+              # Full ECR repo and tags
+              ECR_REPO="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_PREFIX}-${svcname}"
+              TAG_LATEST="${ECR_REPO}:latest"
+              TAG_SHA="${ECR_REPO}:${GIT_SHA}"
+
+              echo "=== Service: $svcname ==="
+              echo "ECR repo: $ECR_REPO"
+              echo "Ensuring ECR repository exists..."
+              if ! aws ecr describe-repositories --repository-names "${REPO_PREFIX}-${svcname}" --region "${AWS_REGION}" >/dev/null 2>&1; then
+                echo "Creating ECR repository ${REPO_PREFIX}-${svcname}"
+                aws ecr create-repository --repository-name "${REPO_PREFIX}-${svcname}" --region "${AWS_REGION}" >/dev/null
+              else
+                echo "ECR repository ${REPO_PREFIX}-${svcname} already exists"
+              fi
+
+              echo "Building Docker image for $svcname"
+              docker build -f "$DOCKERFILE_PATH" -t "$TAG_LATEST" -t "$TAG_SHA" "$svc"
+
+              echo "Pushing image tags for $svcname"
+              docker push "$TAG_SHA"
+              docker push "$TAG_LATEST"
+
+              echo "Finished $svcname"
+            fi
+          done
+
+# EOF - Este workflow sólo realiza: test -> build -> push a ECR.
+# Reiteración de la política: Este pipeline es compatible con AWS Academy: no usa SSH ni despliegue directo en EC2.
