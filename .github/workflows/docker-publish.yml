@@ -39,7 +39,8 @@ jobs:
       - name: Build and push micro-auth
         uses: docker/build-push-action@v4
         with:
-          context: ./micro-auth
+          # Build from repository root so shared modules can be copied into the image
+          context: .
           file: ./micro-auth/Dockerfile
           platforms: linux/amd64
           push: true
@@ -50,7 +51,7 @@ jobs:
       - name: Build and push api-gateway
         uses: docker/build-push-action@v4
         with:
-          context: ./api-gateway
+          context: .
           file: ./api-gateway/Dockerfile
           platforms: linux/amd64
           push: true
@@ -61,7 +62,7 @@ jobs:
       - name: Build and push frontend-web
         uses: docker/build-push-action@v4
         with:
-          context: ./frontend-web
+          context: .
           file: ./frontend-web/Dockerfile
           platforms: linux/amd64
           push: true

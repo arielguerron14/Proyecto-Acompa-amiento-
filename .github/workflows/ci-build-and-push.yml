@@ -21,27 +21,27 @@ jobs:
       matrix:
         include:
           - name: micro-auth
-            context: ./micro-auth
+            path: micro-auth
           - name: api-gateway
-            context: ./api-gateway
+            path: api-gateway
           - name: frontend-web
-            context: ./frontend-web
+            path: frontend-web
           - name: micro-maestros
-            context: ./micro-maestros
+            path: micro-maestros
           - name: micro-estudiantes
-            context: ./micro-estudiantes
+            path: micro-estudiantes
           - name: micro-reportes-estudiantes
-            context: ./micro-reportes-estudiantes
+            path: micro-reportes-estudiantes
           - name: micro-reportes-maestros
-            context: ./micro-reportes-maestros
+            path: micro-reportes-maestros
           - name: micro-notificaciones
-            context: ./micro-notificaciones
+            path: micro-notificaciones
           - name: micro-analytics
-            context: ./micro-analytics
+            path: micro-analytics
           - name: micro-soap-bridge
-            context: ./micro-soap-bridge
+            path: micro-soap-bridge
           - name: monitoring
-            context: ./monitoring
+            path: monitoring
 
     steps:
       - name: Checkout repository
@@ -62,8 +62,9 @@ jobs:
       - name: Build and push image (sha + latest)
         uses: docker/build-push-action@v4
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.context }}/Dockerfile
+          # Use repository root as the build context so shared modules (siblings) are accessible
+          context: .
+          file: ${{ matrix.path }}/Dockerfile
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-${{ matrix.name }}:${{ github.sha }}
