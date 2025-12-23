@@ -15,8 +15,9 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-      AWS_REGION: ${{ env.AWS_REGION }}
-      ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+      # Use top-level env values (don't re-reference `env.*` here — the parser
+      # may reject such expressions). These are available to steps as
+      # ${{ env.AWS_REGION }} and ${{ env.ECR_REPOSITORY }} automatically.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +29,19 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+
+          - name: Debug AWS credentials (non-sensitive)
+            if: ${{ always() }}
+            run: |
+              set -euo pipefail
+              # Print whether secrets are set (do not print values)
+              if [[ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]]; then echo "AWS_ACCESS_KEY_ID present"; else echo "AWS_ACCESS_KEY_ID missing"; fi
+              if [[ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]]; then echo "AWS_SECRET_ACCESS_KEY present"; else echo "AWS_SECRET_ACCESS_KEY missing"; fi
+              if [[ -n "${{ secrets.AWS_SESSION_TOKEN }}" ]]; then echo "AWS_SESSION_TOKEN present"; else echo "AWS_SESSION_TOKEN missing"; fi
+
+              echo "aws --version: $(aws --version 2>&1 | sed -n '1p')"
+              echo "Testing STS caller identity (may fail if creds invalid)"
+              aws sts get-caller-identity || true
 
       - name: Get AWS account ID
         id: aws-account
