@@ -41,6 +41,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
+      - name: Check AWS identity (debug)
+        if: ${{ steps.check-creds.outputs.ecr == 'true' }}
+        run: |
+          echo "Checking AWS credentials (non-sensitive output)"
+          # Ensure AWS CLI is available
+          if ! command -v aws >/dev/null 2>&1; then
+            echo "AWS CLI not found — installing awscli"
+            sudo apt-get update -y
+            sudo apt-get install -y awscli
+          fi
+          echo "AWS CLI: $(aws --version 2>&1)"
+          echo "Calling sts get-caller-identity..."
+          aws sts get-caller-identity --output json
+          if [ -n "${AWS_SESSION_TOKEN:-}" ]; then
+            echo "AWS_SESSION_TOKEN is present (non-empty)"
+          else
+            echo "AWS_SESSION_TOKEN is not set"
+          fi
+
       - name: Log in to Amazon ECR (if AWS credentials provided)
         if: ${{ steps.check-creds.outputs.ecr == 'true' }}
         uses: docker/login-action@v2
