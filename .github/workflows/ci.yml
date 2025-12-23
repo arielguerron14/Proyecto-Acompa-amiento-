@@ -47,7 +47,26 @@ jobs:
             if [ -f "$d/package.json" ]; then
               echo "==> Testing $d"
               pushd $d
-              npm ci --no-audit --prefer-offline
+              if npm ci --no-audit --prefer-offline; then
+                echo "npm ci succeeded"
+              else
+                echo "npm ci failed for $d — printing npm debug logs (if any)"
+                ls -la /home/runner/.npm/_logs || true
+                for f in /home/runner/.npm/_logs/*.log; do
+                  echo "===== $f ====="
+                  sed -n '1,200p' "$f" || true
+                done
+                echo "Falling back to npm install"
+                npm install --no-audit --prefer-offline || {
+                  echo "npm install also failed — printing npm debug logs"
+                  ls -la /home/runner/.npm/_logs || true
+                  for f in /home/runner/.npm/_logs/*.log; do
+                    echo "===== $f ====="
+                    sed -n '1,200p' "$f" || true
+                  done
+                  exit 1
+                }
+              fi
               # Run Jest with diagnostics for open handles to help debug leaks
               # Run tests and output Jest JSON results so we can print failing tests on CI
               npm test --silent -- --detectOpenHandles --runInBand --json --outputFile=jest-results.json || true
@@ -88,8 +107,22 @@ jobs:
             if npm ci --silent --no-audit --prefer-offline; then
               echo "npm ci succeeded"
             else
-              echo "npm ci failed — falling back to 'npm install'"
-              npm install --no-audit --prefer-offline || { echo "npm install also failed"; exit 1; }
+              echo "npm ci failed for ${{ matrix.service }} — printing npm debug logs"
+              ls -la /home/runner/.npm/_logs || true
+              for f in /home/runner/.npm/_logs/*.log; do
+                echo "===== $f ====="
+                sed -n '1,200p' "$f" || true
+              done
+              echo "Falling back to npm install"
+              npm install --no-audit --prefer-offline || {
+                echo "npm install also failed — printing npm debug logs"
+                ls -la /home/runner/.npm/_logs || true
+                for f in /home/runner/.npm/_logs/*.log; do
+                  echo "===== $f ====="
+                  sed -n '1,200p' "$f" || true
+                done
+                exit 1
+              }
             fi
           fi
 
