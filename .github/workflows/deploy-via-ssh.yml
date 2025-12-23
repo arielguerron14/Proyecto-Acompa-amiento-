@@ -113,8 +113,15 @@ jobs:
         run: |
           echo "Checking TCP connectivity to ${{ steps.resolve-host.outputs.host }}:22 from the runner"
           sudo apt-get update -y >/dev/null
-          sudo apt-get install -y netcat >/dev/null
-          nc -vz -w5 "${{ steps.resolve-host.outputs.host }}" 22 || (echo "ERROR: port 22 unreachable from the runner to ${{ steps.resolve-host.outputs.host }}" && exit 1)
+          # 'netcat' may not exist as a package name on some images; try common providers
+          sudo apt-get install -y netcat-openbsd >/dev/null || sudo apt-get install -y ncat >/dev/null || true
+          HOST="${{ steps.resolve-host.outputs.host }}"
+          if command -v nc >/dev/null 2>&1; then
+            nc -vz -w5 "$HOST" 22 || (echo "ERROR: port 22 unreachable from the runner to $HOST" && exit 1)
+          else
+            # Fallback: try bash /dev/tcp (may be unavailable), using timeout to avoid hanging
+            timeout 5 bash -c "</dev/tcp/$HOST/22" >/dev/null 2>&1 || (echo "ERROR: port 22 unreachable from the runner to $HOST (fallback failed)" && exit 1)
+          fi
 
       - name: Deploy to host via SSH
         uses: appleboy/ssh-action@v0.1.9
