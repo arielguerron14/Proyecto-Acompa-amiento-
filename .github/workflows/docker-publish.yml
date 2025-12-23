@@ -45,11 +45,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Fail early if no registry credentials are available
+      - name: Skip build if no registry credentials are available
         if: ${{ ! (secrets.AWS_ACCESS_KEY_ID && secrets.AWS_SECRET_ACCESS_KEY) && ! (secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN) }}
         run: |
-          echo "ERROR: No registry credentials provided. Set either AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY (for ECR) or DOCKERHUB_USERNAME & DOCKERHUB_TOKEN (for Docker Hub) in repo secrets." >&2
-          exit 1
+          echo "No registry credentials provided; skipping image build/push steps. Set either AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY (for ECR) or DOCKERHUB_USERNAME & DOCKERHUB_TOKEN (for Docker Hub) in repo secrets to enable publishing." 
+          exit 0
 
       - name: Build and push micro-auth
         uses: docker/build-push-action@v4

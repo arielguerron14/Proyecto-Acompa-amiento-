@@ -59,43 +59,34 @@ jobs:
               echo "==> Skipping $d (no package.json)"
             fi
           done
-name: CI
+      build-and-test:
+        runs-on: ubuntu-latest
+        strategy:
+          matrix:
+            service: [api-gateway, micro-maestros, micro-estudiantes, micro-reportes-estudiantes, micro-reportes-maestros, frontend-web]
+        steps:
+          - uses: actions/checkout@v4
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+          - name: Use Node
+            uses: actions/setup-node@v4
+            with:
+              node-version: '18'
 
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [api-gateway, micro-maestros, micro-estudiantes, micro-reportes-estudiantes, micro-reportes-maestros, frontend-web]
-    steps:
-      - uses: actions/checkout@v4
+          - name: Install dependencies
+            run: |
+              cd ${{ matrix.service }} || exit 0
+              if [ -f package.json ]; then npm ci; fi
 
-      - name: Use Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
+          - name: Run tests (if exist)
+            run: |
+              cd ${{ matrix.service }} || exit 0
+              if npm run -s test; then echo "tests passed"; fi
 
-      - name: Install dependencies
-        run: |
-          cd ${{ matrix.service }} || exit 0
-          if [ -f package.json ]; then npm ci; fi
-
-      - name: Run tests (if exist)
-        run: |
-          cd ${{ matrix.service }} || exit 0
-          if npm run -s test; then echo "tests passed"; fi
-
-  docker-build:
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build images
-        run: |
-          docker compose -f docker-compose.yml build
+      docker-build:
+        runs-on: ubuntu-latest
+        needs: build-and-test
+        steps:
+          - uses: actions/checkout@v4
+          - name: Build images
+            run: |
+              docker compose -f docker-compose.yml build
