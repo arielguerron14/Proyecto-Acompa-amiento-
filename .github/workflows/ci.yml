@@ -75,7 +75,15 @@ jobs:
       - name: Install dependencies
         run: |
           cd ${{ matrix.service }} || exit 0
-          if [ -f package.json ]; then npm ci; fi
+          if [ -f package.json ]; then
+            echo "Attempting 'npm ci' for ${{ matrix.service }}"
+            if npm ci --silent --no-audit --prefer-offline; then
+              echo "npm ci succeeded"
+            else
+              echo "npm ci failed — falling back to 'npm install'"
+              npm install --no-audit --prefer-offline || { echo "npm install also failed"; exit 1; }
+            fi
+          fi
 
       - name: Run tests (if exist)
         run: |
