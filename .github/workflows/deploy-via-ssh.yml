@@ -1,4 +1,3 @@
-name: CD - Deploy services to EC2 via SSH
 
 # Trigger when the CI workflow completes successfully, or run manually via workflow_dispatch.
 # Uses appleboy/ssh-action to perform docker pull / stop / rm / run on each target EC2 host.
