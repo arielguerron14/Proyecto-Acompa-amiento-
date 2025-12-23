@@ -1,4 +1,3 @@
-name: CD - Deploy services to EC2 via SSH
 
 # Trigger when the CI workflow completes successfully, or run manually via workflow_dispatch.
 # Uses appleboy/ssh-action to perform docker pull / stop / rm / run on each target EC2 host.
@@ -106,9 +105,21 @@ jobs:
           esac
           echo "host=$HOST" >> $GITHUB_OUTPUT
 
+      - name: "Debug: show resolved host"
+        run: |
+          echo "Resolved host: ${{ steps.resolve-host.outputs.host }}"
+
+      - name: Check SSH port from runner
+        run: |
+          echo "Checking TCP connectivity to ${{ steps.resolve-host.outputs.host }}:22 from the runner"
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y netcat >/dev/null
+          nc -vz -w5 "${{ steps.resolve-host.outputs.host }}" 22 || (echo "ERROR: port 22 unreachable from the runner to ${{ steps.resolve-host.outputs.host }}" && exit 1)
+
       - name: Deploy to host via SSH
         uses: appleboy/ssh-action@v0.1.9
         with:
+          debug: true
           host: ${{ steps.resolve-host.outputs.host }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
@@ -128,5 +139,24 @@ jobs:
             docker rm "${{ matrix.container }}" || true
             echo "Running new container (${matrix.container})"
             docker run -d --name "${{ matrix.container }}" --restart always -p ${{ matrix.ports }} $IMAGE
+            # Give the container a few seconds to start, then check its status and logs
+            sleep 5
+            echo "Checking container status for ${matrix.container}"
+            docker ps --filter "name=${{ matrix.container }}" --format 'table {{.Names}}\t{{.Status}}'
+            echo "Last 50 lines of ${matrix.container} logs:" 
+            docker logs --tail 50 "${{ matrix.container }}" || true
+
+            # Try a basic HTTP health check against the host port (if any)
+            HOST_PORT=$(echo "${{ matrix.ports }}" | cut -d':' -f1)
+            if command -v curl >/dev/null 2>&1; then
+              if curl -sSf --max-time 5 http://localhost:$HOST_PORT/ >/dev/null 2>&1; then
+                echo "Health check passed on port $HOST_PORT"
+              else
+                echo "Health check failed or no HTTP endpoint on port $HOST_PORT (continuing)"
+              fi
+            else
+              echo "curl not available on host; skipping HTTP health check"
+            fi
+
             echo "Cleaning up dangling images"
             docker image prune -f || true

@@ -47,13 +47,44 @@ jobs:
             if [ -f "$d/package.json" ]; then
               echo "==> Testing $d"
               pushd $d
-              npm ci --no-audit --prefer-offline
-              # Run Jest with diagnostics for open handles to help debug leaks
-              if npm test --silent -- --detectOpenHandles --runInBand; then
-                echo "[OK] $d tests passed"
+              if npm ci --no-audit --prefer-offline; then
+                echo "npm ci succeeded"
               else
-                echo "[FAIL] $d tests failed (re-run with --detectOpenHandles --runInBand to see open handles)"
-                exit 1
+                echo "npm ci failed for $d — printing npm debug logs (if any)"
+                ls -la /home/runner/.npm/_logs || true
+                for f in /home/runner/.npm/_logs/*.log; do
+                  echo "===== $f ====="
+                  sed -n '1,200p' "$f" || true
+                done
+                echo "Falling back to npm install"
+                npm install --no-audit --prefer-offline || {
+                  echo "npm install also failed — printing npm debug logs"
+                  ls -la /home/runner/.npm/_logs || true
+                  for f in /home/runner/.npm/_logs/*.log; do
+                    echo "===== $f ====="
+                    sed -n '1,200p' "$f" || true
+                  done
+                  exit 1
+                }
+              fi
+              # Run Jest with diagnostics for open handles to help debug leaks
+              # Run tests and output Jest JSON results so we can print failing tests on CI
+              npm test --silent -- --detectOpenHandles --runInBand --json --outputFile=jest-results.json || true
+              if [ -f jest-results.json ]; then
+                node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('jest-results.json')); if(r.numFailedTests>0){ console.error('Failed tests:', r.numFailedTests); r.testResults.filter(t=>t.status!=='passed').forEach(t=>{ console.error('- ' + t.name); t.assertionResults.filter(a=>a.status!=='passed').forEach(a=>console.error('  * ' + a.title)); }); process.exit(1);} process.exit(0);"
+              else
+                echo "No jest-results.json produced; running tests directly to capture output"
+                # Only run tests if package.json defines a "test" script
+                if node -e "try{const p=require('./package.json'); process.exit(!(p.scripts && p.scripts.test));}catch(e){process.exit(1);}"; then
+                  if npm test --silent -- --detectOpenHandles --runInBand; then
+                    echo "[OK] $d tests passed"
+                  else
+                    echo "[FAIL] $d tests failed (re-run with --detectOpenHandles --runInBand to see open handles)"
+                    exit 1
+                  fi
+                else
+                  echo "[SKIP] $d has no test script; skipping tests"
+                fi
               fi
               popd
             else
@@ -81,8 +112,22 @@ jobs:
             if npm ci --silent --no-audit --prefer-offline; then
               echo "npm ci succeeded"
             else
-              echo "npm ci failed — falling back to 'npm install'"
-              npm install --no-audit --prefer-offline || { echo "npm install also failed"; exit 1; }
+              echo "npm ci failed for ${{ matrix.service }} — printing npm debug logs"
+              ls -la /home/runner/.npm/_logs || true
+              for f in /home/runner/.npm/_logs/*.log; do
+                echo "===== $f ====="
+                sed -n '1,200p' "$f" || true
+              done
+              echo "Falling back to npm install"
+              npm install --no-audit --prefer-offline || {
+                echo "npm install also failed — printing npm debug logs"
+                ls -la /home/runner/.npm/_logs || true
+                for f in /home/runner/.npm/_logs/*.log; do
+                  echo "===== $f ====="
+                  sed -n '1,200p' "$f" || true
+                done
+                exit 1
+              }
             fi
           fi
 
@@ -90,7 +135,12 @@ jobs:
         run: |
           cd ${{ matrix.service }} || exit 0
           # Run Jest with flags to detect async handles and force single-threaded runs for reliable diagnostics
-          if npm test --silent -- --detectOpenHandles --runInBand; then echo "tests passed"; fi
+          # Only run tests if package.json defines a "test" script
+          if node -e "try{const p=require('./package.json'); process.exit(!(p.scripts && p.scripts.test));}catch(e){process.exit(1);}"; then
+            if npm test --silent -- --detectOpenHandles --runInBand; then echo "tests passed"; fi
+          else
+            echo "[SKIP] ${{ matrix.service }} has no test script; skipping tests"
+          fi
 
   docker-build:
     runs-on: ubuntu-latest
