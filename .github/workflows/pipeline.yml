@@ -13,6 +13,12 @@ jobs:
   build-and-push:
     name: Test → Build → Push to Docker Hub
     runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
     steps:
       - name: Checkout
@@ -22,27 +28,36 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Configure AWS (for ECR)
-        if: ${{ secrets.AWS_ACCESS_KEY_ID && secrets.AWS_SECRET_ACCESS_KEY && secrets.AWS_REGION }}
+        if: env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY && env.AWS_REGION
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Get AWS account ID
+        id: aws-account
+        run: |
+          aws_account_id=$(aws sts get-caller-identity --query Account --output text)
+          echo "aws_account_id=$aws_account_id" >> $GITHUB_OUTPUT
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names "${{ env.REPO_PREFIX }}-dummy" >/dev/null 2>&1 || true
+
       - name: Log in to ECR (if AWS creds present)
-        if: ${{ secrets.AWS_ACCESS_KEY_ID && secrets.AWS_SECRET_ACCESS_KEY && secrets.AWS_REGION }}
+        if: env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY && env.AWS_REGION
         uses: docker/login-action@v2
         with:
           ecr: auto
-          logout: true
 
       - name: Log in to Docker Hub (if Docker secrets present)
-        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        if: env.DOCKERHUB_USERNAME && env.DOCKERHUB_TOKEN
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          logout: true
+        # logout option intentionally left out here to avoid interfering with remote deploys
 
       - name: Debug Docker Hub secret presence
         if: ${{ always() }}
@@ -60,13 +75,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Discover services: prefer folder 'microservicios' if present, otherwise top-level 'micro-*'
           if [[ -d microservicios ]]; then
             SRCDIR="microservicios"
             SERVICES=("$(ls -1 "$SRCDIR")")
           else
             SERVICES=( $(ls -1 | grep '^micro-' || true) )
           fi
+
           for svc in ${SERVICES[@]}; do
             if [[ -f "$svc/package.json" ]]; then
               echo "Running tests for $svc"
@@ -77,8 +92,7 @@ jobs:
                 echo "npm ci failed; falling back to npm install"
                 npm install --no-audit --prefer-offline
               fi
-              if node -e "try{const p=require('./package.json'); process.exit(!(p.scripts && p.scripts.test));}catch(e){process.exit(1);}"
-              then
+              if node -e "try{const p=require('./package.json'); process.exit(!(p.scripts && p.scripts.test));}catch(e){process.exit(1);}" then
                 npm test --silent -- --detectOpenHandles --runInBand || { echo "Tests failed in $svc"; exit 1; }
               else
                 echo "[SKIP] $svc has no test script"
@@ -95,14 +109,12 @@ jobs:
           GIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          # Discover services same as tests
           if [[ -d microservicios ]]; then
             DIRS=(microservicios/*)
           else
             DIRS=(micro-*)
           fi
 
-          # Determine available registries
           PUSH_TO_DOCKERHUB=false
           if [[ -n "${{ secrets.DOCKERHUB_USERNAME }}" && -n "${{ secrets.DOCKERHUB_TOKEN }}" ]]; then
             PUSH_TO_DOCKERHUB=true
@@ -119,7 +131,6 @@ jobs:
 
           for svcdir in "${DIRS[@]}"; do
             svc=$(basename "$svcdir")
-            # Skip if not a directory
             if [[ ! -d "$svcdir" ]]; then continue; fi
             DOCKERFILE="$svcdir/Dockerfile"
             if [[ ! -f "$DOCKERFILE" ]]; then
@@ -145,7 +156,6 @@ jobs:
             fi
 
             if [[ "$PUSH_TO_ECR" == "true" ]]; then
-              # Ensure ECR repository exists (safe to run; ignore errors on create)
               aws ecr describe-repositories --repository-names "$REPO" >/dev/null 2>&1 || aws ecr create-repository --repository-name "$REPO" >/dev/null 2>&1 || true
               IMAGE_ecr_latest="${ECR_REGISTRY}/${REPO}:latest"
               IMAGE_ecr_sha="${ECR_REGISTRY}/${REPO}:${GIT_SHA::8}"
@@ -167,7 +177,6 @@ jobs:
     steps:
       - name: Validate required deploy secrets
         run: |
-          # Accept either EC2_SSH_KEY or EC2_KEY (some repos use different names)
           if [[ -z "${{ secrets.EC2_HOST }}" || -z "${{ secrets.EC2_USER }}" || ( -z "${{ secrets.EC2_SSH_KEY }}" && -z "${{ secrets.EC2_KEY }}" ) ]]; then
             echo "EC2_HOST, EC2_USER or EC2_SSH_KEY/EC2_KEY secrets are missing; skipping deploy"; exit 78
           fi
@@ -185,14 +194,12 @@ jobs:
             if [[ -n "${{ secrets.DOCKERHUB_USERNAME }}" && -n "${{ secrets.DOCKERHUB_TOKEN }}" ]]; then
               printf '%s' "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin || true
             fi
-            # Attempt docker compose pull/up in home directory (assumes docker-compose.yml present on remote)
             cd ~/ || true
             if [[ -f docker-compose.yml ]]; then
               docker compose pull || true
               docker compose up -d --remove-orphans
             else
               echo "docker-compose.yml not found in home directory of remote host; attempting docker pull for known images"
-              # As fallback, pull images built in this workflow (using REPO_PREFIX and services pattern)
               for svcdir in micro-*; do
                 if [[ -d "$svcdir" ]]; then
                   svc=$(basename "$svcdir")
