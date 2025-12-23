@@ -106,7 +106,7 @@ jobs:
           esac
           echo "host=$HOST" >> $GITHUB_OUTPUT
 
-      - name: Debug: show resolved host
+      - name: "Debug: show resolved host"
         run: |
           echo "Resolved host: ${{ steps.resolve-host.outputs.host }}"
 
