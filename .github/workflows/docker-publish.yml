@@ -36,6 +36,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Verify micro-auth Dockerfile
+        run: |
+          echo "Checking ./micro-auth/Dockerfile"
+          ls -la ./micro-auth || true
+          if [ ! -f ./micro-auth/Dockerfile ]; then echo "ERROR: ./micro-auth/Dockerfile not found" >&2; exit 1; fi
+          echo "---- begin Dockerfile ----"; sed -n '1,120p' ./micro-auth/Dockerfile || true; echo "---- end Dockerfile ----"
+
       - name: Build and push micro-auth
         uses: docker/build-push-action@v4
         with:
@@ -48,6 +55,13 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-micro-auth:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-micro-auth:latest
 
+      - name: Verify api-gateway Dockerfile
+        run: |
+          echo "Checking ./api-gateway/Dockerfile"
+          ls -la ./api-gateway || true
+          if [ ! -f ./api-gateway/Dockerfile ]; then echo "ERROR: ./api-gateway/Dockerfile not found" >&2; exit 1; fi
+          echo "---- begin Dockerfile ----"; sed -n '1,120p' ./api-gateway/Dockerfile || true; echo "---- end Dockerfile ----"
+
       - name: Build and push api-gateway
         uses: docker/build-push-action@v4
         with:
@@ -58,6 +72,13 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-api-gateway:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-api-gateway:latest
+
+      - name: Verify frontend-web Dockerfile
+        run: |
+          echo "Checking ./frontend-web/Dockerfile"
+          ls -la ./frontend-web || true
+          if [ ! -f ./frontend-web/Dockerfile ]; then echo "ERROR: ./frontend-web/Dockerfile not found" >&2; exit 1; fi
+          echo "---- begin Dockerfile ----"; sed -n '1,120p' ./frontend-web/Dockerfile || true; echo "---- end Dockerfile ----"
 
       - name: Build and push frontend-web
         uses: docker/build-push-action@v4
