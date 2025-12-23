@@ -5,14 +5,13 @@ on:
     branches:
       - main
       - master
-      - tests/jest-micro-auth
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     env:
-      # Set REPO_PREFIX from a secret `REPO_PREFIX` if available, otherwise fall back to repo name
       REPO_PREFIX: ${{ secrets.REPO_PREFIX || github.event.repository.name }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,100 +22,48 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Check registry credentials
-        id: check-creds
+      - name: Ensure Docker Hub credentials are set
         run: |
-          ECR=false
-          DOCKERHUB=false
-          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ] && [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then ECR=true; fi
-          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then DOCKERHUB=true; fi
-          echo "ecr=$ECR" >> $GITHUB_OUTPUT
-          echo "dockerhub=$DOCKERHUB" >> $GITHUB_OUTPUT
-
-      - name: Configure AWS credentials (for ECR login)
-        if: ${{ steps.check-creds.outputs.ecr == 'true' }}
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
-
-      - name: Check AWS identity (debug)
-        if: ${{ steps.check-creds.outputs.ecr == 'true' }}
-        run: |
-          echo "Checking AWS credentials (non-sensitive output)"
-          # Ensure AWS CLI is available
-          if ! command -v aws >/dev/null 2>&1; then
-            echo "AWS CLI not found — installing awscli"
-            sudo apt-get update -y
-            sudo apt-get install -y awscli
-          fi
-          echo "AWS CLI: $(aws --version 2>&1)"
-          echo "Calling sts get-caller-identity..."
-          aws sts get-caller-identity --output json
-          if [ -n "${AWS_SESSION_TOKEN:-}" ]; then
-            echo "AWS_SESSION_TOKEN is present (non-empty)"
-          else
-            echo "AWS_SESSION_TOKEN is not set"
+          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ] || [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "ERROR: DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be set in repo secrets to publish images." >&2
+            exit 1
           fi
 
-      - name: Log in to Amazon ECR (if AWS credentials provided)
-        if: ${{ steps.check-creds.outputs.ecr == 'true' }}
-        uses: docker/login-action@v2
-        with:
-          ecr: auto
-          logout: true
-
-      - name: Log in to Docker Hub (if Docker Hub credentials provided)
-        if: ${{ steps.check-creds.outputs.dockerhub == 'true' }}
+      - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Skip build if no registry credentials are available
-        if: ${{ steps.check-creds.outputs.ecr != 'true' && steps.check-creds.outputs.dockerhub != 'true' }}
-        run: |
-          echo "No registry credentials provided; skipping image build/push steps. Set either AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY (for ECR) or DOCKERHUB_USERNAME & DOCKERHUB_TOKEN (for Docker Hub) in repo secrets to enable publishing." 
-          exit 0
 
       - name: Build and push micro-auth
         uses: docker/build-push-action@v4
         with:
           context: ./micro-auth
           file: ./micro-auth/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-micro-auth:${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-micro-auth:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-micro-auth:latest
 
       - name: Build and push api-gateway
         uses: docker/build-push-action@v4
         with:
           context: ./api-gateway
           file: ./api-gateway/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-api-gateway:${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-api-gateway:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-api-gateway:latest
 
       - name: Build and push frontend-web
         uses: docker/build-push-action@v4
         with:
           context: ./frontend-web
           file: ./frontend-web/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-frontend-web:${{ github.sha }}
-
-      - name: Create/Update latest tag on Docker Hub
-        if: success()
-        run: |
-          echo "Tagging images as latest"
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-micro-auth:${{ github.sha }}
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-micro-auth:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-micro-auth:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-micro-auth:latest
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-api-gateway:${{ github.sha }}
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-api-gateway:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-api-gateway:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-api-gateway:latest
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-frontend-web:${{ github.sha }}
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-frontend-web:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-frontend-web:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-frontend-web:latest
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-frontend-web:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-frontend-web:latest
