@@ -11,7 +11,8 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     env:
-      REPO_PREFIX: "${{ env.REPO_PREFIX }}"
+      # Set REPO_PREFIX from a secret `REPO_PREFIX` if available, otherwise fall back to repo name
+      REPO_PREFIX: ${{ secrets.REPO_PREFIX || github.event.repository.name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
