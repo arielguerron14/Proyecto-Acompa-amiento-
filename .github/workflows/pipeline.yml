@@ -35,6 +35,22 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Debug AWS credential presence (pre-configure)
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ env.AWS_ACCESS_KEY_ID }}" ]]; then echo "AWS_ACCESS_KEY_ID present"; else echo "AWS_ACCESS_KEY_ID missing"; fi
+          if [[ -n "${{ env.AWS_SECRET_ACCESS_KEY }}" ]]; then echo "AWS_SECRET_ACCESS_KEY present"; else echo "AWS_SECRET_ACCESS_KEY missing"; fi
+          if [[ -n "${{ env.AWS_REGION }}" ]]; then echo "AWS_REGION present: ${{ env.AWS_REGION }}"; else echo "AWS_REGION missing"; fi
+          aws --version || true
+
+      - name: Debug AWS sts (post-configure)
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          echo "Running aws sts get-caller-identity (may fail if creds invalid)"
+          aws sts get-caller-identity || true
+
       - name: Get AWS account ID
         id: aws-account
         run: |
