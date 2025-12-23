@@ -48,10 +48,11 @@ jobs:
               echo "==> Testing $d"
               pushd $d
               npm ci --no-audit --prefer-offline
-              if npm test --silent; then
+              # Run Jest with diagnostics for open handles to help debug leaks
+              if npm test --silent -- --detectOpenHandles --runInBand; then
                 echo "[OK] $d tests passed"
               else
-                echo "[FAIL] $d tests failed"
+                echo "[FAIL] $d tests failed (re-run with --detectOpenHandles --runInBand to see open handles)"
                 exit 1
               fi
               popd
@@ -88,7 +89,8 @@ jobs:
       - name: Run tests (if exist)
         run: |
           cd ${{ matrix.service }} || exit 0
-          if npm run -s test; then echo "tests passed"; fi
+          # Run Jest with flags to detect async handles and force single-threaded runs for reliable diagnostics
+          if npm test --silent -- --detectOpenHandles --runInBand; then echo "tests passed"; fi
 
   docker-build:
     runs-on: ubuntu-latest
