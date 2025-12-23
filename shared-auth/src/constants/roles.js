@@ -23,7 +23,7 @@ const ROLE_PERMISSIONS = {
     'read:reportes'
   ],
   [ROLES.AUDITOR]: [
-    'read:horarios', 'read:reservas', 'read:reportes'
+    'read:horarios', 'read:reservas', 'read:reportes', 'audit'
   ]
 };
 
