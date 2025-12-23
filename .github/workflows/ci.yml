@@ -49,11 +49,18 @@ jobs:
               pushd $d
               npm ci --no-audit --prefer-offline
               # Run Jest with diagnostics for open handles to help debug leaks
-              if npm test --silent -- --detectOpenHandles --runInBand; then
-                echo "[OK] $d tests passed"
+              # Run tests and output Jest JSON results so we can print failing tests on CI
+              npm test --silent -- --detectOpenHandles --runInBand --json --outputFile=jest-results.json || true
+              if [ -f jest-results.json ]; then
+                node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('jest-results.json')); if(r.numFailedTests>0){ console.error('Failed tests:', r.numFailedTests); r.testResults.filter(t=>t.status!=='passed').forEach(t=>{ console.error('- ' + t.name); t.assertionResults.filter(a=>a.status!=='passed').forEach(a=>console.error('  * ' + a.title)); }); process.exit(1);} process.exit(0);"
               else
-                echo "[FAIL] $d tests failed (re-run with --detectOpenHandles --runInBand to see open handles)"
-                exit 1
+                echo "No jest-results.json produced; running tests directly to capture output"
+                if npm test --silent -- --detectOpenHandles --runInBand; then
+                  echo "[OK] $d tests passed"
+                else
+                  echo "[FAIL] $d tests failed (re-run with --detectOpenHandles --runInBand to see open handles)"
+                  exit 1
+                fi
               fi
               popd
             else

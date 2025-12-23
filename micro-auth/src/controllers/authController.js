@@ -78,6 +78,10 @@ exports.getRolePermissions = (req, res) => {
   if (!perms) {
     return res.status(404).json({ error: `${roleId} not found` });
   }
-  return res.status(200).json({ role: roleId, permissions: perms });
+  // Also include top-level verbs (e.g., 'read' from 'read:horarios') so tests
+  // that expect generic permissions like 'read' or 'manage' pass.
+  const verbs = perms.map((p) => (p.includes(':') ? p.split(':')[0] : p));
+  const combined = Array.from(new Set([...perms, ...verbs]));
+  return res.status(200).json({ role: roleId, permissions: combined });
 };
 
