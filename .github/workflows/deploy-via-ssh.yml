@@ -23,54 +23,55 @@ jobs:
     name: Deploy services via SSH
     runs-on: ubuntu-latest
     env:
-      REPO_PREFIX: ${{ toLower(secrets.REPO_PREFIX || 'proyecto-acomp') }}
+      # Use a lowercase repository prefix to ensure Docker tags are valid
+      REPO_PREFIX: proyecto-acomp
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: frontend-web
-            host: ${{ secrets.FRONTEND_HOST }}
+            host_secret: FRONTEND_HOST
             dir: ./frontend-web
             container: acomp-frontend
             ports: "3000:3000"
           - name: api-gateway
-            host: ${{ secrets.API_GATEWAY_HOST }}
+            host_secret: API_GATEWAY_HOST
             dir: ./api-gateway
             container: acomp-api-gateway
             ports: "8080:8080"
           - name: micro-core
-            host: ${{ secrets.MICRO_CORE_HOST }}
+            host_secret: MICRO_CORE_HOST
             dir: ./micro-core
             container: acomp-micro-core
             ports: "3002:3002"
           - name: micro-auth
-            host: ${{ secrets.MICRO_CORE_HOST }}
+            host_secret: MICRO_CORE_HOST
             dir: ./micro-auth
             container: acomp-micro-auth
             ports: "3001:3001"
           - name: micro-reportes
-            host: ${{ secrets.REPORTES_HOST }}
+            host_secret: REPORTES_HOST
             dir: ./micro-reportes
             container: acomp-micro-reportes
             ports: "3003:3003"
           - name: micro-notificaciones
-            host: ${{ secrets.NOTIFICACIONES_HOST }}
+            host_secret: NOTIFICACIONES_HOST
             dir: ./micro-notificaciones
             container: acomp-micro-notificaciones
             ports: "3004:3004"
           - name: messaging
-            host: ${{ secrets.MESSAGING_HOST }}
+            host_secret: MESSAGING_HOST
             dir: ./messaging
             container: acomp-messaging
             ports: "3005:3005"
           - name: monitoring
-            host: ${{ secrets.MONITORING_HOST }}
+            host_secret: MONITORING_HOST
             dir: ./monitoring
             container: acomp-monitoring
             ports: "9090:9090"
           - name: databases
-            host: ${{ secrets.DATABASES_HOST }}
+            host_secret: DATABASES_HOST
             dir: ./databases
             container: acomp-databases
             ports: "5432:5432"
@@ -82,7 +83,7 @@ jobs:
           echo "services_input=${{ github.event.inputs.services || 'all' }}" >> $GITHUB_OUTPUT
 
       - name: Skip service if not selected (manual dispatch)
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.services != 'all' && !(contains(toJson(split(github.event.inputs.services, ',')), matrix.name)) }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.services != 'all' && !contains(github.event.inputs.services, matrix.name) }}
         run: |
           echo "Skipping ${{ matrix.name }} as not in input services"
           exit 78
@@ -93,10 +94,26 @@ jobs:
           echo "IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-${{ matrix.name }}:$SHA" >> $GITHUB_OUTPUT
           echo "IMAGE_LATEST=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.REPO_PREFIX }}-${{ matrix.name }}:latest" >> $GITHUB_OUTPUT
 
+      - name: Resolve host from secrets
+        id: resolve-host
+        run: |
+          case "${{ matrix.host_secret }}" in
+            FRONTEND_HOST) HOST="${{ secrets.FRONTEND_HOST }}" ;;
+            API_GATEWAY_HOST) HOST="${{ secrets.API_GATEWAY_HOST }}" ;;
+            MICRO_CORE_HOST) HOST="${{ secrets.MICRO_CORE_HOST }}" ;;
+            REPORTES_HOST) HOST="${{ secrets.REPORTES_HOST }}" ;;
+            NOTIFICACIONES_HOST) HOST="${{ secrets.NOTIFICACIONES_HOST }}" ;;
+            MESSAGING_HOST) HOST="${{ secrets.MESSAGING_HOST }}" ;;
+            MONITORING_HOST) HOST="${{ secrets.MONITORING_HOST }}" ;;
+            DATABASES_HOST) HOST="${{ secrets.DATABASES_HOST }}" ;;
+            *) echo "Unknown host secret: ${{ matrix.host_secret }}" >&2 ; exit 1 ;;
+          esac
+          echo "host=$HOST" >> $GITHUB_OUTPUT
+
       - name: Deploy to host via SSH
         uses: appleboy/ssh-action@v0.1.9
         with:
-          host: ${{ matrix.host }}
+          host: ${{ steps.resolve-host.outputs.host }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           port: 22
@@ -104,7 +121,7 @@ jobs:
             set -euo pipefail
             IMAGE="${IMAGE}"
             IMAGE_LATEST="${IMAGE_LATEST}"
-            echo "Pulling $IMAGE on remote host ${{ matrix.host }}"
+            echo "Pulling $IMAGE on remote host ${{ steps.resolve-host.outputs.host }}"
             # login to Docker Hub on remote (non-echoing)
             if [ -n "${DOCKERHUB_USERNAME:-}" ]; then
               printf '%s' "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin || true

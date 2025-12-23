@@ -15,7 +15,8 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     env:
-      REPO_PREFIX: ${{ toLower(secrets.REPO_PREFIX || 'proyecto-acomp') }}
+      # Default lowercase repo prefix to avoid invalid docker tag errors
+      REPO_PREFIX: proyecto-acomp
     strategy:
       matrix:
         include:
