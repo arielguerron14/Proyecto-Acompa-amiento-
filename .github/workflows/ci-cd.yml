@@ -1,0 +1,272 @@
+name: CI/CD - Build, Push to ECR, Deploy to EC2
+
+# Single workflow implementing CI, Docker build & push to AWS ECR, and SSH deploy to EC2
+# Triggers: push to branches and PRs; manual dispatch supported
+on:
+  push:
+    branches: [ main, master, '**' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+env:
+  # lowercase prefix for image names
+  REPO_PREFIX: proyecto-acomp
+  AWS_REGION: us-east-1
+
+jobs:
+  ci:
+    name: CI - run tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 && break
+            echo "Waiting for Postgres..."
+            sleep 1
+          done
+
+      - name: Run tests across services
+        run: |
+          set -euo pipefail
+          SERVICES=(api-gateway micro-auth micro-estudiantes micro-maestros micro-reportes-estudiantes micro-reportes-maestros micro-notificaciones micro-analytics micro-soap-bridge frontend-web)
+          for d in "${SERVICES[@]}"; do
+            if [ -f "$d/package.json" ]; then
+              echo "==> Testing $d"
+              pushd $d
+              # Install dependencies: prefer clean install but fallback to npm install
+              if npm ci --no-audit --prefer-offline; then
+                echo "npm ci succeeded"
+              else
+                echo "npm ci failed for $d — falling back to npm install and printing logs"
+                ls -la /home/runner/.npm/_logs || true
+                for f in /home/runner/.npm/_logs/*.log; do
+                  echo "===== $f ====="; sed -n '1,200p' "$f" || true
+                done
+                npm install --no-audit --prefer-offline || { echo "npm install failed"; exit 1; }
+              fi
+
+              # Only run tests if package.json defines "test" script
+              if node -e "try{const p=require('./package.json'); process.exit(!(p.scripts && p.scripts.test));}catch(e){process.exit(1);}"
+              then
+                npm test --silent -- --detectOpenHandles --runInBand || { echo "Tests failed in $d"; exit 1; }
+              else
+                echo "[SKIP] $d has no test script; skipping tests"
+              fi
+              popd
+            else
+              echo "==> Skipping $d (no package.json)"
+            fi
+          done
+
+  build_and_push:
+    name: Build Docker images & push to AWS ECR
+    runs-on: ubuntu-latest
+    needs: ci
+    env:
+      AWS_REGION: ${{ env.AWS_REGION }}
+      REPO_PREFIX: ${{ env.REPO_PREFIX }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api-gateway
+            path: api-gateway
+          - name: micro-auth
+            path: micro-auth
+          - name: micro-estudiantes
+            path: micro-estudiantes
+          - name: micro-maestros
+            path: micro-maestros
+          - name: micro-reportes-estudiantes
+            path: micro-reportes-estudiantes
+          - name: micro-reportes-maestros
+            path: micro-reportes-maestros
+          - name: micro-notificaciones
+            path: micro-notificaciones
+          - name: micro-analytics
+            path: micro-analytics
+          - name: micro-soap-bridge
+            path: micro-soap-bridge
+          - name: frontend-web
+            path: frontend-web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Determine AWS account ID
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
+      - name: Create ECR repo if missing
+        run: |
+          REPO_NAME="${{ env.REPO_PREFIX }}-${{ matrix.name }}"
+          if ! aws ecr describe-repositories --repository-names "$REPO_NAME" --region $AWS_REGION >/dev/null 2>&1; then
+            echo "Creating ECR repository $REPO_NAME"
+            aws ecr create-repository --repository-name "$REPO_NAME" --region $AWS_REGION >/dev/null
+          else
+            echo "ECR repository $REPO_NAME already exists"
+          fi
+
+      - name: Build and push image to ECR
+        env:
+          ACCOUNT_ID: ${{ steps.account.outputs.account_id }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          REPO_NAME: ${{ env.REPO_PREFIX }}-${{ matrix.name }}
+        run: |
+          FULL_REPO=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}
+          IMAGE_LATEST=${FULL_REPO}:latest
+          IMAGE_SHA=${FULL_REPO}:${GITHUB_SHA::8}
+
+          echo "Building $IMAGE_LATEST from ./${{ matrix.path }}/Dockerfile"
+          docker build -f "${{ matrix.path }}/Dockerfile" -t "$IMAGE_LATEST" -t "$IMAGE_SHA" .
+
+          echo "Pushing $IMAGE_LATEST and $IMAGE_SHA to ECR"
+          docker push "$IMAGE_SHA"
+          docker push "$IMAGE_LATEST"
+
+      - name: Set image outputs
+        id: image-info
+        run: |
+          ACCOUNT_ID=${{ steps.account.outputs.account_id }}
+          REPO_NAME="${{ env.REPO_PREFIX }}-${{ matrix.name }}"
+          echo "image=${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${REPO_NAME}:latest" >> $GITHUB_OUTPUT
+
+  deploy:
+    name: Deploy to EC2 via SSH
+    runs-on: ubuntu-latest
+    needs: build_and_push
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: frontend-web
+            container: acomp-frontend
+            ports: "3000:3000"
+            host_secret: FRONTEND_HOST
+          - name: api-gateway
+            container: acomp-api-gateway
+            ports: "8080:8080"
+            host_secret: API_GATEWAY_HOST
+          - name: micro-auth
+            container: acomp-micro-auth
+            ports: "3001:3001"
+            host_secret: MICRO_CORE_HOST
+          - name: micro-maestros
+            container: acomp-micro-maestros
+            ports: "3002:3002"
+            host_secret: MICRO_CORE_HOST
+          - name: micro-estudiantes
+            container: acomp-micro-estudiantes
+            ports: "5002:5002"
+            host_secret: MICRO_CORE_HOST
+          - name: micro-reportes
+            container: acomp-micro-reportes
+            ports: "3003:3003"
+            host_secret: REPORTES_HOST
+          - name: micro-notificaciones
+            container: acomp-micro-notificaciones
+            ports: "3004:3004"
+            host_secret: NOTIFICACIONES_HOST
+          - name: messaging
+            container: acomp-messaging
+            ports: "3005:3005"
+            host_secret: MESSAGING_HOST
+          - name: databases
+            container: acomp-databases
+            ports: "5432:5432"
+            host_secret: DATABASES_HOST
+
+    steps:
+      - name: Checkout (for helpers)
+        uses: actions/checkout@v4
+
+      - name: Resolve host secret to hostname
+        id: resolve-host
+        run: |
+          case "${{ matrix.host_secret }}" in
+            FRONTEND_HOST) HOST="${{ secrets.FRONTEND_HOST }}" ;;
+            API_GATEWAY_HOST) HOST="${{ secrets.API_GATEWAY_HOST }}" ;;
+            MICRO_CORE_HOST) HOST="${{ secrets.MICRO_CORE_HOST }}" ;;
+            REPORTES_HOST) HOST="${{ secrets.REPORTES_HOST }}" ;;
+            NOTIFICACIONES_HOST) HOST="${{ secrets.NOTIFICACIONES_HOST }}" ;;
+            MESSAGING_HOST) HOST="${{ secrets.MESSAGING_HOST }}" ;;
+            MONITORING_HOST) HOST="${{ secrets.MONITORING_HOST }}" ;;
+            DATABASES_HOST) HOST="${{ secrets.DATABASES_HOST }}" ;;
+            *) echo "Unknown host secret: ${{ matrix.host_secret }}" >&2 ; exit 1 ;;
+          esac
+          echo "host=$HOST" >> $GITHUB_OUTPUT
+
+      - name: Determine AWS account id for remote login
+        id: account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
+      - name: Deploy to host via SSH
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ steps.resolve-host.outputs.host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          debug: true
+          script: |
+            set -euo pipefail
+            REPO_PREFIX=${{ env.REPO_PREFIX }}
+            AWS_REGION=${{ env.AWS_REGION }}
+            ACCOUNT_ID=${{ steps.account.outputs.account_id }}
+            IMAGE=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_PREFIX}-${{ matrix.name }}:latest
+            echo "Pulling $IMAGE on remote host ${{ steps.resolve-host.outputs.host }}"
+            if command -v aws >/dev/null 2>&1; then
+              aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com || true
+            else
+              echo "Warning: aws cli not found on host; ensure EC2 has ECR access or docker credentials"
+            fi
+
+            docker pull "$IMAGE" || true
+            docker stop "${{ matrix.container }}" || true
+            docker rm "${{ matrix.container }}" || true
+            docker run -d --name "${{ matrix.container }}" --restart always -p ${{ matrix.ports }} "$IMAGE"
+
+            sleep 5
+            echo "Container status:"
+            docker ps --filter "name=${{ matrix.container }}" --format 'table {{.Names}}\t{{.Status}}'
+            echo "Last 50 lines of logs:" && docker logs --tail 50 "${{ matrix.container }}" || true
