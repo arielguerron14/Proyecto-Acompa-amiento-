@@ -1,0 +1,149 @@
+@startuml
+skinparam linetype ortho
+skinparam packageStyle rectangle
+
+package "repo root" {
+  folder "api-gateway" {
+    [Dockerfile]
+    [package.json]
+    folder "src" {
+      [server.js]
+      folder "routes" { [authRoutes.js] }
+      folder "middlewares" { [authMiddleware.js] [logger.js] [errorHandler.js] }
+      folder "services" { [sessionService.js] [authService.js] [redisClient.js] }
+      folder "config" { [index.js] }
+    }
+    [.env.example]
+    [.dockerignore]
+    [README.md]
+  }
+
+  folder "frontend-web" {
+    [Dockerfile]
+    [package.json]
+    [README.md]
+    folder "public" {
+      [index.html]
+      [estudiante.html]
+      [maestro.html]
+      [favicon.ico]
+      folder "js" { [auth.js] [reportes.js] [notificaciones.js] }
+      [styles.css]
+    }
+    folder "js" { [estudiante.js] [horarios.js] [reservar.js] [reservas.js] [dashboard.js] }
+    [server.js]
+    [tailwind.config.js]
+    [.dockerignore]
+  }
+
+  folder "micro-estudiantes" {
+    [Dockerfile]
+    [package.json]
+    folder "src" {
+      [app.js]
+      folder "controllers" { [reservasController.js] }
+      folder "models" { [Reserva.js] }
+      folder "routes" { [reservasRoutes.js] }
+      folder "database" { [conexion.js] }
+      folder "utils" { [httpClient.js] }
+    }
+    [.dockerignore]
+  }
+
+  folder "micro-maestros" {
+    [Dockerfile]
+    [package.json]
+    folder "src" {
+      [app.js]
+      folder "controllers" { [horariosController.js] }
+      folder "models" { [Horario.js] }
+      folder "routes" { [horariosRoutes.js] }
+      folder "database" { [index.js] [conexion.js] }
+      folder "services" { [horariosService.js] [messageBroker.js] }
+      folder "middlewares" { [security.js] [logger.js] [errorHandler.js] }
+      [swagger.js]
+    }
+    [.dockerignore]
+  }
+
+  folder "micro-reportes-estudiantes" {
+    [Dockerfile]
+    [package.json]
+    folder "src" {
+      [app.js]
+      folder "controllers" { [reportesEstController.js] }
+      folder "models" { [ReporteEstudiante.js] }
+      folder "routes" { [reportesEstRoutes.js] }
+      folder "database" { [conexion.js] [index.js] }
+      folder "services" { [messageBroker.js] }
+      folder "middlewares" { [security.js] [logger.js] [errorHandler.js] }
+      [swagger.js]
+      folder "config" { [postgres.js] [index.js] }
+    }
+    [.dockerignore]
+  }
+
+  folder "micro-reportes-maestros" {
+    [Dockerfile]
+    [package.json]
+    folder "src" {
+      [app.js]
+      folder "controllers" { [reportesMaestroController.js] }
+      folder "models" { [ReporteMaestro.js] }
+      folder "routes" { [reportesMaestroRoutes.js] }
+      folder "database" { [conexion.js] [index.js] }
+      folder "services" { [messageBroker.js] }
+      folder "middlewares" { [security.js] [logger.js] [errorHandler.js] }
+      [swagger.js]
+      folder "config" { [postgres.js] [index.js] }
+    }
+  }
+
+  folder "monitoring" {
+    [README.md]
+    [prometheus.yml]
+    [alert-rules.yml]
+    folder "dashboards" { [microservices-dashboard.json] }
+    folder "grafana" { [dashboards.json] [datasource.yml] }
+  }
+
+  folder "databases" {
+    folder "mongodb" { [mongod.conf] [init-mongo.js] [Dockerfile] }
+    folder "postgres" { [postgres.conf] [init.sql] [Dockerfile] }
+    folder "redis" { [redis.conf] [init-redis.sh] [Dockerfile] }
+  }
+
+  folder "shared-auth" {
+    [package.json]
+    folder "src" { [index.js] folder "middlewares" { [authMiddleware.js] [logger.js] [errorHandler.js] } folder "services" { [authService.js] } }
+    [.env.example]
+  }
+
+  folder "shared-monitoring" {
+    [README.md]
+    folder "src" { [metrics.js] }
+  }
+
+  folder ".github" {
+    folder "workflows" { [ci.yml] [docker-publish.yml] }
+  }
+
+  folder "scripts" {
+    [start-stack.ps1] [diagnose-failed-containers.ps1] [insert_sample.js]
+  }
+
+  [docker-compose.yml]
+  [docker-compose.dev.yml]
+  [docker-compose.prod.yml]
+  [docker-compose.web.yml]
+  [.gitignore]
+  [README.md]
+  [INFORME_COMPLETO_PROYECTO.md]
+  [ARCHITECTURE_DIAGRAMS.md]
+
+  [README.md]
+  [docker-compose.yml]
+  [.env]
+}
+
+@enduml

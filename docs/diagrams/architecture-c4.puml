@@ -1,0 +1,44 @@
+@startuml
+' Simple C4-like container diagram
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Usuario (Estudiante/Maestro)" as User
+node "Navegador" as Browser
+
+rectangle "Frontend Web\n(Vanilla HTML/CSS/JS)" as Frontend
+rectangle "API Gateway\n(Express, 8080)" as Gateway
+
+rectangle "micro-auth\n(5005)" as Auth
+rectangle "micro-maestros\n(5001)" as Maestros
+rectangle "micro-estudiantes\n(5002)" as Estudiantes
+rectangle "micro-reportes-estudiantes\n(5003)" as ReportesEst
+rectangle "micro-reportes-maestros\n(5004)" as ReportesMaes
+
+database "MongoDB" as Mongo
+database "PostgreSQL" as Postgres
+queue "Kafka (planificado)" as Kafka
+rectangle "Prometheus / Grafana" as Monitoring
+
+User --> Browser : accede (UI)
+Browser --> Frontend : solicita páginas / API
+Frontend --> Gateway : REST
+Gateway --> Auth : /auth/*
+Gateway --> Maestros : /horarios
+Gateway --> Estudiantes : /estudiantes
+Gateway --> ReportesEst : /reportes/estudiantes
+Gateway --> ReportesMaes : /reportes/maestros
+
+Auth --> Mongo : users / sessions
+ReportesEst --> Mongo : store / query
+ReportesMaes --> Mongo : store / query
+Maestros --> Postgres : relational data
+Estudiantes --> Postgres : relational data
+
+ReportesEst ..> Kafka : publish events (plan)
+ReportesMaes ..> Kafka : publish events (plan)
+
+Maestros --> Monitoring : /metrics
+ReportesEst --> Monitoring : /metrics
+
+@enduml

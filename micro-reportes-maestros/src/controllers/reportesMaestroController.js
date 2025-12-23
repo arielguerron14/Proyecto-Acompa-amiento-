@@ -42,4 +42,15 @@ module.exports = {
       res.json(reportes);
     } catch(err){ console.error(err); res.status(500).json({ message: 'Server error' }); }
   }
+,
+
+  // Get a single reporte by its id
+  getReporteByMaestro: async (req, res) => {
+    try {
+      const id = req.params.id;
+      const reporte = await Reporte.findById(id);
+      if (!reporte) return res.status(404).json({ message: 'Reporte no encontrado' });
+      res.json(reporte);
+    } catch (err) { console.error(err); res.status(500).json({ message: 'Server error' }); }
+  }
 };

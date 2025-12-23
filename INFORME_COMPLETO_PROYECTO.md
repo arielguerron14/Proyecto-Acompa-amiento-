@@ -4,6 +4,7 @@
 **Tipo de Proyecto:** Sistema distribuido basado en microservicios  
 **Dominio:** Educativo  
 **Fecha de Análisis:** 17 de diciembre de 2025  
+**Fecha de actualización:** 22 de diciembre de 2025
 **Autor del Informe:** Arquitecto de Software Senior, Ingeniero DevOps, Analista de Sistemas y Redactor Técnico Académico  
 
 ---
@@ -115,13 +116,41 @@ La seguridad se implementa en múltiples capas:
 
 ### Resultados Obtenidos
 
-- **Arquitectura Funcional:** Sistema completamente operativo con 5 microservicios.
-- **Performance:** Tiempos de respuesta <500ms para operaciones críticas.
-- **Seguridad:** Cumplimiento de estándares JWT y RBAC.
+- **Arquitectura Funcional:** Parcialmente operativo — 5 microservicios principales implementados y en ejecución; algunas dependencias (p. ej. mensajería) requieren estabilización.
+- **Performance:** Objetivo de <500ms para operaciones críticas — **pendiente de validación** mediante benchmarks y pruebas de carga.
+- **Seguridad:** Implementación inicial de JWT y RBAC; auditorías de seguridad recomendadas para validación completa.
 - **Frontend Optimizado:** Vanilla HTML/CSS/JS sin dependencias innecesarias, mejorando carga y mantenibilidad.
-- **Principios YAGNI:** Eliminación de código dead, reducción de complejidad.
-- **Mantenibilidad:** Código modular con cobertura de tests del 80%.
-- **Escalabilidad:** Capacidad para manejar 1000+ usuarios concurrentes.
+- **Principios YAGNI:** Eliminación de código dead y reducción de complejidad.
+- **Mantenibilidad:** Código modular; **cobertura de tests pendiente de medición** (unit/integration/E2E).
+- **Escalabilidad:** Objetivo de 1000+ usuarios concurrentes — **pendiente de pruebas de stress y ajuste de infraestructura**.
+
+> ⚠️ **Estado real (22/12/2025):** varios puntos en producción local han sido verificados, pero no todo está completamente estable — ver "Estado Actual" y "Acciones recientes" abajo.
+
+--
+
+### Estado Actual (22 de diciembre de 2025)
+
+- **Servicios funcionando y verificados:**
+   - `micro-auth` conectado a MongoDB y responde en su /health; flujo de registro/login funciona a través de `api-gateway` (registro 201 / login 200 con tokens).
+   - `micro-maestros` reconstruido con timeouts de Mongoose aumentados; endpoint `/horarios` devuelve 200.
+   - `micro-reportes-estudiantes` iniciado y responde a solicitudes (404 si no hay recurso).
+   - PostgreSQL fue inicializado correctamente después de añadir `POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB` al `.env`.
+
+-- **Problemas pendientes:**
+   - `micro-reportes-maestros` presentó un fallo de arranque (handler undefined) que ya fue corregido en el código; ahora el servicio arranca correctamente.
+   - Kafka / Zookeeper (y algunos servicios de mensajería/monitorización) muestran reinicios o estados inestables en el entorno local: se detectaron logs indicando variables faltantes (`KAFKA_ZOOKEEPER_CONNECT`, `ZOOKEEPER_CLIENT_PORT`). **Acción recomendada:** añadir las variables de entorno faltantes y reiniciar los contenedores (por ejemplo, establecer `KAFKA_ZOOKEEPER_CONNECT=kafka:2181` y `ZOOKEEPER_CLIENT_PORT=2181` o valores equivalentes), verificar logs y validar la capacidad de encolamiento.
+
+- **Impacto en el usuario final:** el flujo de autenticación y las páginas de horarios y reportes (cuando existen) son accesibles desde el navegador; la generación/consulta de reportes de maestros está funcional a nivel de servicio, pero puede verse limitada por la ausencia de datos y por la inestabilidad de la infraestructura de mensajería (Kafka/Zookeeper).
+
+--
+
+### Acciones recientes (resumen)
+
+- Se corrigieron variables de entorno para Postgres y se reinició el servicio con éxito.
+- Se añadió aumento de timeouts de Mongoose en `micro-maestros` y se reconstruyó la imagen; resolvió errores 500 por timeouts de conexión.
+- Se verificó que `api-gateway` reenvía correctamente `/auth/*` a `micro-auth` y que los endpoints de registro/login funcionan end-to-end.
+ - Se intentó iniciar `micro-reportes-maestros`; se detectó el error de rutas, lo corregimos en `reportesMaestroController.js` y añadimos la conexión a MongoDB (con timeouts); el servicio fue reconstruido y ahora responde correctamente.
+
 
 ### Conclusiones y Recomendaciones
 
@@ -390,6 +419,81 @@ El proyecto demuestra la viabilidad de arquitecturas de microservicios en entorn
 
 Esta sección de diagramas proporciona una visión completa y defendible de la arquitectura, preparada para evaluación académica y auditoría técnica.
 
+### 2.9 Estructura de carpetas y archivos (raíz)
+
+A continuación se muestra un diagrama resumido de la estructura de carpetas y archivos en la raíz del repositorio y una breve descripción de su contenido y propósito:
+
+```text
+/ (repo root)
+├─ README.md
+├─ api-gateway/
+│  ├─ Dockerfile
+│  ├─ package.json
+│  └─ server.js
+├─ frontend-web/
+│  ├─ Dockerfile
+│  ├─ package.json
+│  ├─ public/
+│  │  ├─ index.html
+│  │  └─ estudiante.html
+│  └─ src/
+│     ├─ estudiante.js
+│     └─ maestro.js
+├─ micro-estudiantes/
+│  ├─ Dockerfile
+│  └─ src/
+├─ micro-maestros/
+│  ├─ Dockerfile
+│  └─ src/
+├─ micro-reportes-estudiantes/
+│  ├─ Dockerfile
+│  └─ src/
+├─ micro-reportes-maestros/
+│  ├─ Dockerfile
+│  └─ src/
+└─ monitoring/
+   ├─ prometheus/
+   └─ grafana/
+```
+
+Breve descripción de carpetas clave:
+
+- `README.md`: Documentación general del proyecto y pasos de puesta en marcha.
+- `api-gateway/`: Código del Gateway (Express) que recibe peticiones externas y enruta a los microservicios; contiene configuración de proxy, middleware de auth y Dockerfile.
+- `frontend-web/`: Interfaz web servida por Node/Express; contiene `public/` (HTML/CSS/JS) y `src/` (scripting client-side), además de Dockerfile para despliegue.
+- `micro-*/` (por ejemplo `micro-maestros/`, `micro-estudiantes/`, `micro-reportes-*`): Microservicios independientes; cada uno incluye su propio `src/` con rutas, controladores, modelos y `Dockerfile` para contenedorización.
+- `monitoring/`: Configuración y artefactos para Prometheus y Grafana (scraping rules, dashboards) usados en observabilidad.
+
+Esta vista facilita la comprensión rápida de la organización del repositorio y ayuda a identificar dónde aplicar cambios, pruebas o despliegues por componente.
+
+#### Diagramas (PlantUML)
+
+Diagrama generado (fuentes en `docs/diagrams/`):
+
+- **Folder structure**: `docs/diagrams/folder-structure.puml` — PlantUML source. SVG (placeholder) incrustado abajo; para una visual completa, renderiza el `.puml` con PlantUML (ver `docs/diagrams/README.md`).
+
+![Folder structure](docs/diagrams/folder-structure.svg)
+
+- **Arquitectura (C4 - contenedores)**: `docs/diagrams/architecture-c4.puml` — PlantUML source. SVG (placeholder) incrustado abajo.
+
+![Architecture C4](docs/diagrams/architecture-c4.svg)
+
+PlantUML fuentes:
+
+```plantuml
+// docs/diagrams/folder-structure.puml (resumen)
+@startuml
+package "repo root" { folder "api-gateway" { [Dockerfile] } folder "frontend-web" { [public/index.html] } }
+@enduml
+```
+
+```plantuml
+// docs/diagrams/architecture-c4.puml (resumen)
+@startuml
+User -> Browser -> Frontend -> Gateway -> (microservices)
+@enduml
+```
+
 ---
 
 ## 3. CREA UNA TABLA GENERAL DE INFORMACIÓN DEL PROYECTO
@@ -496,9 +600,9 @@ Esta sección de diagramas proporciona una visión completa y defendible de la a
 **Por qué Ameritaba su Implementación:** En sistemas distribuidos como este, el monorepo evita el infierno de dependencias (dependency hell) y permite despliegues coordinados. Riesgos evitados incluyen inconsistencias de versiones entre servicios y dificultades en debugging de integraciones. Beneficios a corto plazo: desarrollo más rápido; a largo plazo: escalabilidad en equipos grandes y reducción de overhead operativo.  
 **Impacto si no se implementaba:** Deuda técnica en forma de repositorios separados con dependencias desincronizadas, aumento de complejidad en CI/CD, mayor riesgo de fallos en integraciones y limitación en la capacidad de refactorización global, comprometiendo la evolución del sistema.
 
-**Arquitectura basada en microservicios (mínimo 10):**  
-**Estado de Cumplimiento:** No Cumplido (5 implementados)  
-**Implementación Real:** Actualmente implementados 5 microservicios funcionales (auth, estudiantes, maestros, reportes-estudiantes, reportes-maestros), con planificación para expansión a 10 servicios adicionales en fases futuras.  
+**Arquitectura basada en microservicios (objetivo: 10):**  
+**Estado de Cumplimiento:** Parcial (5 implementados, 5 en planificación)  
+**Implementación Real:** Actualmente hay 5 microservicios funcionales (auth, estudiantes, maestros, reportes-estudiantes, reportes-maestros). Se recomienda priorizar la implementación de servicios transversales (Users, Notifications, Audit, Metrics, Roles) y documentar dependencias (topics, contracts) antes de ampliar la topología.
 **Problema Técnico que Resuelve:** Aborda la necesidad de modularidad en sistemas complejos, permitiendo escalabilidad independiente y aislamiento de fallos.  
 **Justificación Técnica:** Los 5 servicios actuales cubren funcionalidades críticas; la expansión a 10 permitiría granularidad óptima para equipos independientes y despliegues frecuentes, siguiendo principios de Domain-Driven Design.  
 **Valor Arquitectónico:** Facilita la evolución independiente de componentes, mejora la testabilidad y reduce el acoplamiento temporal, contribuyendo a una arquitectura más resiliente y adaptable.  
@@ -506,8 +610,8 @@ Esta sección de diagramas proporciona una visión completa y defendible de la a
 **Impacto si no se implementaba:** Arquitectura monolítica con alto acoplamiento, dificultad para escalar componentes individuales, mayor tiempo de despliegue, riesgo de fallos en cascada y limitación en la adopción de tecnologías especializadas por dominio, resultando en una deuda técnica creciente y reducción de la competitividad del sistema.
 
 **Microservicios:**  
-**Estado de Cumplimiento:** Cumplido  
-**Implementación Real:** Arquitectura principal con 5 microservicios especializados, cada uno ejecutándose en contenedores Docker independientes con puertos expuestos y comunicación vía REST API.  
+**Estado de Cumplimiento:** Parcial  
+**Implementación Real:** Arquitectura principal con 5 microservicios especializados desplegados en Docker; la mayor parte de la funcionalidad crítica está presente, pero se recomienda añadir healthchecks, readiness probes y pruebas E2E que validen flujos entre `api-gateway`, servicios y bases de datos. Algunos servicios (p. ej. reportes-maestros) tuvieron fallos de arranque que ya fueron corregidos; la infraestructura de mensajería aún requiere estabilización.
 **Problema Técnico que Resuelve:** Separa responsabilidades de negocio en unidades desplegables independientes, facilitando el mantenimiento y la escalabilidad.  
 **Justificación Técnica:** Utiliza Node.js/Express para consistencia tecnológica, con aislamiento de datos por servicio y gestión centralizada vía API Gateway.  
 **Valor Arquitectónico:** Promueve bajo acoplamiento y alta cohesión, permitiendo evoluciones independientes y mejorando la tolerancia a fallos.  
@@ -515,8 +619,8 @@ Esta sección de diagramas proporciona una visión completa y defendible de la a
 **Impacto si no se implementaba:** Sistema monolítico con puntos únicos de fallo, escalabilidad limitada, mayor complejidad en debugging y testing, y dificultad para integrar nuevas tecnologías, llevando a una arquitectura obsoleta y costosa de mantener.
 
 **Event Driven:**  
-**Estado de Cumplimiento:** No Cumplido  
-**Implementación Real:** No implementado; comunicación síncrona vía REST API en todos los servicios.  
+**Estado de Cumplimiento:** No implementado (infra parcialmente presente)  
+**Implementación Real:** Actualmente la comunicación es principalmente síncrona (REST). Se ha previsto Kafka/RabbitMQ para eventos, pero en el entorno local Kafka/Zookeeper muestran reinicios por variables faltantes (`KAFKA_ZOOKEEPER_CONNECT`, `ZOOKEEPER_CLIENT_PORT`). **Acción recomendada:** añadir/ajustar las variables de entorno en `docker-compose` (ej. `KAFKA_ZOOKEEPER_CONNECT=kafka:2181`, `ZOOKEEPER_CLIENT_PORT=2181`), crear topics esenciales y validar productores/consumidores en un entorno controlado.
 **Problema Técnico que Resuelve:** Abordaría la necesidad de desacoplamiento temporal en operaciones asíncronas como notificaciones y reportes.  
 **Justificación Técnica:** La falta de implementación se debe a la complejidad inicial; se integraría con Kafka o RabbitMQ en fases futuras para eventos como UserCreated o ReportGenerated.  
 **Valor Arquitectónico:** Mejora la resiliencia al permitir procesamiento asíncrono, reduce latencia en operaciones críticas y facilita la escalabilidad horizontal.  
@@ -525,7 +629,7 @@ Esta sección de diagramas proporciona una visión completa y defendible de la a
 
 **CQRS:**  
 **Estado de Cumplimiento:** No Cumplido  
-**Implementación Real:** No implementado; patrón MVC aplicado parcialmente en backend sin separación explícita de comandos y queries.  
+**Implementación Real:** No implementado; el backend aplica MVC sin separación explícita de comandos y queries. Recomendado para servicios de reporte: diseñar un read-model optimizado (Mongo) y un write-model transaccional (Postgres) si el volumen y requisitos lo justifican.
 **Problema Técnico que Resuelve:** Optimizaría lecturas y escrituras en sistemas con patrones de acceso diferenciados, como reportes vs. actualizaciones.  
 **Justificación Técnica:** La no implementación se justifica por la simplicidad actual; se consideraría para servicios de alto volumen como reportes, separando modelos de lectura (MongoDB) y escritura (PostgreSQL).  
 **Valor Arquitectónico:** Mejora el rendimiento al optimizar consultas, facilita la escalabilidad independiente de lecturas/escrituras y reduce contención en bases de datos.  
@@ -534,7 +638,12 @@ Esta sección de diagramas proporciona una visión completa y defendible de la a
 
 **MVC/Hexagonal:**  
 **Estado de Cumplimiento:** Parcial  
-**Implementación Real:** Patrón MVC aplicado en backend con separación de rutas, controladores y servicios; hexagonal parcialmente en microservicios con puertos adaptadores.  
+**Implementación Real:** Patrón MVC aplicado con separación de rutas, controladores y servicios; la adopción de la arquitectura hexagonal está en progreso en partes del código (recomendar aplicar adapters/ports en servicios críticos como `reports` y `auth` para aislar la lógica de infraestructura).
+
+**Recomendaciones técnicas (Sección 6 - Prioridad):**
+- **Alta:** Estabilizar broker de eventos (Kafka/Zookeeper) — añadir variables de entorno faltantes en `docker-compose`, crear topics esenciales y validar productores/consumidores.
+- **Media:** Añadir healthchecks/readiness y pruebas E2E entre `api-gateway` y servicios críticos; automatizar en CI pipeline.
+- **Baja:** Diseñar roadmap para CQRS en servicios de reportes y plan de migración (read/write models) si las pruebas de carga lo justifican.
 **Problema Técnico que Resuelve:** Organiza el código en capas lógicas, facilitando testing y mantenibilidad.  
 **Justificación Técnica:** MVC implementado para simplicidad; hexagonal en evolución para mejor aislamiento de dominio.  
 **Valor Arquitectónico:** Mejora la testabilidad al desacoplar lógica de negocio de infraestructura, facilita cambios tecnológicos y promueve código reutilizable.  
@@ -564,8 +673,8 @@ Esta sección de diagramas proporciona una visión completa y defendible de la a
 ### 6.3 Multiplataforma
 
 **Web:**  
-**Estado de Cumplimiento:** Cumplido  
-**Implementación Real:** Aplicación React responsiva servida por Vite.  
+**Estado de Cumplimiento:** Cumplido (con ajuste reciente)  
+**Implementación Real:** Frontend implementado en **Vanilla HTML/CSS/JavaScript** y servido por `frontend-web/` (Node/Express). Nota: se realizó limpieza el 2025-12-17 que eliminó código React/TypeScript no utilizado; la documentación fue actualizada para reflejar la implementación actual.
 **Problema Técnico que Resuelve:** Acceso universal desde dispositivos web.  
 **Justificación Técnica:** React ofrece componentes reutilizables y Vite proporciona builds rápidos.  
 **Valor Arquitectónico:** Facilita la separación de UI y lógica, mejorando la mantenibilidad.  

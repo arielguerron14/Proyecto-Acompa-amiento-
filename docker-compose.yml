@@ -139,6 +139,8 @@ services:
       - "5005:5005"
     env_file:
       - .env
+    environment:
+      PORT: '5005'
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
       - ./shared-monitoring:/usr/src/shared-monitoring:delegated
