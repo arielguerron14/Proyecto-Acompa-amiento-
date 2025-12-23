@@ -26,18 +26,22 @@ jobs:
             context: ./api-gateway
           - name: frontend-web
             context: ./frontend-web
-          - name: micro-core
-            context: ./micro-core
-          - name: micro-reportes
-            context: ./micro-reportes
+          - name: micro-maestros
+            context: ./micro-maestros
+          - name: micro-estudiantes
+            context: ./micro-estudiantes
+          - name: micro-reportes-estudiantes
+            context: ./micro-reportes-estudiantes
+          - name: micro-reportes-maestros
+            context: ./micro-reportes-maestros
           - name: micro-notificaciones
             context: ./micro-notificaciones
-          - name: messaging
-            context: ./messaging
+          - name: micro-analytics
+            context: ./micro-analytics
+          - name: micro-soap-bridge
+            context: ./micro-soap-bridge
           - name: monitoring
             context: ./monitoring
-          - name: databases
-            context: ./databases
 
     steps:
       - name: Checkout repository
