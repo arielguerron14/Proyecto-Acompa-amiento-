@@ -1,0 +1,51 @@
+name: api-gateway-ci
+on:
+  push:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: proyecto-acomp-api-gateway
+
+jobs:
+  build-and-push:
+    name: Build and push to Amazon ECR
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: ${{ env.AWS_REGION }}
+      ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get AWS account ID
+        id: aws-account
+        run: |
+          aws_account_id=$(aws sts get-caller-identity --query Account --output text)
+          echo "aws_account_id=$aws_account_id" >> $GITHUB_OUTPUT
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names "${{ env.ECR_REPOSITORY }}" >/dev/null 2>&1 || aws ecr create-repository --repository-name "${{ env.ECR_REPOSITORY }}"
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push image to ECR (latest)
+        uses: docker/build-push-action@v4
+        with:
+          context: ./api-gateway
+          file: ./api-gateway/Dockerfile
+          push: true
+          tags: ${{ steps.aws-account.outputs.aws_account_id }}.dkr.ecr.${{ env.AWS_REGION }}/${{ env.ECR_REPOSITORY }}:latest
