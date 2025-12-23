@@ -1,0 +1,142 @@
+name: CI/CD Pipeline (build, push to Docker Hub, deploy via SSH)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REPO_PREFIX: proyecto-acomp
+
+jobs:
+  build-and-push:
+    name: Test → Build → Push to Docker Hub
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Setup Node.js (for tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run tests per service (if present)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Discover services: prefer folder 'microservicios' if present, otherwise top-level 'micro-*'
+          if [[ -d microservicios ]]; then
+            SRCDIR="microservicios"
+            SERVICES=("$(ls -1 "$SRCDIR")")
+          else
+            SERVICES=( $(ls -1 | grep '^micro-' || true) )
+          fi
+          for svc in ${SERVICES[@]}; do
+            if [[ -f "$svc/package.json" ]]; then
+              echo "Running tests for $svc"
+              pushd "$svc" >/dev/null
+              if npm ci --no-audit --prefer-offline; then
+                echo "npm ci succeeded"
+              else
+                echo "npm ci failed; falling back to npm install"
+                npm install --no-audit --prefer-offline
+              fi
+              if node -e "try{const p=require('./package.json'); process.exit(!(p.scripts && p.scripts.test));}catch(e){process.exit(1);}"
+              then
+                npm test --silent -- --detectOpenHandles --runInBand || { echo "Tests failed in $svc"; exit 1; }
+              else
+                echo "[SKIP] $svc has no test script"
+              fi
+              popd >/dev/null
+            else
+              echo "No package.json for $svc; skipping tests"
+            fi
+          done
+
+      - name: Build & push Docker images (sha + latest)
+        shell: bash
+        env:
+          GIT_SHA: ${{ github.sha }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          set -euo pipefail
+          # Discover services same as tests
+          if [[ -d microservicios ]]; then
+            DIRS=(microservicios/*)
+          else
+            DIRS=(micro-*)
+          fi
+          for svcdir in "${DIRS[@]}"; do
+            svc=$(basename "$svcdir")
+            # Skip if not a directory
+            if [[ ! -d "$svcdir" ]]; then continue; fi
+            DOCKERFILE="$svcdir/Dockerfile"
+            if [[ ! -f "$DOCKERFILE" ]]; then
+              echo "Skipping $svc: no Dockerfile"
+              continue
+            fi
+
+            REPO="${{ env.REPO_PREFIX }}-$svc"
+            IMAGE_latest="${DOCKER_USERNAME}/${REPO}:latest"
+            IMAGE_sha="${DOCKER_USERNAME}/${REPO}:${GIT_SHA::8}"
+
+            echo "Building $svc -> $IMAGE_sha"
+            docker build -f "$DOCKERFILE" -t "$IMAGE_sha" -t "$IMAGE_latest" "$svcdir"
+
+            echo "Pushing $IMAGE_sha"
+            docker push "$IMAGE_sha"
+            echo "Pushing $IMAGE_latest"
+            docker push "$IMAGE_latest"
+          done
+
+  deploy:
+    name: Deploy to EC2 via SSH
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Validate required deploy secrets
+        run: |
+          if [[ -z "${{ secrets.EC2_HOST }}" || -z "${{ secrets.EC2_USER }}" || -z "${{ secrets.EC2_SSH_KEY }}" ]]; then
+            echo "EC2_HOST, EC2_USER or EC2_SSH_KEY secrets are missing; skipping deploy"; exit 78
+          fi
+
+      - name: Deploy (ssh) - pull images and run compose
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+            echo "Logging into Docker Hub on remote"
+            printf '%s' "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
+            # Attempt docker compose pull/up in home directory (assumes docker-compose.yml present on remote)
+            cd ~/ || true
+            if [[ -f docker-compose.yml ]]; then
+              docker compose pull || true
+              docker compose up -d --remove-orphans
+            else
+              echo "docker-compose.yml not found in home directory of remote host; attempting docker pull for known images"
+              # As fallback, pull images built in this workflow (using REPO_PREFIX and services pattern)
+              for svcdir in micro-*; do
+                if [[ -d "$svcdir" ]]; then
+                  svc=$(basename "$svcdir")
+                  docker pull "${{ secrets.DOCKER_USERNAME }}/${{ env.REPO_PREFIX }}-$svc:latest" || true
+                fi
+              done
+            fi
