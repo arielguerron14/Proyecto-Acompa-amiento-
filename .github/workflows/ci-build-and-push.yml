@@ -40,8 +40,6 @@ jobs:
             path: micro-analytics
           - name: micro-soap-bridge
             path: micro-soap-bridge
-          - name: monitoring
-            path: monitoring
 
     steps:
       - name: Checkout repository

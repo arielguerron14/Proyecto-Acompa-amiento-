@@ -65,11 +65,7 @@ jobs:
             dir: ./messaging
             container: acomp-messaging
             ports: "3005:3005"
-          - name: monitoring
-            host_secret: MONITORING_HOST
-            dir: ./monitoring
-            container: acomp-monitoring
-            ports: "9090:9090"
+          # monitoring does not have a Dockerfile / image to build yet; excluded from automated deploys
           - name: databases
             host_secret: DATABASES_HOST
             dir: ./databases
