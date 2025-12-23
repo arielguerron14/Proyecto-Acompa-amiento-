@@ -29,6 +29,7 @@ while [[ $# -gt 0 ]]; do
     --instance-id) INSTANCE_ID="$2"; shift 2;;
     --tag-name) TAG_NAME="$2"; shift 2;;
     --my-ip) MY_IP="$2"; shift 2;;
+    --skip-my-ip) SKIP_MY_IP=true; shift 1;;
     --allow-github) ALLOW_GITHUB=true; shift 1;;
     --apply) APPLY=true; shift 1;;
     --region) REGION="$2"; shift 2;;
@@ -47,13 +48,18 @@ command -v aws >/dev/null 2>&1 || { echo "aws CLI not found; install and configu
 command -v jq >/dev/null 2>&1 || { echo "jq not found; please install jq to run this script." >&2; exit 1; }
 
 if [[ -z "$MY_IP" ]]; then
-  echo "Detecting your public IP..."
-  MY_IP_RAW=$(curl -fsS https://checkip.amazonaws.com || true)
-  if [[ -z "$MY_IP_RAW" ]]; then
-    echo "Failed to determine public IP; use --my-ip to provide one." >&2
-    exit 1
+  if [[ "${SKIP_MY_IP:-false}" == "true" ]]; then
+    echo "Skipping automatic detection of runner public IP (SKIP_MY_IP=true)"
+    MY_IP=""
+  else
+    echo "Detecting your public IP..."
+    MY_IP_RAW=$(curl -fsS https://checkip.amazonaws.com || true)
+    if [[ -z "$MY_IP_RAW" ]]; then
+      echo "Failed to determine public IP; use --my-ip to provide one." >&2
+      exit 1
+    fi
+    MY_IP="${MY_IP_RAW%$'\n'}/32"
   fi
-  MY_IP="${MY_IP_RAW%$'\n'}/32"
 fi
 
 echo "Target instance: ${INSTANCE_ID:-(by tag: $TAG_NAME)}"
@@ -140,7 +146,11 @@ apply_sg_rule(){
 echo
 echo "-- Preparing list of CIDRs to add"
 CIDRS_TO_ADD=()
-CIDRS_TO_ADD+=("$MY_IP")
+if [[ -n "$MY_IP" ]]; then
+  CIDRS_TO_ADD+=("$MY_IP")
+else
+  echo "No personal IP to add (SKIP_MY_IP active or not provided); only adding GitHub Actions CIDRs if requested"
+fi
 
 if $ALLOW_GITHUB; then
   echo "Fetching GitHub Actions CIDRs from api.github.com/meta"
