@@ -3,57 +3,46 @@ name: api-gateway-ci
 on:
   push:
     branches: [ main ]
-  # Allow manual runs from the Actions UI (or via the API/gh CLI)
   workflow_dispatch:
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: proyecto-acomp-api-gateway
+  IMAGE_NAME: proyecto-acomp-api-gateway
 
 jobs:
-  build-and-push:
-    name: Build & Push API Gateway to ECR
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 1️⃣ Configurar credenciales AWS
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 2️⃣ Obtener Account ID (FORMA CORRECTA)
-      - name: Get AWS Account ID
-        id: aws
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
-
-      # 3️⃣ Login a ECR
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v1
-
-      # 4️⃣ Crear repo ECR si no existe
-      - name: Ensure ECR repository exists
-        run: |
-          aws ecr describe-repositories \
-            --repository-names $ECR_REPOSITORY \
-            >/dev/null 2>&1 \
-          || aws ecr create-repository \
-            --repository-name $ECR_REPOSITORY
-
-      # 5️⃣ Build & Push
-      - name: Build and push image to ECR
+      - name: Build and push image
         uses: docker/build-push-action@v4
         with:
           context: ./api-gateway
           file: ./api-gateway/Dockerfile
           push: true
           tags: |
-            ${{ steps.aws.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
+
+      - name: Deploy to EC2 (AWS Academy)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
+            docker stop api-gateway || true
+            docker rm api-gateway || true
+            docker run -d \
+              --name api-gateway \
+              -p 8080:8080 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
