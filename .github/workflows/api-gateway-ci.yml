@@ -1,7 +1,10 @@
 name: api-gateway-ci
+
 on:
   push:
     branches: [ main ]
+  # Allow manual runs from the Actions UI (or via the API/gh CLI)
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
@@ -9,58 +12,48 @@ env:
 
 jobs:
   build-and-push:
-    name: Build and push to Amazon ECR
+    name: Build & Push API Gateway to ECR
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-      # Use top-level env values (don't re-reference `env.*` here — the parser
-      # may reject such expressions). These are available to steps as
-      # ${{ env.AWS_REGION }} and ${{ env.ECR_REPOSITORY }} automatically.
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 1️⃣ Configurar credenciales AWS
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
-        if: ${{ env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY }}
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Debug AWS credentials (non-sensitive)
-        if: ${{ always() }}
+      # 2️⃣ Obtener Account ID (FORMA CORRECTA)
+      - name: Get AWS Account ID
+        id: aws
         run: |
-          set -euo pipefail
-          # Print whether secrets are set (do not print values)
-          if [[ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]]; then echo "AWS_ACCESS_KEY_ID present"; else echo "AWS_ACCESS_KEY_ID missing"; fi
-          if [[ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]]; then echo "AWS_SECRET_ACCESS_KEY present"; else echo "AWS_SECRET_ACCESS_KEY missing"; fi
-          if [[ -n "${{ secrets.AWS_SESSION_TOKEN }}" ]]; then echo "AWS_SESSION_TOKEN present"; else echo "AWS_SESSION_TOKEN missing"; fi
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
 
-          echo "aws --version: $(aws --version 2>&1 | sed -n '1p')"
-          echo "Testing STS caller identity (may fail if creds invalid)"
-          aws sts get-caller-identity || true
-
-      - name: Get AWS account ID
-        id: aws-account
-        run: |
-          aws_account_id=$(aws sts get-caller-identity --query Account --output text)
-          echo "aws_account_id=$aws_account_id" >> $GITHUB_OUTPUT
-
-      - name: Ensure ECR repository exists
-        run: |
-          aws ecr describe-repositories --repository-names "${{ env.ECR_REPOSITORY }}" >/dev/null 2>&1 || aws ecr create-repository --repository-name "${{ env.ECR_REPOSITORY }}"
-
+      # 3️⃣ Login a ECR
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and push image to ECR (latest)
+      # 4️⃣ Crear repo ECR si no existe
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories \
+            --repository-names $ECR_REPOSITORY \
+            >/dev/null 2>&1 \
+          || aws ecr create-repository \
+            --repository-name $ECR_REPOSITORY
+
+      # 5️⃣ Build & Push
+      - name: Build and push image to ECR
         uses: docker/build-push-action@v4
         with:
           context: ./api-gateway
           file: ./api-gateway/Dockerfile
           push: true
-          tags: ${{ steps.aws-account.outputs.aws_account_id }}.dkr.ecr.${{ env.AWS_REGION }}/${{ env.ECR_REPOSITORY }}:latest
+          tags: |
+            ${{ steps.aws.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
