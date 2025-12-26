@@ -2,61 +2,42 @@ name: Deploy API Gateway
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - api-gateway/**
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Clonar repositorio
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 2️⃣ Login a Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 3️⃣ Build y Push de la imagen
-      - name: Build and Push Docker Image
+      - name: Build and push API Gateway image
         run: |
-          docker build \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest \
-            ./api-gateway
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest ./api-gateway
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
 
-          docker push \
-            ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
-
-      # 4️⃣ Deploy en EC2 (API Gateway)
-      - name: Deploy to EC2 - API Gateway
+      - name: Deploy on EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.API_GATEWAY_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           port: 22
-          timeout: 30s
-          command_timeout: 10m
           script: |
-            echo "Login Docker Hub"
             docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-
-            echo "Pull image"
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
-
-            echo "Stop and remove container"
             docker stop api-gateway || true
             docker rm api-gateway || true
-
-            echo "Run container"
             docker run -d \
               --name api-gateway \
-              --restart always \
               -p 8080:8080 \
               ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
