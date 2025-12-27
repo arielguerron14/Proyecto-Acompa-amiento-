@@ -1,0 +1,41 @@
+name: Deploy Micro Estudiantes
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - micro-estudiantes/**
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        run: |
+          docker build -t caguerronp/proyecto-acomp-micro-estudiantes:latest ./micro-estudiantes
+          docker push caguerronp/proyecto-acomp-micro-estudiantes:latest
+
+      - name: Deploy on EC2-3 (Core)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_CORE_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            docker pull caguerronp/proyecto-acomp-micro-estudiantes:latest
+            docker stop micro-estudiantes || true
+            docker rm micro-estudiantes || true
+            docker run -d \
+              --name micro-estudiantes \
+              -p 3002:8080 \
+              --restart unless-stopped \
+              caguerronp/proyecto-acomp-micro-estudiantes:latest
