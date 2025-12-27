@@ -40,3 +40,4 @@ jobs:
               -p 4001:8080 \
               --restart unless-stopped \
               caguerronp/proyecto-acomp-micro-analytics:latest
+# registered by Copilot 2025-12-27T02:28:09.4550941-05:00
