@@ -1,4 +1,5 @@
-trigger: 2025-12-27T11:15:00Z
+trigger: 2025-12-27T11:45:00Z
+message: "ci(databases): touch trigger to force consolidated ci-databases run"trigger: 2025-12-27T11:15:00Z
 message: "ci(databases): touch trigger to force deploy-databases workflow run"trigger: 2025-12-27T09:05:00Z
 message: "ci(databases): touch trigger to force workflow run (add docker-compose and post-deploy diagnostics)"trigger: 2025-12-27T08:50:00Z
 message: "ci(databases): touch trigger to force workflow run (automated)"2025-12-27T08:55:00Z trigger databases

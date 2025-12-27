@@ -1,0 +1,182 @@
+name: CI/CD Databases
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'databases/**'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Optional: postgres|mongodb|redis (when empty, will build all changed services)'
+        required: false
+        default: ''
+      deploy:
+        description: 'When true, deploy after successful builds (default: false)'
+        required: false
+        default: 'false'
+
+jobs:
+  filter:
+    name: Detect changed database folders
+    runs-on: ubuntu-latest
+    outputs:
+      postgres: ${{ steps.filter.outputs.postgres }}
+      mongodb: ${{ steps.filter.outputs.mongodb }}
+      redis: ${{ steps.filter.outputs.redis }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            postgres:
+              - 'databases/postgres/**'
+            mongodb:
+              - 'databases/mongodb/**'
+            redis:
+              - 'databases/redis/**'
+
+  build-postgres:
+    name: Build & Push Postgres
+    needs: filter
+    runs-on: ubuntu-latest
+    if: ${{ needs.filter.outputs.postgres == 'true' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'postgres' || github.event.inputs.service == '')) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Postgres Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./databases/postgres
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/postgres:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/postgres:${{ github.sha }}
+
+  build-mongodb:
+    name: Build & Push MongoDB
+    needs: filter
+    runs-on: ubuntu-latest
+    if: ${{ needs.filter.outputs.mongodb == 'true' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'mongodb' || github.event.inputs.service == '')) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Mongo Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./databases/mongodb
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/mongo-db:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/mongo-db:${{ github.sha }}
+
+  build-redis:
+    name: Build & Push Redis
+    needs: filter
+    runs-on: ubuntu-latest
+    if: ${{ needs.filter.outputs.redis == 'true' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'redis' || github.event.inputs.service == '')) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Redis Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./databases/redis
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/redis:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/redis:${{ github.sha }}
+
+  deploy:
+    name: Deploy Databases (optional)
+    needs: [build-postgres, build-mongodb, build-redis]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare and deploy on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_DATABASES_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+
+            sudo apt-get update
+            sudo apt-get install -y git docker.io docker-compose || true
+            sudo systemctl enable docker || true
+            sudo systemctl start docker || true
+
+            # Clone or update repo
+            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-" || exit 1
+            else
+              git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+            fi
+
+            cd "$HOME/Proyecto-Acompa-amiento-/databases" || { echo "databases dir missing"; exit 1; }
+
+            # For each service, if it was built/pushed or requested, pull the user image and tag it to the official name
+            # Postgres
+            if [ "${{ needs.filter.outputs.postgres }}" = "true" ] || [ "${{ github.event.inputs.service }}" = "postgres" ] || [ "${{ github.event_name }}" = "push" ]; then
+              sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/postgres:latest || true
+              sudo docker tag ${{ secrets.DOCKERHUB_USERNAME }}/postgres:latest postgres:latest || true
+            fi
+
+            # Mongo
+            if [ "${{ needs.filter.outputs.mongodb }}" = "true" ] || [ "${{ github.event.inputs.service }}" = "mongodb" ] || [ "${{ github.event_name }}" = "push" ]; then
+              sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/mongo-db:latest || true
+              sudo docker tag ${{ secrets.DOCKERHUB_USERNAME }}/mongo-db:latest mongo:latest || true
+            fi
+
+            # Redis
+            if [ "${{ needs.filter.outputs.redis }}" = "true" ] || [ "${{ github.event.inputs.service }}" = "redis" ] || [ "${{ github.event_name }}" = "push" ]; then
+              sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/redis:latest || true
+              sudo docker tag ${{ secrets.DOCKERHUB_USERNAME }}/redis:latest redis:latest || true
+            fi
+
+            docker-compose down || true
+            docker-compose pull || true
+            docker-compose up -d || true
+
+            echo "--- DOCKER PS ---"
+            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
