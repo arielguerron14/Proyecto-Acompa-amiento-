@@ -1,0 +1,47 @@
+name: Deploy Micro Reportes Estudiantes
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - micro-reportes-estudiantes/**
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Inspect repo (debug)
+        run: |
+          echo "PWD: $(pwd)"
+          ls -la
+
+      - name: Build & Push
+        run: |
+          # Use repo root as build context and Dockerfile inside micro-reportes-estudiantes
+          docker build -t caguerronp/proyecto-acomp-micro-reportes-estudiantes:latest -f micro-reportes-estudiantes/Dockerfile .
+          docker push caguerronp/proyecto-acomp-micro-reportes-estudiantes:latest
+
+      - name: Deploy on EC2-Reportes
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_REPORTES_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            docker pull caguerronp/proyecto-acomp-micro-reportes-estudiantes:latest
+            docker stop micro-reportes-estudiantes || true
+            docker rm micro-reportes-estudiantes || true
+            docker run -d \
+              --name micro-reportes-estudiantes \
+              -p 4003:8080 \
+              --restart unless-stopped \
+              caguerronp/proyecto-acomp-micro-reportes-estudiantes:latest
