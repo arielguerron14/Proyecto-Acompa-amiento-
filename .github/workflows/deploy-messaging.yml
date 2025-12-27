@@ -1,0 +1,72 @@
+name: Deploy Messaging
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - messaging/**
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Messaging Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./messaging
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/messaging:latest
+
+      - name: Deploy Messaging on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_MESSAGING_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+
+            echo "🐳 Ensure Docker & Compose"
+            sudo apt-get update
+            sudo apt-get install -y git docker.io docker-compose || true
+            sudo systemctl enable docker || true
+            sudo systemctl start docker || true
+
+            echo "🔐 Docker Hub Login"
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin || true
+
+            echo "📦 Clone or update repository"
+            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-" || true
+            else
+              git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+            fi
+
+            cd "$HOME/Proyecto-Acompa-amiento-/messaging" || (echo "messaging dir missing" && ls -la "$HOME/Proyecto-Acompa-amiento-" && exit 1)
+
+            echo "⬇️ Pull messaging image"
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/messaging:latest || true
+            sudo docker tag ${{ secrets.DOCKERHUB_USERNAME }}/messaging:latest messaging:latest || true
+
+            echo "🧹 Stop old containers"
+            sudo docker-compose down || true
+
+            echo "🚀 Start messaging service"
+            sudo docker-compose pull || true
+            sudo docker-compose up -d || true
+
+            echo "--- DOCKER PS ---"
+            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
