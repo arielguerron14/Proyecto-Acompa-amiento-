@@ -1,0 +1,118 @@
+name: Build Database Images
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'databases/**'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Optional: postgres|mongodb|redis (when empty, will build all changed services)'
+        required: false
+        default: ''
+
+jobs:
+  filter:
+    name: Detect changed database folders
+    runs-on: ubuntu-latest
+    outputs:
+      postgres: ${{ steps.filter.outputs.postgres }}
+      mongodb: ${{ steps.filter.outputs.mongodb }}
+      redis: ${{ steps.filter.outputs.redis }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            postgres:
+              - 'databases/postgres/**'
+            mongodb:
+              - 'databases/mongodb/**'
+            redis:
+              - 'databases/redis/**'
+
+  build-postgres:
+    name: Build & Push Postgres
+    needs: filter
+    runs-on: ubuntu-latest
+    if: ${{ needs.filter.outputs.postgres == 'true' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'postgres' || github.event.inputs.service == '')) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Postgres Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./databases/postgres
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/postgres:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/postgres:${{ github.sha }}
+
+  build-mongodb:
+    name: Build & Push MongoDB
+    needs: filter
+    runs-on: ubuntu-latest
+    if: ${{ needs.filter.outputs.mongodb == 'true' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'mongodb' || github.event.inputs.service == '')) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Mongo Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./databases/mongodb
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/mongo-db:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/mongo-db:${{ github.sha }}
+
+  build-redis:
+    name: Build & Push Redis
+    needs: filter
+    runs-on: ubuntu-latest
+    if: ${{ needs.filter.outputs.redis == 'true' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'redis' || github.event.inputs.service == '')) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Redis Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./databases/redis
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/redis:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/redis:${{ github.sha }}
