@@ -2,19 +2,18 @@ name: CI/CD Databases
 
 on:
   push:
-    branches: [ main ]
     paths:
       - 'databases/**'
   workflow_dispatch:
     inputs:
-      service:
-        description: 'Optional: postgres|mongodb|redis (when empty, will build all changed services)'
-        required: false
-        default: ''
       deploy:
-        description: 'When true, deploy after successful builds (default: false)'
+        description: 'Set to true to run deployment after build'
         required: false
         default: 'false'
+      service:
+        description: 'Service to build/deploy (postgres|mongodb|redis). Leave empty for all.'
+        required: false
+        default: ''
 
 jobs:
   filter:
@@ -39,6 +38,12 @@ jobs:
               - 'databases/mongodb/**'
             redis:
               - 'databases/redis/**'
+
+      - name: Export flags to env
+        run: |
+          echo "POSTGRES=${{ steps.filter.outputs.postgres }}" >> $GITHUB_ENV
+          echo "MONGODB=${{ steps.filter.outputs.mongodb }}" >> $GITHUB_ENV
+          echo "REDIS=${{ steps.filter.outputs.redis }}" >> $GITHUB_ENV
 
   build-postgres:
     name: Build & Push Postgres
@@ -123,20 +128,42 @@ jobs:
 
   deploy:
     name: Deploy Databases (optional)
-    needs: [build-postgres, build-mongodb, build-redis]
+    needs: [filter, build-postgres, build-mongodb, build-redis]
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      
+
+      - name: SSH connectivity check (databases host)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y netcat-openbsd || sudo apt-get install -y netcat || true
+          for i in 1 2 3; do
+            nc -z -v -w5 "${{ secrets.EC2_DATABASES_HOST }}" 22 && echo "SSH port reachable" && exit 0
+            echo "Attempt $i failed - waiting 10s"
+            sleep 10
+          done
+          echo "Port 22 is not reachable from runner" >&2
+          exit 1
+
       - name: Prepare and deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          POSTGRES: ${{ needs.filter.outputs.postgres }}
+          MONGODB: ${{ needs.filter.outputs.mongodb }}
+          REDIS: ${{ needs.filter.outputs.redis }}
+          DEPLOY_SERVICE: ${{ github.event.inputs.service }}
+          EVENT_NAME: ${{ github.event_name }}
         with:
           host: ${{ secrets.EC2_DATABASES_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
           port: 22
+          timeout: 2m
+          command_timeout: 15m
           script: |
             set -euo pipefail
             export DEBIAN_FRONTEND=noninteractive
@@ -157,19 +184,19 @@ jobs:
 
             # For each service, if it was built/pushed or requested, pull the user image and tag it to the official name
             # Postgres
-            if [ "${{ needs.filter.outputs.postgres }}" = "true" ] || [ "${{ github.event.inputs.service }}" = "postgres" ] || [ "${{ github.event_name }}" = "push" ]; then
+            if [ "$POSTGRES" = "true" ] || [ "$DEPLOY_SERVICE" = "postgres" ] || [ "$EVENT_NAME" = "push" ]; then
               sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/postgres:latest || true
               sudo docker tag ${{ secrets.DOCKERHUB_USERNAME }}/postgres:latest postgres:latest || true
             fi
 
             # Mongo
-            if [ "${{ needs.filter.outputs.mongodb }}" = "true" ] || [ "${{ github.event.inputs.service }}" = "mongodb" ] || [ "${{ github.event_name }}" = "push" ]; then
+            if [ "$MONGODB" = "true" ] || [ "$DEPLOY_SERVICE" = "mongodb" ] || [ "$EVENT_NAME" = "push" ]; then
               sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/mongo-db:latest || true
               sudo docker tag ${{ secrets.DOCKERHUB_USERNAME }}/mongo-db:latest mongo:latest || true
             fi
 
             # Redis
-            if [ "${{ needs.filter.outputs.redis }}" = "true" ] || [ "${{ github.event.inputs.service }}" = "redis" ] || [ "${{ github.event_name }}" = "push" ]; then
+            if [ "$REDIS" = "true" ] || [ "$DEPLOY_SERVICE" = "redis" ] || [ "$EVENT_NAME" = "push" ]; then
               sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/redis:latest || true
               sudo docker tag ${{ secrets.DOCKERHUB_USERNAME }}/redis:latest redis:latest || true
             fi
