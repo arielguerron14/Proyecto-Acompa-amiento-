@@ -1,0 +1,102 @@
+name: Deploy Monitoring
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - monitoring/**
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Login Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Build & Push Prometheus image
+      - name: Build and Push Prometheus Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./monitoring/prometheus
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/prometheus:latest
+
+      # Build & Push Grafana image
+      - name: Build and Push Grafana Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./monitoring/grafana
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/grafana:latest
+
+      # Deploy on EC2 via SSH
+      - name: Deploy Monitoring on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.MONITORING_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          timeout: 30s
+          command_timeout: 10m
+          script: |
+            # Ensure Docker is installed
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com | sudo sh
+              sudo usermod -aG docker ubuntu
+            fi
+
+            # Ensure Docker Compose
+            if ! command -v docker-compose &> /dev/null; then
+              sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-$(uname -s)-$(uname -m)" \
+                -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+            fi
+
+            sudo systemctl enable docker
+            sudo systemctl start docker
+
+            set -euo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+
+            # Ensure git, docker and compose
+            sudo apt-get update
+            sudo apt-get install -y git docker.io docker-compose || true
+            sudo systemctl enable docker || true
+            sudo systemctl start docker || true
+
+            # Ensure repo present
+            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-" || { echo "git clone failed"; exit 1; }
+            else
+              git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+            fi
+
+            # Enter monitoring folder
+            cd "$HOME/Proyecto-Acompa-amiento-/monitoring" || (echo "monitoring dir missing in repo" && ls -la "$HOME" && exit 1)
+
+            # Pull and run
+            docker-compose down || true
+            docker-compose pull || true
+            docker-compose up -d || true
+
+            # Post-deploy diagnostics
+            echo "--- DOCKER IMAGES (monitoring) ---"
+            sudo docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.Size}}' | egrep 'prometheus|grafana' || true
+
+            echo "--- DOCKER PS (all containers) ---"
+            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
+
+            echo "--- DOCKER-COMPOSE PS ---"
+            docker-compose ps || true
+
+            echo "--- DOCKER-COMPOSE LOGS (tail 200) ---"
+            docker-compose logs --no-color --tail=200 || true

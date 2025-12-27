@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  prometheus:
+    image: arielguerron14/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: arielguerron14/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  grafana_data:
