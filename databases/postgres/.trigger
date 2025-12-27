@@ -1,2 +1,2 @@
-trigger: 2025-12-27T10:05:00Z
-message: "ci(postgres): force build/push image"
+trigger: 2025-12-27T11:30:00Z
+message: "ci(postgres): touch trigger to force build-databases run"
