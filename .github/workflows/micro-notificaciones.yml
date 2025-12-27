@@ -1,0 +1,49 @@
+name: Deploy Micro Notificaciones
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - micro-notificaciones/**
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Inspect repository (debug)
+        run: |
+          echo "PWD: $(pwd)"
+          ls -la
+          ls -la micro-notificaciones || true
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push Image
+        run: |
+          docker build -f micro-notificaciones/Dockerfile -t caguerronp/proyecto-acomp-micro-notificaciones:latest .
+          docker push caguerronp/proyecto-acomp-micro-notificaciones:latest
+
+      - name: Deploy on EC2-Notificaciones
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_NOTIFICACIONES_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            docker pull caguerronp/proyecto-acomp-micro-notificaciones:latest
+            docker stop micro-notificaciones || true
+            docker rm micro-notificaciones || true
+            docker run -d \
+              --name micro-notificaciones \
+              -p 3006:8080 \
+              --restart unless-stopped \
+              caguerronp/proyecto-acomp-micro-notificaciones:latest
