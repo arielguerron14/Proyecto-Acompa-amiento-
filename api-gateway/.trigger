@@ -1,1 +1,2 @@
-trigger 2025-12-26T17:16:50.6736253-05:00
+trigger: 2025-12-27T16:40:00Z
+message: "ci(api-gateway): touch trigger to force run (manual)"

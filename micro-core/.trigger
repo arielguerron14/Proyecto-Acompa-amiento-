@@ -1,1 +1,2 @@
-trigger: 2025-12-26T17:08:35.5836672-05:00
+trigger: 2025-12-27T16:40:00Z
+message: "ci(micro-core): touch trigger to force run (manual)"
