@@ -36,11 +36,14 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           port: 22
           script: |
-            # Ensure Docker & Docker Compose (Ubuntu 24.04 compatible)
+            set -euo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+
+            # Ensure git, Docker & Docker Compose (Ubuntu 24.04 compatible)
             sudo apt-get update
-            sudo apt-get install -y docker.io docker-compose
-            sudo systemctl enable docker
-            sudo systemctl start docker
+            sudo apt-get install -y git docker.io docker-compose || true
+            sudo systemctl enable docker || true
+            sudo systemctl start docker || true
 
             # Pull database images explicitly to ensure latest images are available
             sudo docker pull postgres:15-alpine || echo "postgres pull failed"
@@ -49,9 +52,23 @@ jobs:
             echo "List pulled DB images:"
             sudo docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.Size}}' | egrep 'postgres|mongo|redis' || true
 
-            # Go to databases folder
-            cd ~/databases || exit 1
+            # Ensure the deployment repo content exists on the host (clone if missing)
+            # (uses public GitHub URL; replace with your deploy mechanism if private)
+            if ! command -v git >/dev/null 2>&1; then
+              sudo apt-get install -y git || true
+            fi
 
-            docker-compose down
-            docker-compose pull
-            docker-compose up -d
+            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-" || { echo "git clone failed"; exit 1; }
+            else
+              git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+            fi
+
+            # Use the repo's databases folder
+            cd "$HOME/Proyecto-Acompa-amiento-/databases" || (echo "databases dir missing in repo" && ls -la "$HOME" && exit 1)
+            echo "Present directory: $(pwd)"
+            ls -la || true
+
+            docker-compose down || true
+            docker-compose pull || true
+            docker-compose up -d || true
