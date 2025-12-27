@@ -20,9 +20,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Inspect repo (debug)
+        run: |
+          echo "PWD: $(pwd)"
+          ls -la
+
       - name: Build & Push
         run: |
-          docker build -t caguerronp/proyecto-acomp-micro-analytics:latest ./micro-analytics
+          # Build using repo root as context and the Dockerfile inside micro-analytics
+          docker build -t caguerronp/proyecto-acomp-micro-analytics:latest -f micro-analytics/Dockerfile .
           docker push caguerronp/proyecto-acomp-micro-analytics:latest
 
       - name: Deploy on EC2-Reportes
