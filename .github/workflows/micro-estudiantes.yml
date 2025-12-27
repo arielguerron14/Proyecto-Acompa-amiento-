@@ -14,7 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/login-action@v2
+      - name: Login Docker Hub
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -30,12 +31,15 @@ jobs:
           host: ${{ secrets.EC2_CORE_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
+          port: 22
+          timeout: 30s
+          command_timeout: 10m
           script: |
             docker pull caguerronp/proyecto-acomp-micro-estudiantes:latest
-            docker stop micro-estudiantes || true
-            docker rm micro-estudiantes || true
+            docker stop core-micro-estudiantes || true
+            docker rm core-micro-estudiantes || true
             docker run -d \
-              --name micro-estudiantes \
+              --name core-micro-estudiantes \
               -p 3002:8080 \
               --restart unless-stopped \
               caguerronp/proyecto-acomp-micro-estudiantes:latest
