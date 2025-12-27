@@ -1,0 +1,50 @@
+name: Deploy Databases
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - databases/**
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Inspect repository (debug)
+        run: |
+          echo "PWD: $(pwd)"
+          echo "Listing repo root:" 
+          ls -la
+          echo "Listing databases directory (if present):"
+          ls -la databases || echo "databases/ not found"
+
+      - name: Check deploy secrets (debug)
+        run: |
+          if [ -z "${{ secrets.EC2_DATABASES_HOST }}" ]; then echo "EC2_DATABASES_HOST missing"; else echo "EC2_DATABASES_HOST set"; fi
+          if [ -z "${{ secrets.EC2_KEY }}" ]; then echo "EC2_KEY missing"; else echo "EC2_KEY set"; fi
+
+      - name: Deploy Databases on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_DATABASES_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            # Ensure Docker & Compose
+            sudo apt-get update
+            sudo apt-get install -y docker docker-compose
+            sudo systemctl enable docker
+            sudo systemctl start docker
+
+            # Go to databases folder
+            cd ~/databases || exit 1
+
+            docker-compose down
+            docker-compose pull
+            docker-compose up -d
