@@ -22,9 +22,12 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push image
-        run: |
-          docker build -t caguerronp/proyecto-acomp-micro-auth:latest ./micro-auth
-          docker push caguerronp/proyecto-acomp-micro-auth:latest
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./micro-auth/Dockerfile
+          push: true
+          tags: caguerronp/proyecto-acomp-micro-auth:latest
 
       - name: Deploy on EC2-3 (Core)
         uses: appleboy/ssh-action@v1.0.3
