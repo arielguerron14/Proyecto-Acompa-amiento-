@@ -6,6 +6,15 @@ on:
     paths:
       - messaging/**
   workflow_dispatch:
+    inputs:
+      service:
+        description: 'Optional: service selector (unused)'
+        required: false
+        default: ''
+      deploy:
+        description: 'When true, perform SSH deploy (default: false)'
+        required: false
+        default: 'false'
 
 jobs:
   build-and-deploy:
@@ -48,45 +57,84 @@ jobs:
         run: |
           echo "No Dockerfile found in messaging/ — skipping build and push step."
 
+      - name: SSH connectivity check (messaging host)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y netcat-openbsd || sudo apt-get install -y netcat || true
+          for i in 1 2 3; do
+            nc -z -v -w5 "${{ secrets.EC2_MESSAGING_HOST }}" 22 && echo "SSH port reachable" && exit 0
+            echo "Attempt $i failed - waiting 10s"
+            sleep 10
+          done
+          echo "Port 22 is not reachable from runner" >&2
+          exit 1
+
       - name: Deploy Messaging on EC2
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true' }}
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEPLOY_SERVICE: ${{ github.event.inputs.service || '' }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         with:
           host: ${{ secrets.EC2_MESSAGING_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
           port: 22
+          timeout: 2m
+          command_timeout: 15m
           script: |
-            set -euo pipefail
+            set -euxo pipefail
             export DEBIAN_FRONTEND=noninteractive
 
             echo "🐳 Ensure Docker & Compose"
             sudo apt-get update
-            sudo apt-get install -y git docker.io docker-compose || true
+            sudo apt-get install -y git docker.io docker-compose-plugin || true
             sudo systemctl enable docker || true
             sudo systemctl start docker || true
 
             echo "🔐 Docker Hub Login"
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin || true
+            echo "$DOCKERHUB_TOKEN" | sudo docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
             echo "📦 Clone or update repository"
             if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
-              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-" || true
+              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
             else
-              git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+              git -C "$HOME/Proyecto-Acompa-amiento-" pull
             fi
+
+            echo "--- Repo listing ---"
+            ls -la "$HOME/Proyecto-Acompa-amiento-" || true
 
             cd "$HOME/Proyecto-Acompa-amiento-/messaging" || (echo "messaging dir missing" && ls -la "$HOME/Proyecto-Acompa-amiento-" && exit 1)
 
             echo "⬇️ Pull messaging image"
-            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/messaging:latest || true
-            sudo docker tag ${{ secrets.DOCKERHUB_USERNAME }}/messaging:latest messaging:latest || true
+            sudo docker pull $DOCKERHUB_USERNAME/messaging:latest
+
+            echo "--- Images after pull ---"
+            sudo docker images --format '{{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}' | grep messaging || (echo "Image not found after pull" && exit 1)
+
+            sudo docker tag $DOCKERHUB_USERNAME/messaging:latest messaging:latest
 
             echo "🧹 Stop old containers"
-            sudo docker-compose down || true
+            if command -v docker-compose >/dev/null 2>&1; then
+              sudo docker-compose down
+            else
+              sudo docker compose down
+            fi
 
             echo "🚀 Start messaging service"
-            sudo docker-compose pull || true
-            sudo docker-compose up -d || true
+            if command -v docker-compose >/dev/null 2>&1; then
+              sudo docker-compose pull
+              sudo docker-compose up -d
+            else
+              sudo docker compose pull
+              sudo docker compose up -d
+            fi
+
+            echo "--- DOCKER IMAGES ---"
+            sudo docker images | grep messaging || true
 
             echo "--- DOCKER PS ---"
-            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
+            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'

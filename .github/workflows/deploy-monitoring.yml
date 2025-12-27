@@ -5,6 +5,16 @@ on:
     branches: [ main ]
     paths:
       - monitoring/**
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Optional: service selector (prometheus|grafana)'
+        required: false
+        default: ''
+      deploy:
+        description: 'When true, perform SSH deploy (default: false)'
+        required: false
+        default: 'false'
 
 jobs:
   deploy:
@@ -37,16 +47,31 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/grafana:latest
 
+      - name: SSH connectivity check (monitoring host)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y netcat-openbsd || sudo apt-get install -y netcat || true
+          for i in 1 2 3; do
+            nc -z -v -w5 "${{ secrets.MONITORING_HOST }}" 22 && echo "SSH port reachable" && exit 0
+            echo "Attempt $i failed - waiting 10s"
+            sleep 10
+          done
+          echo "Port 22 is not reachable from runner" >&2
+          exit 1
+
       # Deploy on EC2 via SSH
       - name: Deploy Monitoring on EC2
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEPLOY_SERVICE: ${{ github.event.inputs.service || '' }}
         with:
           host: ${{ secrets.MONITORING_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          timeout: 30s
-          command_timeout: 10m
+          timeout: 2m
+          command_timeout: 15m
           script: |
             # Ensure Docker is installed
             if ! command -v docker &> /dev/null; then

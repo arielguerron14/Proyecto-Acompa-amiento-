@@ -260,7 +260,7 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 ## 📊 Comparativa de Microservicios
 
 | Servicio | Tipo | Base Datos | Integraciones | Estado |
-|----------|------|-----------|---------------|--------|
+| --- | --- | --- | --- | --- |
 | micro-maestros | Datos | MongoDB | - | Core |
 | micro-estudiantes | Datos | MongoDB | - | Core |
 | micro-reportes-est | Agregación | MongoDB | - | Core |
@@ -277,7 +277,8 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 ## 🔄 Flujos de Integración
 
 ### Flujo 1: Reserva de Estudiante
-```
+
+```text
 Frontend (estudiante.html)
     ↓
 API Gateway (/estudiantes/reservas)
@@ -296,7 +297,8 @@ micro-notificaciones (envía confirmación)
 ```
 
 ### Flujo 2: Autenticación Global
-```
+
+```text
 Cliente (Login)
     ↓
 API Gateway (/auth/login)
@@ -311,7 +313,8 @@ shared-auth/authMiddleware (verifica en cada request)
 ```
 
 ### Flujo 3: Integración SOAP Legacy
-```
+
+```text
 micro-soap-bridge (POST /soap/call)
     ↓
 SoapService.callService()
