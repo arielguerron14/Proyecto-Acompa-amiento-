@@ -1,5 +1,5 @@
-trigger: 2025-12-27T16:58:00Z
-message: "ci(micro-reportes-estudiantes): forced trigger run (manual)"
+trigger: 2025-12-27T18:43:00Z
+message: "ci(micro-reportes-estudiantes): rerun for error check #1"
 trigger 2025-12-27T00:00:00Z
 trigger: 2025-12-27T16:40:00Z
 2025-12-27T16:58:00Z - forced trigger by GitHub Copilot
