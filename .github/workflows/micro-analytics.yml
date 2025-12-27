@@ -1,0 +1,42 @@
+name: Deploy Micro Analytics
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - micro-analytics/**
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push
+        run: |
+          docker build -t caguerronp/proyecto-acomp-micro-analytics:latest ./micro-analytics
+          docker push caguerronp/proyecto-acomp-micro-analytics:latest
+
+      - name: Deploy on EC2-Reportes
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_REPORTES_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            docker pull caguerronp/proyecto-acomp-micro-analytics:latest
+            docker stop micro-analytics || true
+            docker rm micro-analytics || true
+            docker run -d \
+              --name micro-analytics \
+              -p 4001:8080 \
+              --restart unless-stopped \
+              caguerronp/proyecto-acomp-micro-analytics:latest
