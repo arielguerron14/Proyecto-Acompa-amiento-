@@ -1,0 +1,49 @@
+name: Force run all workflows
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref (branch/tag/sha) to use when dispatching workflows'
+        required: false
+        default: 'main'
+
+permissions:
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List repo workflows
+        uses: actions/github-script@v6
+        id: list
+        with:
+          script: |
+            const resp = await github.rest.actions.listRepoWorkflows({ owner: context.repo.owner, repo: context.repo.repo });
+            core.info(`Found ${resp.data.workflows.length} workflows`);
+            return resp.data.workflows.map(w => ({ id: w.id, path: w.path, name: w.name }));
+
+      - name: Dispatch workflows
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const workflows = ${{ toJson(steps.list.outputs.result) }} || [];
+            const ref = core.getInput('ref') || 'main';
+            for (const wf of workflows) {
+              try {
+                core.info(`Dispatching ${wf.name} (${wf.path}) -> ${ref}`);
+                await github.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: wf.id,
+                  ref
+                });
+                core.info(`Dispatched ${wf.path}`);
+              } catch (err) {
+                core.warning(`Failed to dispatch ${wf.path}: ${err.message}`);
+              }
+            }
+
+      - name: Done
+        run: echo "Requested dispatch for all workflows (check Actions tab for runs)."
