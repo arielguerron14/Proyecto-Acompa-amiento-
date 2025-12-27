@@ -72,3 +72,16 @@ jobs:
             docker-compose down || true
             docker-compose pull || true
             docker-compose up -d || true
+
+            # Post-deploy diagnostics: show images, containers, compose status and recent logs
+            echo "--- DOCKER IMAGES (db-related) ---"
+            sudo docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.Size}}' | egrep 'postgres|mongo|redis' || true
+
+            echo "--- DOCKER PS (all containers) ---"
+            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
+
+            echo "--- DOCKER-COMPOSE PS ---"
+            docker-compose ps || true
+
+            echo "--- DOCKER-COMPOSE LOGS (tail 200) ---"
+            docker-compose logs --no-color --tail=200 || true
