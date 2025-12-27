@@ -21,12 +21,32 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Inspect messaging folder (debug)
+        run: |
+          echo "Listing messaging/ content:"
+          ls -la messaging || true
+
+      - name: Check for Dockerfile
+        id: check
+        run: |
+          if [ -f messaging/Dockerfile ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and Push Messaging Image
+        if: steps.check.outputs.exists == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./messaging
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/messaging:latest
+
+      - name: Skip build if no Dockerfile
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          echo "No Dockerfile found in messaging/ — skipping build and push step."
 
       - name: Deploy Messaging on EC2
         uses: appleboy/ssh-action@v1.0.3
