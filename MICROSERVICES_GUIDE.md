@@ -11,6 +11,7 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Descripción:** Router central que gestiona todas las solicitudes y redirecciona a los microservicios correspondientes.
 
 **Responsabilidades:**
+
 - Proxy HTTP de solicitudes
 - Autenticación global
 - Rate limiting
@@ -19,6 +20,7 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Stack:** Express.js + http-proxy-middleware
 
 **Rutas expuestas:**
+
 - `/maestros/*` → micro-maestros (5001)
 - `/estudiantes/*` → micro-estudiantes (5002)
 - `/reportes/estudiantes/*` → micro-reportes-estudiantes (5003)
@@ -32,15 +34,18 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Descripción:** Gestión de horarios y disponibilidad de maestros.
 
 **Responsabilidades:**
+
 - CRUD de horarios
 - Gestión de disponibilidad
 - Consultas de horarios por maestro
 - Validación de conflictos
 
 **Models:**
+
 - `Horario` (maestroId, horaInicio, horaFin, dia, materia)
 
 **Endpoints clave:**
+
 - `GET /horarios` - Lista todos
 - `POST /horarios` - Crea nuevo
 - `PUT /horarios/:id` - Actualiza
@@ -53,15 +58,18 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Descripción:** Gestión de reservas de estudiantes.
 
 **Responsabilidades:**
+
 - CRUD de reservas
 - Validación de disponibilidad
 - Consultas de reservas por estudiante
 - Cancelación de reservas
 
 **Models:**
+
 - `Reserva` (estudianteId, maestroId, horarioId, fecha, estado)
 
 **Endpoints clave:**
+
 - `GET /reservas` - Lista todas
 - `POST /reservas` - Crea nueva
 - `PUT /reservas/:id` - Actualiza
@@ -74,12 +82,14 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Descripción:** Generación de reportes analíticos para estudiantes.
 
 **Responsabilidades:**
+
 - Reportes de asistencia
 - Historial de reservas
 - Estadísticas de uso
 - Exportación de datos
 
 **Endpoints clave:**
+
 - `GET /reportes/asistencia/:estudianteId` - Reporte de asistencia
 - `GET /reportes/historial/:estudianteId` - Historial de reservas
 - `GET /reportes/estadisticas` - Estadísticas generales
@@ -92,12 +102,14 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Descripción:** Generación de reportes analíticos para maestros.
 
 **Responsabilidades:**
+
 - Reportes de estudiantes atendidos
 - Estadísticas de sesiones
 - Métricas de disponibilidad
 - Análisis de carga
 
 **Endpoints clave:**
+
 - `GET /reportes/estudiantes/:maestroId` - Estudiantes atendidos
 - `GET /reportes/sesiones/:maestroId` - Sesiones realizadas
 - `GET /reportes/estadisticas` - Estadísticas de maestros
@@ -110,18 +122,21 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Descripción:** Autenticación y autorización centralizada con RBAC.
 
 **Responsabilidades:**
+
 - Verificación de tokens JWT
 - Validación de permisos
 - Gestión de roles
 - Control de acceso
 
 **Endpoints clave:**
+
 - `POST /auth/verify-token` - Verifica JWT
 - `POST /auth/validate-permission` - Valida permiso
 - `GET /auth/roles` - Lista roles
 - `GET /auth/roles/:roleId/permissions` - Permisos del rol
 
 **Roles soportados:**
+
 - `admin` - Acceso total
 - `maestro` - Gestionar horarios, ver reservas
 - `estudiante` - Ver horarios, crear/cancelar reservas
@@ -134,18 +149,21 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Descripción:** Servicio centralizado de notificaciones multicanal.
 
 **Responsabilidades:**
+
 - Envío de emails
 - Envío de SMS
 - Push notifications
 - Templates reutilizables
 
 **Endpoints clave:**
+
 - `POST /notificaciones/email` - Envía email
 - `POST /notificaciones/sms` - Envía SMS
 - `POST /notificaciones/push` - Envía push
 - `GET /notificaciones/templates` - Lista templates
 
 **Templates disponibles:**
+
 - `WELCOME` - Bienvenida
 - `PASSWORD_RESET` - Reseteo contraseña
 - `BOOKING_CONFIRMATION` - Confirmación reserva
@@ -158,17 +176,20 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Descripción:** Análisis en tiempo real y procesamiento de eventos con Kafka.
 
 **Responsabilidades:**
+
 - Consumo de eventos desde Kafka
 - Almacenamiento de analytics
 - Estadísticas agregadas
 - Generación de reportes
 
 **Tópicos Kafka:**
+
 - `reservas` - Eventos de reservas
 - `horarios` - Eventos de horarios
 - `reportes` - Eventos de reportes
 
 **Endpoints clave:**
+
 - `GET /analytics/events` - Lista eventos
 - `GET /analytics/stats` - Estadísticas
 - `POST /analytics/events` - Registra evento
@@ -181,12 +202,14 @@ El proyecto ahora consta de **10 microservicios** distribuidos en una arquitectu
 **Descripción:** Puente de integración con servicios SOAP legacy.
 
 **Responsabilidades:**
+
 - Adaptador REST → SOAP
 - Transformación de datos
 - Gestión de servicios legacy
 - WSDL management
 
 **Servicios SOAP soportados:**
+
 - `ALUMNOS` - Gestión de alumnos
 - `CALIFICACIONES` - Calificaciones
 - `ASISTENCIA` - Registro de asistencia

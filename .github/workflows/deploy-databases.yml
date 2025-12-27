@@ -1,0 +1,92 @@
+name: Deploy Databases
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - databases/**
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Optional: service selector (unused)'
+        required: false
+        default: ''
+      deploy:
+        description: 'When true, perform SSH deploy (default: false)'
+        required: false
+        default: 'false'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      
+
+      # (Removed duplicate SSH connectivity check - pre-check is already performed before deploy)
+
+      - name: Deploy Databases on EC2
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true' }}
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEPLOY_SERVICE: ${{ github.event.inputs.service || '' }}
+        with:
+          host: ${{ secrets.EC2_DATABASES_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          timeout: 2m
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+
+            echo "🔧 Installing Docker & Docker Compose"
+            sudo apt-get update
+            sudo apt-get install -y docker.io docker-compose
+            sudo systemctl enable docker
+            sudo systemctl start docker
+
+            echo "📦 Cloning or updating repository"
+            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
+            else
+              git -C "$HOME/Proyecto-Acompa-amiento-" pull
+            fi
+
+            echo "📁 Enter databases directory"
+            cd "$HOME/Proyecto-Acompa-amiento-/databases"
+
+            echo "🧹 Stopping previous containers"
+            docker-compose down || true
+
+            echo "⬇️ Pulling database images"
+            docker-compose pull
+
+            echo "🚀 Starting databases"
+            docker-compose up -d
+
+            echo "📊 Databases status"
+            docker-compose ps || true
+
+            echo "--- DOCKER IMAGES ---"
+            sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+
+            echo "--- RECENT DOCKER-COMPOSE LOGS (tail 200) ---"
+            docker-compose logs --no-color --tail=200 || true
+
+      - name: SSH connectivity check (databases host)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y netcat-openbsd || sudo apt-get install -y netcat || true
+          for i in 1 2 3; do
+            nc -z -v -w5 "${{ secrets.EC2_DATABASES_HOST }}" 22 && echo "SSH port reachable" && exit 0
+            echo "Attempt $i failed - waiting 10s"
+            sleep 10
+          done
+          echo "Port 22 is not reachable from runner" >&2
+          exit 1
