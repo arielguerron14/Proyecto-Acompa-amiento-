@@ -24,15 +24,35 @@ jobs:
             core.info(`Found ${resp.data.workflows.length} workflows`);
             return resp.data.workflows.map(w => ({ id: w.id, path: w.path, name: w.name }));
 
-      - name: Dispatch workflows
+      - name: Dispatch workflows (with diagnostics)
         uses: actions/github-script@v6
         with:
           script: |
-            const workflows = ${{ toJson(steps.list.outputs.result) }} || [];
+            const workflows = JSON.parse(process.env['WORKFLOWS'] || '[]');
             const ref = core.getInput('ref') || 'main';
+            let dispatched = 0;
+            let skipped = 0;
             for (const wf of workflows) {
+              core.info(`Checking ${wf.name} (${wf.path})`);
+              let hasDispatch = false;
               try {
-                core.info(`Dispatching ${wf.name} (${wf.path}) -> ${ref}`);
+                const content = await github.rest.repos.getContent({ owner: context.repo.owner, repo: context.repo.repo, path: wf.path });
+                const raw = Buffer.from(content.data.content, content.data.encoding).toString();
+                if (/workflow_dispatch\s*:/m.test(raw)) {
+                  hasDispatch = true;
+                } else {
+                  core.info(`Skipping ${wf.path}: no workflow_dispatch trigger found`);
+                  skipped++;
+                  continue;
+                }
+              } catch (err) {
+                core.warning(`Could not read workflow file ${wf.path}: ${err.message}`);
+                skipped++;
+                continue;
+              }
+
+              try {
+                core.info(`Dispatching ${wf.name} -> ${ref}`);
                 await github.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -40,10 +60,14 @@ jobs:
                   ref
                 });
                 core.info(`Dispatched ${wf.path}`);
+                dispatched++;
               } catch (err) {
                 core.warning(`Failed to dispatch ${wf.path}: ${err.message}`);
               }
             }
+            core.info(`Dispatch summary: attempted=${workflows.length} dispatched=${dispatched} skipped=${skipped}`);
+        env:
+          WORKFLOWS: "${{ steps.list.outputs.result }}"
 
       - name: Done
         run: echo "Requested dispatch for all workflows (check Actions tab for runs)."
