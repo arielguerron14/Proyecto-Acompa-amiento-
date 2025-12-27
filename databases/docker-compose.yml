@@ -2,6 +2,7 @@ version: "3.8"
 
 services:
   postgres:
+    # image is tagged locally during deploy to use the pushed image
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
@@ -13,6 +14,7 @@ services:
       - "5432:5432"
 
   mongo:
+    # image is tagged locally during deploy to use the pushed image
     image: mongo:6.0
     restart: unless-stopped
     ports:
@@ -21,6 +23,7 @@ services:
       - mongo_data:/data/db
 
   redis:
+    # image is tagged locally during deploy to use the pushed image
     image: redis:7-alpine
     restart: unless-stopped
     ports:
