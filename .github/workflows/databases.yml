@@ -18,9 +18,9 @@ jobs:
       - name: Inspect repository (debug)
         run: |
           echo "PWD: $(pwd)"
-          echo "Listing repo root:" 
+          echo "Listing repo root:"
           ls -la
-          echo "Listing databases directory (if present):"
+          echo "Listing databases directory:"
           ls -la databases || echo "databases/ not found"
 
       - name: Check deploy secrets (debug)
@@ -36,11 +36,18 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           port: 22
           script: |
-            # Ensure Docker & Compose
+            # Ensure Docker & Docker Compose (Ubuntu 24.04 compatible)
             sudo apt-get update
-            sudo apt-get install -y docker docker-compose
+            sudo apt-get install -y docker.io docker-compose
             sudo systemctl enable docker
             sudo systemctl start docker
+
+            # Pull database images explicitly to ensure latest images are available
+            sudo docker pull postgres:15-alpine || echo "postgres pull failed"
+            sudo docker pull mongo:6.0 || echo "mongo pull failed"
+            sudo docker pull redis:7-alpine || echo "redis pull failed"
+            echo "List pulled DB images:"
+            sudo docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.Size}}' | egrep 'postgres|mongo|redis' || true
 
             # Go to databases folder
             cd ~/databases || exit 1
