@@ -54,11 +54,12 @@ jobs:
         echo "=== Deploying Messaging Services ==="
         cd "$HOME/Proyecto-Acompa-amiento-/messaging"
         
-        echo "=== Stopping old containers ==="
-        sudo docker-compose down || true
+        echo "=== Cleaning up old containers and images ==="
+        sudo docker-compose -f docker-compose.yml down -v || true
+        sudo docker system prune -f || true
         
         echo "=== Building and starting services ==="
-        sudo docker-compose up -d --build
+        sudo docker-compose -f docker-compose.yml up -d --build
         
         echo "=== Waiting for services to be healthy ==="
         sleep 20
@@ -67,10 +68,10 @@ jobs:
         sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
         
         echo "=== Checking service status ==="
-        sudo docker-compose ps
+        sudo docker-compose -f docker-compose.yml ps
         
         echo "=== Service logs ==="
-        sudo docker-compose logs --tail=100
+        sudo docker-compose -f docker-compose.yml logs --tail=50
         
         echo "=== Success! ==="
         echo "Zookeeper: ${{ secrets.MESSAGING_HOST }}:2181"
