@@ -52,29 +52,35 @@ jobs:
         fi
         
         echo "=== Full cleanup of messaging directory ==="
+        # Kill all containers
+        sudo docker kill $(sudo docker ps -q) 2>/dev/null || true
+        sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
+        
+        # Remove all networks and volumes
+        sudo docker network prune -f || true
+        sudo docker volume prune -f || true
+        sudo docker image prune -af || true
+        
+        # Delete and fresh clone messaging directory
+        rm -rf "$HOME/Proyecto-Acompa-amiento-/messaging" || true
+        cd "$HOME/Proyecto-Acompa-amiento-"
+        git fetch origin
+        git reset --hard origin/main
+        
+        echo "=== Verify docker-compose.yml exists and is valid ==="
         cd "$HOME/Proyecto-Acompa-amiento-/messaging"
-        
-        # Kill all containers related to messaging
-        sudo docker ps -a --format '{{.Names}}' | grep -E 'proyecto-|local-' | xargs -r sudo docker kill || true
-        sudo docker ps -a --format '{{.Names}}' | grep -E 'proyecto-|local-' | xargs -r sudo docker rm -f || true
-        
-        # Remove old networks
-        sudo docker network rm messaging-network 2>/dev/null || true
-        
-        # Remove old volumes
-        sudo docker volume ls --format '{{.Name}}' | grep -E 'zookeeper|kafka|rabbitmq' | xargs -r sudo docker volume rm || true
-        
-        # Full prune
-        sudo docker system prune -af --volumes || true
-        
-        echo "=== Remove any old docker-compose files ==="
-        rm -f docker-compose.override.yml || true
-        
-        # Verify we have the correct docker-compose.yml
         if [ ! -f "docker-compose.yml" ]; then
           echo "ERROR: docker-compose.yml not found!"
+          ls -la
           exit 1
         fi
+        
+        # Show the docker-compose.yml content for debugging
+        echo "=== docker-compose.yml content (first 30 lines) ==="
+        head -30 docker-compose.yml
+        
+        echo "=== Validate docker-compose.yml ==="
+        sudo docker-compose config > /dev/null 2>&1 || { echo "Invalid docker-compose.yml"; cat docker-compose.yml; exit 1; }
         
         echo "=== Building and starting services ==="
         sudo docker-compose up -d --build
