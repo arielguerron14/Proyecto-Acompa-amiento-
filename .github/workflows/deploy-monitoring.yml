@@ -1,4 +1,4 @@
-name: Build, Push, and Deploy Monitoring
+name: Build and Deploy Monitoring
 
 on:
   push:
@@ -7,31 +7,7 @@ on:
       - monitoring/**
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Log in to Docker Hub
-      run: |
-        echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-
-    - name: Build Prometheus Image
-      run: |
-        cd ./monitoring/prometheus
-        docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/prometheus:latest" .
-        docker push "${{ secrets.DOCKERHUB_USERNAME }}/prometheus:latest"
-
-    - name: Build Grafana Image
-      run: |
-        cd ./monitoring/grafana
-        docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/grafana:latest" .
-        docker push "${{ secrets.DOCKERHUB_USERNAME }}/grafana:latest"
-
   deploy-ec2:
-    needs: build-and-push
     runs-on: ubuntu-latest
 
     steps:
@@ -48,28 +24,24 @@ jobs:
         ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.MONITORING_HOST }} << 'EOF'
         set -e
         
-        echo "=== Updating System ==="
+        echo "=== System Update ==="
         sudo apt-get update -y
         
         echo "=== Installing Docker ==="
         if ! command -v docker &> /dev/null; then
-          sudo apt-get install -y docker.io curl
-          sudo usermod -aG docker ubuntu || true
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh get-docker.sh
+          sudo usermod -aG docker ubuntu
           sudo systemctl start docker
           sudo systemctl enable docker
         fi
         
         echo "=== Installing Docker Compose V2 ==="
-        if ! command -v docker-compose &> /dev/null; then
-          sudo mkdir -p /usr/local/lib/docker/cli-plugins
-          sudo curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
-            -o /usr/local/lib/docker/cli-plugins/docker-compose
-          sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-          sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose || true
-        fi
-        
-        echo "=== Logging in to Docker Hub ==="
-        echo "${{ secrets.DOCKERHUB_TOKEN }}" | sudo docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+        sudo mkdir -p /usr/local/lib/docker/cli-plugins
+        sudo curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+          -o /usr/local/lib/docker/cli-plugins/docker-compose
+        sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+        sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose 2>/dev/null || true
         
         echo "=== Cloning/Updating Repository ==="
         if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
@@ -79,25 +51,38 @@ jobs:
           git pull origin main
         fi
         
-        echo "=== Deploying Monitoring Services ==="
+        echo "=== Building Monitoring Images ==="
         cd "$HOME/Proyecto-Acompa-amiento-/monitoring"
         
+        echo "Building Prometheus image..."
+        sudo docker build -t local-prometheus:latest ./prometheus
+        
+        echo "Building Grafana image..."
+        sudo docker build -t local-grafana:latest ./grafana
+        
+        echo "=== Updating docker-compose.yml to use local images ==="
+        sudo sed -i 's|arielguerron14/prometheus:latest|local-prometheus:latest|g' docker-compose.yml
+        sudo sed -i 's|arielguerron14/grafana:latest|local-grafana:latest|g' docker-compose.yml
+        
+        echo "=== Stopping and removing old containers ==="
         sudo docker-compose down || true
-        sudo docker-compose pull
+        
+        echo "=== Starting monitoring services ==="
         sudo docker-compose up -d
         
-        echo "=== Waiting for Services to Start ==="
-        sleep 10
+        echo "=== Waiting for services to be healthy ==="
+        sleep 15
         
-        echo "=== Docker Images ==="
-        sudo docker images | grep -E 'prometheus|grafana' || echo "No images found"
-        
-        echo "=== Running Containers ==="
+        echo "=== Checking running containers ==="
         sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
         
-        echo "=== Service Status ==="
+        echo "=== Checking service status ==="
         sudo docker-compose ps
         
-        echo "=== Container Logs (last 50 lines) ==="
-        sudo docker-compose logs --tail=50
+        echo "=== Service logs ==="
+        sudo docker-compose logs --tail=100
+        
+        echo "=== Success! ==="
+        echo "Prometheus: http://${{ secrets.MONITORING_HOST }}:9090"
+        echo "Grafana: http://${{ secrets.MONITORING_HOST }}:3000"
         EOF
