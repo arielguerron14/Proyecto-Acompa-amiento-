@@ -67,6 +67,26 @@ Sistema de autenticación centralizado con:
 
 📖 Ver [AUTH_DOCUMENTATION.md](./AUTH_DOCUMENTATION.md) para guía completa.
 
+## 📨 Servicios de Mensajería
+
+Los servicios de mensajería están organizados en la carpeta `messaging/` con sus propias imágenes Docker:
+
+| Servicio | Puerto | Descripción |
+|----------|--------|-------------|
+| **Zookeeper** | 2181 | Coordinador para Kafka |
+| **Kafka** | 9092/29092 | Event streaming distribuido |
+| **RabbitMQ** | 5672/15672 | Message broker AMQP |
+| **Kafka UI** | 8081 | Panel de control Kafka |
+
+### Iniciar servicios de mensajería
+
+```bash
+cd messaging
+docker-compose up -d
+```
+
+📖 Ver [messaging/README.md](./messaging/README.md) y [messaging/EXAMPLES.md](./messaging/EXAMPLES.md) para uso detallado.
+
 ## 📦 Estructura del Proyecto
 
 ```
@@ -78,10 +98,16 @@ Sistema de autenticación centralizado con:
 ├── micro-reportes-estudiantes/
 ├── micro-reportes-maestros/
 ├── micro-soap-bridge/        # SOAP Bridge
-├── message-broker/           # Message Broker
+├── micro-analytics/          # Analytics
+├── messaging/                # Servicios de mensajería
+│   ├── zookeeper/
+│   ├── kafka/
+│   ├── rabbitmq/
+│   └── docker-compose.yml
+├── databases/                # Bases de datos
+├── monitoring/               # Monitoreo (Prometheus/Grafana)
 ├── shared-auth/              # Auth compartido
 ├── shared-monitoring/        # Monitoreo compartido
-├── shared-security/          # Seguridad compartida
 ├── frontend-web/             # Frontend
 └── [config y documentación]
 ```
