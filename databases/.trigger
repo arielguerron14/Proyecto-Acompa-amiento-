@@ -1,2 +1,2 @@
-trigger: 2025-12-27T18:42:00Z
-message: "ci(databases): rerun for error check #1"
+trigger: 2025-12-27T19:00:00Z
+message: "ci(databases): rerun round #2 - manual focus test"
