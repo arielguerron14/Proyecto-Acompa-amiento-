@@ -339,6 +339,19 @@ body {
     box-shadow: 0 4px 12px rgba(231, 76, 60, 0.2);
 }
 
+/* Mensajes de éxito */
+.success-message {
+    background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+    border: 1px solid #27ae60;
+    color: #1e8449;
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    font-size: 15px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(39, 174, 96, 0.2);
+}
+
 .hidden {
     display: none !important;
 }

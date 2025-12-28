@@ -120,25 +120,39 @@ async function handleSubmit(event) {
         const result = await response.json();
 
         if (response.ok) {
-            // Éxito: almacenar token y redirigir
-            if (result.token) {
-                localStorage.setItem('token', result.token);
-                // Redirigir según el rol
-                let redirectUrl = '/dashboard.html'; // Default
-                if (result.user && result.user.role) {
-                    if (result.user.role === 'estudiante') {
-                        redirectUrl = '/estudiante.html';
-                    } else if (result.user.role === 'maestro') {
-                        redirectUrl = '/maestro.html';
+            if (isLoginMode) {
+                // Login: esperamos token
+                if (result.token) {
+                    localStorage.setItem('token', result.token);
+                    let redirectUrl = '/dashboard.html';
+                    if (result.user && result.user.role) {
+                        if (result.user.role === 'estudiante') {
+                            redirectUrl = '/estudiante.html';
+                        } else if (result.user.role === 'maestro') {
+                            redirectUrl = '/maestro.html';
+                        }
                     }
+                    window.location.href = redirectUrl;
+                } else {
+                    showError('Respuesta inesperada del servidor');
                 }
-                window.location.href = redirectUrl;
             } else {
-                showError('Respuesta inesperada del servidor');
+                // Register: éxito, mostrar mensaje y cambiar a login
+                errorMessage.textContent = '✅ Cuenta creada exitosamente. Por favor inicia sesión.';
+                errorMessage.classList.remove('hidden');
+                errorMessage.classList.add('success-message');
+                errorMessage.classList.remove('error-message');
+                
+                setTimeout(() => {
+                    isLoginMode = true;
+                    updateUI();
+                    hideError();
+                    authForm.reset();
+                }, 2500);
             }
         } else {
             // Error del servidor
-            showError(result.message || 'Error en la autenticación');
+            showError(result.message || result.error || 'Error en la autenticación');
         }
     } catch (error) {
         console.error('Error:', error);
