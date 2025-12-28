@@ -22,7 +22,7 @@ jobs:
 
     - name: Build and Push Docker Image
       run: |
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-estudiantes:latest ./micro-estudiantes
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-estudiantes:latest -f ./micro-estudiantes/Dockerfile .
         docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-estudiantes:latest
 
   deploy-ec2:

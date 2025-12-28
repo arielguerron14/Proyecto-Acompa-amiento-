@@ -22,7 +22,7 @@ jobs:
 
     - name: Build and Push Docker Image
       run: |
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-auth:latest ./micro-auth
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-auth:latest -f ./micro-auth/Dockerfile .
         docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-auth:latest
 
   deploy-ec2:

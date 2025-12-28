@@ -22,7 +22,7 @@ jobs:
 
     - name: Build and Push Docker Image
       run: |
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest ./api-gateway
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest -f ./api-gateway/Dockerfile .
         docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
 
   deploy-ec2:
