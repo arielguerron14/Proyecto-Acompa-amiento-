@@ -1,0 +1,17 @@
+FROM confluentinc/cp-kafka:7.5.0
+
+LABEL maintainer="Proyecto Acompañamiento"
+LABEL description="Apache Kafka message broker"
+
+ENV KAFKA_BROKER_ID=1
+ENV KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+ENV KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+ENV KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+ENV KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+ENV KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+ENV KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+
+EXPOSE 9092 29092
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD kafka-broker-api-versions.sh --bootstrap-server localhost:29092 || exit 1
