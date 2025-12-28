@@ -14,6 +14,9 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
       with:
@@ -24,6 +27,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./monitoring/prometheus
+        file: ./monitoring/prometheus/Dockerfile
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/prometheus:latest
 
@@ -31,6 +35,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./monitoring/grafana
+        file: ./monitoring/grafana/Dockerfile
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/grafana:latest
 
@@ -39,6 +44,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
     - name: Set permissions for private key
       run: |
         echo "${{ secrets.EC2_KEY }}" > key.pem
@@ -47,81 +55,58 @@ jobs:
     - name: Deploy to EC2
       run: |
         ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.MONITORING_HOST }} << 'EOF'
+        set -e
+        
+        echo "=== Updating System ==="
         sudo apt-get update -y
-        if ! command -v docker &> /dev/null
-        then
-          sudo apt-get install -y docker.io docker-compose
+        
+        echo "=== Installing Docker ==="
+        if ! command -v docker &> /dev/null; then
+          sudo apt-get install -y docker.io curl
+          sudo usermod -aG docker ubuntu || true
           sudo systemctl start docker
           sudo systemctl enable docker
         fi
-
-        sudo docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
         
-        # Clone or update repo
+        echo "=== Installing Docker Compose V2 ==="
+        if ! command -v docker-compose &> /dev/null; then
+          sudo mkdir -p /usr/local/lib/docker/cli-plugins
+          sudo curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+            -o /usr/local/lib/docker/cli-plugins/docker-compose
+          sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose || true
+        fi
+        
+        echo "=== Logging in to Docker Hub ==="
+        echo "${{ secrets.DOCKERHUB_TOKEN }}" | sudo docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+        
+        echo "=== Cloning/Updating Repository ==="
         if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
         else
-          git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+          cd "$HOME/Proyecto-Acompa-amiento-"
+          git pull origin main
         fi
-
-        cd "$HOME/Proyecto-Acompa-amiento-/monitoring" || exit 1
-
+        
+        echo "=== Deploying Monitoring Services ==="
+        cd "$HOME/Proyecto-Acompa-amiento-/monitoring"
+        
         sudo docker-compose down || true
-        sudo docker-compose pull || true
-        sudo docker-compose up -d || true
-
-        echo "--- DOCKER PS ---"
-        sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
-
-        echo "--- DOCKER IMAGES ---"
-        sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
-
-        sudo docker image prune -f
+        sudo docker-compose pull
+        sudo docker-compose up -d
+        
+        echo "=== Waiting for Services to Start ==="
+        sleep 10
+        
+        echo "=== Docker Images ==="
+        sudo docker images | grep -E 'prometheus|grafana' || echo "No images found"
+        
+        echo "=== Running Containers ==="
+        sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
+        
+        echo "=== Service Status ==="
+        sudo docker-compose ps
+        
+        echo "=== Container Logs (last 50 lines) ==="
+        sudo docker-compose logs --tail=50
         EOF
-
-            # Ensure Docker Compose
-            if ! command -v docker-compose &> /dev/null; then
-              sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-$(uname -s)-$(uname -m)" \
-                -o /usr/local/bin/docker-compose
-              sudo chmod +x /usr/local/bin/docker-compose
-            fi
-
-            sudo systemctl enable docker
-            sudo systemctl start docker
-
-            set -euo pipefail
-            export DEBIAN_FRONTEND=noninteractive
-
-            # Ensure git, docker and compose
-            sudo apt-get update
-            sudo apt-get install -y git docker.io docker-compose || true
-            sudo systemctl enable docker || true
-            sudo systemctl start docker || true
-
-            # Ensure repo present
-            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
-              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-" || { echo "git clone failed"; exit 1; }
-            else
-              git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
-            fi
-
-            # Enter monitoring folder
-            cd "$HOME/Proyecto-Acompa-amiento-/monitoring" || (echo "monitoring dir missing in repo" && ls -la "$HOME" && exit 1)
-
-            # Pull and run
-            docker-compose down || true
-            docker-compose pull || true
-            docker-compose up -d || true
-
-            # Post-deploy diagnostics
-            echo "--- DOCKER IMAGES (monitoring) ---"
-            sudo docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.Size}}' | egrep 'prometheus|grafana' || true
-
-            echo "--- DOCKER PS (all containers) ---"
-            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
-
-            echo "--- DOCKER-COMPOSE PS ---"
-            docker-compose ps || true
-
-            echo "--- DOCKER-COMPOSE LOGS (tail 200) ---"
-            docker-compose logs --no-color --tail=200 || true
