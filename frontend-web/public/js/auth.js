@@ -7,7 +7,10 @@
 window.addEventListener('unhandledrejection', function(event) {
   const msg = String(event.reason || '');
   // Suppress the specific browser extension error about message channel
-  if (msg.includes('message channel') || msg.includes('asynchronous response')) {
+  if (msg.includes('message channel') || 
+      msg.includes('asynchronous response') ||
+      msg.includes('listener indicated') ||
+      msg.includes('closed before a response')) {
     event.preventDefault();
     console.debug('[auth.js] Suppressed extension message:', event.reason);
   }
