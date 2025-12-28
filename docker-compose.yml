@@ -297,7 +297,7 @@ services:
       - internal-network
     restart: unless-stopped
     healthcheck:
-      test: kafka-broker-api-versions.sh --bootstrap-server localhost:9092
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:29092"]
       interval: 10s
       timeout: 5s
       retries: 5
