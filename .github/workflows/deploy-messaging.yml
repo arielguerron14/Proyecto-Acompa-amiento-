@@ -51,27 +51,45 @@ jobs:
           git pull origin main
         fi
         
-        echo "=== Deploying Messaging Services ==="
+        echo "=== Full cleanup of messaging directory ==="
         cd "$HOME/Proyecto-Acompa-amiento-/messaging"
         
-        echo "=== Cleaning up old containers and images ==="
-        sudo docker-compose -f docker-compose.yml down -v || true
-        sudo docker system prune -f || true
+        # Kill all containers related to messaging
+        sudo docker ps -a --format '{{.Names}}' | grep -E 'proyecto-|local-' | xargs -r sudo docker kill || true
+        sudo docker ps -a --format '{{.Names}}' | grep -E 'proyecto-|local-' | xargs -r sudo docker rm -f || true
+        
+        # Remove old networks
+        sudo docker network rm messaging-network 2>/dev/null || true
+        
+        # Remove old volumes
+        sudo docker volume ls --format '{{.Name}}' | grep -E 'zookeeper|kafka|rabbitmq' | xargs -r sudo docker volume rm || true
+        
+        # Full prune
+        sudo docker system prune -af --volumes || true
+        
+        echo "=== Remove any old docker-compose files ==="
+        rm -f docker-compose.override.yml || true
+        
+        # Verify we have the correct docker-compose.yml
+        if [ ! -f "docker-compose.yml" ]; then
+          echo "ERROR: docker-compose.yml not found!"
+          exit 1
+        fi
         
         echo "=== Building and starting services ==="
-        sudo docker-compose -f docker-compose.yml up -d --build
+        sudo docker-compose up -d --build
         
         echo "=== Waiting for services to be healthy ==="
-        sleep 20
+        sleep 25
         
         echo "=== Checking running containers ==="
         sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
         
         echo "=== Checking service status ==="
-        sudo docker-compose -f docker-compose.yml ps
+        sudo docker-compose ps
         
         echo "=== Service logs ==="
-        sudo docker-compose -f docker-compose.yml logs --tail=50
+        sudo docker-compose logs --tail=50
         
         echo "=== Success! ==="
         echo "Zookeeper: ${{ secrets.MESSAGING_HOST }}:2181"
