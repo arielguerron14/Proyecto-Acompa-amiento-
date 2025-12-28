@@ -52,16 +52,10 @@ services:
       - kafka-data:/var/lib/kafka/data
     depends_on:
       zookeeper:
-        condition: service_healthy
+        condition: service_started
     networks:
       - messaging-network
     restart: unless-stopped
-    healthcheck:
-      test: kafka-broker-api-versions.sh --bootstrap-server localhost:29092 || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # RabbitMQ - Message broker with management UI
   rabbitmq:
@@ -104,9 +98,9 @@ services:
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     depends_on:
       kafka:
-        condition: service_healthy
+        condition: service_started
       zookeeper:
-        condition: service_healthy
+        condition: service_started
     networks:
       - messaging-network
     restart: unless-stopped

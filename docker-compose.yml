@@ -169,25 +169,6 @@ services:
       - internal-network
     restart: unless-stopped
 
-  # Microservicio: analytics
-  micro-analytics:
-    build:
-      context: .
-      dockerfile: micro-analytics/Dockerfile
-    container_name: micro-analytics
-    ports:
-      - "5007:5007"
-    env_file:
-      - .env
-    volumes:
-      - ./shared-auth:/usr/src/shared-auth:delegated
-    depends_on:
-      kafka:
-        condition: service_healthy
-    networks:
-      - internal-network
-    restart: unless-stopped
-
   # Microservicio: soap-bridge
   micro-soap-bridge:
     build:
@@ -229,8 +210,6 @@ services:
       micro-auth:
         condition: service_started
       micro-notificaciones:
-        condition: service_started
-      micro-analytics:
         condition: service_started
       micro-soap-bridge:
         condition: service_started
