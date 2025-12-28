@@ -5,79 +5,55 @@ on:
     branches: [ main ]
     paths:
       - databases/**
-  workflow_dispatch:
-    inputs:
-      service:
-        description: 'Optional: service selector (unused)'
-        required: false
-        default: ''
-      deploy:
-        description: 'When true, perform SSH deploy (default: false)'
-        required: false
-        default: 'false'
 
 jobs:
-  deploy:
+  deploy-ec2:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      
-
-      # (Removed duplicate SSH connectivity check - pre-check is already performed before deploy)
+      - name: Set permissions for private key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 600 key.pem
 
       - name: Deploy Databases on EC2
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true' }}
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DEPLOY_SERVICE: ${{ github.event.inputs.service || '' }}
-        with:
-          host: ${{ secrets.EC2_DATABASES_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          port: 22
-          timeout: 2m
-          command_timeout: 15m
-          script: |
-            set -euo pipefail
-            export DEBIAN_FRONTEND=noninteractive
-
-            echo "🔧 Installing Docker & Docker Compose"
-            sudo apt-get update
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.EC2_DATABASES_HOST }} << 'EOF'
+          sudo apt-get update -y
+          if ! command -v docker &> /dev/null
+          then
             sudo apt-get install -y docker.io docker-compose
-            sudo systemctl enable docker
             sudo systemctl start docker
+            sudo systemctl enable docker
+          fi
 
-            echo "📦 Cloning or updating repository"
-            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
-              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
-            else
-              git -C "$HOME/Proyecto-Acompa-amiento-" pull
-            fi
+          # Clone or update repo
+          if [ ! -d "$HOME/Proyecto-Acompa-imiento-" ]; then
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
+          else
+            git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+          fi
 
-            echo "📁 Enter databases directory"
-            cd "$HOME/Proyecto-Acompa-amiento-/databases"
+          cd "$HOME/Proyecto-Acompa-amiento-/databases" || exit 1
 
-            echo "🧹 Stopping previous containers"
-            docker-compose down || true
+          sudo docker-compose down || true
+          sudo docker-compose pull || true
+          sudo docker-compose up -d || true
 
-            echo "⬇️ Pulling database images"
-            docker-compose pull
+          echo "--- DOCKER PS ---"
+          sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
 
-            echo "🚀 Starting databases"
-            docker-compose up -d
+          echo "--- DOCKER IMAGES ---"
+          sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
 
-            echo "📊 Databases status"
-            docker-compose ps || true
+          echo "--- DOCKER-COMPOSE LOGS (tail 200) ---"
+          sudo docker-compose logs --no-color --tail=200 || true
 
-            echo "--- DOCKER IMAGES ---"
-            sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
-
-            echo "--- RECENT DOCKER-COMPOSE LOGS (tail 200) ---"
-            docker-compose logs --no-color --tail=200 || true
+          sudo docker image prune -f
+          EOF
 
       - name: SSH connectivity check (databases host)
         run: |

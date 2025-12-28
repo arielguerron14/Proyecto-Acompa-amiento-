@@ -1,78 +1,62 @@
-name: Deploy Micro Estudiantes
+name: Build, Push, and Deploy Micro Estudiantes
 
 on:
   push:
     branches: [ main ]
     paths:
       - micro-estudiantes/**
-  workflow_dispatch:
-    inputs:
-      service:
-        description: 'Optional service selector (unused)'
-        required: false
-        default: ''
-      deploy:
-        description: 'When true, perform SSH deploy (default: false)'
-        required: false
-        default: 'false'
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Login Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push image
-        run: |
-          docker build -t caguerronp/proyecto-acomp-micro-estudiantes:latest ./micro-estudiantes
-          docker push caguerronp/proyecto-acomp-micro-estudiantes:latest
+    - name: Build and Push Docker Image
+      run: |
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-estudiantes:latest ./micro-estudiantes
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-estudiantes:latest
 
-      - name: SSH connectivity check (core host)
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y netcat-openbsd || sudo apt-get install -y netcat || true
-          for i in 1 2 3; do
-            nc -z -v -w5 "${{ secrets.EC2_CORE_HOST }}" 22 && echo "SSH port reachable" && exit 0
-            echo "Attempt $i failed - waiting 10s"
-            sleep 10
-          done
-          echo "Port 22 is not reachable from runner" >&2
-          exit 1
+  deploy-ec2:
+    needs: build-and-push
+    runs-on: ubuntu-latest
 
-      - name: Deploy on EC2-3 (Core)
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true' }}
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DEPLOY_SERVICE: ${{ github.event.inputs.service || '' }}
-        with:
-          host: ${{ secrets.EC2_CORE_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          port: 22
-          timeout: 2m
-          command_timeout: 15m
-          script: |
-            set -euo pipefail
+    steps:
+    - name: Set permissions for private key
+      run: |
+        echo "${{ secrets.EC2_KEY }}" > key.pem
+        chmod 600 key.pem
 
-            docker pull caguerronp/proyecto-acomp-micro-estudiantes:latest
-            docker stop core-micro-estudiantes || true
-            docker rm core-micro-estudiantes || true
-            docker run -d \
-              --name core-micro-estudiantes \
-              -p 3002:8080 \
-              --restart unless-stopped \
-              caguerronp/proyecto-acomp-micro-estudiantes:latest
+    - name: Deploy to EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.EC2_CORE_HOST }} << 'EOF'
+        sudo apt-get update -y
+        if ! command -v docker &> /dev/null
+        then
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          sudo systemctl enable docker
+        fi
 
-            echo "--- DOCKER PS ---"
-            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
+        sudo docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+        sudo docker stop core-micro-estudiantes || true
+        sudo docker rm core-micro-estudiantes || true
+        sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-estudiantes:latest
+        sudo docker run -d -p 3002:8080 --restart unless-stopped --name core-micro-estudiantes ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-estudiantes:latest
 
-            echo "--- DOCKER IMAGES ---"
-            sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+        echo "--- DOCKER PS ---"
+        sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
+
+        echo "--- DOCKER IMAGES ---"
+        sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+
+        sudo docker image prune -f
+        EOF

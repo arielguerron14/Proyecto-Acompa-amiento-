@@ -1,84 +1,62 @@
-name: Deploy Frontend
+name: Build, Push, and Deploy Frontend
 
 on:
   push:
     branches: [ main ]
     paths:
       - frontend-web/**
-  workflow_dispatch:
-    inputs:
-      service:
-        description: 'Optional service selector (unused)'
-        required: false
-        default: ''
-      deploy:
-        description: 'When true, perform SSH deploy (default: false)'
-        required: false
-        default: 'false'
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Inspect repository (debug)
-        run: |
-          echo "PWD: $(pwd)"
-          ls -la
-          ls -la frontend-web || true
+    - name: Build and Push Docker Image
+      run: |
+        docker build -f frontend-web/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-frontend:latest .
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-frontend:latest
 
-      - name: Build and push frontend
-        run: |
-          # Build from repo root to ensure any shared files are available
-          docker build -f frontend-web/Dockerfile -t caguerronp/proyecto-acomp-frontend:latest .
-          docker push caguerronp/proyecto-acomp-frontend:latest
+  deploy-ec2:
+    needs: build-and-push
+    runs-on: ubuntu-latest
 
-      - name: SSH connectivity check (frontend host)
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y netcat-openbsd || sudo apt-get install -y netcat || true
-          for i in 1 2 3; do
-            nc -z -v -w5 "${{ secrets.EC2_FRONTEND_HOST }}" 22 && echo "SSH port reachable" && exit 0
-            echo "Attempt $i failed - waiting 10s"
-            sleep 10
-          done
-          echo "Port 22 is not reachable from runner" >&2
-          exit 1
+    steps:
+    - name: Set permissions for private key
+      run: |
+        echo "${{ secrets.EC2_KEY }}" > key.pem
+        chmod 600 key.pem
 
-      - name: Deploy on EC2 Frontend
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true' }}
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DEPLOY_SERVICE: ${{ github.event.inputs.service || '' }}
-        with:
-          host: ${{ secrets.EC2_FRONTEND_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          port: 22
-          timeout: 2m
-          command_timeout: 15m
-          script: |
-            set -euo pipefail
+    - name: Deploy to EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.EC2_FRONTEND_HOST }} << 'EOF'
+        sudo apt-get update -y
+        if ! command -v docker &> /dev/null
+        then
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          sudo systemctl enable docker
+        fi
 
-            docker pull caguerronp/proyecto-acomp-frontend:latest
-            docker stop frontend || true
-            docker rm frontend || true
-            docker run -d \
-              --name frontend \
-              -p 80:80 \
-              --restart unless-stopped \
-              caguerronp/proyecto-acomp-frontend:latest
+        sudo docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+        sudo docker stop frontend || true
+        sudo docker rm frontend || true
+        sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-frontend:latest
+        sudo docker run -d -p 80:80 --restart unless-stopped --name frontend ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-frontend:latest
 
-            echo "--- DOCKER PS ---"
-            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
+        echo "--- DOCKER PS ---"
+        sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
 
-            echo "--- DOCKER IMAGES ---"
-            sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+        echo "--- DOCKER IMAGES ---"
+        sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+
+        sudo docker image prune -f
+        EOF
