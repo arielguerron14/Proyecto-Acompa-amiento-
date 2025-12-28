@@ -51,31 +51,17 @@ jobs:
           git pull origin main
         fi
         
-        echo "=== Building Messaging Images ==="
+        echo "=== Deploying Messaging Services ==="
         cd "$HOME/Proyecto-Acompa-amiento-/messaging"
         
-        echo "Building Zookeeper image..."
-        sudo docker build -t local-zookeeper:latest ./zookeeper
-        
-        echo "Building Kafka image..."
-        sudo docker build -t local-kafka:latest ./kafka
-        
-        echo "Building RabbitMQ image..."
-        sudo docker build -t local-rabbitmq:latest ./rabbitmq
-        
-        echo "=== Updating docker-compose.yml to use local images ==="
-        sudo sed -i 's|zookeeper|local-zookeeper:latest|g' docker-compose.yml
-        sudo sed -i 's|kafka|local-kafka:latest|g' docker-compose.yml
-        sudo sed -i 's|rabbitmq|local-rabbitmq:latest|g' docker-compose.yml
-        
-        echo "=== Stopping and removing old containers ==="
+        echo "=== Stopping old containers ==="
         sudo docker-compose down || true
         
-        echo "=== Starting messaging services ==="
-        sudo docker-compose up -d
+        echo "=== Building and starting services ==="
+        sudo docker-compose up -d --build
         
         echo "=== Waiting for services to be healthy ==="
-        sleep 15
+        sleep 20
         
         echo "=== Checking running containers ==="
         sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
