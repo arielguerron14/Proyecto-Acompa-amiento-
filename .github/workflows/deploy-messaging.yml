@@ -1,4 +1,4 @@
-name: Build, Push, and Deploy Messaging
+name: Build and Deploy Messaging Services
 
 on:
   push:
@@ -7,109 +7,88 @@ on:
       - messaging/**
 
 jobs:
-  check-content:
+  deploy-ec2:
     runs-on: ubuntu-latest
-    outputs:
-      has-dockerfile: ${{ steps.check.outputs.has-dockerfile }}
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Check for Dockerfile
-      id: check
+    - name: Set permissions for private key
       run: |
-        if [ -f messaging/Dockerfile ]; then
-          echo "has-dockerfile=true" >> $GITHUB_OUTPUT
-        else
-          echo "has-dockerfile=false" >> $GITHUB_OUTPUT
+        echo "${{ secrets.EC2_KEY }}" > key.pem
+        chmod 600 key.pem
+
+    - name: Deploy to EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.MESSAGING_HOST }} << 'EOF'
+        set -e
+        
+        echo "=== System Update ==="
+        sudo apt-get update -y
+        
+        echo "=== Installing Docker ==="
+        if ! command -v docker &> /dev/null; then
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh get-docker.sh
+          sudo usermod -aG docker ubuntu
+          sudo systemctl start docker
+          sudo systemctl enable docker
         fi
+        
+        echo "=== Installing Docker Compose V2 ==="
+        sudo mkdir -p /usr/local/lib/docker/cli-plugins
+        sudo curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+          -o /usr/local/lib/docker/cli-plugins/docker-compose
+        sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+        sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose 2>/dev/null || true
+        
+        echo "=== Cloning/Updating Repository ==="
+        if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
+        else
+          cd "$HOME/Proyecto-Acompa-amiento-"
+          git pull origin main
+        fi
+        
+        echo "=== Building Messaging Images ==="
+        cd "$HOME/Proyecto-Acompa-amiento-/messaging"
+        
+        echo "Building Zookeeper image..."
+        sudo docker build -t local-zookeeper:latest ./zookeeper
+        
+        echo "Building Kafka image..."
+        sudo docker build -t local-kafka:latest ./kafka
+        
+        echo "Building RabbitMQ image..."
+        sudo docker build -t local-rabbitmq:latest ./rabbitmq
+        
+        echo "=== Updating docker-compose.yml to use local images ==="
+        sudo sed -i 's|zookeeper|local-zookeeper:latest|g' docker-compose.yml
+        sudo sed -i 's|kafka|local-kafka:latest|g' docker-compose.yml
+        sudo sed -i 's|rabbitmq|local-rabbitmq:latest|g' docker-compose.yml
+        
+        echo "=== Stopping and removing old containers ==="
+        sudo docker-compose down || true
+        
+        echo "=== Starting messaging services ==="
+        sudo docker-compose up -d
+        
+        echo "=== Waiting for services to be healthy ==="
+        sleep 15
+        
+        echo "=== Checking running containers ==="
+        sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
+        
+        echo "=== Checking service status ==="
+        sudo docker-compose ps
+        
+        echo "=== Service logs ==="
+        sudo docker-compose logs --tail=100
+        
+        echo "=== Success! ==="
+        echo "Zookeeper: ${{ secrets.MESSAGING_HOST }}:2181"
+        echo "Kafka: ${{ secrets.MESSAGING_HOST }}:9092"
+        echo "RabbitMQ: ${{ secrets.MESSAGING_HOST }}:5672 (Management: http://${{ secrets.MESSAGING_HOST }}:15672)"
+        EOF
 
-  build-and-push:
-    needs: check-content
-    if: ${{ needs.check-content.outputs.has-dockerfile == 'true' }}
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Build and Push Messaging Image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./messaging
-        push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/messaging:latest
-
-  skip-messaging:
-    needs: check-content
-    if: ${{ needs.check-content.outputs.has-dockerfile == 'false' }}
-    runs-on: ubuntu-latest
-    steps:
-    - name: Skip messaging
-      run: echo "No Dockerfile in messaging/ — skipping build and deploy."
-          host: ${{ secrets.EC2_MESSAGING_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          port: 22
-          timeout: 2m
-          command_timeout: 15m
-          script: |
-            set -euxo pipefail
-            export DEBIAN_FRONTEND=noninteractive
-
-            echo "🐳 Ensure Docker & Compose"
-            sudo apt-get update
-            sudo apt-get install -y git docker.io docker-compose-plugin || true
-            sudo systemctl enable docker || true
-            sudo systemctl start docker || true
-
-            echo "🔐 Docker Hub Login"
-            echo "$DOCKERHUB_TOKEN" | sudo docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-
-            echo "📦 Clone or update repository"
-            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
-              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
-            else
-              git -C "$HOME/Proyecto-Acompa-amiento-" pull
-            fi
-
-            echo "--- Repo listing ---"
-            ls -la "$HOME/Proyecto-Acompa-amiento-" || true
-
-            cd "$HOME/Proyecto-Acompa-amiento-/messaging" || (echo "messaging dir missing" && ls -la "$HOME/Proyecto-Acompa-amiento-" && exit 1)
-
-            echo "⬇️ Pull messaging image"
-            sudo docker pull $DOCKERHUB_USERNAME/messaging:latest
-
-            echo "--- Images after pull ---"
-            sudo docker images --format '{{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}' | grep messaging || (echo "Image not found after pull" && exit 1)
-
-            sudo docker tag $DOCKERHUB_USERNAME/messaging:latest messaging:latest
-
-            echo "🧹 Stop old containers"
-            if command -v docker-compose >/dev/null 2>&1; then
-              sudo docker-compose down
-            else
-              sudo docker compose down
-            fi
-
-            echo "🚀 Start messaging service"
-            if command -v docker-compose >/dev/null 2>&1; then
-              sudo docker-compose pull
-              sudo docker-compose up -d
-            else
-              sudo docker compose pull
-              sudo docker compose up -d
-            fi
-
-            echo "--- DOCKER IMAGES ---"
-            sudo docker images | grep messaging || true
-
-            echo "--- DOCKER PS ---"
-            sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
