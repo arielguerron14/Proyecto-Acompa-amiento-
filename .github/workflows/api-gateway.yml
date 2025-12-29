@@ -46,7 +46,7 @@ jobs:
 
     - name: Deploy to EC2
       run: |
-        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.API_GATEWAY_HOST }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.API_GATEWAY_HOST }} << 'ENDSSH'
         set -e
         
         echo "=== Installing Docker if needed ==="
@@ -81,7 +81,8 @@ jobs:
         sudo docker logs api-gateway || true
         
         echo "=== Verifying port is listening ==="
-        sudo netstat -tlnp | grep 8080 || echo "Port not yet listening"
+        sudo ss -tlnp | grep 8080 || echo "Port check skipped"
         
-        EOF        sudo docker image prune -f
+        echo "=== API Gateway deployment complete ==="
+        ENDSSH        sudo docker image prune -f
         EOF
