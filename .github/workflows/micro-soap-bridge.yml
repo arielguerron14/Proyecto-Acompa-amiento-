@@ -21,7 +21,7 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest ./micro-soap-bridge/
+          docker build -f micro-soap-bridge/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest
 
   deploy-aws:
