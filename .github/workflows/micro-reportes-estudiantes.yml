@@ -73,6 +73,3 @@ jobs:
           
           echo '=== Micro Reportes Estudiantes deployment complete ==='
           "
-
-        sudo docker image prune -f
-        EOF

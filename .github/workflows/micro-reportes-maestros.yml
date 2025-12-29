@@ -73,9 +73,3 @@ jobs:
           
           echo '=== Micro Reportes Maestros deployment complete ==='
           "
-
-        sudo docker image prune -f
-        EOF
-
-            echo "--- DOCKER IMAGES ---"
-            sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
