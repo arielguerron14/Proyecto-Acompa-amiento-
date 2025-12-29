@@ -11,7 +11,7 @@ COPY frontend-web/package*.json ./
 RUN npm install
 
 # Copy source code
-COPY frontend-web/. .
+COPY . .
 
 # Expose port
 EXPOSE 80
