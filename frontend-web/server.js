@@ -7,7 +7,7 @@ import { URL } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://127.0.0.1:8080';
+const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8080';
 
 const server = http.createServer((req, res) => {
     // Handle API proxy requests
