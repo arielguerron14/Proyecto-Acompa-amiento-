@@ -21,7 +21,7 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest ./micro-maestros/
+          docker build -f micro-maestros/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest
 
   deploy-aws:
