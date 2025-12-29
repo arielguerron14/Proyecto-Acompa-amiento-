@@ -6,8 +6,7 @@ WORKDIR /usr/src
 COPY shared-auth ./shared-auth
 COPY shared-monitoring ./shared-monitoring
 
-# Copy micro service
-COPY micro-notificaciones ./app
+COPY . /usr/src/app
 
 WORKDIR /usr/src/app
 

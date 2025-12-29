@@ -5,8 +5,7 @@ WORKDIR /usr/src
 # copy shared modules first
 COPY shared-auth ./shared-auth
 
-# copy this service
-COPY micro-reportes-maestros ./app
+COPY . /usr/src/app
 WORKDIR /usr/src/app
 
 # install dependencies (production)

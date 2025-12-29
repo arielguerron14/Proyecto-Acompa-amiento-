@@ -3,13 +3,12 @@ FROM node:18-alpine
 WORKDIR /usr/src/app
 
 # Copy package manifests
-COPY micro-maestros/package*.json ./
+COPY package*.json ./
 
 # Install production dependencies
 RUN npm install --production
 
-# Copy entire project
-COPY micro-maestros/. . 
+COPY . .
 
 # Force rebuild
 

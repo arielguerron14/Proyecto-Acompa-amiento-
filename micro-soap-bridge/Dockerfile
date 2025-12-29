@@ -7,8 +7,7 @@ WORKDIR /usr/src
 COPY shared-auth /usr/shared-auth
 RUN cd /usr/shared-auth && npm ci --only=production --silent
 
-# copy this service and install dependencies
-COPY micro-soap-bridge /usr/src/app
+COPY . /usr/src/app
 WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent
 
