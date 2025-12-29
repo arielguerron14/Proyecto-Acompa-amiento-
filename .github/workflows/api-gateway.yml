@@ -23,78 +23,56 @@ jobs:
     - name: Build and Push Docker Image
       run: |
         set -e
-        echo "Building API Gateway image..."
         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest -f ./api-gateway/Dockerfile .
-        echo "Image built successfully"
-        
-        echo "Pushing to Docker Hub..."
         docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
-        echo "Image pushed successfully"
-        
-        echo "Verifying image..."
-        docker inspect ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
 
   deploy-ec2:
     needs: build-and-push
     runs-on: ubuntu-latest
 
     steps:
-    - name: Set permissions for private key
+    - name: Setup SSH
       run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_KEY }}" > ~/.ssh/key.pem
+        chmod 600 ~/.ssh/key.pem
 
     - name: Deploy to EC2
-      env:
-        DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        API_HOST: ${{ secrets.API_GATEWAY_HOST }}
       run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
-        
-        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i key.pem ec2-user@${{ secrets.API_GATEWAY_HOST }} \
-          "
-          set -e
-          
-          echo '=== Installing Docker if needed ==='
-          if ! command -v docker &> /dev/null; then
-            sudo apt-get update -y
-            sudo apt-get install -y docker.io
-            sudo usermod -aG docker ubuntu
-            sudo systemctl start docker
-            sudo systemctl enable docker
-          fi
-          
-          echo '=== Logging in to Docker Hub ==='
-          echo '${{ secrets.DOCKERHUB_TOKEN }}' | sudo docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
-          
-          echo '=== Stopping old container ==='
-          sudo docker stop api-gateway 2>/dev/null || true
-          sudo docker rm api-gateway 2>/dev/null || true
-          
-          echo '=== Pulling latest image ==='
-          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
-          
-          echo '=== Starting API Gateway ==='
-          sudo docker run -d -p 80:8080 \
-            --restart unless-stopped \
-            --name api-gateway \
-            -e AUTH_SERVICE=http://44.200.28.232:3001 \
-            -e MAESTROS_SERVICE=http://44.200.28.232:3003 \
-            -e ESTUDIANTES_SERVICE=http://44.200.28.232:3002 \
-            -e REPORTES_EST_SERVICE=http://3.238.23.241:4003 \
-            -e REPORTES_MAEST_SERVICE=http://3.238.23.241:4002 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
-          
-          echo '=== Waiting for container to start ==='
-          sleep 5
-          
-          echo '=== Checking container status ==='
-          sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
-          
-          echo '=== Checking container logs ==='
-          sudo docker logs api-gateway || true
-          
-          echo '=== API Gateway deployment complete ==='
-          "
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+        -i ~/.ssh/key.pem ubuntu@${{ secrets.API_GATEWAY_HOST }} << 'EOF'
+        set -e
+
+        echo "=== Installing Docker if needed ==="
+        if ! command -v docker &> /dev/null; then
+          sudo apt-get update -y
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          sudo systemctl enable docker
+          sudo usermod -aG docker ubuntu
+        fi
+
+        echo "=== Logging in to Docker Hub ==="
+        echo '${{ secrets.DOCKERHUB_TOKEN }}' | sudo docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
+
+        echo "=== Stopping old container ==="
+        sudo docker stop api-gateway 2>/dev/null || true
+        sudo docker rm api-gateway 2>/dev/null || true
+
+        echo "=== Pulling latest image ==="
+        sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
+
+        echo "=== Starting API Gateway ==="
+        sudo docker run -d -p 80:8080 \
+          --restart unless-stopped \
+          --name api-gateway \
+          -e AUTH_SERVICE=http://172.31.71.144:3001 \
+          -e MAESTROS_SERVICE=http://172.31.71.144:3003 \
+          -e ESTUDIANTES_SERVICE=http://172.31.71.144:3002 \
+          -e REPORTES_EST_SERVICE=http://172.31.74.207:4003 \
+          -e REPORTES_MAEST_SERVICE=http://172.31.74.207:4002 \
+          ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
+
+        sudo docker ps
+        echo "=== API Gateway deployment complete ==="
+        EOF
