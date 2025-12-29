@@ -3,13 +3,13 @@ FROM node:18-alpine
 WORKDIR /usr/src/app
 
 # Copy package manifests
-COPY package*.json ./
+COPY micro-estudiantes/package*.json ./
 
 # Install production dependencies
 RUN npm install --production
 
 # Copy entire project
-COPY . .
+COPY micro-estudiantes/. .
 
 # install dependencies (production)
 RUN npm install --production
