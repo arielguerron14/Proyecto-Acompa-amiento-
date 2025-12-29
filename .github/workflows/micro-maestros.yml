@@ -30,12 +30,12 @@ jobs:
     steps:
       - name: Set permissions for private key
         run: |
-          echo "${{ secrets.AWS_EC2_KEY }}" > key.pem
+          echo "${{ secrets.EC2_KEY }}" > key.pem
           chmod 600 key.pem
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i key.pem ec2-user@${{ secrets.EC2_MAESTROS_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i key.pem ec2-user@${{ secrets.EC2_CORE_HOST }} << 'EOF'
           sudo yum update -y
           if ! command -v docker &> /dev/null
           then
