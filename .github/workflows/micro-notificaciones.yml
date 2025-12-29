@@ -37,26 +37,42 @@ jobs:
 
     - name: Deploy to EC2
       run: |
-        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.EC2_NOTIFICACIONES_HOST }} << 'EOF'
-        sudo apt-get update -y
-        if ! command -v docker &> /dev/null
-        then
-          sudo apt-get install -y docker.io
-          sudo systemctl start docker
-          sudo systemctl enable docker
-        fi
-
-        sudo docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-        sudo docker stop micro-notificaciones || true
-        sudo docker rm micro-notificaciones || true
-        sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-notificaciones:latest
-        sudo docker run -d -p 3006:8080 --restart unless-stopped --name micro-notificaciones ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-notificaciones:latest
-
-        echo "--- DOCKER PS ---"
-        sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
-
-        echo "--- DOCKER IMAGES ---"
-        sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+        echo "${{ secrets.EC2_KEY }}" > key.pem
+        chmod 600 key.pem
+        
+        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.EC2_NOTIFICACIONES_HOST }} \
+          "
+          set -e
+          
+          echo '=== Installing Docker if needed ==='
+          if ! command -v docker &> /dev/null; then
+            sudo apt-get update -y
+            sudo apt-get install -y docker.io
+            sudo systemctl start docker
+            sudo systemctl enable docker
+          fi
+          
+          echo '=== Logging in to Docker Hub ==='
+          echo '${{ secrets.DOCKERHUB_TOKEN }}' | sudo docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
+          
+          echo '=== Stopping old container ==='
+          sudo docker stop micro-notificaciones 2>/dev/null || true
+          sudo docker rm micro-notificaciones 2>/dev/null || true
+          
+          echo '=== Pulling latest image ==='
+          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-notificaciones:latest
+          
+          echo '=== Starting Micro Notificaciones ==='
+          sudo docker run -d -p 3006:3006 --restart unless-stopped --name micro-notificaciones ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-notificaciones:latest
+          
+          echo '=== Waiting for container to start ==='
+          sleep 3
+          
+          echo '=== Checking container status ==='
+          sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
+          
+          echo '=== Micro Notificaciones deployment complete ==='
+          "
 
         sudo docker image prune -f
         EOF
