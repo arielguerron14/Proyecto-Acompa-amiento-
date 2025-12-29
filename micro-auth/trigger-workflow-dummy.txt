@@ -1,0 +1,2 @@
+# Dummy file para forzar trigger de workflow
+Fecha: 2025-12-29
