@@ -6,6 +6,10 @@ on:
     paths:
       - monitoring/**
 
+concurrency:
+  group: deploy-monitoring
+  cancel-in-progress: false
+
 jobs:
   deploy-ec2:
     runs-on: ubuntu-latest

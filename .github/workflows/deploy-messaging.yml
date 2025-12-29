@@ -6,6 +6,10 @@ on:
     paths:
       - messaging/**
 
+concurrency:
+  group: deploy-messaging
+  cancel-in-progress: false
+
 jobs:
   deploy-ec2:
     runs-on: ubuntu-latest
@@ -59,7 +63,6 @@ jobs:
         # Remove all networks and volumes
         sudo docker network prune -f || true
         sudo docker volume prune -f || true
-        sudo docker image prune -af || true
         
         # Delete and fresh clone messaging directory
         rm -rf "$HOME/Proyecto-Acompa-amiento-/messaging" || true
