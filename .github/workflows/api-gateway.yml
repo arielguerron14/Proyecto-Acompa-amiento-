@@ -78,7 +78,14 @@ jobs:
           sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
           
           echo '=== Starting API Gateway ==='
-          sudo docker run -d -p 8080:8080 --restart unless-stopped --name api-gateway ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
+          sudo docker run -d -p 8080:8080 \
+            --restart unless-stopped \
+            --name api-gateway \
+            -e MAESTROS_SERVICE=http://44.200.28.232:3003 \
+            -e ESTUDIANTES_SERVICE=http://44.200.28.232:3002 \
+            -e REPORTES_EST_SERVICE=http://3.238.23.241:4003 \
+            -e REPORTES_MAEST_SERVICE=http://3.238.23.241:4002 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-api-gateway:latest
           
           echo '=== Waiting for container to start ==='
           sleep 5

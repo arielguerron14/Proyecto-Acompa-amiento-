@@ -30,15 +30,20 @@ app.get('/test', (req, res) => {
 });
 
 // APLICAR SEGURIDAD Y CORS PRIMERO (antes que cualquier ruta)
-const maestros = 'http://micro-maestros:5001';
-const estudiantes = 'http://micro-estudiantes:5002';
-const reportesEst = 'http://micro-reportes-estudiantes:5003';
-const reportesMaest = 'http://micro-reportes-maestros:5004';
+// Use environment variables for production, fallback to docker-compose names for local development
+const maestros = process.env.MAESTROS_SERVICE || 'http://micro-maestros:5001';
+const estudiantes = process.env.ESTUDIANTES_SERVICE || 'http://micro-estudiantes:5002';
+const reportesEst = process.env.REPORTES_EST_SERVICE || 'http://micro-reportes-estudiantes:5003';
+const reportesMaest = process.env.REPORTES_MAEST_SERVICE || 'http://micro-reportes-maestros:5004';
 const frontend = process.env.FRONTEND_URL || 'http://frontend-web:5500';
 
-// Proxy middleware for microservices
+console.log('🔗 Service URLs:');
+console.log(`  Maestros: ${maestros}`);
+console.log(`  Estudiantes: ${estudiantes}`);
+console.log(`  Reportes Estudiantes: ${reportesEst}`);
+console.log(`  Reportes Maestros: ${reportesMaest}`);
 
-// Handle preflight requests for horarios
+// Proxy middleware for microservices// Handle preflight requests for horarios
 app.options('/api/horarios', cors());
 
 // Handle preflight requests for estudiantes
