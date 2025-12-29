@@ -16,11 +16,11 @@ jobs:
       redis: ${{ steps.filter.outputs.redis }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_DATABASES_HOST }} << 'EOF'
+          sudo apt update -y
       - name: Filter changed paths
         id: filter
-        uses: dorny/paths-filter@v2
+            sudo apt install -y docker.io docker-compose
         with:
           filters: |
             postgres:
