@@ -1,0 +1,51 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "smoke-trigger.txt"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set permissions for private key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Run smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Define services to test: name -> host:port:path
+          declare -A SERVICES
+          SERVICES[api-gateway]="${{ secrets.API_GATEWAY_HOST }}:80:/health"
+          SERVICES[frontend]="${{ secrets.EC2_FRONTEND_HOST }}:80:/"
+          SERVICES[micro-analytics]="${{ secrets.EC2_REPORTES_HOST }}:3010:/health"
+          SERVICES[micro-notificaciones]="${{ secrets.EC2_NOTIFICACIONES_HOST }}:3006:/health"
+          SERVICES[micro-soap-bridge]="${{ secrets.EC2_BRIDGE_HOST }}:3007:/health"
+          SERVICES[micro-auth]="${{ secrets.EC2_CORE_HOST }}:3001:/health"
+          SERVICES[micro-maestros]="${{ secrets.EC2_CORE_HOST }}:3003:/health"
+          SERVICES[micro-estudiantes]="${{ secrets.EC2_CORE_HOST }}:3002:/health"
+
+          for name in "${!SERVICES[@]}"; do
+            entry=${SERVICES[$name]}
+            IFS=':' read -r host port path <<< "$entry"
+            if [ -z "$host" ]; then
+              echo "SKIP $name: host secret missing"
+              continue
+            fi
+
+            echo "\n=== SMOKE: $name @ $host:$port$path ==="
+            echo "-- docker ps --"
+            ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@"$host" "sudo docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'" || echo "SSH/docker ps failed for $host"
+
+            echo "-- curl health --"
+            ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@"$host" "curl -sS -o /dev/null -w '%{http_code}' http://localhost:$port$path" || echo "curl failed for $host"
+          done
