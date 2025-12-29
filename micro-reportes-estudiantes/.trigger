@@ -6,3 +6,4 @@ trigger: 2025-12-27T16:40:00Z
 message: "ci(micro-reportes-estudiantes): forced trigger run (manual)"
 message: "ci(micro-reportes-estudiantes): touch trigger to force run (manual)"
 workflow-test: 2025-12-28T12:35:30Z
+force-deploy: 2025-12-28T19:16:24Z
