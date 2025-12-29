@@ -9,8 +9,9 @@ window.API_CONFIG = (function() {
     // Local development
     API_BASE = 'http://localhost:8080';
   } else {
-    // Production: Use same host on port 80 (HTTP)
-    API_BASE = `${protocol}//${hostname}`;
+    // Production: API Gateway is on same server as frontend on /api path
+    // The frontend server proxies /api requests to the actual API Gateway
+    API_BASE = `${protocol}//${hostname}/api`;
   }
   
   console.log(`🔧 API Configuration loaded`);

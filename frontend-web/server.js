@@ -2,14 +2,46 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { URL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://127.0.0.1:8080';
+
 const server = http.createServer((req, res) => {
-    // Remover parámetros de query de la URL
+    // Handle API proxy requests
+    if (req.url.startsWith('/api/')) {
+        const endpoint = req.url.substring(4); // Remove '/api' prefix
+        const targetUrl = new URL(endpoint, API_GATEWAY_URL);
+        
+        console.log(`🔄 Proxying ${req.method} ${req.url} -> ${targetUrl.toString()}`);
+        
+        const proxyReq = http.request(targetUrl, {
+            method: req.method,
+            headers: req.headers
+        }, (proxyRes) => {
+            // Copy response headers
+            Object.keys(proxyRes.headers).forEach(key => {
+                res.setHeader(key, proxyRes.headers[key]);
+            });
+            res.writeHead(proxyRes.statusCode);
+            proxyRes.pipe(res);
+        });
+        
+        proxyReq.on('error', (err) => {
+            console.error(`❌ Proxy error: ${err.message}`);
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'API Gateway unavailable', details: err.message }));
+        });
+        
+        req.pipe(proxyReq);
+        return;
+    }
+
+    // Serve static files
     const urlPath = req.url.split('?')[0];
-    let filePath = path.join(__dirname, urlPath === '/' ? 'index.html' : urlPath);
+    let filePath = path.join(__dirname, 'public', urlPath === '/' ? 'index.html' : urlPath);
 
     // Si no tiene extensión, asumir .html
     if (!path.extname(filePath)) {
@@ -20,17 +52,18 @@ const server = http.createServer((req, res) => {
     const contentType = {
         '.html': 'text/html',
         '.css': 'text/css',
-        '.js': 'text/javascript'
+        '.js': 'text/javascript',
+        '.json': 'application/json'
     }[ext] || 'text/plain';
 
     fs.readFile(filePath, (err, data) => {
         if (err) {
-            // Intentar servir desde root si no encuentra en subcarpetas
-            const altPath = path.join(__dirname, path.basename(req.url));
+            // Try from public folder
+            const altPath = path.join(__dirname, 'public', path.basename(req.url));
             fs.readFile(altPath, (altErr, altData) => {
                 if (altErr) {
-                    res.writeHead(404);
-                    res.end('File not found');
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'File not found' }));
                 } else {
                     res.writeHead(200, { 'Content-Type': contentType });
                     res.end(altData);
@@ -43,7 +76,8 @@ const server = http.createServer((req, res) => {
     });
 });
 
-const PORT = process.env.FRONTEND_PORT || 5500;
-server.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}/`);
+const PORT = process.env.FRONTEND_PORT || 80;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 Frontend server running at http://localhost:${PORT}/`);
+    console.log(`🔗 API Gateway proxied from: ${API_GATEWAY_URL}`);
 });
