@@ -1,92 +1,49 @@
-name: Build and Deploy Monitoring
+name: Deploy Monitoring
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
     paths:
-      - monitoring/**
-
-concurrency:
-  group: deploy-monitoring
-  cancel-in-progress: false
+      - "monitoring/**"
 
 jobs:
-  deploy-ec2:
+  deploy-aws:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Set permissions for private key
+        run: |
+          echo "${{ secrets.AWS_EC2_KEY }}" > key.pem
+          chmod 600 key.pem
 
-    - name: Set permissions for private key
-      run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ec2-user@${{ secrets.AWS_EC2_HOST_MONITORING }} << 'EOF'
+          sudo yum update -y
+          if ! command -v docker &> /dev/null
+          then
+            sudo yum install -y docker
+            sudo systemctl start docker
+            sudo systemctl enable docker
+          fi
 
-    - name: Deploy to EC2
-      run: |
-        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.MONITORING_HOST }} << 'EOF'
-        set -e
-        
-        echo "=== System Update ==="
-        sudo apt-get update -y
-        
-        echo "=== Installing Docker ==="
-        if ! command -v docker &> /dev/null; then
-          curl -fsSL https://get.docker.com -o get-docker.sh
-          sudo sh get-docker.sh
-          sudo usermod -aG docker ubuntu
-          sudo systemctl start docker
-          sudo systemctl enable docker
-        fi
-        
-        echo "=== Installing Docker Compose V2 ==="
-        sudo mkdir -p /usr/local/lib/docker/cli-plugins
-        sudo curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
-          -o /usr/local/lib/docker/cli-plugins/docker-compose
-        sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-        sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose 2>/dev/null || true
-        
-        echo "=== Cloning/Updating Repository ==="
-        if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
-        else
-          cd "$HOME/Proyecto-Acompa-amiento-"
-          git pull origin main
-        fi
-        
-        echo "=== Building Monitoring Images ==="
-        cd "$HOME/Proyecto-Acompa-amiento-/monitoring"
-        
-        echo "Building Prometheus image..."
-        sudo docker build -t local-prometheus:latest ./prometheus
-        
-        echo "Building Grafana image..."
-        sudo docker build -t local-grafana:latest ./grafana
-        
-        echo "=== Updating docker-compose.yml to use local images ==="
-        sudo sed -i 's|arielguerron14/prometheus:latest|local-prometheus:latest|g' docker-compose.yml
-        sudo sed -i 's|arielguerron14/grafana:latest|local-grafana:latest|g' docker-compose.yml
-        
-        echo "=== Stopping and removing old containers ==="
-        sudo docker-compose down || true
-        
-        echo "=== Starting monitoring services ==="
-        sudo docker-compose up -d
-        
-        echo "=== Waiting for services to be healthy ==="
-        sleep 15
-        
-        echo "=== Checking running containers ==="
-        sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
-        
-        echo "=== Checking service status ==="
-        sudo docker-compose ps
-        
-        echo "=== Service logs ==="
-        sudo docker-compose logs --tail=100
-        
-        echo "=== Success! ==="
-        echo "Prometheus: http://${{ secrets.MONITORING_HOST }}:9090"
-        echo "Grafana: http://${{ secrets.MONITORING_HOST }}:3000"
-        EOF
+          # Clone or update repo
+          if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
+          else
+            git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+          fi
+
+          cd "$HOME/Proyecto-Acompa-amiento-/monitoring" || exit 1
+
+          sudo docker-compose down || true
+          sudo docker-compose pull || true
+          sudo docker-compose up -d || true
+
+          echo "--- DOCKER PS ---"
+          sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
+
+          echo "--- DOCKER IMAGES ---"
+          sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+
+          sudo docker image prune -f
+          EOF

@@ -1,80 +1,52 @@
-name: Build, Push, and Deploy Frontend
+name: Build, Push, and Deploy Frontend Web
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
     paths:
-      - frontend-web/**
+      - "frontend-web/**"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and Push Docker Image
-      run: |
-        docker build -f frontend-web/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-frontend:latest .
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-frontend:latest
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest ./frontend-web/
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
 
-  deploy-ec2:
+  deploy-aws:
     needs: build-and-push
     runs-on: ubuntu-latest
-
     steps:
-    - name: Set permissions for private key
-      run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
+      - name: Set permissions for private key
+        run: |
+          echo "${{ secrets.AWS_EC2_KEY }}" > key.pem
+          chmod 600 key.pem
 
-    - name: Deploy to EC2
-      run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
-        
-        ssh -o StrictHostKeyChecking=no -i key.pem ec2-user@${{ secrets.EC2_FRONTEND_HOST }} \
-          "
-          set -e
-          
-          echo '=== Installing Docker if needed ==='
-          if ! command -v docker &> /dev/null; then
-            sudo yum update -y
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ec2-user@${{ secrets.AWS_EC2_HOST_FRONTEND }} << 'EOF'
+          sudo yum update -y
+          if ! command -v docker &> /dev/null
+          then
             sudo yum install -y docker
-            sudo usermod -aG docker ec2-user
             sudo systemctl start docker
             sudo systemctl enable docker
           fi
-          
-          echo '=== Logging in to Docker Hub ==='
-          echo '${{ secrets.DOCKERHUB_TOKEN }}' | sudo docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
-          
-          echo '=== Stopping old container ==='
-          sudo docker stop frontend 2>/dev/null || true
-          sudo docker rm frontend 2>/dev/null || true
-          
-          echo '=== Pulling latest image ==='
-          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-frontend:latest
-          
-          echo '=== Starting Frontend ==='
-          sudo docker run -d -p 80:80 \
-            --restart unless-stopped \
-            --name frontend \
-            -e API_GATEWAY_URL=http://98.93.35.99:80 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-frontend:latest
-          
-          echo '=== Waiting for container to start ==='
-          sleep 3
-          
-          echo '=== Checking container status ==='
-          sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
-          
-          echo '=== Frontend deployment complete ==='
-          "
+
+          sudo docker stop frontend-web-container || true
+          sudo docker rm frontend-web-container || true
+          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
+          sudo docker run -d -p 80:80 --name frontend-web-container ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
+          sudo docker image prune -f
+          EOF

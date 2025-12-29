@@ -2,74 +2,51 @@ name: Build, Push, and Deploy Micro Reportes Maestros
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
     paths:
-      - micro-reportes-maestros/**
+      - "micro-reportes-maestros/**"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and Push Docker Image
-      run: |
-        docker build -f micro-reportes-maestros/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-reportes-maestros:latest .
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-reportes-maestros:latest
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-reportes-maestros:latest ./micro-reportes-maestros/
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-reportes-maestros:latest
 
-  deploy-ec2:
+  deploy-aws:
     needs: build-and-push
     runs-on: ubuntu-latest
-
     steps:
-    - name: Set permissions for private key
-      run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
+      - name: Set permissions for private key
+        run: |
+          echo "${{ secrets.AWS_EC2_KEY }}" > key.pem
+          chmod 600 key.pem
 
-    - name: Deploy to EC2
-      run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
-        
-        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.EC2_REPORTES_HOST }} \
-          "
-          set -e
-          
-          echo '=== Installing Docker if needed ==='
-          if ! command -v docker &> /dev/null; then
-            sudo apt-get update -y
-            sudo apt-get install -y docker.io
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ec2-user@${{ secrets.AWS_EC2_HOST_REPORTES_MAESTROS }} << 'EOF'
+          sudo yum update -y
+          if ! command -v docker &> /dev/null
+          then
+            sudo yum install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
           fi
-          
-          echo '=== Logging in to Docker Hub ==='
-          echo '${{ secrets.DOCKERHUB_TOKEN }}' | sudo docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
-          
-          echo '=== Stopping old container ==='
-          sudo docker stop micro-reportes-maestros 2>/dev/null || true
-          sudo docker rm micro-reportes-maestros 2>/dev/null || true
-          
-          echo '=== Pulling latest image ==='
-          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-reportes-maestros:latest
-          
-          echo '=== Starting Micro Reportes Maestros ==='
-          sudo docker run -d -p 4002:4002 --restart unless-stopped --name micro-reportes-maestros ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-reportes-maestros:latest
-          
-          echo '=== Waiting for container to start ==='
-          sleep 3
-          
-          echo '=== Checking container status ==='
-          sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
-          
-          echo '=== Micro Reportes Maestros deployment complete ==='
-          "
+
+          sudo docker stop micro-reportes-maestros-container || true
+          sudo docker rm micro-reportes-maestros-container || true
+          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-reportes-maestros:latest
+          sudo docker run -d -p 4002:4002 --name micro-reportes-maestros-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-reportes-maestros:latest
+          sudo docker image prune -f
+          EOF

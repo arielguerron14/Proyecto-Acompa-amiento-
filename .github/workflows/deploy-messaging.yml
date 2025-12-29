@@ -1,108 +1,50 @@
-name: Build and Deploy Messaging Services
+name: Deploy Messaging Services
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
     paths:
-      - messaging/**
-
-concurrency:
-  group: deploy-messaging
-  cancel-in-progress: false
+      - "messaging/**"
 
 jobs:
-  deploy-ec2:
+  deploy-aws:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Set permissions for private key
+        run: |
+          echo "${{ secrets.AWS_EC2_KEY }}" > key.pem
+          chmod 600 key.pem
 
-    - name: Set permissions for private key
-      run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ec2-user@${{ secrets.AWS_EC2_HOST_MESSAGING }} << 'EOF'
+          sudo yum update -y
+          if ! command -v docker &> /dev/null
+          then
+            sudo yum install -y docker
+            sudo systemctl start docker
+            sudo systemctl enable docker
+          fi
 
-    - name: Deploy to EC2
-      run: |
-        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.MESSAGING_HOST }} << 'EOF'
-        set -e
-        
-        echo "=== System Update ==="
-        sudo apt-get update -y
-        
-        echo "=== Installing Docker ==="
-        if ! command -v docker &> /dev/null; then
-          curl -fsSL https://get.docker.com -o get-docker.sh
-          sudo sh get-docker.sh
-          sudo usermod -aG docker ubuntu
-          sudo systemctl start docker
-          sudo systemctl enable docker
-        fi
-        
-        echo "=== Installing Docker Compose V2 ==="
-        sudo mkdir -p /usr/local/lib/docker/cli-plugins
-        sudo curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
-          -o /usr/local/lib/docker/cli-plugins/docker-compose
-        sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-        sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose 2>/dev/null || true
-        
-        echo "=== Cloning/Updating Repository ==="
-        if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
-        else
-          cd "$HOME/Proyecto-Acompa-amiento-"
-          git pull origin main
-        fi
-        
-        echo "=== Full cleanup of messaging directory ==="
-        # Kill all containers
-        sudo docker kill $(sudo docker ps -q) 2>/dev/null || true
-        sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
-        
-        # Remove all networks and volumes
-        sudo docker network prune -f || true
-        sudo docker volume prune -f || true
-        
-        # Delete and fresh clone messaging directory
-        rm -rf "$HOME/Proyecto-Acompa-amiento-/messaging" || true
-        cd "$HOME/Proyecto-Acompa-amiento-"
-        git fetch origin
-        git reset --hard origin/main
-        
-        echo "=== Verify docker-compose.yml exists and is valid ==="
-        cd "$HOME/Proyecto-Acompa-amiento-/messaging"
-        if [ ! -f "docker-compose.yml" ]; then
-          echo "ERROR: docker-compose.yml not found!"
-          ls -la
-          exit 1
-        fi
-        
-        # Show the docker-compose.yml content for debugging
-        echo "=== docker-compose.yml content (first 30 lines) ==="
-        head -30 docker-compose.yml
-        
-        echo "=== Validate docker-compose.yml ==="
-        sudo docker-compose config > /dev/null 2>&1 || { echo "Invalid docker-compose.yml"; cat docker-compose.yml; exit 1; }
-        
-        echo "=== Building and starting services ==="
-        sudo docker-compose up -d --build
-        
-        echo "=== Waiting for services to be healthy ==="
-        sleep 25
-        
-        echo "=== Checking running containers ==="
-        sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
-        
-        echo "=== Checking service status ==="
-        sudo docker-compose ps
-        
-        echo "=== Service logs ==="
-        sudo docker-compose logs --tail=50
-        
-        echo "=== Success! ==="
-        echo "Zookeeper: ${{ secrets.MESSAGING_HOST }}:2181"
-        echo "Kafka: ${{ secrets.MESSAGING_HOST }}:9092"
-        echo "RabbitMQ: ${{ secrets.MESSAGING_HOST }}:5672 (Management: http://${{ secrets.MESSAGING_HOST }}:15672)"
-        EOF
+          # Clone or update repo
+          if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
+          else
+            git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+          fi
+
+          cd "$HOME/Proyecto-Acompa-amiento-/messaging" || exit 1
+
+          sudo docker-compose down || true
+          sudo docker-compose pull || true
+          sudo docker-compose up -d --build || true
+
+          echo "--- DOCKER PS ---"
+          sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
+
+          echo "--- DOCKER IMAGES ---"
+          sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+
+          sudo docker image prune -f
+          EOF
 

@@ -2,74 +2,51 @@ name: Build, Push, and Deploy Micro Maestros
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
     paths:
-      - micro-maestros/**
+      - "micro-maestros/**"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and Push Docker Image
-      run: |
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-maestros:latest -f ./micro-maestros/Dockerfile .
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-maestros:latest
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest ./micro-maestros/
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest
 
-  deploy-ec2:
+  deploy-aws:
     needs: build-and-push
     runs-on: ubuntu-latest
-
     steps:
-    - name: Set permissions for private key
-      run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
+      - name: Set permissions for private key
+        run: |
+          echo "${{ secrets.AWS_EC2_KEY }}" > key.pem
+          chmod 600 key.pem
 
-    - name: Deploy to EC2
-      run: |
-        echo "${{ secrets.EC2_KEY }}" > key.pem
-        chmod 600 key.pem
-        
-        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.EC2_CORE_HOST }} \
-          "
-          set -e
-          
-          echo '=== Installing Docker if needed ==='
-          if ! command -v docker &> /dev/null; then
-            sudo apt-get update -y
-            sudo apt-get install -y docker.io
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ec2-user@${{ secrets.AWS_EC2_HOST_MAESTROS }} << 'EOF'
+          sudo yum update -y
+          if ! command -v docker &> /dev/null
+          then
+            sudo yum install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
           fi
-          
-          echo '=== Logging in to Docker Hub ==='
-          echo '${{ secrets.DOCKERHUB_TOKEN }}' | sudo docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
-          
-          echo '=== Stopping old container ==='
-          sudo docker stop micro-maestros 2>/dev/null || true
-          sudo docker rm micro-maestros 2>/dev/null || true
-          
-          echo '=== Pulling latest image ==='
-          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-maestros:latest
-          
-          echo '=== Starting Micro Maestros ==='
-          sudo docker run -d -p 3003:3003 --restart unless-stopped --name micro-maestros ${{ secrets.DOCKERHUB_USERNAME }}/proyecto-acomp-micro-maestros:latest
-          
-          echo '=== Waiting for container to start ==='
-          sleep 3
-          
-          echo '=== Checking container status ==='
-          sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
-          
-          echo '=== Micro Maestros deployment complete ==='
-          "
+
+          sudo docker stop micro-maestros-container || true
+          sudo docker rm micro-maestros-container || true
+          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest
+          sudo docker run -d -p 3003:3003 --name micro-maestros-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest
+          sudo docker image prune -f
+          EOF
