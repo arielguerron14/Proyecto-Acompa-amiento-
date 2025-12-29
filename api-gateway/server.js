@@ -15,8 +15,8 @@ app.use((req, res, next) => {
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080', 'http://localhost:5500'],
-  credentials: true
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080', 'http://localhost:5500', '*'],
+  credentials: false
 }));
 app.use(express.json());
 
@@ -259,7 +259,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-const PORT = process.env.API_GATEWAY_PORT || process.env.PORT || 3000;
+const PORT = process.env.API_GATEWAY_PORT || process.env.PORT || 8080;
 console.log(`🌐 Starting server on port ${PORT}...`);
 
 app.listen(PORT, () => {
