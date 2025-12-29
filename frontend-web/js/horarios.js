@@ -161,7 +161,8 @@ async function loadHorarios() {
     const payload = JSON.parse(atob(token.split('.')[1]));
     const maestroId = payload.userId;
 
-    const response = await fetch(`http://localhost:5001/horarios/maestro/${maestroId}`, {
+    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+    const response = await fetch(`${apiBase}/horarios/maestro/${maestroId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
@@ -187,7 +188,8 @@ async function loadReportes() {
     const payload = JSON.parse(atob(token.split('.')[1]));
     const maestroId = payload.userId;
 
-    const response = await fetch(`http://localhost:5001/horarios/reportes/${maestroId}`, {
+    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+    const response = await fetch(`${apiBase}/horarios/reportes/${maestroId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
@@ -414,7 +416,8 @@ async function guardarHorario() {
 
   try {
     const token = localStorage.getItem('token');
-    const url = horarioEditando ? `http://localhost:5001/horarios/${horarioEditando}` : 'http://localhost:5001/horarios';
+    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+    const url = horarioEditando ? `${apiBase}/horarios/${horarioEditando}` : `${apiBase}/horarios`;
     const method = horarioEditando ? 'PUT' : 'POST';
 
     console.log('Enviando petición:', method, url);
@@ -494,7 +497,8 @@ async function eliminarHorario(id) {
 
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`http://localhost:5001/horarios/${id}`, {
+    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+    const response = await fetch(`${apiBase}/horarios/${id}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -523,7 +527,8 @@ async function cambiarEstado(id) {
 
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`http://localhost:5001/horarios/${id}`, {
+    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+    const response = await fetch(`${apiBase}/horarios/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

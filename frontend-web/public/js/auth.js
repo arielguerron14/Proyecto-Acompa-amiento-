@@ -17,7 +17,16 @@ window.addEventListener('unhandledrejection', function(event) {
 });
 
 (function () {
-  const API_BASE = 'http://localhost:3000';
+  // Determine API base URL dynamically based on environment
+  let API_BASE;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    // Local development
+    API_BASE = 'http://localhost:8080';
+  } else {
+    // Production - use the same host but with port 8080
+    API_BASE = `http://${window.location.hostname}:8080`;
+  }
+  
   const TOKEN_KEY = 'acomp_jwt_token_v1';
 
   // Prevent multiple executions

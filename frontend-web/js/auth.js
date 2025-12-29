@@ -94,13 +94,13 @@ async function handleSubmit(event) {
         let url, body;
 
         if (isLoginMode) {
-            url = 'http://localhost:8080/auth/login';
+            url = window.API_CONFIG.buildUrl('/auth/login');
             body = {
                 email: data.email,
                 password: data.password
             };
         } else {
-            url = 'http://localhost:8080/auth/register';
+            url = window.API_CONFIG.buildUrl('/auth/register');
             body = {
                 name: data.nombre,
                 email: data.email,
