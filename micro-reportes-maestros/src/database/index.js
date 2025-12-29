@@ -7,7 +7,7 @@ async function connectDB() {
 
   // Connect to MongoDB for ReporteMaestro documents
   mongoose.set('bufferTimeoutMS', 30000);
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://mongo:27017/micro-reportes-maestros', {
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://172.31.78.234:27017/micro-reportes-maestros', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     serverSelectionTimeoutMS: 30000,
