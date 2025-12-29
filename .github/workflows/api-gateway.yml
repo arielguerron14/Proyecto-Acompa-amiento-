@@ -53,8 +53,7 @@ jobs:
         echo "${{ secrets.EC2_KEY }}" > key.pem
         chmod 600 key.pem
         
-        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.API_GATEWAY_HOST }} \
-          -v \
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i key.pem ec2-user@${{ secrets.API_GATEWAY_HOST }} \
           "
           set -e
           
