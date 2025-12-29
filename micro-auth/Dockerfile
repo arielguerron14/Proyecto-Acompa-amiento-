@@ -3,7 +3,7 @@ FROM node:18-alpine
 WORKDIR /usr/src
 
 COPY shared-auth ./shared-auth
-COPY shared-monitoring ./shared-monitoring
+COPY ../shared-monitoring/src ./shared-monitoring
 COPY . /usr/src/app
 
 # install dependencies for shared modules first
