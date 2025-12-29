@@ -90,5 +90,4 @@ jobs:
           sudo docker logs api-gateway || true
           
           echo '=== API Gateway deployment complete ==='
-          "        sudo docker image prune -f
-        EOF
+          "
