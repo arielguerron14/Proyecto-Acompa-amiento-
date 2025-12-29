@@ -21,7 +21,7 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-reportes-estudiantes:latest ./micro-reportes-estudiantes/
+          docker build -f micro-reportes-estudiantes/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-reportes-estudiantes:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-reportes-estudiantes:latest
 
   deploy-aws:
@@ -30,12 +30,12 @@ jobs:
     steps:
       - name: Set permissions for private key
         run: |
-          echo "${{ secrets.AWS_EC2_KEY }}" > key.pem
+          echo "${{ secrets.EC2_KEY }}" > key.pem
           chmod 600 key.pem
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i key.pem ec2-user@${{ secrets.AWS_EC2_HOST_REPORTES_ESTUDIANTES }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} << 'EOF'
           sudo yum update -y
           if ! command -v docker &> /dev/null
           then
