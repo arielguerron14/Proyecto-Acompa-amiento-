@@ -8,11 +8,12 @@ window.API_CONFIG = (function() {
   let API_BASE;
   
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    // Local development
+    // Local development -> call local API directly
     API_BASE = 'http://localhost:8080';
   } else {
-    // Production - use the same host but with port 8080
-    API_BASE = `http://${window.location.hostname}:8080`;
+    // Production -> use frontend server proxy at /api to avoid cross-origin and public IP issues
+    // The frontend server (server.js) proxies '/api/*' to the actual API gateway (configured via API_GATEWAY_URL env)
+    API_BASE = '/api';
   }
   
   return {
@@ -20,6 +21,8 @@ window.API_CONFIG = (function() {
     
     // Helper method to build full URLs
     buildUrl: function(endpoint) {
+      // Ensure endpoint begins with '/'
+      if (!endpoint.startsWith('/')) endpoint = '/' + endpoint;
       return API_BASE + endpoint;
     },
     
