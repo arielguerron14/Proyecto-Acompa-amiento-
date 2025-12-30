@@ -1,237 +1,176 @@
-/**
- * Centralized JWT Authentication Handler
- * Manages token storage, verification, and automatic header injection
- */
+// Estado de la aplicación
+let isLoginMode = true;
 
-// Handle unhandled promise rejections from browser extensions
-window.addEventListener('unhandledrejection', function(event) {
-  const msg = String(event.reason || '');
-  // Suppress the specific browser extension error about message channel
-  if (msg.includes('message channel') || 
-      msg.includes('asynchronous response') ||
-      msg.includes('listener indicated') ||
-      msg.includes('closed before a response')) {
+// Elementos del DOM
+const authTitle = document.getElementById('auth-title');
+const authSubtitle = document.getElementById('auth-subtitle');
+const errorMessage = document.getElementById('error-message');
+const authForm = document.getElementById('auth-form');
+const registerFields = document.getElementById('register-fields');
+const roleField = document.getElementById('role-field');
+const submitBtn = document.getElementById('submit-btn');
+const toggleModeBtn = document.getElementById('toggle-mode');
+
+// Función para mostrar/ocultar elementos
+function toggleVisibility(element, show) {
+    if (show) {
+        element.classList.remove('hidden');
+    } else {
+        element.classList.add('hidden');
+    }
+}
+
+// Función para actualizar la UI según el modo
+function updateUI() {
+    if (isLoginMode) {
+        if (authTitle) authTitle.textContent = 'Iniciar Sesión';
+        if (authSubtitle) authSubtitle.textContent = 'Accede a tu cuenta';
+        if (submitBtn) submitBtn.textContent = 'Ingresar';
+        if (toggleModeBtn) toggleModeBtn.textContent = '¿No tienes cuenta? Regístrate';
+
+        if (registerFields) toggleVisibility(registerFields, false);
+        if (roleField) toggleVisibility(roleField, false);
+    } else {
+        if (authTitle) authTitle.textContent = 'Crear Cuenta';
+        if (authSubtitle) authSubtitle.textContent = 'Regístrate en el sistema';
+        if (submitBtn) submitBtn.textContent = 'Registrarse';
+        if (toggleModeBtn) toggleModeBtn.textContent = '¿Ya tienes cuenta? Inicia sesión';
+
+        if (registerFields) toggleVisibility(registerFields, true);
+        if (roleField) toggleVisibility(roleField, true);
+    }
+}
+
+// Función para mostrar errores
+function showError(message) {
+    errorMessage.textContent = message;
+    toggleVisibility(errorMessage, true);
+}
+
+// Función para ocultar errores
+function hideError() {
+    toggleVisibility(errorMessage, false);
+}
+
+// Función para manejar el toggle de modo
+function handleToggleMode() {
+    isLoginMode = !isLoginMode;
+    updateUI();
+    hideError();
+
+    // Limpiar el formulario
+    authForm.reset();
+}
+
+// Función para manejar el envío del formulario
+async function handleSubmit(event) {
     event.preventDefault();
-    console.debug('[auth.js] Suppressed extension message:', event.reason);
-  }
-});
+    hideError();
 
-(function () {
-  // Determine API base URL dynamically based on environment
-  let API_BASE;
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    // Local development
-    API_BASE = 'http://localhost:8080';
-  } else {
-    // Production - use the same host but with port 8080
-    API_BASE = `http://${window.location.hostname}:8080`;
-  }
-  
-  const TOKEN_KEY = 'acomp_jwt_token_v1';
+    const formData = new FormData(authForm);
+    const data = Object.fromEntries(formData);
 
-  // Prevent multiple executions
-  let initialized = false;
-
-  /**
-   * Token management
-   */
-  function getToken() {
-    try {
-      return localStorage.getItem(TOKEN_KEY);
-    } catch (e) {
-      return null;
+    // Validación adicional para registro
+    if (!isLoginMode) {
+        if (!data.nombre || !data.nombre.trim()) {
+            showError('El nombre es requerido');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Registrarse';
+            return;
+        }
+        if (!data.role) {
+            showError('El rol es requerido');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Registrarse';
+            return;
+        }
     }
-  }
 
-  function setToken(token) {
-    try {
-      localStorage.setItem(TOKEN_KEY, token);
-    } catch (e) {
-      // ignore
-    }
-  }
+    // Deshabilitar el botón durante el envío
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Cargando...';
 
-  function removeToken() {
     try {
-      localStorage.removeItem(TOKEN_KEY);
-    } catch (e) {
-      // ignore
-    }
-  }
+        let url, body;
 
-  /**
-   * Login
-   */
-  async function login(email, password) {
-    try {
-      const res = await fetch(API_BASE + '/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (res.status === 200 && data.success && data.token) {
-        setToken(data.token);
-        window.currentUser = data.user;
-        return { success: true, user: data.user };
-      }
-      return { success: false, error: data.error || 'Login failed' };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
-  }
+        if (isLoginMode) {
+            url = window.API_CONFIG.buildUrl('/auth/login');
+            body = {
+                email: data.email,
+                password: data.password
+            };
+        } else {
+            url = window.API_CONFIG.buildUrl('/auth/register');
+            body = {
+                name: data.nombre,
+                email: data.email,
+                password: data.password,
+                role: data.role
+            };
+        }
 
-  /**
-   * Register
-   */
-  async function register(email, password, name, role = 'estudiante') {
-    try {
-      const res = await fetch(API_BASE + '/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, role })
-      });
-      const data = await res.json();
-      if (res.status === 201 && data.success) {
-        return { success: true, user: data.user };
-      }
-      return { success: false, error: data.error || 'Registration failed' };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
-  }
-
-  /**
-   * Logout
-   */
-  async function logout() {
-    try {
-      const token = getToken();
-      if (token) {
-        await fetch(API_BASE + '/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token
-          },
-          body: JSON.stringify({})
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
         });
-      }
-    } catch (err) {
-      // ignore
+
+        const result = await response.json();
+
+        if (response.ok) {
+            if (isLoginMode) {
+                // Login: esperamos token
+                if (result.token) {
+                    localStorage.setItem('token', result.token);
+                    let redirectUrl = '/dashboard.html';
+                    if (result.user && result.user.role) {
+                        if (result.user.role === 'estudiante') {
+                            redirectUrl = '/estudiante.html';
+                        } else if (result.user.role === 'maestro') {
+                            redirectUrl = '/maestro.html';
+                        }
+                    }
+                    window.location.href = redirectUrl;
+                } else {
+                    showError('Respuesta inesperada del servidor');
+                }
+            } else {
+                // Register: éxito, mostrar mensaje y cambiar a login
+                errorMessage.textContent = '✅ Cuenta creada exitosamente. Por favor inicia sesión.';
+                errorMessage.classList.remove('hidden');
+                errorMessage.classList.add('success-message');
+                errorMessage.classList.remove('error-message');
+                
+                setTimeout(() => {
+                    isLoginMode = true;
+                    updateUI();
+                    hideError();
+                    authForm.reset();
+                }, 2500);
+            }
+        } else {
+            // Error del servidor
+            showError(result.message || result.error || 'Error en la autenticación');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Error de conexión. Verifica que el servidor esté ejecutándose.');
     } finally {
-      removeToken();
+        // Rehabilitar el botón
+        submitBtn.disabled = false;
+        updateUI();
     }
-    return { success: true };
-  }
+}
 
-  /**
-   * Verify token
-   */
-  async function verifyToken(token) {
-    if (!token) return { valid: false };
-    try {
-      const res = await fetch(API_BASE + '/auth/verify-token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token
-        },
-        body: JSON.stringify({})
-      });
-      if (res.status === 200) {
-        const data = await res.json();
-        return { valid: true, payload: data.payload || data };
-      }
-      return { valid: false };
-    } catch (err) {
-      return { valid: false };
-    }
-  }
+// Event listeners
+if (toggleModeBtn) {
+    toggleModeBtn.addEventListener('click', handleToggleMode);
+}
+if (authForm) {
+    authForm.addEventListener('submit', handleSubmit);
+}
 
-  /**
-   * Patch fetch() to auto-add Authorization header
-   */
-  (function patchFetch() {
-    const _fetch = window.fetch.bind(window);
-    window.fetch = async function (input, init = {}) {
-      try {
-        const token = getToken();
-        if (token) {
-          init.headers = init.headers || {};
-          if (!init.headers['Authorization'] && !init.headers['authorization']) {
-            init.headers['Authorization'] = 'Bearer ' + token;
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
-      return _fetch(input, init);
-    };
-  })();
-
-  /**
-   * Auto-redirect and token verification logic
-   */
-  async function initializeAuth() {
-    if (initialized) return;
-    initialized = true;
-
-    try {
-      const path = (location.pathname || '').toLowerCase();
-      const isLogin = path.includes('login.html') || path === '/' || path === '';
-      const token = getToken();
-
-      // No token
-      if (!token) {
-        if (!isLogin) {
-          location.href = '/login.html';
-        }
-        return;
-      }
-
-      // Verify token
-      const result = await verifyToken(token);
-      if (result && result.valid) {
-        window.currentUser = result.payload;
-        // If on login and have valid token, redirect
-        if (isLogin) {
-          const role = (result.payload && result.payload.roles && result.payload.roles[0]) || 'estudiante';
-          location.href = role === 'estudiante' ? '/estudiante.html' : '/index.html';
-        }
-        return;
-      }
-
-      // Token invalid
-      removeToken();
-      if (!isLogin) {
-        location.href = '/login.html';
-      }
-    } catch (err) {
-      console.error('[auth.js] Error during initialization:', err);
-      // Don't throw - let page load normally
-    }
-  }
-
-  /**
-   * Expose public API
-   */
-  window.AuthClient = {
-    getToken,
-    setToken,
-    removeToken,
-    login,
-    register,
-    logout,
-    verifyToken
-  };
-
-  /**
-   * Initialize on DOM ready
-   */
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeAuth);
-  } else {
-    setTimeout(initializeAuth, 0);
-  }
-})();
+// Inicializar la UI
+updateUI();
