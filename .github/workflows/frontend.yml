@@ -20,10 +20,26 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Build and Push Docker Image (tagged by SHA)
+        id: build_push
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest ./frontend-web/
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:${SHORT_SHA}
+          LATEST=${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
+
+          echo "Building image $IMAGE"
+          docker build -t "$IMAGE" ./frontend-web/
+
+          echo "Tagging as latest"
+          docker tag "$IMAGE" "$LATEST"
+
+          echo "Pushing $IMAGE"
+          docker push "$IMAGE"
+
+          echo "Pushing $LATEST"
+          docker push "$LATEST"
+
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
   deploy-aws:
     needs: build-and-push
@@ -34,21 +50,45 @@ jobs:
           echo "${{ secrets.EC2_KEY }}" > key.pem
           chmod 600 key.pem
 
-      - name: Deploy to EC2
+      - name: Deploy to EC2 (pull SHA tag or build fallback)
+        env:
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FRONTEND_HOST }} << 'EOF'
-          sudo apt update -y
-          if ! command -v docker &> /dev/null
-          then
+          set -e
+          echo "Updating apt & ensuring docker is present"
+          sudo apt update -y || true
+          if ! command -v docker &> /dev/null; then
             sudo apt install -y docker.io
             sudo systemctl start docker
             sudo systemctl enable docker
           fi
 
+          echo "Attempt docker login to pull private images"
+          echo "$DOCKER_TOKEN" | sudo docker login -u "$DOCKER_USER" --password-stdin || true
+
+          echo "Attempting to pull image: $IMAGE"
+          if sudo docker pull "$IMAGE"; then
+            RUN_IMAGE="$IMAGE"
+            echo "Pulled $IMAGE successfully"
+          else
+            echo "Pull failed, building locally on EC2 as fallback"
+            if [ -d ~/repo ]; then cd ~/repo && git fetch origin && git checkout main && git pull origin main; else git clone https://github.com/${{ github.repository }} ~/repo && cd ~/repo; fi
+            cd ~/repo/frontend-web
+            sudo docker build -t frontend-web:local .
+            RUN_IMAGE=frontend-web:local
+          fi
+
+          echo "Stopping old container"
           sudo docker stop frontend-web-container || true
           sudo docker rm frontend-web-container || true
-          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
-          sudo docker run -d --restart unless-stopped -p 80:80 --name frontend-web-container ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
+
+          echo "Running $RUN_IMAGE"
+          sudo docker run -d --restart unless-stopped -p 80:80 --name frontend-web-container "$RUN_IMAGE"
+
+          # prune with retries
           for i in 1 2 3 4 5; do
             if sudo docker image prune -f; then break; else echo "docker prune busy, retrying ($i)"; sleep 2; fi
           done || true
