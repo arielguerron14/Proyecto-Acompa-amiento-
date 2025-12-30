@@ -94,11 +94,44 @@ jobs:
             RUN_IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:latest"
           fi
 
-          echo "Running container from image: $RUN_IMAGE"
-          sudo docker run -d --restart unless-stopped -p 3001:3001 --name micro-auth-container "$RUN_IMAGE" || true
+          # Create env file from repository secrets so the deployed container uses correct runtime config
+          echo "MONGO_URI=${{ secrets.MONGO_URI }}" > "$HOME/micro-auth.env"
+          if [ -n "${{ secrets.REDIS_HOST }}" ]; then echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> "$HOME/micro-auth.env"; fi
+          if [ -n "${{ secrets.REDIS_PORT }}" ]; then echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> "$HOME/micro-auth.env"; fi
+
+          echo "Running container from image: $RUN_IMAGE with env file"
+          sudo docker run -d --restart unless-stopped --env-file "$HOME/micro-auth.env" -p 3001:3001 --name micro-auth-container "$RUN_IMAGE" || true
           sleep 2
           echo "Container status:"; sudo docker ps -a --filter "name=micro-auth-container" || true
           echo "Recent logs (micro-auth):"; sudo docker logs --tail 200 micro-auth-container || true
+          # Post-deploy health check (retry loop)
+          echo "Waiting for micro-auth service to become healthy..."
+          HEALTH_OK=0
+          for i in $(seq 1 12); do
+            if sudo docker run --rm --network host curlimages/curl:7.88.1 -sSf http://localhost:3001/health > /dev/null 2>&1; then
+              echo "micro-auth /health OK"
+              HEALTH_OK=1
+              break
+            else
+              echo "micro-auth not ready yet (attempt $i/12), sleeping 5s..."
+              sleep 5
+            fi
+          done
+          if [ "$HEALTH_OK" != "1" ]; then
+            echo "ERROR: micro-auth failed health check; dumping logs"
+            sudo docker logs --tail 500 micro-auth-container || true
+            exit 1
+          fi
+
+          # Basic smoke test: attempt to register a test user (will not fail pipeline if service returns 4xx)
+          echo "Running basic registration smoke test"
+          set -o pipefail
+          if sudo docker run --rm --network host curlimages/curl:7.88.1 -sS -o /tmp/smoke.json -w "%{http_code}" -X POST http://localhost:3001/auth/register -H 'Content-Type: application/json' -d '{"name":"smoke","email":"smoke+ci@example.com","password":"p","role":"estudiante"}' | grep -E "2.." >/dev/null; then
+            echo "Smoke test registration returned 2xx"
+          else
+            echo "Smoke test registration did not return 2xx; /auth/register may be failing - check service logs"
+            sudo tail -n 200 /tmp/smoke.json || true
+          fi
           sudo docker image prune -f
           EOF
 
