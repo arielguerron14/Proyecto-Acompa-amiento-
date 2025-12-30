@@ -23,7 +23,7 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           # Use repository root as build context so shared modules are available
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest -f micro-soap-bridge/Dockerfile micro-soap-bridge/
+          docker build -f micro-soap-bridge/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest
 
   deploy-aws:

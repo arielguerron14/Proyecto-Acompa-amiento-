@@ -4,8 +4,11 @@ WORKDIR /usr/src
 
 # copy shared modules and helpers from repo root into /usr
 # so relative requires like '../../../shared-auth' resolve correctly
-COPY ../shared-auth /usr/shared-auth
-RUN cd /usr/shared-auth && npm ci --only=production --silent
+COPY shared-auth ./shared-auth
+WORKDIR /usr/src/shared-auth
+RUN npm ci --only=production --silent || npm install --production --silent
+
+WORKDIR /usr/src
 
 COPY . /usr/src/app
 WORKDIR /usr/src/app
