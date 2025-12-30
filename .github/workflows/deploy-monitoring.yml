@@ -38,15 +38,99 @@ jobs:
           elif docker compose version &> /dev/null; then
             COMPOSE_CMD="docker compose"
           else
-            echo "docker compose not found, attempting to install docker-compose-plugin"
-            sudo apt-get update -y
-            sudo apt-get install -y docker-compose-plugin || true
-            if docker compose version &> /dev/null; then
+            echo "docker compose not found, attempting installation fallbacks"
+            sudo apt-get update -y || true
+            sudo apt-get install -y curl wget ca-certificates gnupg lsb-release || true
+
+            ARCH=$(uname -m)
+            echo "Detected architecture: $ARCH"
+            case "$ARCH" in
+              x86_64|amd64) COMPOSE_BIN_NAME="docker-compose-linux-x86_64" ;;
+              aarch64|arm64) COMPOSE_BIN_NAME="docker-compose-linux-aarch64" ;;
+              *) COMPOSE_BIN_NAME="docker-compose-linux-x86_64" ;;
+            esac
+
+            # Ensure Docker's APT repository is present (helps install docker-compose-plugin)
+            if [ ! -f /etc/apt/sources.list.d/docker.list ]; then
+              echo "Adding Docker APT repository and GPG key"
+              sudo mkdir -p /etc/apt/keyrings || true
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg || true
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+              sudo apt-get update -y || true
+            fi
+
+            # Try distro package first (now with Docker repo available)
+            if sudo apt-get install -y docker-compose-plugin || sudo apt-get install -y docker-ce docker-ce-cli containerd.io; then
+              echo "Installed docker-compose-plugin or docker-ce packages via apt"
+            else
+              echo "apt install docker-compose-plugin failed, attempting to download compose plugin binary ($COMPOSE_BIN_NAME)"
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins || true
+
+              DOWNLOAD_URL="https://github.com/docker/compose/releases/latest/download/${COMPOSE_BIN_NAME}"
+
+              # Try curl, then wget, with a few retries
+              set +e
+              for i in 1 2 3; do
+                if command -v curl &> /dev/null; then
+                  sudo curl -fSL "$DOWNLOAD_URL" -o /usr/local/lib/docker/cli-plugins/docker-compose && break
+                elif command -v wget &> /dev/null; then
+                  sudo wget -q -O /usr/local/lib/docker/cli-plugins/docker-compose "$DOWNLOAD_URL" && break
+                else
+                  echo "No curl/wget available to download compose binary"
+                fi
+                sleep 1
+              done
+              set -e
+
+              # Fallback to user cli-plugins if system path not writable
+              if [ ! -x /usr/local/lib/docker/cli-plugins/docker-compose ]; then
+                sudo mkdir -p "$HOME/.docker/cli-plugins" || true
+                if command -v curl &> /dev/null; then
+                  curl -fSL "$DOWNLOAD_URL" -o "$HOME/.docker/cli-plugins/docker-compose" || true
+                elif command -v wget &> /dev/null; then
+                  wget -q -O "$HOME/.docker/cli-plugins/docker-compose" "$DOWNLOAD_URL" || true
+                fi
+              fi
+
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose || sudo chmod +x "$HOME/.docker/cli-plugins/docker-compose" || true
+
+              if [ -x /usr/local/lib/docker/cli-plugins/docker-compose ] || [ -x "$HOME/.docker/cli-plugins/docker-compose" ]; then
+                echo "Installed docker compose plugin binary"
+              else
+                echo "Download/install of compose plugin binary failed; attempting legacy python 'docker-compose' via pip"
+                sudo apt-get install -y python3 python3-pip || true
+                sudo pip3 install --upgrade pip || true
+                sudo pip3 install docker-compose || true
+              fi
+            fi
+
+            # Final verification and diagnostics
+            if command -v docker-compose &> /dev/null; then
+              COMPOSE_CMD="docker-compose"
+            elif docker compose version &> /dev/null; then
               COMPOSE_CMD="docker compose"
             else
               echo "ERROR: docker compose is not available after install attempts"
+              echo "--- ARCH / OS ---"
+              uname -a || true
+              lsb_release -a || true
+              echo "--- PLUGIN PATHS ---"
+              ls -la /usr/local/lib/docker/cli-plugins || true
+              ls -la "$HOME/.docker/cli-plugins" || true
+              echo "--- DOCKER / NETWORK INFO ---"
+              docker --version || true
+              apt-cache policy docker-compose-plugin || true
+              echo "--- CHECK OUTBOUND CONNECTIVITY ---"
+              if command -v curl &> /dev/null; then
+                curl -I https://github.com || true
+              elif command -v wget &> /dev/null; then
+                wget --spider https://github.com || true
+              fi
+              echo "--- DOCKER JOURNAL ---"
+              sudo journalctl -u docker --no-pager --no-hostname -n 200 || true
               exit 1
             fi
+          fi
           fi
 
           # Clone or update repo
