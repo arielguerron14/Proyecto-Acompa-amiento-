@@ -145,10 +145,29 @@ jobs:
           # Use the detected compose command
           sudo $COMPOSE_CMD down || true
 
+          # If Dockerfiles are present in the monitoring folder, build images locally and tag them
+          if [ -f "./prometheus/Dockerfile" ]; then
+            echo "--- Building local Prometheus image from ./prometheus/Dockerfile ---"
+            sudo docker build -t arielguerron14/prometheus:latest ./prometheus || true
+          fi
+          if [ -f "./grafana/Dockerfile" ]; then
+            echo "--- Building local Grafana image from ./grafana/Dockerfile ---"
+            sudo docker build -t arielguerron14/grafana:latest ./grafana || true
+          fi
+
           # Pre-pull images explicitly (make failures visible in Action logs)
-          echo "--- Pulling monitoring images ---"
-          sudo docker pull arielguerron14/prometheus:latest || true
-          sudo docker pull arielguerron14/grafana:latest || true
+          echo "--- Ensuring monitoring images are available (build local first, then pull if missing) ---"
+          if sudo docker image inspect arielguerron14/prometheus:latest >/dev/null 2>&1; then
+            echo "Prometheus image is present locally, skipping docker pull"
+          else
+            sudo docker pull arielguerron14/prometheus:latest || true
+          fi
+
+          if sudo docker image inspect arielguerron14/grafana:latest >/dev/null 2>&1; then
+            echo "Grafana image is present locally, skipping docker pull"
+          else
+            sudo docker pull arielguerron14/grafana:latest || true
+          fi
 
           echo "--- Starting monitoring stack with $COMPOSE_CMD ---"
           sudo $COMPOSE_CMD pull || true
