@@ -83,6 +83,7 @@ jobs:
             echo "Pulled micro-estudiantes image successfully: $IMAGE_REF"
             echo "Verifying shared-auth exists inside image..."
             sudo docker run --rm --entrypoint ls $IMAGE_REF /usr/src/shared-auth/src/middlewares || echo "shared-auth not present in image"
+            RUN_IMAGE="$IMAGE_REF"
           else
             echo "Pull failed; attempting to build image locally on the EC2 host"
             if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
@@ -92,9 +93,11 @@ jobs:
             fi
             # Build from repo root so shared-auth is included in the image
             sudo docker build -f "$HOME/Proyecto-Acompa-amiento-/micro-estudiantes/Dockerfile" -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest "$HOME/Proyecto-Acompa-amiento-" || true
+            RUN_IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest"
           fi
 
-          sudo docker run -d -p 3002:3002 --name micro-estudiantes-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest || true
+          echo "Running container from image: $RUN_IMAGE"
+          sudo docker run -d -p 3002:3002 --name micro-estudiantes-container "$RUN_IMAGE" || true
           sleep 2
           echo "Container status:"; sudo docker ps -a --filter "name=micro-estudiantes-container" || true
           echo "Recent logs (micro-estudiantes):"; sudo docker logs --tail 200 micro-estudiantes-container || true

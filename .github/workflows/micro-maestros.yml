@@ -82,6 +82,7 @@ jobs:
             echo "Pulled micro-maestros image successfully: $IMAGE_REF"
             echo "Verifying shared-auth exists inside image..."
             sudo docker run --rm --entrypoint ls $IMAGE_REF /usr/src/shared-auth/src/middlewares || echo "shared-auth not present in image"
+            RUN_IMAGE="$IMAGE_REF"
           else
             echo "Pull failed; attempting to build image locally on the EC2 host"
             if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
@@ -90,9 +91,11 @@ jobs:
               git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
             fi
             sudo docker build -f "$HOME/Proyecto-Acompa-amiento-/micro-maestros/Dockerfile" -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest "$HOME/Proyecto-Acompa-amiento-" || true
+            RUN_IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest"
           fi
 
-          sudo docker run -d -p 3003:3003 --name micro-maestros-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest || true
+          echo "Running container from image: $RUN_IMAGE"
+          sudo docker run -d -p 3003:3003 --name micro-maestros-container "$RUN_IMAGE" || true
           sleep 2
           echo "Container status:"; sudo docker ps -a --filter "name=micro-maestros-container" || true
           echo "Recent logs (micro-maestros):"; sudo docker logs --tail 200 micro-maestros-container || true
