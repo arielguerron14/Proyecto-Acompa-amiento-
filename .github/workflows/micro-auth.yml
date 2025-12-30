@@ -28,8 +28,18 @@ jobs:
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
           IMAGE_TAG="${SHORT_SHA}"
           echo "Image tag will be: $IMAGE_TAG"
-          echo "::set-output name=image-tag::$IMAGE_TAG"
+          echo "image-tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
           docker build -f micro-auth/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:$IMAGE_TAG .
+
+          echo "Verifying built image contains shared-auth files"
+          if docker run --rm --entrypoint ls ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:$IMAGE_TAG /usr/src/shared-auth/src/middlewares; then
+            echo "shared-auth present in built image"
+          else
+            echo "ERROR: shared-auth NOT found in built image; failing the job to avoid pushing a broken image"
+            docker run --rm --entrypoint ls ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:$IMAGE_TAG /usr/src || true
+            exit 1
+          fi
+
           docker tag ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:$IMAGE_TAG ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:latest
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:$IMAGE_TAG
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:latest

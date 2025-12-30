@@ -28,8 +28,19 @@ jobs:
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
           IMAGE_TAG="${SHORT_SHA}"
           echo "Image tag will be: $IMAGE_TAG"
-          echo "::set-output name=image-tag::$IMAGE_TAG"
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:$IMAGE_TAG ./micro-estudiantes/
+          echo "image-tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          # Build using repo root as context so shared-auth (sibling dir) is available
+          docker build -f micro-estudiantes/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:$IMAGE_TAG .
+
+          echo "Verifying built image contains shared-auth files"
+          if docker run --rm --entrypoint ls ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:$IMAGE_TAG /usr/src/shared-auth/src/middlewares; then
+            echo "shared-auth present in built image"
+          else
+            echo "ERROR: shared-auth NOT found in built image; failing the job to avoid pushing a broken image"
+            docker run --rm --entrypoint ls ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:$IMAGE_TAG /usr/src || true
+            exit 1
+          fi
+
           docker tag ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:$IMAGE_TAG ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:$IMAGE_TAG
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest
@@ -79,7 +90,8 @@ jobs:
             else
               git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
             fi
-            sudo docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest "$HOME/Proyecto-Acompa-amiento-/micro-estudiantes" || true
+            # Build from repo root so shared-auth is included in the image
+            sudo docker build -f "$HOME/Proyecto-Acompa-amiento-/micro-estudiantes/Dockerfile" -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest "$HOME/Proyecto-Acompa-amiento-" || true
           fi
 
           sudo docker run -d -p 3002:3002 --name micro-estudiantes-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest || true

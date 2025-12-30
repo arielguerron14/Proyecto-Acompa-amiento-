@@ -5,9 +5,9 @@ WORKDIR /usr/src
 
 
 # Copy shared modules (from monorepo root context)
-COPY shared-auth ./shared-auth
-COPY shared-monitoring/src ./shared-monitoring
-COPY micro-notificaciones /usr/src/app
+COPY shared-auth/ /usr/src/shared-auth/
+COPY shared-monitoring/src/ /usr/src/shared-monitoring/
+COPY micro-notificaciones/ /usr/src/app/
 
 WORKDIR /usr/src/app
 
