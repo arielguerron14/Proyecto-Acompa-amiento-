@@ -23,8 +23,9 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const ref = core.getInput('ref') || 'main';
-            const wfInput = core.getInput('workflows') || '';
+            // Read workflow_dispatch inputs from the event payload
+            const ref = (context.payload && context.payload.inputs && context.payload.inputs.ref) || 'main';
+            const wfInput = (context.payload && context.payload.inputs && context.payload.inputs.workflows) || '';
             let workflows = [];
             if (wfInput) {
               workflows = wfInput.split(',').map(s => s.trim()).filter(Boolean);
@@ -47,12 +48,16 @@ jobs:
             }
 
             for (const wf of workflows) {
-              core.info(`Dispatching ${wf} -> ${ref}`);
-              await github.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: wf,
-                ref
-              });
-              core.info(`Triggered ${wf}`);
+              console.log(`Dispatching ${wf} -> ${ref}`);
+              try {
+                await github.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: wf,
+                  ref
+                });
+                console.log(`Triggered ${wf}`);
+              } catch (err) {
+                console.error(`Failed to trigger ${wf}: ${err.message}`);
+              }
             }

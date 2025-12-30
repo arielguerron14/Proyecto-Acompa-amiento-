@@ -3,11 +3,11 @@ FROM node:18-alpine
 WORKDIR /usr/src
 
 
-# Copy shared modules
-COPY shared-auth ./shared-auth
-COPY ../shared-monitoring/src ./shared-monitoring
 
-COPY . /usr/src/app
+# Copy shared modules (from monorepo root context)
+COPY shared-auth ./shared-auth
+COPY shared-monitoring/src ./shared-monitoring
+COPY micro-notificaciones /usr/src/app
 
 WORKDIR /usr/src/app
 

@@ -10,227 +10,48 @@ on:
 jobs:
   deploy-aws:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Set permissions for private key
+      - name: Setup SSH key
         run: |
           echo "${{ secrets.EC2_KEY }}" > key.pem
           chmod 600 key.pem
 
-      - name: Deploy to EC2
+      - name: Deploy Monitoring to EC2
         run: |
-          if [ -z "${{ secrets.EC2_MONITORING_HOST }}" ]; then
-            echo "ERROR: secret EC2_MONITORING_HOST is not set. Set the correct host secret in repository settings.";
-            exit 1;
-          fi
+          ssh -o StrictHostKeyChecking=no -i key.pem \
+          ${{ secrets.EC2_USER }}@${{ secrets.EC2_MONITORING_HOST }} << 'EOF'
 
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_MONITORING_HOST }} << 'EOF'
+          set -e
+
           sudo apt update -y
-          if ! command -v docker &> /dev/null
-          then
+
+          # Docker
+          if ! command -v docker &> /dev/null; then
             sudo apt install -y docker.io
-            sudo systemctl start docker
             sudo systemctl enable docker
+            sudo systemctl start docker
           fi
 
-          # Ensure docker-compose (or docker compose) is available
-          if command -v docker-compose &> /dev/null; then
-            COMPOSE_CMD="docker-compose"
-          elif docker compose version &> /dev/null; then
-            COMPOSE_CMD="docker compose"
-          else
-            echo "docker compose not found, attempting installation fallbacks"
-            sudo apt-get update -y || true
-            sudo apt-get install -y curl wget ca-certificates gnupg lsb-release || true
-
-            ARCH=$(uname -m)
-            echo "Detected architecture: $ARCH"
-            case "$ARCH" in
-              x86_64|amd64) COMPOSE_BIN_NAME="docker-compose-linux-x86_64" ;;
-              aarch64|arm64) COMPOSE_BIN_NAME="docker-compose-linux-aarch64" ;;
-              *) COMPOSE_BIN_NAME="docker-compose-linux-x86_64" ;;
-            esac
-
-            # Ensure Docker's APT repository is present (helps install docker-compose-plugin)
-            if [ ! -f /etc/apt/sources.list.d/docker.list ]; then
-              echo "Adding Docker APT repository and GPG key"
-              sudo mkdir -p /etc/apt/keyrings || true
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg || true
-              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-              sudo apt-get update -y || true
-            fi
-
-            # Try distro package first (now with Docker repo available)
-            if sudo apt-get install -y docker-compose-plugin || sudo apt-get install -y docker-ce docker-ce-cli containerd.io; then
-              echo "Installed docker-compose-plugin or docker-ce packages via apt"
-            else
-              echo "apt install docker-compose-plugin failed, attempting to download compose plugin binary ($COMPOSE_BIN_NAME)"
-              sudo mkdir -p /usr/local/lib/docker/cli-plugins || true
-
-              DOWNLOAD_URL="https://github.com/docker/compose/releases/latest/download/${COMPOSE_BIN_NAME}"
-
-              # Try curl, then wget, with a few retries
-              set +e
-              for i in 1 2 3; do
-                if command -v curl &> /dev/null; then
-                  sudo curl -fSL "$DOWNLOAD_URL" -o /usr/local/lib/docker/cli-plugins/docker-compose && break
-                elif command -v wget &> /dev/null; then
-                  sudo wget -q -O /usr/local/lib/docker/cli-plugins/docker-compose "$DOWNLOAD_URL" && break
-                else
-                  echo "No curl/wget available to download compose binary"
-                fi
-                sleep 1
-              done
-              set -e
-
-              # Fallback to user cli-plugins if system path not writable
-              if [ ! -x /usr/local/lib/docker/cli-plugins/docker-compose ]; then
-                sudo mkdir -p "$HOME/.docker/cli-plugins" || true
-                if command -v curl &> /dev/null; then
-                  curl -fSL "$DOWNLOAD_URL" -o "$HOME/.docker/cli-plugins/docker-compose" || true
-                elif command -v wget &> /dev/null; then
-                  wget -q -O "$HOME/.docker/cli-plugins/docker-compose" "$DOWNLOAD_URL" || true
-                fi
-              fi
-
-              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose || sudo chmod +x "$HOME/.docker/cli-plugins/docker-compose" || true
-
-              if [ -x /usr/local/lib/docker/cli-plugins/docker-compose ] || [ -x "$HOME/.docker/cli-plugins/docker-compose" ]; then
-                echo "Installed docker compose plugin binary"
-              else
-                echo "Download/install of compose plugin binary failed; attempting legacy python 'docker-compose' via pip"
-                sudo apt-get install -y python3 python3-pip || true
-                sudo pip3 install --upgrade pip || true
-                sudo pip3 install docker-compose || true
-              fi
-            fi
-
-            # Final verification and diagnostics
-            if command -v docker-compose &> /dev/null; then
-              COMPOSE_CMD="docker-compose"
-            elif docker compose version &> /dev/null; then
-              COMPOSE_CMD="docker compose"
-            else
-              echo "ERROR: docker compose is not available after install attempts"
-              echo "--- ARCH / OS ---"
-              uname -a || true
-              lsb_release -a || true
-              echo "--- PLUGIN PATHS ---"
-              ls -la /usr/local/lib/docker/cli-plugins || true
-              ls -la "$HOME/.docker/cli-plugins" || true
-              echo "--- DOCKER / NETWORK INFO ---"
-              docker --version || true
-              apt-cache policy docker-compose-plugin || true
-              echo "--- CHECK OUTBOUND CONNECTIVITY ---"
-              if command -v curl &> /dev/null; then
-                curl -I https://github.com || true
-              elif command -v wget &> /dev/null; then
-                wget --spider https://github.com || true
-              fi
-              echo "--- DOCKER JOURNAL ---"
-              sudo journalctl -u docker --no-pager --no-hostname -n 200 || true
-
-              # Set a flag to fallback to direct docker run commands instead of docker compose
-              echo "Falling back to direct 'docker run' to start monitoring services"
-              FALLBACK_DOCKER_RUN=1
-            fi
-          fi
+          # docker-compose BINARIO (NO plugin)
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 \
+              -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
           fi
 
-          # Clone or update repo
+          # Repo
           if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
           else
-            git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+            git -C Proyecto-Acompa-amiento- pull || true
           fi
 
-          cd "$HOME/Proyecto-Acompa-amiento-/monitoring" || exit 1
+          cd Proyecto-Acompa-amiento-/monitoring
 
-          # Use the detected compose command (or fallback to docker run if compose missing)
-          if [ -z "${FALLBACK_DOCKER_RUN:-}" ]; then
-            sudo $COMPOSE_CMD down || true
-          else
-            echo "Skipping compose down because fallback to docker run is enabled"
-          fi
+          sudo docker-compose down || true
+          sudo docker-compose pull
+          sudo docker-compose up -d
 
-          # If Dockerfiles are present in the monitoring folder, build images locally and tag them
-          if [ -f "./prometheus/Dockerfile" ]; then
-            echo "--- Building local Prometheus image from ./prometheus/Dockerfile ---"
-            sudo docker build -t arielguerron14/prometheus:latest ./prometheus || true
-          fi
-          if [ -f "./grafana/Dockerfile" ]; then
-            echo "--- Building local Grafana image from ./grafana/Dockerfile ---"
-            sudo docker build -t arielguerron14/grafana:latest ./grafana || true
-          fi
-
-          # Pre-pull images explicitly (make failures visible in Action logs)
-          echo "--- Ensuring monitoring images are available (build local first, then pull if missing) ---"
-          if sudo docker image inspect arielguerron14/prometheus:latest >/dev/null 2>&1; then
-            echo "Prometheus image is present locally, skipping docker pull"
-          else
-            sudo docker pull arielguerron14/prometheus:latest || true
-          fi
-
-          if sudo docker image inspect arielguerron14/grafana:latest >/dev/null 2>&1; then
-            echo "Grafana image is present locally, skipping docker pull"
-          else
-            sudo docker pull arielguerron14/grafana:latest || true
-          fi
-
-          if [ -z "${FALLBACK_DOCKER_RUN:-}" ]; then
-            echo "--- Starting monitoring stack with $COMPOSE_CMD ---"
-            sudo $COMPOSE_CMD pull || true
-            sudo $COMPOSE_CMD up -d
-          else
-            echo "--- Starting monitoring stack with direct docker run fallback ---"
-            # Ensure data volume exists
-            sudo docker volume create grafana_data || true
-
-            # Stop & remove any previous containers to ensure idempotency
-            sudo docker rm -f monitoring_prometheus monitoring_grafana >/dev/null 2>&1 || true
-
-            # Start Prometheus
-            if sudo docker image inspect arielguerron14/prometheus:latest >/dev/null 2>&1; then
-              echo "Running local Prometheus image"
-            else
-              echo "Prometheus image missing locally, attempting to pull"
-              sudo docker pull arielguerron14/prometheus:latest || true
-            fi
-            sudo docker run -d --name monitoring_prometheus --restart unless-stopped -p 9090:9090 -v "$PWD"/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro arielguerron14/prometheus:latest || true
-
-            # Start Grafana
-            if sudo docker image inspect arielguerron14/grafana:latest >/dev/null 2>&1; then
-              echo "Running local Grafana image"
-            else
-              echo "Grafana image missing locally, attempting to pull"
-              sudo docker pull arielguerron14/grafana:latest || true
-            fi
-            sudo docker run -d --name monitoring_grafana --restart unless-stopped -p 3000:3000 -v grafana_data:/var/lib/grafana arielguerron14/grafana:latest || true
-          fi
-
-          # Show container status and recent logs to surface failures
-          echo "--- DOCKER PS AFTER UP ---"
-          sudo docker ps -a --format 'table {{.ID}}	{{.Image}}	{{.Status}}	{{.Ports}}	{{.Names}}' || true
-
-          echo "--- COMPOSE PS ---"
-          sudo $COMPOSE_CMD ps || true
-
-          echo "--- LAST 200 LOG LINES (compose) ---"
-          sudo $COMPOSE_CMD logs --no-color --tail=200 || true
-
-          # Also show individual container logs if they exited
-          echo "--- Individual container logs (last 200 lines) ---"
-          for cid in $(sudo docker ps -a -q); do
-            echo "--- Logs for $cid ---"
-            sudo docker logs --tail 200 $cid || true
-          done
-
-          echo "--- DOCKER PS ---"
-          sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
-
-          echo "--- DOCKER IMAGES ---"
-          sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
-
-          sudo docker image prune -f
+          sudo docker ps -a
           EOF
-
-    

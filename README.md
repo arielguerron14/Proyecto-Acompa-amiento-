@@ -28,23 +28,24 @@ docker-compose up -d
 ```
 
 ### Acceso a la Aplicación
-- **Frontend**: http://localhost:3001
-- **API Gateway**: http://localhost:3000
+- **Frontend**: http://localhost:5500
+- **API Gateway**: http://localhost:8080
 - **Auth Service**: http://localhost:5005
 
 ## 📋 Servicios
 
 | Servicio | Puerto | Descripción |
 |----------|--------|-------------|
-| **API Gateway** | 3000 | Punto de entrada único |
+| **API Gateway** | 8080 | Punto de entrada único |
 | **micro-auth** | 5005 | Autenticación y RBAC |
-| **micro-estudiantes** | 5001 | Gestión de estudiantes |
-| **micro-maestros** | 5002 | Gestión de maestros |
-| **micro-notificaciones** | 5003 | Notificaciones |
-| **micro-reportes-estudiantes** | 5004 | Reportes de estudiantes |
-| **micro-reportes-maestros** | 5006 | Reportes de maestros |
+| **micro-estudiantes** | 5002 | Gestión de estudiantes |
+| **micro-maestros** | 5001 | Gestión de maestros |
+| **micro-notificaciones** | 5006 | Notificaciones |
+| **micro-reportes-estudiantes** | 5003 | Reportes de estudiantes |
+| **micro-reportes-maestros** | 5004 | Reportes de maestros |
+| **micro-analytics** | 5007 | Analytics |
 | **micro-soap-bridge** | 5008 | Integración SOAP |
-| **Frontend Web** | 3001 | Interfaz web |
+| **Frontend Web** | 5500 | Interfaz web |
 
 ## 🏗️ Arquitectura
 

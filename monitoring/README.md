@@ -9,17 +9,22 @@
 
 ## Servicios Monitoreados
 
-Los siguientes servicios exponen métricas en `/metrics`:
-- api-gateway:3000
-- micro-auth:5000
+Los siguientes servicios exponen métricas en `/metrics` (puertos por defecto):
+- api-gateway:8080
+- micro-auth:5005
 - micro-maestros:5001
 - micro-estudiantes:5002
 - micro-reportes-estudiantes:5003
 - micro-reportes-maestros:5004
-- micro-notificaciones:5005
-- micro-analytics:5006
-- micro-soap-bridge:5007
-- message-broker:5008
+- micro-notificaciones:5006
+- micro-analytics:5007
+- micro-soap-bridge:5008
+
+Componentes de mensajería y puertos comunes:
+- Kafka broker: 9092
+- Zookeeper: 2181
+- RabbitMQ: 5672 (management 15672)
+- Kafka UI: 8081
 
 ## Dashboards
 

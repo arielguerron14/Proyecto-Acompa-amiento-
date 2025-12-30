@@ -31,10 +31,10 @@ app.get('/health', (req, res) => {
 
 // Service URLs from environment or defaults
 const auth = process.env.AUTH_SERVICE || 'http://micro-auth:5005';
-const maestros = process.env.MAESTROS_SERVICE || 'http://micro-maestros:3003';
-const estudiantes = process.env.ESTUDIANTES_SERVICE || 'http://micro-estudiantes:3002';
-const reportesEst = process.env.REPORTES_EST_SERVICE || 'http://micro-reportes-estudiantes:4003';
-const reportesMaest = process.env.REPORTES_MAEST_SERVICE || 'http://micro-reportes-maestros:4002';
+const maestros = process.env.MAESTROS_SERVICE || 'http://micro-maestros:5001';
+const estudiantes = process.env.ESTUDIANTES_SERVICE || 'http://micro-estudiantes:5002';
+const reportesEst = process.env.REPORTES_EST_SERVICE || 'http://micro-reportes-estudiantes:5003';
+const reportesMaest = process.env.REPORTES_MAEST_SERVICE || 'http://micro-reportes-maestros:5004';
 
 console.log('🔗 Configured Services:');
 console.log(`  Auth: ${auth}`);
