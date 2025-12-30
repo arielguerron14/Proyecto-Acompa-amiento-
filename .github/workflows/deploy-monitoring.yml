@@ -128,7 +128,10 @@ jobs:
               fi
               echo "--- DOCKER JOURNAL ---"
               sudo journalctl -u docker --no-pager --no-hostname -n 200 || true
-              exit 1
+
+              # Set a flag to fallback to direct docker run commands instead of docker compose
+              echo "Falling back to direct 'docker run' to start monitoring services"
+              FALLBACK_DOCKER_RUN=1
             fi
           fi
           fi
@@ -142,8 +145,12 @@ jobs:
 
           cd "$HOME/Proyecto-Acompa-amiento-/monitoring" || exit 1
 
-          # Use the detected compose command
-          sudo $COMPOSE_CMD down || true
+          # Use the detected compose command (or fallback to docker run if compose missing)
+          if [ -z "${FALLBACK_DOCKER_RUN:-}" ]; then
+            sudo $COMPOSE_CMD down || true
+          else
+            echo "Skipping compose down because fallback to docker run is enabled"
+          fi
 
           # If Dockerfiles are present in the monitoring folder, build images locally and tag them
           if [ -f "./prometheus/Dockerfile" ]; then
@@ -169,9 +176,36 @@ jobs:
             sudo docker pull arielguerron14/grafana:latest || true
           fi
 
-          echo "--- Starting monitoring stack with $COMPOSE_CMD ---"
-          sudo $COMPOSE_CMD pull || true
-          sudo $COMPOSE_CMD up -d
+          if [ -z "${FALLBACK_DOCKER_RUN:-}" ]; then
+            echo "--- Starting monitoring stack with $COMPOSE_CMD ---"
+            sudo $COMPOSE_CMD pull || true
+            sudo $COMPOSE_CMD up -d
+          else
+            echo "--- Starting monitoring stack with direct docker run fallback ---"
+            # Ensure data volume exists
+            sudo docker volume create grafana_data || true
+
+            # Stop & remove any previous containers to ensure idempotency
+            sudo docker rm -f monitoring_prometheus monitoring_grafana >/dev/null 2>&1 || true
+
+            # Start Prometheus
+            if sudo docker image inspect arielguerron14/prometheus:latest >/dev/null 2>&1; then
+              echo "Running local Prometheus image"
+            else
+              echo "Prometheus image missing locally, attempting to pull"
+              sudo docker pull arielguerron14/prometheus:latest || true
+            fi
+            sudo docker run -d --name monitoring_prometheus --restart unless-stopped -p 9090:9090 -v "$PWD"/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro arielguerron14/prometheus:latest || true
+
+            # Start Grafana
+            if sudo docker image inspect arielguerron14/grafana:latest >/dev/null 2>&1; then
+              echo "Running local Grafana image"
+            else
+              echo "Grafana image missing locally, attempting to pull"
+              sudo docker pull arielguerron14/grafana:latest || true
+            fi
+            sudo docker run -d --name monitoring_grafana --restart unless-stopped -p 3000:3000 -v grafana_data:/var/lib/grafana arielguerron14/grafana:latest || true
+          fi
 
           # Show container status and recent logs to surface failures
           echo "--- DOCKER PS AFTER UP ---"
