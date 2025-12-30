@@ -10,6 +10,8 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.set-image.outputs.image-tag }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -21,8 +23,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and Push Docker Image
+        id: set-image
         run: |
-          docker build -f micro-maestros/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest .
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          IMAGE_TAG="${SHORT_SHA}"
+          echo "Image tag will be: $IMAGE_TAG"
+          echo "::set-output name=image-tag::$IMAGE_TAG"
+          docker build -f micro-maestros/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:$IMAGE_TAG .
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:$IMAGE_TAG ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:$IMAGE_TAG
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest
 
   deploy-aws:
@@ -55,9 +64,14 @@ jobs:
 
           sudo docker stop micro-maestros-container || true
           sudo docker rm micro-maestros-container || true
-          echo "Attempting to pull image ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest"
-          if sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:latest; then
-            echo "Pulled micro-maestros image successfully"
+          IMAGE_TAG=${{ needs.build-and-push.outputs.image-tag }}
+          if [ -z "$IMAGE_TAG" ]; then IMAGE_TAG=latest; fi
+          IMAGE_REF=${{ secrets.DOCKERHUB_USERNAME }}/micro-maestros:$IMAGE_TAG
+          echo "Attempting to pull image $IMAGE_REF"
+          if sudo docker pull $IMAGE_REF; then
+            echo "Pulled micro-maestros image successfully: $IMAGE_REF"
+            echo "Verifying shared-auth exists inside image..."
+            sudo docker run --rm --entrypoint ls $IMAGE_REF /usr/src/shared-auth/src/middlewares || echo "shared-auth not present in image"
           else
             echo "Pull failed; attempting to build image locally on the EC2 host"
             if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
