@@ -49,7 +49,9 @@ jobs:
           sudo docker rm frontend-web-container || true
           sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
           sudo docker run -d --restart unless-stopped -p 80:80 --name frontend-web-container ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
-          sudo docker image prune -f
+          for i in 1 2 3 4 5; do
+            if sudo docker image prune -f; then break; else echo "docker prune busy, retrying ($i)"; sleep 2; fi
+          done || true
           EOF
 
       

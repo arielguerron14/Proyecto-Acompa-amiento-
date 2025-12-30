@@ -56,7 +56,9 @@ jobs:
           sudo docker rm micro-soap-bridge-container || true
           sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest
           sudo docker run -d -p 5008:5008 --restart unless-stopped --name micro-soap-bridge-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest
-          sudo docker image prune -f
+          for i in 1 2 3 4 5; do
+            if sudo docker image prune -f; then break; else echo "docker prune busy, retrying ($i)"; sleep 2; fi
+          done || true
           EOF
 
           echo "--- DOCKER IMAGES ---"

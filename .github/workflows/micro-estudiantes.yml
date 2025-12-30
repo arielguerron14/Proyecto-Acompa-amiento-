@@ -101,6 +101,9 @@ jobs:
           sleep 2
           echo "Container status:"; sudo docker ps -a --filter "name=micro-estudiantes-container" || true
           echo "Recent logs (micro-estudiantes):"; sudo docker logs --tail 200 micro-estudiantes-container || true
-          sudo docker image prune -f
+          # retry prune if another prune is running (avoid race)
+          for i in 1 2 3 4 5; do
+            if sudo docker image prune -f; then break; else echo "docker prune busy, retrying ($i)"; sleep 2; fi
+          done || true
           EOF
 
