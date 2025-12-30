@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
     paths:
       - "micro-analytics/**"
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -55,4 +56,3 @@ jobs:
           sudo docker run -d -p 3010:3010 --name micro-analytics-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-analytics:latest
           sudo docker image prune -f
           EOF
-# registered by Copilot 2025-12-27T02:28:09.4550941-05:00

@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
     paths:
       - "micro-soap-bridge/**"
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -21,7 +22,8 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -f micro-soap-bridge/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest .
+          # Use repository root as build context so shared modules are available
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest -f micro-soap-bridge/Dockerfile micro-soap-bridge/
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest
 
   deploy-aws:
@@ -36,12 +38,12 @@ jobs:
       - name: Deploy to EC2
         run: |
           # fail early if host secret is missing to avoid ambiguous ssh errors
-          if [ -z "${{ secrets.EC2_BRIDGE_HOST }}" ]; then
-            echo "ERROR: secret EC2_BRIDGE_HOST is not set. Set the correct host secret in repository settings.";
+          if [ -z "${{ secrets.EC2_NOTIFICACIONES_HOST }}" ]; then
+            echo "ERROR: secret EC2_NOTIFICACIONES_HOST is not set. Set the correct host secret in repository settings.";
             exit 1;
           fi
 
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_BRIDGE_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} << 'EOF'
           sudo apt update -y
           if ! command -v docker &> /dev/null
           then
@@ -53,9 +55,20 @@ jobs:
           sudo docker stop micro-soap-bridge-container || true
           sudo docker rm micro-soap-bridge-container || true
           sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest
-          sudo docker run -d -p 3007:3007 --name micro-soap-bridge-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest
+          sudo docker run -d -p 5008:5008 --restart unless-stopped --name micro-soap-bridge-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-soap-bridge:latest
           sudo docker image prune -f
           EOF
 
           echo "--- DOCKER IMAGES ---"
           sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+
+      - name: Trigger Smoke Tests
+        if: always()
+        run: |
+          echo "Triggering smoke-tests workflow"
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/smoke-tests.yml/dispatches \
+            -d '{"ref":"main"}' || echo "Failed to trigger smoke-tests"
+

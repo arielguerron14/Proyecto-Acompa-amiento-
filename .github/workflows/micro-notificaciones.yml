@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
     paths:
       - "micro-notificaciones/**"
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -62,3 +63,5 @@ jobs:
 
           echo "--- DOCKER IMAGES ---"
           sudo docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' || true
+
+    

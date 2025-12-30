@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
     paths:
       - "messaging/**"
+  workflow_dispatch:
 
 jobs:
   deploy-aws:
@@ -53,3 +54,4 @@ jobs:
           sudo docker image prune -f
           EOF
 
+    

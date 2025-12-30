@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
     paths:
       - "micro-reportes-estudiantes/**"
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -55,3 +56,4 @@ jobs:
           sudo docker run -d -p 4003:4003 --name micro-reportes-estudiantes-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-reportes-estudiantes:latest
           sudo docker image prune -f
           EOF
+

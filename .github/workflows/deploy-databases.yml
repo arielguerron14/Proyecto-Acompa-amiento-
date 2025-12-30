@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
     paths:
       - "databases/**"
+  workflow_dispatch:
 
 jobs:
   deploy-aws:
@@ -55,3 +56,5 @@ jobs:
 
           sudo docker image prune -f
           EOF
+
+   

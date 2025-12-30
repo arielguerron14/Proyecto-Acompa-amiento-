@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
     paths:
       - "frontend-web/**"
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -50,3 +51,5 @@ jobs:
           sudo docker run -d -p 80:80 --name frontend-web-container ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
           sudo docker image prune -f
           EOF
+
+      
