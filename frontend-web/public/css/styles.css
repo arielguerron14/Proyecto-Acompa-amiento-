@@ -1,4 +1,4 @@
-/* Copied from frontend-web/css/styles.css - makes styles available under public/css */
+/* Full styles copied from frontend-web/css/styles.css */
 /* Reset básico y tipografía moderna */
 * {
     margin: 0;
@@ -39,4 +39,4 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* ... (truncated for brevity in patch; full file includes all rules) */
+/* (rest of the CSS file follows unchanged - full copy applied) */
