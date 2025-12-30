@@ -50,10 +50,28 @@ jobs:
             sudo systemctl enable docker
           fi
 
+          echo "Logging in to Docker Hub (for private image pulls)"
+          sudo docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} || echo "docker login failed (proceeding, pull may fail)"
+
           sudo docker stop micro-auth-container || true
           sudo docker rm micro-auth-container || true
-          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:latest
-          sudo docker run -d -p 3001:3001 --name micro-auth-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:latest
+          echo "Attempting to pull image ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:latest"
+          if sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:latest; then
+            echo "Pulled micro-auth image successfully"
+          else
+            echo "Pull failed; attempting to build image locally on the EC2 host"
+            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
+            else
+              git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+            fi
+            sudo docker build -f "$HOME/Proyecto-Acompa-amiento-/micro-auth/Dockerfile" -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:latest "$HOME/Proyecto-Acompa-amiento-" || true
+          fi
+
+          sudo docker run -d -p 3001:3001 --name micro-auth-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-auth:latest || true
+          sleep 2
+          echo "Container status:"; sudo docker ps -a --filter "name=micro-auth-container" || true
+          echo "Recent logs (micro-auth):"; sudo docker logs --tail 200 micro-auth-container || true
           sudo docker image prune -f
           EOF
 

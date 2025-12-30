@@ -50,10 +50,28 @@ jobs:
             sudo systemctl enable docker
           fi
 
+          echo "Logging in to Docker Hub (for private image pulls)"
+          sudo docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} || echo "docker login failed (proceeding, pull may fail)"
+
           sudo docker stop micro-estudiantes-container || true
           sudo docker rm micro-estudiantes-container || true
-          sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest
-          sudo docker run -d -p 3002:3002 --name micro-estudiantes-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest
+          echo "Attempting to pull image ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest"
+          if sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest; then
+            echo "Pulled micro-estudiantes image successfully"
+          else
+            echo "Pull failed; attempting to build image locally on the EC2 host"
+            if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
+              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
+            else
+              git -C "$HOME/Proyecto-Acompa-amiento-" pull || true
+            fi
+            sudo docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest "$HOME/Proyecto-Acompa-amiento-/micro-estudiantes" || true
+          fi
+
+          sudo docker run -d -p 3002:3002 --name micro-estudiantes-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-estudiantes:latest || true
+          sleep 2
+          echo "Container status:"; sudo docker ps -a --filter "name=micro-estudiantes-container" || true
+          echo "Recent logs (micro-estudiantes):"; sudo docker logs --tail 200 micro-estudiantes-container || true
           sudo docker image prune -f
           EOF
 
