@@ -48,7 +48,7 @@ jobs:
           sudo docker stop frontend-web-container || true
           sudo docker rm frontend-web-container || true
           sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
-          sudo docker run -d -p 80:80 --name frontend-web-container ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
+          sudo docker run -d --restart unless-stopped -p 80:80 --name frontend-web-container ${{ secrets.DOCKERHUB_USERNAME }}/frontend-web:latest
           sudo docker image prune -f
           EOF
 

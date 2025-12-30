@@ -95,7 +95,7 @@ jobs:
           fi
 
           echo "Running container from image: $RUN_IMAGE"
-          sudo docker run -d -p 3003:3003 --name micro-maestros-container "$RUN_IMAGE" || true
+          sudo docker run -d --restart unless-stopped -p 3003:3003 --name micro-maestros-container "$RUN_IMAGE" || true
           sleep 2
           echo "Container status:"; sudo docker ps -a --filter "name=micro-maestros-container" || true
           echo "Recent logs (micro-maestros):"; sudo docker logs --tail 200 micro-maestros-container || true

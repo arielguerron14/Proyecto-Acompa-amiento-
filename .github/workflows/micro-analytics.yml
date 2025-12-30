@@ -53,6 +53,6 @@ jobs:
           sudo docker stop micro-analytics-container || true
           sudo docker rm micro-analytics-container || true
           sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/micro-analytics:latest
-          sudo docker run -d -p 3010:3010 --name micro-analytics-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-analytics:latest
+          sudo docker run -d --restart unless-stopped -p 3010:3010 --name micro-analytics-container ${{ secrets.DOCKERHUB_USERNAME }}/micro-analytics:latest
           sudo docker image prune -f
           EOF
