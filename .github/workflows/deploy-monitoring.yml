@@ -50,8 +50,10 @@ jobs:
           cd Proyecto-Acompa-amiento-/monitoring
 
           sudo docker-compose down || true
-          sudo docker-compose pull
-          sudo docker-compose up -d
+          echo "Building monitoring images (if necessary)"
+          sudo docker-compose build --pull || true
+          echo "Starting monitoring stack"
+          sudo docker-compose up -d || true
 
           sudo docker ps -a
           EOF

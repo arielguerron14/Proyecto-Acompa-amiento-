@@ -1,7 +1,6 @@
-version: "3.8"
-
 services:
   prometheus:
+    build: ./prometheus
     image: arielguerron14/prometheus:latest
     ports:
       - "9090:9090"
@@ -9,6 +8,7 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 
   grafana:
+    build: ./grafana
     image: arielguerron14/grafana:latest
     ports:
       - "3000:3000"
