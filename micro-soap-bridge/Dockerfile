@@ -1,16 +1,15 @@
 FROM node:18-alpine
 
-WORKDIR /usr/src
+WORKDIR /
 
-# copy shared modules and helpers from repo root into /usr
-# so relative requires like '../../../shared-auth' resolve correctly
-COPY shared-auth ./shared-auth
-WORKDIR /usr/src/shared-auth
+# Copy shared modules into the absolute path expected by the code (/usr/shared-auth)
+# Some source files require('/usr/shared-auth/...') so we place shared-auth there.
+COPY shared-auth/ /usr/shared-auth/
+WORKDIR /usr/shared-auth
 RUN npm ci --only=production --silent || npm install --production --silent
 
-WORKDIR /usr/src
-
-COPY . /usr/src/app
+# Copy app sources into /usr/src/app and install
+COPY micro-soap-bridge/ /usr/src/app/
 WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent
 
