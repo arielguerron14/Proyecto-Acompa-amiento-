@@ -32,6 +32,23 @@ jobs:
             sudo systemctl enable docker
           fi
 
+          # Ensure docker-compose (or docker compose) is available
+          if command -v docker-compose &> /dev/null; then
+            COMPOSE_CMD="docker-compose"
+          elif docker compose version &> /dev/null; then
+            COMPOSE_CMD="docker compose"
+          else
+            echo "docker compose not found, attempting to install docker-compose-plugin"
+            sudo apt-get update -y
+            sudo apt-get install -y docker-compose-plugin || true
+            if docker compose version &> /dev/null; then
+              COMPOSE_CMD="docker compose"
+            else
+              echo "ERROR: docker compose is not available after install attempts"
+              exit 1
+            fi
+          fi
+
           # Clone or update repo
           if [ ! -d "$HOME/Proyecto-Acompa-amiento-" ]; then
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git "$HOME/Proyecto-Acompa-amiento-"
@@ -41,9 +58,34 @@ jobs:
 
           cd "$HOME/Proyecto-Acompa-amiento-/monitoring" || exit 1
 
-          sudo docker-compose down || true
-          sudo docker-compose pull || true
-          sudo docker-compose up -d || true
+          # Use the detected compose command
+          sudo $COMPOSE_CMD down || true
+
+          # Pre-pull images explicitly (make failures visible in Action logs)
+          echo "--- Pulling monitoring images ---"
+          sudo docker pull arielguerron14/prometheus:latest || true
+          sudo docker pull arielguerron14/grafana:latest || true
+
+          echo "--- Starting monitoring stack with $COMPOSE_CMD ---"
+          sudo $COMPOSE_CMD pull || true
+          sudo $COMPOSE_CMD up -d
+
+          # Show container status and recent logs to surface failures
+          echo "--- DOCKER PS AFTER UP ---"
+          sudo docker ps -a --format 'table {{.ID}}	{{.Image}}	{{.Status}}	{{.Ports}}	{{.Names}}' || true
+
+          echo "--- COMPOSE PS ---"
+          sudo $COMPOSE_CMD ps || true
+
+          echo "--- LAST 200 LOG LINES (compose) ---"
+          sudo $COMPOSE_CMD logs --no-color --tail=200 || true
+
+          # Also show individual container logs if they exited
+          echo "--- Individual container logs (last 200 lines) ---"
+          for cid in $(sudo docker ps -a -q); do
+            echo "--- Logs for $cid ---"
+            sudo docker logs --tail 200 $cid || true
+          done
 
           echo "--- DOCKER PS ---"
           sudo docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}' || true
