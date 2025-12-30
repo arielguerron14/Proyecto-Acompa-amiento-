@@ -1,20 +1,19 @@
 FROM node:18-alpine
 
+WORKDIR /usr/src
+
+# Copy shared modules and app
+COPY shared-auth ./shared-auth
+COPY micro-estudiantes /usr/src/app
+
+# install dependencies for shared-auth first
+WORKDIR /usr/src/shared-auth
+RUN npm ci --only=production --silent || npm install --production --silent
+
 WORKDIR /usr/src/app
-
-# Copy package manifests
-COPY package*.json ./
-
-# Install production dependencies
-RUN npm install --production
-
-COPY . .
-
-# install dependencies (production)
-RUN npm install --production
+RUN npm ci --only=production --silent || npm install --production --silent
 
 ENV NODE_ENV=production
 ENV PORT=5002
 EXPOSE 5002
-
 CMD ["node", "src/app.js"]
