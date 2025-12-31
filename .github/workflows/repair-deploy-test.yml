@@ -1,0 +1,24 @@
+name: Repair deploy (test)
+
+on:
+  push:
+    branches:
+      - run-repair
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.MONGO_URI }}" ]; then
+            echo "ERROR: Required secret MONGO_URI is not set.";
+            exit 1
+          fi
+          echo "MONGO_URI set"
+
+      - name: Simulate repair actions
+        run: |
+          echo "Simulating repair actions for all hosts"
+          echo "Would SSH to hosts and run fix-deploy.sh here"
+          echo "Simulation complete"

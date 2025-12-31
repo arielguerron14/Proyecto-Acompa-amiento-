@@ -1,0 +1,24 @@
+name: CI Test for run-repair
+
+on:
+  push:
+    branches:
+      - run-repair
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print environment
+        run: |
+          echo "Running smoke test for run-repair branch"
+          echo "Branch: $GITHUB_REF"
+      - name: Check MONGO_URI secret
+        run: |
+          if [ -z "${{ secrets.MONGO_URI }}" ]; then
+            echo "MONGO_URI missing"; exit 1
+          else
+            echo "MONGO_URI present"
+          fi
+      - name: Done
+        run: echo "smoke ok"
