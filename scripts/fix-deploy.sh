@@ -12,6 +12,8 @@ set -euo pipefail
 RETRY_ATTEMPTS=${RETRY_ATTEMPTS:-12}
 RETRY_SLEEP=${RETRY_SLEEP:-5}
 
+LOG_TAIL=${LOG_TAIL:-2000}
+
 services=(
   "micro-auth-container"
   "micro-estudiantes-container"
