@@ -7,6 +7,9 @@ on:
         description: 'Target group: core|frontend|reportes|notificaciones|all'
         required: false
         default: 'all'
+  push:
+    branches:
+      - 'run-repair'
 
 jobs:
   repair:
@@ -57,7 +60,25 @@ jobs:
             echo "EC2_REPORTES_HOST not set; skipping"; exit 0
           fi
           echo "Running fix script on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-reportes.log
+          echo "Writing env files on reportes host from secrets"
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} << 'EOF'
+cat > "$HOME/micro-analytics.env" <<ENV
+MONGO_URI='${{ secrets.MONGO_URI }}'
+REDIS_HOST='${{ secrets.REDIS_HOST }}'
+REDIS_PORT='${{ secrets.REDIS_PORT }}'
+REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
+ENV
+
+cat > "$HOME/micro-reportes-estudiantes.env" <<ENV
+MONGO_URI='${{ secrets.MONGO_URI }}'
+ENV
+
+cat > "$HOME/micro-reportes-maestros.env" <<ENV
+MONGO_URI='${{ secrets.MONGO_URI }}'
+ENV
+
+bash -s < scripts/fix-deploy.sh
+EOF | tee repair-reportes.log
       - name: Upload reportes repair logs
         if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
         uses: actions/upload-artifact@v4
@@ -72,7 +93,17 @@ jobs:
             echo "EC2_NOTIFICACIONES_HOST not set; skipping"; exit 0
           fi
           echo "Running fix script on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-notificaciones.log
+          echo "Writing env file on notificaciones host from secrets"
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} << 'EOF'
+cat > "$HOME/micro-notificaciones.env" <<ENV
+MONGO_URI='${{ secrets.MONGO_URI }}'
+REDIS_HOST='${{ secrets.REDIS_HOST }}'
+REDIS_PORT='${{ secrets.REDIS_PORT }}'
+REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
+ENV
+
+bash -s < scripts/fix-deploy.sh
+EOF | tee repair-notificaciones.log
       - name: Upload notificaciones repair logs
         if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
         uses: actions/upload-artifact@v4
