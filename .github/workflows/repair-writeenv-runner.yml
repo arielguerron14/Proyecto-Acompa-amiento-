@@ -51,3 +51,61 @@ jobs:
             echo "--- DECODED-HEX ---"
             echo '$MONGO_B64' | base64 -d | od -An -t x1 -v || true
           EOF | sed 's/^/REMOTE-DECODE-NOTIF: /' | tee remote-decode-notif.log >> repair-notificaciones.log || true
+
+      - name: Write envs on reportes host (safe)
+        run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "reportes" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping write on reportes host (TARGET=$TARGET)"; exit 0
+          fi
+          echo "Preparing sanitized env write to reportes host ${{ secrets.EC2_REPORTES_HOST }}"
+          MONGO_B64=$(printf '%s' "${{ secrets.MONGO_URI }}" | base64 -w0)
+          REDIS_HOST_B64=$(printf '%s' "${{ secrets.REDIS_HOST }}" | base64 -w0)
+          REDIS_PORT_B64=$(printf '%s' "${{ secrets.REDIS_PORT }}" | base64 -w0)
+          REDIS_PW_B64=$(printf '%s' "${{ secrets.REDIS_PASSWORD }}" | base64 -w0)
+
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} <<'EOF'
+  set -euo pipefail
+  # decode, remove CR/LF and literal backslash-n, then write via printf to ensure single-line values
+  MONGO_RAW=$(echo '$MONGO_B64' | base64 -d)
+  MONGO_CLEAN=$(printf '%s' "$MONGO_RAW" | tr -d '\r\n' | sed 's/\\n//g')
+  REDIS_HOST=$(echo '$REDIS_HOST_B64' | base64 -d | tr -d '\r\n')
+  REDIS_PORT=$(echo '$REDIS_PORT_B64' | base64 -d | tr -d '\r\n')
+  REDIS_PASSWORD=$(echo '$REDIS_PW_B64' | base64 -d | tr -d '\r\n')
+
+  printf "MONGO_URI='%s'\nREDIS_HOST='%s'\nREDIS_PORT='%s'\nREDIS_PASSWORD='%s'\n" "$MONGO_CLEAN" "$REDIS_HOST" "$REDIS_PORT" "$REDIS_PASSWORD" > "$HOME/micro-analytics.env"
+
+  # verify
+  echo "--- _written_ micro-analytics.env ---"
+  sed -n '1,100p' "$HOME/micro-analytics.env"
+  echo "--- micro-analytics.env MONGO_URI (hex bytes) ---"
+  perl -0777 -ne "if (/MONGO_URI='(.*?)'/s){ print \$1 }" "$HOME/micro-analytics.env" | od -An -t x1 -v || true
+EOF | sed 's/^/REPORTES-WRITE: /' | tee repair-reportes-write.log >> repair-reportes.log || true
+
+      - name: Write envs on notificaciones host (safe)
+        run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "notificaciones" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping write on notificaciones host (TARGET=$TARGET)"; exit 0
+          fi
+          echo "Preparing sanitized env write to notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
+          MONGO_B64=$(printf '%s' "${{ secrets.MONGO_URI }}" | base64 -w0)
+          REDIS_HOST_B64=$(printf '%s' "${{ secrets.REDIS_HOST }}" | base64 -w0)
+          REDIS_PORT_B64=$(printf '%s' "${{ secrets.REDIS_PORT }}" | base64 -w0)
+          REDIS_PW_B64=$(printf '%s' "${{ secrets.REDIS_PASSWORD }}" | base64 -w0)
+
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} <<'EOF'
+  set -euo pipefail
+  MONGO_RAW=$(echo '$MONGO_B64' | base64 -d)
+  MONGO_CLEAN=$(printf '%s' "$MONGO_RAW" | tr -d '\r\n' | sed 's/\\n//g')
+  REDIS_HOST=$(echo '$REDIS_HOST_B64' | base64 -d | tr -d '\r\n')
+  REDIS_PORT=$(echo '$REDIS_PORT_B64' | base64 -d | tr -d '\r\n')
+  REDIS_PASSWORD=$(echo '$REDIS_PW_B64' | base64 -d | tr -d '\r\n')
+
+  printf "MONGO_URI='%s'\nREDIS_HOST='%s'\nREDIS_PORT='%s'\nREDIS_PASSWORD='%s'\n" "$MONGO_CLEAN" "$REDIS_HOST" "$REDIS_PORT" "$REDIS_PASSWORD" > "$HOME/micro-notificaciones.env"
+
+  echo "--- _written_ micro-notificaciones.env ---"
+  sed -n '1,100p' "$HOME/micro-notificaciones.env"
+  echo "--- micro-notificaciones.env MONGO_URI (hex bytes) ---"
+  perl -0777 -ne "if (/MONGO_URI='(.*?)'/s){ print \$1 }" "$HOME/micro-notificaciones.env" | od -An -t x1 -v || true
+EOF | sed 's/^/NOTIF-WRITE: /' | tee repair-notificaciones-write.log >> repair-notificaciones.log || true

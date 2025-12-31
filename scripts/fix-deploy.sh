@@ -44,9 +44,19 @@ function inspect_container() {
   if [ -f "$ENV_FILE" ]; then
     echo "-- $ENV_FILE --"
     sed -n '1,200p' "$ENV_FILE" || true
-    # Emit raw and hex views of MONGO_URI for debug (if present)
-    awk -F= '/^MONGO_URI/ {print $2}' "$ENV_FILE" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
-    awk -F= '/^MONGO_URI/ {print $2}' "$ENV_FILE" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+    # Emit raw and hex views of MONGO_URI for debug (if present) and detect embedded newlines
+    if perl -0777 -ne "if (/MONGO_URI='(.*?)'/s){ print \$1 }" "$ENV_FILE" > /tmp/.mongo_val.$$ 2>/dev/null; then
+      echo "  MONGO_URI (visible):"
+      sed -n '1,5p' /tmp/.mongo_val.$$ | sed -n 'l;p' || true
+      echo "  MONGO_URI (hex bytes):"
+      od -An -t x1 -v /tmp/.mongo_val.$$ || true
+      if od -An -t x1 -v /tmp/.mongo_val.$$ | grep -q '0a'; then
+        echo "  [WARNING] MONGO_URI contains LF (0x0a) bytes — this will break single-line env files"
+      fi
+      rm -f /tmp/.mongo_val.$$ || true
+    else
+      echo "  (MONGO_URI not found in $ENV_FILE)"
+    fi
   else
     echo "  (no env file at $ENV_FILE)"
   fi
@@ -111,7 +121,17 @@ function try_recreate() {
 
   echo "  Running container $name from $IMAGE"
   if [ -f "$ENV_FILE" ]; then
-    sudo docker run -d --restart unless-stopped --env-file "$ENV_FILE" $PORT_ARG --name "$name" "$IMAGE" || { echo "  Failed to run $name"; return 1; }
+    # Make a defensive sanitized copy of env file removing embedded newlines inside single-quoted values
+    SANITIZED_ENV="$ENV_FILE.sanitized"
+    perl -0777 -pe "s/(^MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egms" "$ENV_FILE" > "$SANITIZED_ENV" || cp "$ENV_FILE" "$SANITIZED_ENV"
+    # If sanitization changed the file, warn and use the sanitized copy
+    if ! cmp -s "$ENV_FILE" "$SANITIZED_ENV" 2>/dev/null; then
+      echo "  [NOTICE] Env file contained embedded newlines; using sanitized copy $SANITIZED_ENV"
+      ENV_TO_USE="$SANITIZED_ENV"
+    else
+      ENV_TO_USE="$ENV_FILE"
+    fi
+    sudo docker run -d --restart unless-stopped --env-file "$ENV_TO_USE" $PORT_ARG --name "$name" "$IMAGE" || { echo "  Failed to run $name"; return 1; }
   else
     sudo docker run -d --restart unless-stopped $PORT_ARG --name "$name" "$IMAGE" || { echo "  Failed to run $name"; return 1; }
   fi
