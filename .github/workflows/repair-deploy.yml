@@ -113,6 +113,13 @@ ENV
 
             bash -s < scripts/fix-deploy.sh
           EOF | tee repair-reportes.log
+      - name: Extract reportes env debug from main log
+        if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
+        run: |
+          # Pull DEBUG blocks out into a dedicated file for easier upload/inspection
+          grep -n "^--- DEBUG" -A5 repair-reportes.log > repair-reportes-env-debug.log || true
+          echo "--- repair-reportes-env-debug.log contents ---"
+          sed -n '1,200p' repair-reportes-env-debug.log || true
       - name: Sanitize reportes envs (post-write)
         run: |
           # Sanitize MONGO_URI in case embedded newlines persisted
@@ -123,6 +130,12 @@ ENV
         with:
           name: repair-reportes-log
           path: repair-reportes.log
+      - name: Upload reportes env-debug artifact
+        if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-reportes-env-debug
+          path: repair-reportes-env-debug.log
 
       - name: Repair Notificaciones Host
         if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
@@ -156,6 +169,12 @@ ENV
 
             bash -s < scripts/fix-deploy.sh
           EOF | tee repair-notificaciones.log
+      - name: Extract notificaciones env debug from main log
+        if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
+        run: |
+          grep -n "^--- DEBUG" -A5 repair-notificaciones.log > repair-notificaciones-env-debug.log || true
+          echo "--- repair-notificaciones-env-debug.log contents ---"
+          sed -n '1,200p' repair-notificaciones-env-debug.log || true
       - name: Sanitize notificaciones env (post-write)
         run: |
           # Sanitize MONGO_URI on notificaciones host as well
@@ -166,6 +185,12 @@ ENV
         with:
           name: repair-notificaciones-log
           path: repair-notificaciones.log
+      - name: Upload notificaciones env-debug artifact
+        if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-notificaciones-env-debug
+          path: repair-notificaciones-env-debug.log
 
       - name: Done
         run: echo "Repair job completed. Check step logs for per-host outputs."

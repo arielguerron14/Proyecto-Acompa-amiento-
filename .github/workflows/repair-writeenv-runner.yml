@@ -69,7 +69,8 @@ EOF
         run: |
           echo "Collecting byte-level debug of MONGO_URI on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
           # Run hexdump on the host and also emit the readable "visible" form so we can tell if there are literal backslash-n
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} <<'EOF' 2>/dev/null
+          # NOTE: do NOT suppress stderr here so any SSH/hexdump failures are visible in the workflow run log.
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} <<'EOF'
             echo "--- micro-analytics.env MONGO_URI (raw) ---"
             awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
             echo "--- micro-analytics.env MONGO_URI (hex bytes) ---"
@@ -85,6 +86,12 @@ EOF
             echo "--- micro-reportes-maestros.env MONGO_URI (hex bytes) ---"
             awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-maestros.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
           EOF | sed 's/^/REPORTES-ENV: /' | tee repair-reportes-env-debug.log >> repair-reportes.log || true
+
+      - name: Show env-debug file (for easier access in Actions UI)
+        if: ${{ github.event.inputs.target == 'reportes' || github.event.inputs.target == 'all' }}
+        run: |
+          echo "--- repair-reportes-env-debug.log contents ---"
+          if [ -f repair-reportes-env-debug.log ]; then sed -n '1,400p' repair-reportes-env-debug.log; else echo "(missing)"; fi
 
       - name: Write env on notificaciones host
         if: ${{ github.event.inputs.target == 'notificaciones' || github.event.inputs.target == 'all' }}
@@ -137,3 +144,9 @@ EOF
         with:
           name: repair-writeenv-logs
           path: repair-*.log
+
+      - name: Upload env-debug artifacts (if any)
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-env-debug
+          path: repair-*-env-debug.log
