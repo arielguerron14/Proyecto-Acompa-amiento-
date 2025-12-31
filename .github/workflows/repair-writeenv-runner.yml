@@ -9,6 +9,14 @@ on:
         default: 'all'
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate runner (smoke)
+        run: |
+          echo "SMOKE: repair-writeenv-runner validation step"
+          echo "This job ensures the workflow can start and run simple steps."
+
   write-env-and-repair:
     runs-on: ubuntu-latest
     steps:
