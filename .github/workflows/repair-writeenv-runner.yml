@@ -58,6 +58,10 @@ jobs:
   ENV
 
   echo "Env files written on reportes host"
+  # Ensure no embedded newlines remain inside quoted values (defensive)
+  perl -0777 -pe "s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs" -i "$HOME/micro-analytics.env"
+  perl -0777 -pe "s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs" -i "$HOME/micro-reportes-estudiantes.env"
+  perl -0777 -pe "s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs" -i "$HOME/micro-reportes-maestros.env"
 EOF
 
       - name: Write env on notificaciones host

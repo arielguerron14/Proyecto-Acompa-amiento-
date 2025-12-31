@@ -98,6 +98,8 @@ ENV
 
 bash -s < scripts/fix-deploy.sh
 EOF | tee repair-reportes.log
+          # Sanitize MONGO_URI in case embedded newlines persisted
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} "perl -0777 -pe \"s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs\" -i \"$HOME/micro-analytics.env\" \"$HOME/micro-reportes-estudiantes.env\" \"$HOME/micro-reportes-maestros.env\" || true"
         - name: Upload reportes repair logs
           if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
           uses: actions/upload-artifact@v4
@@ -133,6 +135,8 @@ ENV
 
 bash -s < scripts/fix-deploy.sh
 EOF | tee repair-notificaciones.log
+          # Sanitize MONGO_URI on notificaciones host as well
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} "perl -0777 -pe \"s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs\" -i \"$HOME/micro-notificaciones.env\" || true"
         - name: Upload notificaciones repair logs
           if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
           uses: actions/upload-artifact@v4
