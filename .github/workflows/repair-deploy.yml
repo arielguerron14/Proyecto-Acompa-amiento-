@@ -1,0 +1,60 @@
+name: Repair deploy (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target group: core|frontend|reportes|notificaciones|all'
+        required: false
+        default: 'all'
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Repair Core Host
+        if: ${{ inputs.target == 'core' || inputs.target == 'all' }}
+        run: |
+          if [ -z "${{ secrets.EC2_CORE_HOST }}" ]; then
+            echo "EC2_CORE_HOST not set; skipping"; exit 0
+          fi
+          echo "Running fix script on core host ${{ secrets.EC2_CORE_HOST }}"
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_CORE_HOST }} 'bash -s' < scripts/fix-deploy.sh
+
+      - name: Repair Frontend Host
+        if: ${{ inputs.target == 'frontend' || inputs.target == 'all' }}
+        run: |
+          if [ -z "${{ secrets.EC2_FRONTEND_HOST }}" ]; then
+            echo "EC2_FRONTEND_HOST not set; skipping"; exit 0
+          fi
+          echo "Running fix script on frontend host ${{ secrets.EC2_FRONTEND_HOST }}"
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FRONTEND_HOST }} 'bash -s' < scripts/fix-deploy.sh
+
+      - name: Repair Reportes Host
+        if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
+        run: |
+          if [ -z "${{ secrets.EC2_REPORTES_HOST }}" ]; then
+            echo "EC2_REPORTES_HOST not set; skipping"; exit 0
+          fi
+          echo "Running fix script on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} 'bash -s' < scripts/fix-deploy.sh
+
+      - name: Repair Notificaciones Host
+        if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
+        run: |
+          if [ -z "${{ secrets.EC2_NOTIFICACIONES_HOST }}" ]; then
+            echo "EC2_NOTIFICACIONES_HOST not set; skipping"; exit 0
+          fi
+          echo "Running fix script on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} 'bash -s' < scripts/fix-deploy.sh
+
+      - name: Done
+        run: echo "Repair job completed. Check step logs for per-host outputs."
