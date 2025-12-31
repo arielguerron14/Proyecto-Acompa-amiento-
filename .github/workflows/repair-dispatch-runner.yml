@@ -1,0 +1,57 @@
+name: Repair dispatch runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target group: core|frontend|reportes|notificaciones|all'
+        required: false
+        default: 'all'
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.MONGO_URI }}" ]; then
+            echo "ERROR: Required secret MONGO_URI is not set. Add it to repository secrets before running.";
+            exit 1
+          fi
+          echo "MONGO_URI is set. Proceeding..."
+
+      - name: Repair hosts (core/frontend/reportes/notificaciones)
+        run: |
+          set -e
+          TARGET=${{ github.event.inputs.target || 'all' }}
+
+          run_fix() {
+            HOST=$1
+            NAME=$2
+            if [ -z "$HOST" ]; then
+              echo "$NAME host not set; skipping"; return
+            fi
+            echo "Running fix script on $NAME host $HOST"
+            cat scripts/fix-deploy.sh | ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@$HOST 'bash -s' | tee repair-$NAME.log
+            echo "Uploading repair-$NAME.log"
+            ls -l repair-$NAME.log || true
+          }
+
+          if [ "$TARGET" = "core" ] || [ "$TARGET" = "all" ]; then run_fix "${{ secrets.EC2_CORE_HOST }}" core; fi
+          if [ "$TARGET" = "frontend" ] || [ "$TARGET" = "all" ]; then run_fix "${{ secrets.EC2_FRONTEND_HOST }}" frontend; fi
+          if [ "$TARGET" = "reportes" ] || [ "$TARGET" = "all" ]; then run_fix "${{ secrets.EC2_REPORTES_HOST }}" reportes; fi
+          if [ "$TARGET" = "notificaciones" ] || [ "$TARGET" = "all" ]; then run_fix "${{ secrets.EC2_NOTIFICACIONES_HOST }}" notificaciones; fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-logs
+          path: repair-*.log
