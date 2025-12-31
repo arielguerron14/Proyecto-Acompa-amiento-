@@ -44,6 +44,9 @@ function inspect_container() {
   if [ -f "$ENV_FILE" ]; then
     echo "-- $ENV_FILE --"
     sed -n '1,200p' "$ENV_FILE" || true
+    # Emit raw and hex views of MONGO_URI for debug (if present)
+    awk -F= '/^MONGO_URI/ {print $2}' "$ENV_FILE" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+    awk -F= '/^MONGO_URI/ {print $2}' "$ENV_FILE" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
   else
     echo "  (no env file at $ENV_FILE)"
   fi
