@@ -43,6 +43,21 @@ jobs:
             echo '$MONGO_B64' | base64 -d | od -An -t x1 -v || true
           EOF | sed 's/^/REMOTE-DECODE-REPORTES: /' | tee remote-decode-reportes.log >> repair-reportes.log || true
 
+      - name: Test sanitized decode on reportes host (tr -d '\r\n')
+        run: |
+          echo "Testing sanitized base64 decode of MONGO_URI on remote host (tr -d '\r\\n')"
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} <<'EOF' || echo "REMOTE-REPORTES: ssh failed"
+            echo '$MONGO_B64' > /tmp/mongo.b64 || true
+            base64 -d /tmp/mongo.b64 | tr -d '\r\n' > /tmp/mongo.dec || true
+            echo "--- SANITIZED-DECODED-HEX ---"
+            od -An -t x1 -v /tmp/mongo.dec || true
+            if od -An -t x1 -v /tmp/mongo.dec | grep -qw '0a'; then
+              echo "ERROR: sanitized decoded contains LF"; exit 2
+            fi
+          EOF | sed 's/^/REMOTE-SANITIZED-DECODE-REPORTES: /' | tee remote-decode-reportes-sanitized.log >> repair-reportes.log || true
+
       - name: Test decode on notificaciones host (base64 decode, show raw + hex)
         run: |
           echo "Testing base64 decode of MONGO_URI on notificaciones host (no write)"
@@ -54,6 +69,21 @@ jobs:
             echo "--- DECODED-HEX ---"
             echo '$MONGO_B64' | base64 -d | od -An -t x1 -v || true
           EOF | sed 's/^/REMOTE-DECODE-NOTIF: /' | tee remote-decode-notif.log >> repair-notificaciones.log || true
+
+      - name: Test sanitized decode on notificaciones host (tr -d '\r\n')
+        run: |
+          echo "Testing sanitized base64 decode of MONGO_URI on notificaciones host (tr -d '\r\\n')"
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} <<'EOF' || echo "REMOTE-NOTIF: ssh failed"
+            echo '$MONGO_B64' > /tmp/mongo.b64 || true
+            base64 -d /tmp/mongo.b64 | tr -d '\r\n' > /tmp/mongo.dec || true
+            echo "--- SANITIZED-DECODED-HEX ---"
+            od -An -t x1 -v /tmp/mongo.dec || true
+            if od -An -t x1 -v /tmp/mongo.dec | grep -qw '0a'; then
+              echo "ERROR: sanitized decoded contains LF"; exit 2
+            fi
+          EOF | sed 's/^/REMOTE-SANITIZED-DECODE-NOTIF: /' | tee remote-decode-notif-sanitized.log >> repair-notificaciones.log || true
 
       - name: Remote write smoke test on reportes (non-destructive)
         run: |
