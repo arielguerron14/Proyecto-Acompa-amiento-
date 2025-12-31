@@ -13,6 +13,8 @@ on:
 jobs:
   smoke-validate:
     runs-on: ubuntu-latest
+    env:
+      TARGET: ${{ github.event.inputs.target }}
     steps:
       - name: Smoke validate
         run: |
@@ -31,8 +33,11 @@ jobs:
           fi
 
       - name: Write envs on reportes host
-        if: ${{ github.event.inputs.target == 'reportes' || github.event.inputs.target == 'all' }}
         run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "reportes" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping reportes host (TARGET=$TARGET)"; exit 0
+          fi
           echo "Writing env files on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
           MONGO_B64=$(printf '%s' "${{ secrets.MONGO_URI }}" | base64 -w0)
           REDIS_HOST_B64=$(printf '%s' "${{ secrets.REDIS_HOST }}" | base64 -w0)
@@ -69,8 +74,11 @@ jobs:
 EOF
 
       - name: Debug env bytes on reportes host
-        if: ${{ github.event.inputs.target == 'reportes' || github.event.inputs.target == 'all' }}
         run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "reportes" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping debug for reportes host (TARGET=$TARGET)"; exit 0
+          fi
           echo "Collecting byte-level debug of MONGO_URI on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
           # Run hexdump on the host and also emit the readable "visible" form so we can tell if there are literal backslash-n
           # NOTE: do NOT suppress stderr here so any SSH/hexdump failures are visible in the workflow run log.
@@ -92,14 +100,20 @@ EOF
           EOF | sed 's/^/REPORTES-ENV: /' | tee repair-reportes-env-debug.log >> repair-reportes.log || true
 
       - name: Show env-debug file (for easier access in Actions UI)
-        if: ${{ github.event.inputs.target == 'reportes' || github.event.inputs.target == 'all' }}
         run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "reportes" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping show env-debug for reportes host (TARGET=$TARGET)"; exit 0
+          fi
           echo "--- repair-reportes-env-debug.log contents ---"
           if [ -f repair-reportes-env-debug.log ]; then sed -n '1,400p' repair-reportes-env-debug.log; else echo "(missing)"; fi
 
       - name: Write env on notificaciones host
-        if: ${{ github.event.inputs.target == 'notificaciones' || github.event.inputs.target == 'all' }}
         run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "notificaciones" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping notificaciones host (TARGET=$TARGET)"; exit 0
+          fi
           echo "Writing env file on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
           MONGO_B64=$(printf '%s' "${{ secrets.MONGO_URI }}" | base64 -w0)
           REDIS_HOST_B64=$(printf '%s' "${{ secrets.REDIS_HOST }}" | base64 -w0)
@@ -123,14 +137,20 @@ EOF
 EOF
 
       - name: Run fix script on reportes host
-        if: ${{ github.event.inputs.target == 'reportes' || github.event.inputs.target == 'all' }}
         run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "reportes" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping fix script on reportes host (TARGET=$TARGET)"; exit 0
+          fi
           echo "Running fix script on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
           cat scripts/fix-deploy.sh | ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} 'bash -s' | tee repair-reportes.log
 
       - name: Debug env bytes on notificaciones host
-        if: ${{ github.event.inputs.target == 'notificaciones' || github.event.inputs.target == 'all' }}
         run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "notificaciones" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping debug for notificaciones host (TARGET=$TARGET)"; exit 0
+          fi
           echo "Collecting byte-level debug of MONGO_URI on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} <<'EOF' 2>/dev/null
             echo "--- micro-notificaciones.env MONGO_URI (hex bytes) ---"
@@ -138,8 +158,11 @@ EOF
           EOF | sed 's/^/NOTIF-ENV: /' | tee repair-notificaciones-env-debug.log >> repair-notificaciones.log || true
 
       - name: Run fix script on notificaciones host
-        if: ${{ github.event.inputs.target == 'notificaciones' || github.event.inputs.target == 'all' }}
         run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "notificaciones" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping fix script on notificaciones host (TARGET=$TARGET)"; exit 0
+          fi
           echo "Running fix script on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
           cat scripts/fix-deploy.sh | ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} 'bash -s' | tee repair-notificaciones.log
 
