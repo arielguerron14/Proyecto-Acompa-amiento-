@@ -70,19 +70,30 @@ jobs:
           echo "Running fix script on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
           echo "Writing env files on reportes host from secrets"
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} << 'EOF'
+  MONGO_URI='${{ secrets.MONGO_URI }}'
+  REDIS_HOST='${{ secrets.REDIS_HOST }}'
+  REDIS_PORT='${{ secrets.REDIS_PORT }}'
+  REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
+
+  # Sanitize values: remove embedded CR/LF to keep them single-line
+  MONGO_URI=$(echo "$MONGO_URI" | tr -d '\r\n')
+  REDIS_HOST=$(echo "$REDIS_HOST" | tr -d '\r\n')
+  REDIS_PORT=$(echo "$REDIS_PORT" | tr -d '\r\n')
+  REDIS_PASSWORD=$(echo "$REDIS_PASSWORD" | tr -d '\r\n')
+
 cat > "$HOME/micro-analytics.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-REDIS_HOST='${{ secrets.REDIS_HOST }}'
-REDIS_PORT='${{ secrets.REDIS_PORT }}'
-REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
+  MONGO_URI='$MONGO_URI'
+REDIS_HOST='$REDIS_HOST'
+REDIS_PORT='$REDIS_PORT'
+REDIS_PASSWORD='$REDIS_PASSWORD'
 ENV
 
 cat > "$HOME/micro-reportes-estudiantes.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
+MONGO_URI='$MONGO_URI'
 ENV
 
 cat > "$HOME/micro-reportes-maestros.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
+MONGO_URI='$MONGO_URI'
 ENV
 
 bash -s < scripts/fix-deploy.sh
@@ -103,11 +114,22 @@ EOF | tee repair-reportes.log
           echo "Running fix script on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
           echo "Writing env file on notificaciones host from secrets"
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} << 'EOF'
+  MONGO_URI='${{ secrets.MONGO_URI }}'
+  REDIS_HOST='${{ secrets.REDIS_HOST }}'
+  REDIS_PORT='${{ secrets.REDIS_PORT }}'
+  REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
+
+  # Sanitize
+  MONGO_URI=$(echo "$MONGO_URI" | tr -d '\r\n')
+  REDIS_HOST=$(echo "$REDIS_HOST" | tr -d '\r\n')
+  REDIS_PORT=$(echo "$REDIS_PORT" | tr -d '\r\n')
+  REDIS_PASSWORD=$(echo "$REDIS_PASSWORD" | tr -d '\r\n')
+
 cat > "$HOME/micro-notificaciones.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-REDIS_HOST='${{ secrets.REDIS_HOST }}'
-REDIS_PORT='${{ secrets.REDIS_PORT }}'
-REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
+MONGO_URI='$MONGO_URI'
+REDIS_HOST='$REDIS_HOST'
+REDIS_PORT='$REDIS_PORT'
+REDIS_PASSWORD='$REDIS_PASSWORD'
 ENV
 
 bash -s < scripts/fix-deploy.sh

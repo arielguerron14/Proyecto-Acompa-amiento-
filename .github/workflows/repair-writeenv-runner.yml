@@ -31,38 +31,60 @@ jobs:
         run: |
           echo "Writing env files on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} << 'EOF'
-cat > "$HOME/micro-analytics.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-REDIS_HOST='${{ secrets.REDIS_HOST }}'
-REDIS_PORT='${{ secrets.REDIS_PORT }}'
-REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
-ENV
+          MONGO_URI='${{ secrets.MONGO_URI }}'
+          REDIS_HOST='${{ secrets.REDIS_HOST }}'
+          REDIS_PORT='${{ secrets.REDIS_PORT }}'
+          REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
 
-cat > "$HOME/micro-reportes-estudiantes.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-ENV
+          # Sanitize to remove any embedded CR/LF that could break single-line env values
+          MONGO_URI=$(echo "$MONGO_URI" | tr -d '\r\n')
+          REDIS_HOST=$(echo "$REDIS_HOST" | tr -d '\r\n')
+          REDIS_PORT=$(echo "$REDIS_PORT" | tr -d '\r\n')
+          REDIS_PASSWORD=$(echo "$REDIS_PASSWORD" | tr -d '\r\n')
 
-cat > "$HOME/micro-reportes-maestros.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-ENV
+          cat > "$HOME/micro-analytics.env" <<ENV
+          MONGO_URI='$MONGO_URI'
+          REDIS_HOST='$REDIS_HOST'
+          REDIS_PORT='$REDIS_PORT'
+          REDIS_PASSWORD='$REDIS_PASSWORD'
+          ENV
 
-echo "Env files written on reportes host"
-EOF
+          cat > "$HOME/micro-reportes-estudiantes.env" <<ENV
+          MONGO_URI='$MONGO_URI'
+          ENV
+
+          cat > "$HOME/micro-reportes-maestros.env" <<ENV
+          MONGO_URI='$MONGO_URI'
+          ENV
+
+          echo "Env files written on reportes host"
+          EOF
 
       - name: Write env on notificaciones host
         if: ${{ github.event.inputs.target == 'notificaciones' || github.event.inputs.target == 'all' }}
         run: |
           echo "Writing env file on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} << 'EOF'
-cat > "$HOME/micro-notificaciones.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-REDIS_HOST='${{ secrets.REDIS_HOST }}'
-REDIS_PORT='${{ secrets.REDIS_PORT }}'
-REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
-ENV
+          MONGO_URI='${{ secrets.MONGO_URI }}'
+          REDIS_HOST='${{ secrets.REDIS_HOST }}'
+          REDIS_PORT='${{ secrets.REDIS_PORT }}'
+          REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
 
-echo "Env file written on notificaciones host"
-EOF
+          # Sanitize
+          MONGO_URI=$(echo "$MONGO_URI" | tr -d '\r\n')
+          REDIS_HOST=$(echo "$REDIS_HOST" | tr -d '\r\n')
+          REDIS_PORT=$(echo "$REDIS_PORT" | tr -d '\r\n')
+          REDIS_PASSWORD=$(echo "$REDIS_PASSWORD" | tr -d '\r\n')
+
+          cat > "$HOME/micro-notificaciones.env" <<ENV
+          MONGO_URI='$MONGO_URI'
+          REDIS_HOST='$REDIS_HOST'
+          REDIS_PORT='$REDIS_PORT'
+          REDIS_PASSWORD='$REDIS_PASSWORD'
+          ENV
+
+          echo "Env file written on notificaciones host"
+          EOF
 
       - name: Run fix script on reportes host
         if: ${{ github.event.inputs.target == 'reportes' || github.event.inputs.target == 'all' }}
