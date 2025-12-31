@@ -27,7 +27,13 @@ jobs:
             echo "EC2_CORE_HOST not set; skipping"; exit 0
           fi
           echo "Running fix script on core host ${{ secrets.EC2_CORE_HOST }}"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_CORE_HOST }} 'bash -s' < scripts/fix-deploy.sh
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_CORE_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-core.log
+      - name: Upload core repair logs
+        if: ${{ inputs.target == 'core' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-core-log
+          path: repair-core.log
 
       - name: Repair Frontend Host
         if: ${{ inputs.target == 'frontend' || inputs.target == 'all' }}
@@ -36,7 +42,13 @@ jobs:
             echo "EC2_FRONTEND_HOST not set; skipping"; exit 0
           fi
           echo "Running fix script on frontend host ${{ secrets.EC2_FRONTEND_HOST }}"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FRONTEND_HOST }} 'bash -s' < scripts/fix-deploy.sh
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FRONTEND_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-frontend.log
+      - name: Upload frontend repair logs
+        if: ${{ inputs.target == 'frontend' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-frontend-log
+          path: repair-frontend.log
 
       - name: Repair Reportes Host
         if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
@@ -45,7 +57,13 @@ jobs:
             echo "EC2_REPORTES_HOST not set; skipping"; exit 0
           fi
           echo "Running fix script on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} 'bash -s' < scripts/fix-deploy.sh
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-reportes.log
+      - name: Upload reportes repair logs
+        if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-reportes-log
+          path: repair-reportes.log
 
       - name: Repair Notificaciones Host
         if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
@@ -54,7 +72,13 @@ jobs:
             echo "EC2_NOTIFICACIONES_HOST not set; skipping"; exit 0
           fi
           echo "Running fix script on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} 'bash -s' < scripts/fix-deploy.sh
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-notificaciones.log
+      - name: Upload notificaciones repair logs
+        if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-notificaciones-log
+          path: repair-notificaciones.log
 
       - name: Done
         run: echo "Repair job completed. Check step logs for per-host outputs."
