@@ -52,4 +52,13 @@ jobs:
             echo '$MONGO_B64' | base64 -d | od -An -t x1 -v || true
           EOF | sed 's/^/REMOTE-DECODE-NOTIF: /' | tee remote-decode-notif.log >> repair-notificaciones.log || true
 
+      - name: Remote write smoke test on reportes (non-destructive)
+        run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "reportes" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping remote write smoke (TARGET=$TARGET)"; exit 0
+          fi
+          echo "Attempting non-destructive remote write on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} 'echo "REPAIR-SMOKE-REPORTES" > /tmp/repair-write-smoke.txt && cat /tmp/repair-write-smoke.txt' || echo "REMOTE-REPORTES: ssh failed or unreachable"
+
       # (sanitized write steps temporarily removed to isolate run creation issue)
