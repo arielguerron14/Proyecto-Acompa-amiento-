@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - run-repair
+  workflow_dispatch:
 
 jobs:
   write-env-and-repair:
