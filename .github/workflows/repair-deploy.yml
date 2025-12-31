@@ -95,8 +95,23 @@ ENV
 cat > "$HOME/micro-reportes-maestros.env" <<ENV
 MONGO_URI='$MONGO_URI'
 ENV
+            # Emit MONGO_URI raw and hex bytes for debugging
+            echo "--- DEBUG: micro-analytics.env MONGO_URI (raw) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+            echo "--- DEBUG: micro-analytics.env MONGO_URI (hex) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
 
-bash -s < scripts/fix-deploy.sh
+            echo "--- DEBUG: micro-reportes-estudiantes.env MONGO_URI (raw) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-estudiantes.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+            echo "--- DEBUG: micro-reportes-estudiantes.env MONGO_URI (hex) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-estudiantes.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+
+            echo "--- DEBUG: micro-reportes-maestros.env MONGO_URI (raw) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-maestros.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+            echo "--- DEBUG: micro-reportes-maestros.env MONGO_URI (hex) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-maestros.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+
+            bash -s < scripts/fix-deploy.sh
 EOF | tee repair-reportes.log
           # Sanitize MONGO_URI in case embedded newlines persisted
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} "perl -0777 -pe \"s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs\" -i \"$HOME/micro-analytics.env\" \"$HOME/micro-reportes-estudiantes.env\" \"$HOME/micro-reportes-maestros.env\" || true"
@@ -132,8 +147,12 @@ REDIS_HOST='$REDIS_HOST'
 REDIS_PORT='$REDIS_PORT'
 REDIS_PASSWORD='$REDIS_PASSWORD'
 ENV
+            echo "--- DEBUG: micro-notificaciones.env MONGO_URI (raw) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+            echo "--- DEBUG: micro-notificaciones.env MONGO_URI (hex) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
 
-bash -s < scripts/fix-deploy.sh
+            bash -s < scripts/fix-deploy.sh
 EOF | tee repair-notificaciones.log
           # Sanitize MONGO_URI on notificaciones host as well
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} "perl -0777 -pe \"s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs\" -i \"$HOME/micro-notificaciones.env\" || true"
