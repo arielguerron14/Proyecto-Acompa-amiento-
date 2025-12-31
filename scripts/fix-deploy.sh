@@ -36,10 +36,18 @@ function inspect_container() {
 
   echo "\n--- Inspecting ${name} ---"
   sudo docker inspect --format 'Name: {{.Name}}\nImage: {{.Config.Image}}\nStatus: {{.State.Status}}\nRestartCount: {{.RestartCount}}\nExitCode: {{.State.ExitCode}}' "$name" || true
-  echo "\n[ENV] Relevant envs:" 
-  sudo docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$name" | grep -E 'MONGO|REDIS|DB|API|PORT|NODE_ENV' || true
-  echo "\n[LOG] Last 500 lines of logs for ${name}:"
-  sudo docker logs --tail 500 "$name" || true
+  echo "\n[ENV FILE - host] (if exists):"
+  SERVICE_SHORT=$(echo "$name" | sed 's/-container$//')
+  ENV_FILE="$HOME/${SERVICE_SHORT}.env"
+  if [ -f "$ENV_FILE" ]; then
+    echo "-- $ENV_FILE --"
+    sed -n '1,200p' "$ENV_FILE" || true
+  else
+    echo "  (no env file at $ENV_FILE)"
+  fi
+
+  echo "\n[LOG] Last ${LOG_TAIL} lines of logs for ${name}:"
+  sudo docker logs --tail ${LOG_TAIL} --timestamps "$name" || true
 }
 
 function try_recreate() {
@@ -119,12 +127,19 @@ function try_recreate() {
     done
     echo "  ${name} failed /health after retries"
     # capture additional diagnostics from the newly started container
-    echo "  Capturing post-recreate logs for ${name} (last 500 lines):"
-    sudo docker logs --tail 500 "$name" || true
+    echo "  Capturing post-recreate logs for ${name} (last ${LOG_TAIL} lines):"
+    sudo docker logs --tail ${LOG_TAIL} --timestamps "$name" || true
     echo "  Inspecting ${name} for details:" 
     sudo docker inspect --format 'State: {{.State.Status}}; ExitCode: {{.State.ExitCode}}; StartedAt: {{.State.StartedAt}}; Error: {{.State.Error}}' "$name" || true
+    echo "  Container environment (from inspect):"
+    sudo docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$name" || true
     echo "  Listing docker ps -a (matching name):"
     sudo docker ps -a --filter "name=${name}" --format 'table {{.Names}}	{{.Status}}	{{.Image}}' || true
+    echo "  Host env file contents (if present):"
+    if [ -f "$ENV_FILE" ]; then
+      echo "-- $ENV_FILE --"
+      sed -n '1,500p' "$ENV_FILE" || true
+    fi
     return 1
   else
     echo "  No port to check /health for ${name}, inspect logs to confirm"
