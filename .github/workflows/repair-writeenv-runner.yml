@@ -33,7 +33,9 @@ jobs:
       - name: Test decode on reportes host (base64 decode, show raw + hex)
         run: |
           echo "Testing base64 decode of MONGO_URI on remote host (no write)"
-          MONGO_B64=$(printf '%s' "${{ secrets.MONGO_URI }}" | base64 -w0)
+          # Sanitize secret on runner before encoding to avoid embedded CR/LF or literal "\n"
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} <<EOF || echo "REMOTE-REPORTES: ssh failed"
             echo "--- DECODED-RAW ---"
             echo '$MONGO_B64' | base64 -d | sed -n 'l;p' || true
@@ -44,7 +46,8 @@ jobs:
       - name: Test decode on notificaciones host (base64 decode, show raw + hex)
         run: |
           echo "Testing base64 decode of MONGO_URI on notificaciones host (no write)"
-          MONGO_B64=$(printf '%s' "${{ secrets.MONGO_URI }}" | base64 -w0)
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} <<EOF || echo "REMOTE-NOTIF: ssh failed"
             echo "--- DECODED-RAW ---"
             echo '$MONGO_B64' | base64 -d | sed -n 'l;p' || true

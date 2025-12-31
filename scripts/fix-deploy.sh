@@ -123,7 +123,8 @@ function try_recreate() {
   if [ -f "$ENV_FILE" ]; then
     # Make a defensive sanitized copy of env file removing embedded newlines inside single-quoted values
     SANITIZED_ENV="$ENV_FILE.sanitized"
-    perl -0777 -pe "s/(^MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egms" "$ENV_FILE" > "$SANITIZED_ENV" || cp "$ENV_FILE" "$SANITIZED_ENV"
+    # Remove embedded CR/LF bytes from the single-quoted MONGO_URI value in a portable way
+    perl -0777 -pe 's/(^MONGO_URI=\x27)(.*?)\x27/$1 . do { my $v = $2; $v =~ s/[\r\n]+//g; $v } . "\x27"/mes' "$ENV_FILE" > "$SANITIZED_ENV" || cp "$ENV_FILE" "$SANITIZED_ENV"
     # If sanitization changed the file, warn and use the sanitized copy
     if ! cmp -s "$ENV_FILE" "$SANITIZED_ENV" 2>/dev/null; then
       echo "  [NOTICE] Env file contained embedded newlines; using sanitized copy $SANITIZED_ENV"
