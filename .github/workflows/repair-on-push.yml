@@ -51,7 +51,7 @@ EOF
 cat > "$HOME/micro-notificaciones.env" <<ENV
 MONGO_URI='${{ secrets.MONGO_URI }}'
 REDIS_HOST='${{ secrets.REDIS_HOST }}'
-REDIS_PORT='${{ secrets.RELDB_PORT }}'
+REDIS_PORT='${{ secrets.REDIS_PORT }}'
 REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
 ENV
 EOF
