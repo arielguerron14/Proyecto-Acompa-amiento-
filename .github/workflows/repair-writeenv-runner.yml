@@ -1,27 +1,23 @@
-name: Repair write-env runner
+name: Repair write-env runner (TEMPORARY MINIMAL)
 
 on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'Target group to write envs and run repair: reportes|notificaciones|all'
+        description: 'Target group: reportes|notificaciones|all'
         required: false
-        default: 'all'
+        default: 'reportes'
+  push:
+    branches: [ 'run-repair' ]
 
 jobs:
-  validate:
+  smoke-validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Validate runner (smoke)
+      - name: Smoke validate
         run: |
-          echo "SMOKE: repair-writeenv-runner validation step"
-          echo "This job ensures the workflow can start and run simple steps."
-
-  write-env-and-repair:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+          echo "SMOKE: minimal repair-writeenv-runner executed"
+          echo "If this succeeds, the original workflow contains the problematic block"
 
       - name: Prepare SSH key
         run: |
