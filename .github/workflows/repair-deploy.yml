@@ -39,12 +39,12 @@ jobs:
           fi
           echo "Running fix script on core host ${{ secrets.EC2_CORE_HOST }}"
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_CORE_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-core.log
-        - name: Upload core repair logs
-          if: ${{ inputs.target == 'core' || inputs.target == 'all' }}
-          uses: actions/upload-artifact@v4
-          with:
-            name: repair-core-log
-            path: repair-core.log
+      - name: Upload core repair logs
+        if: ${{ inputs.target == 'core' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-core-log
+          path: repair-core.log
 
       - name: Repair Frontend Host
         if: ${{ inputs.target == 'frontend' || inputs.target == 'all' }}
@@ -54,12 +54,12 @@ jobs:
           fi
           echo "Running fix script on frontend host ${{ secrets.EC2_FRONTEND_HOST }}"
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FRONTEND_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-frontend.log
-        - name: Upload frontend repair logs
-          if: ${{ inputs.target == 'frontend' || inputs.target == 'all' }}
-          uses: actions/upload-artifact@v4
-          with:
-            name: repair-frontend-log
-            path: repair-frontend.log
+      - name: Upload frontend repair logs
+        if: ${{ inputs.target == 'frontend' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-frontend-log
+          path: repair-frontend.log
 
       - name: Repair Reportes Host
         if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
@@ -112,15 +112,17 @@ ENV
             awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-maestros.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
 
             bash -s < scripts/fix-deploy.sh
-EOF | tee repair-reportes.log
+          EOF | tee repair-reportes.log
+      - name: Sanitize reportes envs (post-write)
+        run: |
           # Sanitize MONGO_URI in case embedded newlines persisted
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} "perl -0777 -pe \"s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs\" -i \"$HOME/micro-analytics.env\" \"$HOME/micro-reportes-estudiantes.env\" \"$HOME/micro-reportes-maestros.env\" || true"
-        - name: Upload reportes repair logs
-          if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
-          uses: actions/upload-artifact@v4
-          with:
-            name: repair-reportes-log
-            path: repair-reportes.log
+      - name: Upload reportes repair logs
+        if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-reportes-log
+          path: repair-reportes.log
 
       - name: Repair Notificaciones Host
         if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
@@ -153,15 +155,17 @@ ENV
             awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
 
             bash -s < scripts/fix-deploy.sh
-EOF | tee repair-notificaciones.log
+          EOF | tee repair-notificaciones.log
+      - name: Sanitize notificaciones env (post-write)
+        run: |
           # Sanitize MONGO_URI on notificaciones host as well
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} "perl -0777 -pe \"s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs\" -i \"$HOME/micro-notificaciones.env\" || true"
-        - name: Upload notificaciones repair logs
-          if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
-          uses: actions/upload-artifact@v4
-          with:
-            name: repair-notificaciones-log
-            path: repair-notificaciones.log
+      - name: Upload notificaciones repair logs
+        if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-notificaciones-log
+          path: repair-notificaciones.log
 
       - name: Done
         run: echo "Repair job completed. Check step logs for per-host outputs."
