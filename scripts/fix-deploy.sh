@@ -117,7 +117,15 @@ function try_recreate() {
         sleep $RETRY_SLEEP
       fi
     done
-    echo "  ${name} failed /health after retries"; return 1
+    echo "  ${name} failed /health after retries"
+    # capture additional diagnostics from the newly started container
+    echo "  Capturing post-recreate logs for ${name} (last 500 lines):"
+    sudo docker logs --tail 500 "$name" || true
+    echo "  Inspecting ${name} for details:" 
+    sudo docker inspect --format 'State: {{.State.Status}}; ExitCode: {{.State.ExitCode}}; StartedAt: {{.State.StartedAt}}; Error: {{.State.Error}}' "$name" || true
+    echo "  Listing docker ps -a (matching name):"
+    sudo docker ps -a --filter "name=${name}" --format 'table {{.Names}}	{{.Status}}	{{.Image}}' || true
+    return 1
   else
     echo "  No port to check /health for ${name}, inspect logs to confirm"
     return 0
