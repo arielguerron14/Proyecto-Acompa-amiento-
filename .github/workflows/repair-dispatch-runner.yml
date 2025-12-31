@@ -47,8 +47,39 @@ jobs:
 
           if [ "$TARGET" = "core" ] || [ "$TARGET" = "all" ]; then run_fix "${{ secrets.EC2_CORE_HOST }}" core; fi
           if [ "$TARGET" = "frontend" ] || [ "$TARGET" = "all" ]; then run_fix "${{ secrets.EC2_FRONTEND_HOST }}" frontend; fi
-          if [ "$TARGET" = "reportes" ] || [ "$TARGET" = "all" ]; then run_fix "${{ secrets.EC2_REPORTES_HOST }}" reportes; fi
-          if [ "$TARGET" = "notificaciones" ] || [ "$TARGET" = "all" ]; then run_fix "${{ secrets.EC2_NOTIFICACIONES_HOST }}" notificaciones; fi
+          if [ "$TARGET" = "reportes" ] || [ "$TARGET" = "all" ]; then
+            echo "Writing env files on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
+            ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} << 'EOF'
+cat > "$HOME/micro-analytics.env" <<ENV
+MONGO_URI='${{ secrets.MONGO_URI }}'
+REDIS_HOST='${{ secrets.REDIS_HOST }}'
+REDIS_PORT='${{ secrets.REDIS_PORT }}'
+REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
+ENV
+
+cat > "$HOME/micro-reportes-estudiantes.env" <<ENV
+MONGO_URI='${{ secrets.MONGO_URI }}'
+ENV
+
+cat > "$HOME/micro-reportes-maestros.env" <<ENV
+MONGO_URI='${{ secrets.MONGO_URI }}'
+ENV
+
+EOF
+            run_fix "${{ secrets.EC2_REPORTES_HOST }}" reportes;
+          fi
+          if [ "$TARGET" = "notificaciones" ] || [ "$TARGET" = "all" ]; then
+            echo "Writing env file on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
+            ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} << 'EOF'
+cat > "$HOME/micro-notificaciones.env" <<ENV
+MONGO_URI='${{ secrets.MONGO_URI }}'
+REDIS_HOST='${{ secrets.REDIS_HOST }}'
+REDIS_PORT='${{ secrets.REDIS_PORT }}'
+REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
+ENV
+EOF
+            run_fix "${{ secrets.EC2_NOTIFICACIONES_HOST }}" notificaciones;
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
