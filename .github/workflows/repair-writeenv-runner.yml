@@ -64,6 +64,19 @@ jobs:
   perl -0777 -pe "s/(MONGO_URI=')(.+?)(')/\$1.(\$2=~s/[\r\n]+//gr).\$3/egs" -i "$HOME/micro-reportes-maestros.env"
 EOF
 
+      - name: Debug env bytes on reportes host
+        if: ${{ github.event.inputs.target == 'reportes' || github.event.inputs.target == 'all' }}
+        run: |
+          echo "Collecting byte-level debug of MONGO_URI on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} <<'EOF' 2>/dev/null
+            echo "--- micro-analytics.env MONGO_URI (hex bytes) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+            echo "--- micro-reportes-estudiantes.env MONGO_URI (hex bytes) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-estudiantes.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+            echo "--- micro-reportes-maestros.env MONGO_URI (hex bytes) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-maestros.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+          EOF | sed 's/^/REPORTES-ENV: /' | tee repair-reportes-env-debug.log
+
       - name: Write env on notificaciones host
         if: ${{ github.event.inputs.target == 'notificaciones' || github.event.inputs.target == 'all' }}
         run: |
@@ -94,6 +107,15 @@ EOF
         run: |
           echo "Running fix script on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
           cat scripts/fix-deploy.sh | ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} 'bash -s' | tee repair-reportes.log
+
+      - name: Debug env bytes on notificaciones host
+        if: ${{ github.event.inputs.target == 'notificaciones' || github.event.inputs.target == 'all' }}
+        run: |
+          echo "Collecting byte-level debug of MONGO_URI on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} <<'EOF' 2>/dev/null
+            echo "--- micro-notificaciones.env MONGO_URI (hex bytes) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+          EOF | sed 's/^/NOTIF-ENV: /' | tee repair-notificaciones-env-debug.log
 
       - name: Run fix script on notificaciones host
         if: ${{ github.event.inputs.target == 'notificaciones' || github.event.inputs.target == 'all' }}
