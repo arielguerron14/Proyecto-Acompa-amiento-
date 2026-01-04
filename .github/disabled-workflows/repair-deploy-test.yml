@@ -1,0 +1,11 @@
+name: Repair deploy (test) (archived)
+
+# Archived: test workflow for run-repair branch
+on: []
+
+jobs:
+  archived:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Archived
+        run: echo "Original repair-deploy-test.yml archived and removed from active workflows"

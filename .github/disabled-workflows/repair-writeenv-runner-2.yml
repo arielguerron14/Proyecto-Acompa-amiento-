@@ -1,0 +1,11 @@
+name: Repair write-env runner (v2) (archived)
+
+# Archived per request: repair workflows removed from CI.
+on: []
+
+jobs:
+  archived:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Archived
+        run: echo "Original repair-writeenv-runner-2.yml archived and removed from active workflows"

@@ -1,0 +1,11 @@
+name: Docker Smoke Test (archived)
+
+# Archived per request: removed from active workflow set
+on: []
+
+jobs:
+  archived:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Archived
+        run: echo "Original docker-smoke-test.yml archived and removed from active workflows"

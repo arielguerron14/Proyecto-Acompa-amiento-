@@ -1,13 +1,18 @@
 import sys
 from pathlib import Path
-try:
-    import yaml
-except Exception as e:
-    print('Missing PyYAML:', e); sys.exit(2)
-path = Path(r'c:/Users/ariel/Escritorio/distri/Proyecto-Acompa-amiento-/.github/workflows/repair-on-push.yml')
-try:
-    data = yaml.safe_load(path.read_text())
-    print('YAML parsed OK')
-except Exception as e:
-    print('YAML parse error:', e)
+
+# Validate there are no remaining repair/smoke workflows
+root = Path(__file__).resolve().parents[1] / '.github' / 'workflows'
+def is_archived(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding='utf-8')
+        return 'Removed from active workflows per request' in text
+    except Exception:
+        return False
+
+found = [p.name for p in root.glob('*.yml') if ('repair' in p.name or 'smoke' in p.name) and not is_archived(p)]
+if found:
+    print('ERROR: found active workflows that should be removed:', found)
     sys.exit(1)
+else:
+    print('OK: no active repair/smoke workflows found in .github/workflows')
