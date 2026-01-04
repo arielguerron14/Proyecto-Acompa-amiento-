@@ -6,9 +6,15 @@ on:
     paths:
       - "monitoring/**"
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Run the deploy step to AWS (true/false). Defaults to 'false'."
+        required: false
+        default: 'false'
 
 jobs:
   deploy-aws:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
