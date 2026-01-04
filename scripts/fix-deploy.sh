@@ -12,6 +12,8 @@ set -euo pipefail
 RETRY_ATTEMPTS=${RETRY_ATTEMPTS:-12}
 RETRY_SLEEP=${RETRY_SLEEP:-5}
 
+LOG_TAIL=${LOG_TAIL:-2000}
+
 services=(
   "micro-auth-container"
   "micro-estudiantes-container"
@@ -36,10 +38,31 @@ function inspect_container() {
 
   echo "\n--- Inspecting ${name} ---"
   sudo docker inspect --format 'Name: {{.Name}}\nImage: {{.Config.Image}}\nStatus: {{.State.Status}}\nRestartCount: {{.RestartCount}}\nExitCode: {{.State.ExitCode}}' "$name" || true
-  echo "\n[ENV] Relevant envs:" 
-  sudo docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$name" | grep -E 'MONGO|REDIS|DB|API|PORT|NODE_ENV' || true
-  echo "\n[LOG] Last 500 lines of logs for ${name}:"
-  sudo docker logs --tail 500 "$name" || true
+  echo "\n[ENV FILE - host] (if exists):"
+  SERVICE_SHORT=$(echo "$name" | sed 's/-container$//')
+  ENV_FILE="$HOME/${SERVICE_SHORT}.env"
+  if [ -f "$ENV_FILE" ]; then
+    echo "-- $ENV_FILE --"
+    sed -n '1,200p' "$ENV_FILE" || true
+    # Emit raw and hex views of MONGO_URI for debug (if present) and detect embedded newlines
+    if perl -0777 -ne "if (/MONGO_URI='(.*?)'/s){ print \$1 }" "$ENV_FILE" > /tmp/.mongo_val.$$ 2>/dev/null; then
+      echo "  MONGO_URI (visible):"
+      sed -n '1,5p' /tmp/.mongo_val.$$ | sed -n 'l;p' || true
+      echo "  MONGO_URI (hex bytes):"
+      od -An -t x1 -v /tmp/.mongo_val.$$ || true
+      if od -An -t x1 -v /tmp/.mongo_val.$$ | grep -q '0a'; then
+        echo "  [WARNING] MONGO_URI contains LF (0x0a) bytes — this will break single-line env files"
+      fi
+      rm -f /tmp/.mongo_val.$$ || true
+    else
+      echo "  (MONGO_URI not found in $ENV_FILE)"
+    fi
+  else
+    echo "  (no env file at $ENV_FILE)"
+  fi
+
+  echo "\n[LOG] Last ${LOG_TAIL} lines of logs for ${name}:"
+  sudo docker logs --tail ${LOG_TAIL} --timestamps "$name" || true
 }
 
 function try_recreate() {
@@ -98,7 +121,18 @@ function try_recreate() {
 
   echo "  Running container $name from $IMAGE"
   if [ -f "$ENV_FILE" ]; then
-    sudo docker run -d --restart unless-stopped --env-file "$ENV_FILE" $PORT_ARG --name "$name" "$IMAGE" || { echo "  Failed to run $name"; return 1; }
+    # Make a defensive sanitized copy of env file removing embedded newlines inside single-quoted values
+    SANITIZED_ENV="$ENV_FILE.sanitized"
+    # Remove embedded CR/LF bytes from the single-quoted MONGO_URI value in a portable way
+    perl -0777 -pe 's/(^MONGO_URI=\x27)(.*?)\x27/$1 . do { my $v = $2; $v =~ s/[\r\n]+//g; $v } . "\x27"/mes' "$ENV_FILE" > "$SANITIZED_ENV" || cp "$ENV_FILE" "$SANITIZED_ENV"
+    # If sanitization changed the file, warn and use the sanitized copy
+    if ! cmp -s "$ENV_FILE" "$SANITIZED_ENV" 2>/dev/null; then
+      echo "  [NOTICE] Env file contained embedded newlines; using sanitized copy $SANITIZED_ENV"
+      ENV_TO_USE="$SANITIZED_ENV"
+    else
+      ENV_TO_USE="$ENV_FILE"
+    fi
+    sudo docker run -d --restart unless-stopped --env-file "$ENV_TO_USE" $PORT_ARG --name "$name" "$IMAGE" || { echo "  Failed to run $name"; return 1; }
   else
     sudo docker run -d --restart unless-stopped $PORT_ARG --name "$name" "$IMAGE" || { echo "  Failed to run $name"; return 1; }
   fi
@@ -119,12 +153,19 @@ function try_recreate() {
     done
     echo "  ${name} failed /health after retries"
     # capture additional diagnostics from the newly started container
-    echo "  Capturing post-recreate logs for ${name} (last 500 lines):"
-    sudo docker logs --tail 500 "$name" || true
+    echo "  Capturing post-recreate logs for ${name} (last ${LOG_TAIL} lines):"
+    sudo docker logs --tail ${LOG_TAIL} --timestamps "$name" || true
     echo "  Inspecting ${name} for details:" 
     sudo docker inspect --format 'State: {{.State.Status}}; ExitCode: {{.State.ExitCode}}; StartedAt: {{.State.StartedAt}}; Error: {{.State.Error}}' "$name" || true
+    echo "  Container environment (from inspect):"
+    sudo docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$name" || true
     echo "  Listing docker ps -a (matching name):"
     sudo docker ps -a --filter "name=${name}" --format 'table {{.Names}}	{{.Status}}	{{.Image}}' || true
+    echo "  Host env file contents (if present):"
+    if [ -f "$ENV_FILE" ]; then
+      echo "-- $ENV_FILE --"
+      sed -n '1,500p' "$ENV_FILE" || true
+    fi
     return 1
   else
     echo "  No port to check /health for ${name}, inspect logs to confirm"

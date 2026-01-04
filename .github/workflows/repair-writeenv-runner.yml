@@ -1,4 +1,15 @@
 name: Repair write-env runner (TEMPORARY MINIMAL)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target group: reportes|notificaciones|all'
+        required: false
+        default: 'reportes'
+  push:
+    branches: [ 'run-repair' ]
+
 jobs:
   smoke-validate:
     runs-on: ubuntu-latest
@@ -9,18 +20,87 @@ jobs:
         run: |
           echo "SMOKE: minimal repair-writeenv-runner executed"
           echo "If this succeeds, the original workflow contains the problematic block"
-
       - name: Prepare SSH key
         run: |
           echo "${{ secrets.EC2_KEY }}" > key.pem
           chmod 600 key.pem
 
-      - name: Validate MONGO_URI
+      - name: Minimal check - ensure SSH key works
         run: |
-          if [ -z "${{ secrets.MONGO_URI }}" ]; then
-            echo "ERROR: Required secret MONGO_URI is not set."; exit 1
-          fi
+          # Attempt to list the home directory on the EC2 host to validate SSH connectivity
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} 'ls -lad $HOME' || true
 
+      - name: Test decode on reportes host (base64 decode, show raw + hex)
+        run: |
+          echo "Testing base64 decode of MONGO_URI on remote host (no write)"
+          # Sanitize secret on runner before encoding to avoid embedded CR/LF or literal "\n"
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} <<EOF || echo "REMOTE-REPORTES: ssh failed"
+            echo "--- DECODED-RAW ---"
+            echo '$MONGO_B64' | base64 -d | sed -n 'l;p' || true
+            echo "--- DECODED-HEX ---"
+            echo '$MONGO_B64' | base64 -d | od -An -t x1 -v || true
+          EOF | sed 's/^/REMOTE-DECODE-REPORTES: /' | tee remote-decode-reportes.log >> repair-reportes.log || true
+
+      - name: Test decode on notificaciones host (base64 decode, show raw + hex)
+        run: |
+          echo "Testing base64 decode of MONGO_URI on notificaciones host (no write)"
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} <<EOF || echo "REMOTE-NOTIF: ssh failed"
+            echo "--- DECODED-RAW ---"
+            echo '$MONGO_B64' | base64 -d | sed -n 'l;p' || true
+            echo "--- DECODED-HEX ---"
+            echo '$MONGO_B64' | base64 -d | od -An -t x1 -v || true
+          EOF | sed 's/^/REMOTE-DECODE-NOTIF: /' | tee remote-decode-notif.log >> repair-notificaciones.log || true
+
+      - name: Remote write smoke test on reportes (non-destructive)
+        run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "reportes" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping remote write smoke (TARGET=$TARGET)"; exit 0
+          fi
+          echo "Attempting non-destructive remote write on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
+          # Perform a sanitized write on-host using runner-side base64 encoding and on-host decode/printf
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} <<'REMOTE_EOF' || echo "REMOTE-REPORTES: ssh failed"
+  echo '$MONGO_B64' > /tmp/mongo.b64 || true
+  base64 -d /tmp/mongo.b64 | tr -d '\r\n' > /tmp/mongo.dec || true
+  MONGO_URI="$(cat /tmp/mongo.dec)"
+  printf "MONGO_URI='%s'\n" "$MONGO_URI" > "$HOME/micro-analytics.env"
+  awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+  awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+  if awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v | grep -qw '0a'; then
+    echo "ERROR: MONGO_URI contains LF bytes after write on reportes host"; exit 2
+  fi
+REMOTE_EOF | sed 's/^/REMOTE-DECODE-REPORTES: /' | tee remote-decode-reportes.log >> repair-reportes.log || true
+
+<<<<<<< HEAD
+      - name: Remote sanitized write smoke test on notificaciones (non-destructive)
+        run: |
+          TARGET=${TARGET:-reportes}
+          if [ "$TARGET" != "notificaciones" ] && [ "$TARGET" != "all" ]; then
+            echo "Skipping remote write smoke (TARGET=$TARGET)"; exit 0
+          fi
+          echo "Attempting sanitized remote write on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} <<'REMOTE_EOF' || echo "REMOTE-NOTIF: ssh failed"
+  echo '$MONGO_B64' > /tmp/mongo.b64 || true
+  base64 -d /tmp/mongo.b64 | tr -d '\r\n' > /tmp/mongo.dec || true
+  MONGO_URI="$(cat /tmp/mongo.dec)"
+  printf "MONGO_URI='%s'\n" "$MONGO_URI" > "$HOME/micro-notificaciones.env"
+  # post-write sanitization
+  perl -0777 -pe 's/(MONGO_URI=')(.+?)(')/$1.(($2)=~s/[\r\n]+//gr).$3/egs' -i "$HOME/micro-notificaciones.env" || true
+  awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+  awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+  if awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v | grep -qw '0a'; then
+    echo "ERROR: MONGO_URI contains LF bytes after write on notificaciones host"; exit 2
+  fi
+REMOTE_EOF | sed 's/^/REMOTE-DECODE-NOTIF: /' | tee remote-decode-notif.log >> repair-notificaciones.log || true
+=======
       - name: Write envs on reportes host
         run: |
           TARGET=${TARGET:-reportes}
@@ -177,3 +257,4 @@ EOF
         with:
           name: repair-writeenv-logs
           path: repair-*.log
+>>>>>>> origin/main

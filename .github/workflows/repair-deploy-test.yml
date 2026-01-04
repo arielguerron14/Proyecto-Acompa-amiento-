@@ -1,3 +1,16 @@
+name: Repair Deploy Test
+
+on:
+  push:
+    branches:
+      - 'run-repair'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hello
+        run: echo "Repair deploy test run at $(date)"
 name: Repair deploy (test)
 
 on:

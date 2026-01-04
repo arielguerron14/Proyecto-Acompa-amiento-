@@ -30,6 +30,12 @@ jobs:
             exit 1
           fi
           echo "MONGO_URI is set. Proceeding..."
+      - name: Check MONGO_URI trailing newline
+        run: |
+          # If the secret contains a trailing LF (0x0a) we will strip it before writing; log a notice for operators
+          if printf '%s' "${{ secrets.MONGO_URI }}" | tail -c1 | od -An -t x1 | grep -qw '0a'; then
+            echo "NOTICE: MONGO_URI secret contains trailing LF (0x0a); runner will strip it before writing to hosts. Consider cleaning the repository secret.";
+          fi
 
       - name: Repair Core Host
         if: ${{ inputs.target == 'core' || inputs.target == 'all' }}
@@ -39,12 +45,12 @@ jobs:
           fi
           echo "Running fix script on core host ${{ secrets.EC2_CORE_HOST }}"
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_CORE_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-core.log
-        - name: Upload core repair logs
-          if: ${{ inputs.target == 'core' || inputs.target == 'all' }}
-          uses: actions/upload-artifact@v4
-          with:
-            name: repair-core-log
-            path: repair-core.log
+      - name: Upload core repair logs
+        if: ${{ inputs.target == 'core' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-core-log
+          path: repair-core.log
 
       - name: Repair Frontend Host
         if: ${{ inputs.target == 'frontend' || inputs.target == 'all' }}
@@ -54,12 +60,12 @@ jobs:
           fi
           echo "Running fix script on frontend host ${{ secrets.EC2_FRONTEND_HOST }}"
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_FRONTEND_HOST }} 'bash -s' < scripts/fix-deploy.sh | tee repair-frontend.log
-        - name: Upload frontend repair logs
-          if: ${{ inputs.target == 'frontend' || inputs.target == 'all' }}
-          uses: actions/upload-artifact@v4
-          with:
-            name: repair-frontend-log
-            path: repair-frontend.log
+      - name: Upload frontend repair logs
+        if: ${{ inputs.target == 'frontend' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-frontend-log
+          path: repair-frontend.log
 
       - name: Repair Reportes Host
         if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
@@ -69,30 +75,84 @@ jobs:
           fi
           echo "Running fix script on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
           echo "Writing env files on reportes host from secrets"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} << 'EOF'
-cat > "$HOME/micro-analytics.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-REDIS_HOST='${{ secrets.REDIS_HOST }}'
-REDIS_PORT='${{ secrets.REDIS_PORT }}'
-REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
-ENV
+          # Make a defensive sanitized copy of the secret on the runner: remove CR, LF and literal "\n"
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
+          REDIS_HOST_B64=$(printf '%s' "${{ secrets.REDIS_HOST }}" | base64 -w0)
+          REDIS_PORT_B64=$(printf '%s' "${{ secrets.REDIS_PORT }}" | base64 -w0)
+          REDIS_PW_B64=$(printf '%s' "${{ secrets.REDIS_PASSWORD }}" | base64 -w0)
 
-cat > "$HOME/micro-reportes-estudiantes.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-ENV
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} <<'REMOTE_EOF'
+  # Write base64 payloads to temp, decode on-host and force single-line values
+  echo '$MONGO_B64' > /tmp/mongo.b64 || true
+  base64 -d /tmp/mongo.b64 | tr -d '\r\n' > /tmp/mongo.dec || true
+  MONGO_URI="$(cat /tmp/mongo.dec)"
 
-cat > "$HOME/micro-reportes-maestros.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-ENV
+  echo '$REDIS_HOST_B64' > /tmp/redis_host.b64 || true
+  base64 -d /tmp/redis_host.b64 | tr -d '\r\n' > /tmp/redis_host.dec || true
+  REDIS_HOST="$(cat /tmp/redis_host.dec)"
 
-bash -s < scripts/fix-deploy.sh
-EOF | tee repair-reportes.log
-        - name: Upload reportes repair logs
-          if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
-          uses: actions/upload-artifact@v4
-          with:
-            name: repair-reportes-log
-            path: repair-reportes.log
+  echo '$REDIS_PORT_B64' > /tmp/redis_port.b64 || true
+  base64 -d /tmp/redis_port.b64 | tr -d '\r\n' > /tmp/redis_port.dec || true
+  REDIS_PORT="$(cat /tmp/redis_port.dec)"
+
+  echo '$REDIS_PW_B64' > /tmp/redis_pw.b64 || true
+  base64 -d /tmp/redis_pw.b64 | tr -d '\r\n' > /tmp/redis_pw.dec || true
+  REDIS_PASSWORD="$(cat /tmp/redis_pw.dec)"
+
+  # Emit env files using printf to guarantee single-line values
+  printf "MONGO_URI='%s'\nREDIS_HOST='%s'\nREDIS_PORT='%s'\nREDIS_PASSWORD='%s'\n" "$MONGO_URI" "$REDIS_HOST" "$REDIS_PORT" "$REDIS_PASSWORD" > "$HOME/micro-analytics.env"
+  printf "MONGO_URI='%s'\n" "$MONGO_URI" > "$HOME/micro-reportes-estudiantes.env"
+  printf "MONGO_URI='%s'\n" "$MONGO_URI" > "$HOME/micro-reportes-maestros.env"
+
+  # On-host sanitization: remove any embedded CR/LF from single-quoted MONGO_URI values
+  perl -0777 -pe 's/(MONGO_URI=')(.+?)(')/$1.(($2)=~s/[\r\n]+//gr).$3/egs' -i "$HOME/micro-analytics.env" "$HOME/micro-reportes-estudiantes.env" "$HOME/micro-reportes-maestros.env" || true
+
+  # Verify there are no LF (0x0a) bytes inside the decoded MONGO_URI after sanitization
+  if awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v | grep -qw '0a'; then
+    echo "ERROR: MONGO_URI contains LF bytes after on-host sanitization"; exit 2
+  fi
+
+            # Emit MONGO_URI raw and hex bytes for debugging
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-estudiantes.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-estudiantes.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-maestros.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-reportes-maestros.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+
+            # Verify there are no LF (0x0a) bytes inside the decoded MONGO_URI
+            if awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-analytics.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v | grep -qw '0a'; then
+              echo "ERROR: MONGO_URI contains LF bytes after write on reportes host"; exit 2
+            fi
+
+            bash -s < scripts/fix-deploy.sh
+          REMOTE_EOF | sed 's/^/REMOTE-DECODE-REPORTES: /' | tee remote-decode-reportes.log >> repair-reportes.log || true
+      - name: Extract reportes env debug from main log
+        if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
+        run: |
+          # Pull DEBUG blocks out into a dedicated file for easier upload/inspection
+          grep -n "^--- DEBUG" -A5 repair-reportes.log > repair-reportes-env-debug.log || true
+          echo "--- repair-reportes-env-debug.log contents ---"
+          sed -n '1,200p' repair-reportes-env-debug.log || true
+      - name: Sanitize reportes envs (post-write)
+        run: |
+          # Sanitize MONGO_URI in case embedded newlines persisted (remote perl with safe quoting)
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} 'perl -0777 -pe '\''s/(MONGO_URI=')(.+?)(')/$1.(($2)=~s/[\r\n]+//gr).$3/egs'\'' -i "$HOME/micro-analytics.env" "$HOME/micro-reportes-estudiantes.env" "$HOME/micro-reportes-maestros.env" || true
+      - name: Upload reportes repair logs
+        if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-reportes-log
+          path: repair-reportes.log
+      - name: Upload reportes env-debug artifact
+        if: ${{ inputs.target == 'reportes' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-reportes-env-debug
+          path: repair-reportes-env-debug.log
 
       - name: Repair Notificaciones Host
         if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
@@ -102,22 +162,70 @@ EOF | tee repair-reportes.log
           fi
           echo "Running fix script on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
           echo "Writing env file on notificaciones host from secrets"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} << 'EOF'
-cat > "$HOME/micro-notificaciones.env" <<ENV
-MONGO_URI='${{ secrets.MONGO_URI }}'
-REDIS_HOST='${{ secrets.REDIS_HOST }}'
-REDIS_PORT='${{ secrets.REDIS_PORT }}'
-REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}'
-ENV
+          # Sanitize secret on runner before encoding
+          MONGO_CLEAN=$(printf '%s' "${{ secrets.MONGO_URI }}" | tr -d '\r' | sed 's/\\n//g' | tr -d '\n')
+          MONGO_B64=$(printf '%s' "$MONGO_CLEAN" | base64 -w0)
+          REDIS_HOST_B64=$(printf '%s' "${{ secrets.REDIS_HOST }}" | base64 -w0)
+          REDIS_PORT_B64=$(printf '%s' "${{ secrets.REDIS_PORT }}" | base64 -w0)
+          REDIS_PW_B64=$(printf '%s' "${{ secrets.REDIS_PASSWORD }}" | base64 -w0)
 
-bash -s < scripts/fix-deploy.sh
-EOF | tee repair-notificaciones.log
-        - name: Upload notificaciones repair logs
-          if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
-          uses: actions/upload-artifact@v4
-          with:
-            name: repair-notificaciones-log
-            path: repair-notificaciones.log
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} <<'REMOTE_EOF'
+  # Write base64 payloads to temp, decode on-host and force single-line values
+  echo '$MONGO_B64' > /tmp/mongo.b64 || true
+  base64 -d /tmp/mongo.b64 | tr -d '\r\n' > /tmp/mongo.dec || true
+  MONGO_URI="$(cat /tmp/mongo.dec)"
+
+  echo '$REDIS_HOST_B64' > /tmp/redis_host.b64 || true
+  base64 -d /tmp/redis_host.b64 | tr -d '\r\n' > /tmp/redis_host.dec || true
+  REDIS_HOST="$(cat /tmp/redis_host.dec)"
+
+  echo '$REDIS_PORT_B64' > /tmp/redis_port.b64 || true
+  base64 -d /tmp/redis_port.b64 | tr -d '\r\n' > /tmp/redis_port.dec || true
+  REDIS_PORT="$(cat /tmp/redis_port.dec)"
+
+  echo '$REDIS_PW_B64' > /tmp/redis_pw.b64 || true
+  base64 -d /tmp/redis_pw.b64 | tr -d '\r\n' > /tmp/redis_pw.dec || true
+  REDIS_PASSWORD="$(cat /tmp/redis_pw.dec)"
+
+  printf "MONGO_URI='%s'\nREDIS_HOST='%s'\nREDIS_PORT='%s'\nREDIS_PASSWORD='%s'\n" "$MONGO_URI" "$REDIS_HOST" "$REDIS_PORT" "$REDIS_PASSWORD" > "$HOME/micro-notificaciones.env"
+
+            # On-host sanitization: remove any embedded CR/LF from single-quoted MONGO_URI values
+            perl -0777 -pe 's/(MONGO_URI=')(.+?)(')/$1.(($2)=~s/[\r\n]+//gr).$3/egs' -i "$HOME/micro-notificaciones.env" || true
+
+            echo "--- DEBUG: micro-notificaciones.env MONGO_URI (raw) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | sed -n 'l;p' || true
+            echo "--- DEBUG: micro-notificaciones.env MONGO_URI (hex) ---"
+            awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v || true
+
+            # Verify there are no LF (0x0a) bytes inside the decoded MONGO_URI after sanitization
+            if awk -F= '/^MONGO_URI/ {print $2}' "$HOME/micro-notificaciones.env" | sed "s/^'//; s/'$//" | od -An -t x1 -v | grep -qw '0a'; then
+              echo "ERROR: MONGO_URI contains LF bytes after on-host sanitization"; exit 2
+            fi
+
+            bash -s < scripts/fix-deploy.sh
+          REMOTE_EOF | sed 's/^/REMOTE-DECODE-NOTIF: /' | tee remote-decode-notif.log >> repair-notificaciones.log || true
+      - name: Extract notificaciones env debug from main log
+        if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
+        run: |
+          grep -n "^--- DEBUG" -A5 repair-notificaciones.log > repair-notificaciones-env-debug.log || true
+          echo "--- repair-notificaciones-env-debug.log contents ---"
+          sed -n '1,200p' repair-notificaciones-env-debug.log || true
+      - name: Sanitize notificaciones env (post-write)
+        run: |
+          # Sanitize MONGO_URI on notificaciones host as well (use safe single-quoted ssh command)
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} 'perl -0777 -pe '\''s/(MONGO_URI=')(.+?)(')/$1.(($2)=~s/[\r\n]+//gr).$3/egs'\'' -i "$HOME/micro-notificaciones.env" || true
+      - name: Upload notificaciones repair logs
+        if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-notificaciones-log
+          path: repair-notificaciones.log
+      - name: Upload notificaciones env-debug artifact
+        if: ${{ inputs.target == 'notificaciones' || inputs.target == 'all' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-notificaciones-env-debug
+          path: repair-notificaciones-env-debug.log
 
       - name: Done
         run: echo "Repair job completed. Check step logs for per-host outputs."
