@@ -16,7 +16,8 @@ module.exports = {
       const list = await horariosService.getByMaestro(maestroId);
       res.json({ success: true, horarios: list });
     } catch (err) {
-      res.status(500).json({ success: false, error: err.message });
+      console.error('Error in getHorariosByMaestro:', err.message, err.stack || '');
+      res.status(err.status || 500).json({ success: false, error: err.message });
     }
   },
 
@@ -26,7 +27,8 @@ module.exports = {
       const reportes = await horariosService.getReportesByMaestro(maestroId);
       res.json({ success: true, reportes });
     } catch (err) {
-      res.status(500).json({ success: false, error: err.message });
+      console.error('Error in getHorariosReportes:', err.message, err.stack || '');
+      res.status(err.status || 500).json({ success: false, error: err.message });
     }
   },
 
