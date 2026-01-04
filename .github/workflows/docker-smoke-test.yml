@@ -15,6 +15,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Prepare .env
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+            echo "Copied .env.example to .env"
+          else
+            echo "No .env.example found; creating minimal .env"
+            cat > .env <<'EOF'
+NODE_ENV=production
+TAG=latest
+EOF
+          fi
+
       - name: Start stack (docker-compose)
         run: |
           chmod +x scripts/start-stack.sh
