@@ -26,8 +26,6 @@ jobs:
 
       - name: Write envs on reportes host
         run: |
-          echo "Writing env files on reportes host ${{ secrets.EC2_REPORTES_HOST }}"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_REPORTES_HOST }} << 'EOF'
           cat > "$HOME/micro-analytics.env" <<ENV
           MONGO_URI='${{ secrets.MONGO_URI }}'
           REDIS_HOST='${{ secrets.REDIS_HOST }}'
@@ -47,8 +45,6 @@ jobs:
 
       - name: Write env on notificaciones host
         run: |
-          echo "Writing env file on notificaciones host ${{ secrets.EC2_NOTIFICACIONES_HOST }}"
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_NOTIFICACIONES_HOST }} << 'EOF'
           cat > "$HOME/micro-notificaciones.env" <<ENV
           MONGO_URI='${{ secrets.MONGO_URI }}'
           REDIS_HOST='${{ secrets.REDIS_HOST }}'
