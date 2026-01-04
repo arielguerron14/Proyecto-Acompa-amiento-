@@ -6,6 +6,11 @@ on:
     paths:
       - "messaging/**"
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Run the deploy step to AWS (true/false). Defaults to 'false'."
+        required: false
+        default: 'false'
 
 jobs:
   deploy-aws:

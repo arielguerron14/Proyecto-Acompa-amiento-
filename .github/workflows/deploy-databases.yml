@@ -7,9 +7,15 @@ on:
       - "databases/**"
   workflow_dispatch:
 
+      inputs:
+        deploy:
+          description: "Run the deploy step to AWS (true/false). Defaults to 'false'."
+          required: false
+          default: 'false'
 jobs:
   deploy-aws:
-    runs-on: ubuntu-latest
+      runs-on: ubuntu-latest
+      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true' }}
     steps:
       - name: Set permissions for private key
         run: |

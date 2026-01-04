@@ -1,7 +1,12 @@
 name: Build and push Docker images to Docker Hub
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Service to build (e.g. api-gateway). Use 'all' or leave empty to build all"
+        required: false
+        default: 'all'
   push:
     branches: [ main ]
 
@@ -53,6 +58,7 @@ jobs:
           - name: messaging-kafka
             path: messaging/kafka
 
+    if: ${{ github.event.inputs.target == 'all' || github.event.inputs.target == matrix.name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
