@@ -72,7 +72,7 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.path }}
+          context: .
           file: ${{ matrix.path }}/Dockerfile
           push: true
           tags: ${{ env.REGISTRY }}/acompanamiento-${{ matrix.name }}:todo,${{ env.REGISTRY }}/acompanamiento-${{ matrix.name }}:latest
