@@ -85,26 +85,27 @@ let horarios = [];
 let horarioEditando = null;
 let currentTab = 'horarios';
 
-// Elementos del DOM
-const tabButtons = document.querySelectorAll('.nav-tab');
-const tabContents = document.querySelectorAll('.module');
-const horarioForm = document.getElementById('horario-form');
-const horariosTable = document.getElementById('horarios-table').querySelector('tbody');
-const semestreSelect = document.getElementById('semestre');
-const materiaSelect = document.getElementById('materia');
-const horaInicioInput = document.getElementById('hora-inicio');
-const horaFinInput = document.getElementById('hora-fin');
-const duracionDisplay = document.getElementById('duracion-display');
-const guardarBtn = document.getElementById('guardar-horario');
-const cancelarBtn = document.getElementById('cancelar-horario');
+// Elementos del DOM (defensivos: algunos pueden no existir según la página)
+const tabButtons = document.querySelectorAll('.nav-tab') || [];
+const tabContents = document.querySelectorAll('.module') || [];
+const horarioForm = document.getElementById('horario-form') || null;
+const _horariosTableElem = document.getElementById('horarios-table');
+const horariosTable = _horariosTableElem ? _horariosTableElem.querySelector('tbody') : null;
+const semestreSelect = document.getElementById('semestre') || null;
+const materiaSelect = document.getElementById('materia') || null;
+const horaInicioInput = document.getElementById('hora-inicio') || null;
+const horaFinInput = document.getElementById('hora-fin') || null;
+const duracionDisplay = document.getElementById('duracion-display') || null;
+const guardarBtn = document.getElementById('guardar-horario') || null;
+const cancelarBtn = document.getElementById('cancelar-horario') || null;
 
-// Reportes
-const totalHorasSemana = document.getElementById('total-horas-semana');
-const horasPorMateria = document.getElementById('horas-por-materia');
-const horariosPorDia = document.getElementById('horarios-por-dia');
-const horariosPorModalidad = document.getElementById('horarios-por-modalidad');
-const cuposDisponibles = document.getElementById('cupos-disponibles');
-const materiasDemanda = document.getElementById('materias-demanda');
+// Reportes (may not be present on all pages)
+const totalHorasSemana = document.getElementById('total-horas-semana') || null;
+const horasPorMateria = document.getElementById('horas-por-materia') || null;
+const horariosPorDia = document.getElementById('horarios-por-dia') || null;
+const horariosPorModalidad = document.getElementById('horarios-por-modalidad') || null;
+const cuposDisponibles = document.getElementById('cupos-disponibles') || null;
+const materiasDemanda = document.getElementById('materias-demanda') || null;
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
@@ -122,19 +123,23 @@ function initApp() {
 function setupEventListeners() {
   // Tabs
   tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.module));
+    try {
+      btn.addEventListener('click', () => switchTab(btn.dataset.module));
+    } catch (err) {
+      // ignore attach errors
+    }
   });
 
-  // Formulario
-  semestreSelect.addEventListener('change', updateMateriaOptions);
-  horaInicioInput.addEventListener('change', calcularDuracion);
-  horaFinInput.addEventListener('change', calcularDuracion);
+  // Formulario (attach only if elements exist)
+  if (semestreSelect) semestreSelect.addEventListener('change', updateMateriaOptions);
+  if (horaInicioInput) horaInicioInput.addEventListener('change', calcularDuracion);
+  if (horaFinInput) horaFinInput.addEventListener('change', calcularDuracion);
 
-  guardarBtn.addEventListener('click', guardarHorario);
-  cancelarBtn.addEventListener('click', cancelarEdicion);
+  if (guardarBtn) guardarBtn.addEventListener('click', guardarHorario);
+  if (cancelarBtn) cancelarBtn.addEventListener('click', cancelarEdicion);
 
   // Validación en tiempo real
-  horarioForm.addEventListener('input', validarFormulario);
+  if (horarioForm) horarioForm.addEventListener('input', validarFormulario);
 }
 
 // Cambiar pestaña
@@ -204,6 +209,8 @@ async function loadReportes() {
 
 // Renderizar horarios en tabla
 function renderHorarios() {
+  if (!horariosTable) return; // nothing to render on this page
+
   horariosTable.innerHTML = '';
 
   if (horarios.length === 0) {
@@ -237,43 +244,54 @@ function renderHorarios() {
 
 // Renderizar reportes
 function renderReportes(reportes) {
-  totalHorasSemana.textContent = reportes.totalHorasSemana.toFixed(1);
+  if (totalHorasSemana) totalHorasSemana.textContent = (reportes.totalHorasSemana || 0).toFixed(1);
 
   // Horas por materia
-  horasPorMateria.innerHTML = '';
-  Object.entries(reportes.horasPorMateria).forEach(([materia, horas]) => {
-    horasPorMateria.innerHTML += `<div>${materia}: ${horas.toFixed(1)}h</div>`;
-  });
+  if (horasPorMateria) {
+    horasPorMateria.innerHTML = '';
+    Object.entries(reportes.horasPorMateria || {}).forEach(([materia, horas]) => {
+      horasPorMateria.innerHTML += `<div>${materia}: ${horas.toFixed(1)}h</div>`;
+    });
+  }
 
   // Horarios por día
-  horariosPorDia.innerHTML = '';
-  DIAS_SEMANA.forEach(dia => {
-    const count = reportes.horariosPorDia[dia] || 0;
-    horariosPorDia.innerHTML += `<div>${dia}: ${count}</div>`;
-  });
+  if (horariosPorDia) {
+    horariosPorDia.innerHTML = '';
+    DIAS_SEMANA.forEach(dia => {
+      const count = (reportes.horariosPorDia && reportes.horariosPorDia[dia]) || 0;
+      horariosPorDia.innerHTML += `<div>${dia}: ${count}</div>`;
+    });
+  }
 
   // Horarios por modalidad
-  horariosPorModalidad.innerHTML = '';
-  MODALIDADES.forEach(modalidad => {
-    const count = reportes.horariosPorModalidad[modalidad] || 0;
-    horariosPorModalidad.innerHTML += `<div>${modalidad}: ${count}</div>`;
-  });
+  if (horariosPorModalidad) {
+    horariosPorModalidad.innerHTML = '';
+    MODALIDADES.forEach(modalidad => {
+      const count = (reportes.horariosPorModalidad && reportes.horariosPorModalidad[modalidad]) || 0;
+      horariosPorModalidad.innerHTML += `<div>${modalidad}: ${count}</div>`;
+    });
+  }
 
-  cuposDisponibles.textContent = reportes.cuposDisponibles;
+  if (cuposDisponibles) cuposDisponibles.textContent = reportes.cuposDisponibles || 0;
 
   // Materias con mayor demanda
-  materiasDemanda.innerHTML = '';
-  Object.entries(reportes.materiasDemanda)
-    .sort(([,a], [,b]) => b - a)
-    .slice(0, 5)
-    .forEach(([materia, cupos]) => {
-      materiasDemanda.innerHTML += `<div>${materia}: ${cupos} cupos</div>`;
-    });
+  if (materiasDemanda) {
+    materiasDemanda.innerHTML = '';
+    Object.entries(reportes.materiasDemanda || {})
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .forEach(([materia, cupos]) => {
+        materiasDemanda.innerHTML += `<div>${materia}: ${cupos} cupos</div>`;
+      });
+  }
 }
 
 // Actualizar opciones de materia según semestre
 function updateMateriaOptions() {
-  const semestre = parseInt(semestreSelect.value);
+  // Defensive: if the select elements are not present on the page, do nothing
+  if (!semestreSelect || !materiaSelect) return;
+
+  const semestre = parseInt(semestreSelect.value) || 0;
   const materias = MATERIAS_POR_SEMESTRE[semestre] || [];
 
   materiaSelect.innerHTML = '<option value="">Seleccione una materia</option>';
@@ -288,8 +306,13 @@ function updateMateriaOptions() {
 
 // Calcular duración automáticamente
 function calcularDuracion() {
-  const inicio = horaInicioInput.value;
-  const fin = horaFinInput.value;
+  // Defensive: ensure inputs and display exist
+  if (!horaInicioInput || !horaFinInput || !duracionDisplay) {
+    return 0;
+  }
+
+  const inicio = (horaInicioInput.value || '').trim();
+  const fin = (horaFinInput.value || '').trim();
 
   if (inicio && fin) {
     const inicioMin = timeToMinutes(inicio);
@@ -321,15 +344,21 @@ function calcularDuracionMinutos(inicio, fin) {
 
 // Validar formulario
 function validarFormulario() {
-  const semestre = semestreSelect.value;
-  const materia = materiaSelect.value;
-  const paralelo = document.getElementById('paralelo').value;
-  const dia = document.getElementById('dia').value;
-  const horaInicio = horaInicioInput.value;
-  const horaFin = horaFinInput.value;
-  const modalidad = document.getElementById('modalidad').value;
-  const lugar = document.getElementById('lugar').value;
-  const cupo = document.getElementById('cupo').value;
+  // Defensive getters: if elements are missing, use default empty values
+  const semestre = semestreSelect ? semestreSelect.value : '';
+  const materia = materiaSelect ? materiaSelect.value : '';
+  const paraleloElem = document.getElementById('paralelo');
+  const paralelo = paraleloElem ? paraleloElem.value : '';
+  const diaElem = document.getElementById('dia');
+  const dia = diaElem ? diaElem.value : '';
+  const horaInicio = horaInicioInput ? horaInicioInput.value : '';
+  const horaFin = horaFinInput ? horaFinInput.value : '';
+  const modalidadElem = document.getElementById('modalidad');
+  const modalidad = modalidadElem ? modalidadElem.value : '';
+  const lugarElem = document.getElementById('lugar');
+  const lugar = lugarElem ? lugarElem.value : '';
+  const cupoElem = document.getElementById('cupo');
+  const cupo = cupoElem ? cupoElem.value : '';
 
   let isValid = true;
   let errors = [];
@@ -420,38 +449,53 @@ async function guardarHorario() {
     const url = horarioEditando ? `${apiBase}/horarios/${horarioEditando}` : `${apiBase}/horarios`;
     const method = horarioEditando ? 'PUT' : 'POST';
 
+    // Indicate loading state to user
+    if (guardarBtn) {
+      guardarBtn.disabled = true;
+      guardarBtn.textContent = horarioEditando ? 'Actualizando...' : 'Guardando...';
+    }
+
     console.log('Enviando petición:', method, url);
-    console.log('Datos:', horarioData);
+    console.log('Datos (object):', horarioData);
+    console.log('Datos (stringified):', JSON.stringify(horarioData));
 
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(horarioData)
-    });
+    let response, result;
+    try {
+      response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(horarioData)
+      });
 
-    console.log('Respuesta recibida:', response.status, response.statusText);
+      console.log('Respuesta recibida:', response.status, response.statusText);
+      // Attempt to parse JSON safely
+      try { result = await response.json(); } catch (e) { result = {}; }
 
-    const result = await response.json();
-
-    if (response.ok && (result.success || method === 'POST')) {
-      showSuccess(horarioEditando ? 'Horario actualizado' : 'Horario creado');
-      horarioForm.reset();
-      horarioEditando = null;
-      guardarBtn.textContent = 'Crear Horario';
-      loadHorarios();
-      loadReportes();
-    } else {
-      let errorMsg = result.message || result.error || 'Error al guardar horario';
-      
-      // Mensaje específico para conflicto de horarios
-      if (response.status === 409) {
-        errorMsg = 'Conflicto de horario: Ya existe un horario que se solapa con el horario que intentas crear. Por favor, elige una hora diferente o un día diferente.';
+      if (response && response.ok && (result.success || method === 'POST')) {
+        showSuccess(horarioEditando ? 'Horario actualizado' : 'Horario creado');
+        horarioForm.reset();
+        horarioEditando = null;
+        loadHorarios();
+        loadReportes();
+      } else {
+        let errorMsg = (result && (result.message || result.error)) || 'Error al guardar horario';
+        if (response && response.status === 409) {
+          errorMsg = 'Conflicto de horario: Ya existe un horario que se solapa con el horario que intentas crear. Por favor, elige una hora diferente o un día diferente.';
+        }
+        showError(errorMsg);
       }
-      
-      showError(errorMsg);
+    } catch (error) {
+      console.error('Error:', error);
+      showError('Error de conexión');
+    } finally {
+      // Always restore button state so UI doesn't remain bloqueada
+      if (guardarBtn) {
+        guardarBtn.disabled = false;
+        guardarBtn.textContent = horarioEditando ? 'Actualizar Horario' : 'Crear Horario';
+      }
     }
   } catch (error) {
     console.error('Error:', error);

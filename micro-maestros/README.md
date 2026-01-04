@@ -186,6 +186,7 @@ curl -X DELETE http://localhost:5001/horarios/HORARIO-001
 |----------|-------------|-------------|
 | `MONGO_URL` | Cadena de conexión MongoDB | `mongodb://localhost:27017/maestros` |
 | `PORT` | Puerto del servicio | `5001` |
+| `HORARIOS_REPORT_TIMEOUT_MS` | Timeout máximo (ms) para la generación de reportes de horarios (evita bloqueos por servicios lentos) | `5000` |
 
 ## Database
 
