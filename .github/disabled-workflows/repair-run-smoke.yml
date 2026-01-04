@@ -1,0 +1,11 @@
+name: Repair run smoke test (archived)
+
+# Archived per request: repair/smoke workflows removed from CI.
+on: []
+
+jobs:
+  archived:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Archived
+        run: echo "Original repair-run-smoke.yml archived and removed from active workflows"

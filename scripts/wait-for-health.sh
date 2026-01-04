@@ -22,7 +22,7 @@ END=$((START + TIMEOUT))
 
 ENDPOINTS=(
   "http://localhost:5001/health"
-  "http://localhost:5002/health"
+  "http://localhost:8080/health"
   "http://localhost:5003/health"
   "http://localhost:5004/health"
   "http://localhost:5005/health"

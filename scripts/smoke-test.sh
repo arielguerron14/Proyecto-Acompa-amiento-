@@ -17,7 +17,7 @@ URLS[reportes-maestros]="http://localhost:5004/health"
 URLS[auth]="http://localhost:5005/health"
 URLS[notificaciones]="http://localhost:5006/health"
 URLS[soap]="http://localhost:5008/health"
-URLS[apigateway]="http://localhost:8080/"
+URLS[apigateway]="http://localhost:8080/health"
 
 FAILED=0
 for name in "${!URLS[@]}"; do

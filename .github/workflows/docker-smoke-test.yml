@@ -1,50 +1,11 @@
-name: Docker Smoke Test
+name: REMOVED: Docker Smoke Test
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ 'run-repair', 'main' ]
+# Removed from active workflows per request; archived at .github/disabled-workflows/docker-smoke-test.yml
+on: []
 
 jobs:
-  smoke:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Prepare .env
-        run: |
-          if [ -f .env.example ]; then
-            cp .env.example .env
-            echo "Copied .env.example to .env"
-          else
-            echo "No .env.example found; creating minimal .env"
-            cat > .env <<'EOF'
-NODE_ENV=production
-TAG=latest
-EOF
-          fi
-
-      - name: Start stack (docker-compose)
-        run: |
-          chmod +x scripts/start-stack.sh
-          ./scripts/start-stack.sh
-
-      - name: Run smoke tests
-        run: |
-          chmod +x scripts/smoke-test.sh
-          ./scripts/smoke-test.sh
-
-      - name: Upload smoke artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-artifacts
-          path: artifacts/smoke
-
-      - name: Tear down
-        if: always()
-        run: |
-          docker compose down --volumes --remove-orphans || true
+      - name: Removed
+        run: echo "Workflow removed from active workflows; archived at .github/disabled-workflows/docker-smoke-test.yml"

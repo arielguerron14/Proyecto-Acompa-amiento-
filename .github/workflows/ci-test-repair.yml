@@ -1,24 +1,11 @@
-name: CI Test for run-repair
+name: REMOVED: CI Test for run-repair
 
-on:
-  push:
-    branches:
-      - run-repair
+# Removed from active workflows per request; archived at .github/disabled-workflows/ci-test-repair.yml
+on: []
 
 jobs:
-  smoke:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - name: Print environment
-        run: |
-          echo "Running smoke test for run-repair branch"
-          echo "Branch: $GITHUB_REF"
-      - name: Check MONGO_URI secret
-        run: |
-          if [ -z "${{ secrets.MONGO_URI }}" ]; then
-            echo "MONGO_URI missing"; exit 1
-          else
-            echo "MONGO_URI present"
-          fi
-      - name: Done
-        run: echo "smoke ok"
+      - name: Removed
+        run: echo "Workflow removed from active workflows; archived at .github/disabled-workflows/ci-test-repair.yml"

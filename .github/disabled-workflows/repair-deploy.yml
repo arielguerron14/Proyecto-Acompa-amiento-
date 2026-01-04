@@ -1,0 +1,11 @@
+name: Repair deploy (archived)
+
+# Archived: original repair-deploy manual workflow. Removed from active workflows per request.
+on: []
+
+jobs:
+  archived:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Archived
+        run: echo "Original repair-deploy.yml archived and removed from active workflows"

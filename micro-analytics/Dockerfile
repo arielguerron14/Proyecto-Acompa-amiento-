@@ -16,8 +16,8 @@ RUN npm ci --only=production --silent || npm install --production --silent
 
 # create symlinks for shared dependencies (point to /usr/src/shared-auth)
 RUN mkdir -p node_modules && \
-    ln -sf ../shared-auth node_modules/shared-auth && \
-    ln -sf ../shared-monitoring node_modules/shared-monitoring
+    ln -sf /usr/src/shared-auth node_modules/shared-auth && \
+    ln -sf /usr/src/shared-monitoring node_modules/shared-monitoring
 
 ENV NODE_ENV=production
 ENV PORT=5007

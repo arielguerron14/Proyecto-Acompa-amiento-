@@ -1,26 +1,11 @@
-name: Repair run smoke test
+name: REMOVED: Repair run smoke test
 
-on:
-  workflow_dispatch:
-    inputs:
-      target:
-        description: 'Target: reportes|notificaciones|all'
-        required: false
-        default: 'reportes'
-  push:
-    branches: [ 'run-repair' ]
+# Removed from active workflows per request; archived at .github/disabled-workflows/repair-run-smoke.yml
+on: []
 
 jobs:
-  smoke:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Print environment info
-        run: |
-          echo "SMOKE: branch=${GITHUB_REF}"
-          echo "SMOKE: repo=${GITHUB_REPOSITORY}"
-          echo "SMOKE: run on $(uname -a)"
-          echo "SMOKE: List environment variables of interest"
-          env | grep -E 'GITHUB|RUNNER|EC2|MONGO|REDIS' || true
+      - name: Removed
+        run: echo "Workflow removed from active workflows; archived at .github/disabled-workflows/repair-run-smoke.yml"
