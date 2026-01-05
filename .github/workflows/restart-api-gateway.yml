@@ -51,6 +51,10 @@ jobs:
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
           cd Proyecto-Acompa-amiento-
           
+          echo "Verifying directory structure..."
+          pwd
+          ls -la api-gateway/Dockerfile
+          
           echo "Step 5: Build API Gateway image..."
           docker build -t api-gateway:latest -f api-gateway/Dockerfile ./api-gateway
           

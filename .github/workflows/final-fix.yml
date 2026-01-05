@@ -49,6 +49,10 @@ jobs:
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
           cd Proyecto-Acompa-amiento-
           
+          echo "Verifying directory structure..."
+          pwd
+          ls -la micro-auth/Dockerfile micro-maestros/Dockerfile micro-estudiantes/Dockerfile
+          
           echo "Step 4: Rebuild microservice images (without hardcoded PORTs)..."
           docker build -t micro-auth:latest -f micro-auth/Dockerfile .
           docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .

@@ -51,6 +51,10 @@ jobs:
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
           cd Proyecto-Acompa-amiento-
           
+          echo "Verifying directory structure..."
+          pwd
+          ls -la frontend-web/Dockerfile
+          
           echo "Step 5: Build frontend image..."
           docker build -t frontend-web:latest -f frontend-web/Dockerfile ./frontend-web
           
