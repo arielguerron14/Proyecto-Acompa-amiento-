@@ -117,16 +117,18 @@ jobs:
           echo "Step 10: Verify full system connectivity"
           echo "=================================================="
           
-          echo "Testing Frontend..."
-          curl -I http://98.92.84.126 2>&1 | head -5 || echo "Frontend test"
+          echo "Testing Microservices Health..."
+          curl -I http://100.24.118.233:3000/health 2>&1 | head -5 || echo "Auth service test"
+          curl -I http://100.24.118.233:3001/health 2>&1 | head -5 || echo "Estudiantes service test"
+          curl -I http://100.24.118.233:3002/health 2>&1 | head -5 || echo "Maestros service test"
           
           echo ""
           echo "Testing API Gateway health..."
-          curl -I http://98.84.30.35:8080/health 2>&1 | head -5 || echo "API Gateway test"
+          curl -I http://100.49.159.65:8080/health 2>&1 | head -5 || echo "API Gateway test"
           
           echo ""
           echo "Testing registration endpoint..."
-          curl -s -X POST http://98.92.84.126/api/auth/register \
+          curl -s -X POST http://100.49.159.65:8080/api/auth/register \
             -H "Content-Type: application/json" \
             -d '{"nombre":"Test","email":"test@example.com","password":"123456","rol":"Estudiante"}' 2>&1 | head -20 || echo "Registration test"
 
@@ -138,7 +140,9 @@ jobs:
           echo "=================================================="
           echo ""
           echo "If you see HTTP 200 or proper responses above, the fix worked!"
-          echo "Try accessing the frontend now: http://98.92.84.126"
+          echo "Microservices: http://100.24.118.233:3000/3001/3002"
+          echo "API Gateway: http://100.49.159.65:8080"
+          echo "Frontend: http://44.210.241.99"
           echo ""
 
       - name: Cleanup
