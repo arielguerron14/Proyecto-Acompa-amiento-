@@ -44,7 +44,9 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ env.EC2_DB_SSH_KEY }}" > ~/.ssh/aws-ec2-db.pem
+          cat > ~/.ssh/aws-ec2-db.pem << 'EOF'
+          ${{ env.EC2_DB_SSH_KEY }}
+          EOF
           chmod 600 ~/.ssh/aws-ec2-db.pem
           echo "StrictHostKeyChecking=no" >> ~/.ssh/config
           echo "UserKnownHostsFile=/dev/null" >> ~/.ssh/config
