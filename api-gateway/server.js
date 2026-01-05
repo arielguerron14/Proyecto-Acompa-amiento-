@@ -62,11 +62,11 @@ app.get('/health', (req, res) => {
 });
 
 // Service URLs from environment or defaults
-const auth = process.env.AUTH_SERVICE || 'http://micro-auth:5005';
-const maestros = process.env.MAESTROS_SERVICE || 'http://micro-maestros:5001';
-const estudiantes = process.env.ESTUDIANTES_SERVICE || 'http://micro-estudiantes:5002';
-const reportesEst = process.env.REPORTES_EST_SERVICE || 'http://micro-reportes-estudiantes:5003';
-const reportesMaest = process.env.REPORTES_MAEST_SERVICE || 'http://micro-reportes-maestros:5004';
+const auth = process.env.AUTH_SERVICE || 'http://13.223.196.229:3000';
+const maestros = process.env.MAESTROS_SERVICE || 'http://13.223.196.229:3002';
+const estudiantes = process.env.ESTUDIANTES_SERVICE || 'http://13.223.196.229:3001';
+const reportesEst = process.env.REPORTES_EST_SERVICE || 'http://100.28.217.159:5003';
+const reportesMaest = process.env.REPORTES_MAEST_SERVICE || 'http://100.28.217.159:5004';
 
 console.log('🔗 Configured Services:');
 console.log(`  Auth: ${auth}`);

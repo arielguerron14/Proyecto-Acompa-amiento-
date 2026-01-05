@@ -88,11 +88,11 @@ jobs:
           docker run -d --name api-gateway --restart unless-stopped \
             -p 8080:8080 \
             -e PORT=8080 \
-            -e AUTH_SERVICE=http://100.24.118.233:3000 \
-            -e MAESTROS_SERVICE=http://100.24.118.233:3002 \
-            -e ESTUDIANTES_SERVICE=http://100.24.118.233:3001 \
-            -e REPORTES_EST_SERVICE=http://98.84.26.109:5003 \
-            -e REPORTES_MAEST_SERVICE=http://98.84.26.109:5004 \
+            -e AUTH_SERVICE=http://13.223.196.229:3000 \
+            -e MAESTROS_SERVICE=http://13.223.196.229:3002 \
+            -e ESTUDIANTES_SERVICE=http://13.223.196.229:3001 \
+            -e REPORTES_EST_SERVICE=http://100.28.217.159:5003 \
+            -e REPORTES_MAEST_SERVICE=http://100.28.217.159:5004 \
             api-gateway:latest
           
           sleep 5

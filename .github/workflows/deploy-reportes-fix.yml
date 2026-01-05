@@ -31,7 +31,7 @@ jobs:
           echo "=================================================="
           echo "Deploying Reportes Services"
           echo "=================================================="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.26.109 << 'DEPLOY_REPORTES'
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.28.217.159 << 'DEPLOY_REPORTES'
           set -e
           
           echo "Step 1: Update code from latest main branch..."
@@ -76,7 +76,7 @@ jobs:
           echo "=================================================="
           echo "Restarting Microservices with Fixed Env Vars"
           echo "=================================================="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.24.118.233 << 'RESTART_SERVICES'
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@13.223.196.229 << 'RESTART_SERVICES'
           set -e
           
           echo "Step 1: Stop and remove all old services..."
@@ -98,40 +98,40 @@ jobs:
           docker run -d --name micro-auth --restart unless-stopped \
             -p 3000:3000 \
             -e PORT=3000 \
-            -e DB_HOST=98.84.26.109 \
+            -e DB_HOST=13.220.99.207 \
             -e DB_USER=root \
             -e DB_PASS=password \
-            -e REDIS_HOST=98.84.26.109 \
+            -e REDIS_HOST=13.220.99.207 \
             -e REDIS_PORT=6379 \
-            -e MONGO_URI=mongodb://98.84.26.109:27017/authdb \
+            -e MONGO_URI=mongodb://13.220.99.207:27017/authdb \
             micro-auth:latest
           
           echo "Step 5: Start estudiantes service with reportes URLs..."
           docker run -d --name micro-estudiantes --restart unless-stopped \
             -p 3001:3001 \
             -e PORT=3001 \
-            -e DB_HOST=98.84.26.109 \
+            -e DB_HOST=13.220.99.207 \
             -e DB_USER=postgres \
             -e DB_PASS=example \
-            -e REDIS_HOST=98.84.26.109 \
+            -e REDIS_HOST=13.220.99.207 \
             -e REDIS_PORT=6379 \
-            -e MONGO_URI=mongodb://98.84.26.109:27017/estudiantesdb \
-            -e MAESTROS_URL=http://100.24.118.233:3002 \
-            -e REPORTES_EST_URL=http://98.84.26.109:5003 \
-            -e REPORTES_MAEST_URL=http://98.84.26.109:5004 \
+            -e MONGO_URI=mongodb://13.220.99.207:27017/estudiantesdb \
+            -e MAESTROS_URL=http://13.223.196.229:3002 \
+            -e REPORTES_EST_URL=http://100.28.217.159:5003 \
+            -e REPORTES_MAEST_URL=http://100.28.217.159:5004 \
             micro-estudiantes:latest
           
           echo "Step 6: Start maestros service with estudiantes URL..."
           docker run -d --name micro-maestros --restart unless-stopped \
             -p 3002:3002 \
             -e PORT=3002 \
-            -e DB_HOST=98.84.26.109 \
+            -e DB_HOST=13.220.99.207 \
             -e DB_USER=postgres \
             -e DB_PASS=example \
-            -e REDIS_HOST=98.84.26.109 \
+            -e REDIS_HOST=13.220.99.207 \
             -e REDIS_PORT=6379 \
-            -e MONGO_URI=mongodb://98.84.26.109:27017/maestrosdb \
-            -e ESTUDIANTES_URL=http://100.24.118.233:3001 \
+            -e MONGO_URI=mongodb://13.220.99.207:27017/maestrosdb \
+            -e ESTUDIANTES_URL=http://13.223.196.229:3001 \
             micro-maestros:latest
           
           echo "Step 7: Wait for services..."
@@ -151,18 +151,18 @@ jobs:
           echo "=================================================="
           
           echo "Testing Microservices Health..."
-          curl -s http://100.24.118.233:3000/health | jq . || echo "Auth service test"
-          curl -s http://100.24.118.233:3001/health | jq . || echo "Estudiantes service test"
-          curl -s http://100.24.118.233:3002/health | jq . || echo "Maestros service test"
+          curl -s http://13.223.196.229:3000/health | jq . || echo "Auth service test"
+          curl -s http://13.223.196.229:3001/health | jq . || echo "Estudiantes service test"
+          curl -s http://13.223.196.229:3002/health | jq . || echo "Maestros service test"
           
           echo ""
           echo "Testing Reportes Services..."
-          curl -s http://98.84.26.109:5003/health | jq . || echo "Reportes Estudiantes test"
-          curl -s http://98.84.26.109:5004/health | jq . || echo "Reportes Maestros test"
+          curl -s http://100.28.217.159:5003/health | jq . || echo "Reportes Estudiantes test"
+          curl -s http://100.28.217.159:5004/health | jq . || echo "Reportes Maestros test"
           
           echo ""
           echo "Testing API Gateway..."
-          curl -s http://100.49.159.65:8080/health | jq . || echo "API Gateway test"
+          curl -s http://100.48.66.29:8080/health | jq . || echo "API Gateway test"
           
           echo ""
           echo "Testing Horarios endpoint..."
