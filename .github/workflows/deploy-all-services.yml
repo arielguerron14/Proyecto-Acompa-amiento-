@@ -1,0 +1,143 @@
+name: Deploy All Services to New EC2 Instances
+
+on:
+  workflow_dispatch:
+
+env:
+  SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+
+jobs:
+  deploy-microservices:
+    name: Deploy All Microservices
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+          cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          EOF
+
+      - name: Deploy Microservices on Core Server (13.223.196.229)
+        run: |
+          echo "=================================================="
+          echo "Deploying Microservices to 13.223.196.229"
+          echo "=================================================="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@13.223.196.229 << 'DEPLOY_MICROSERVICES'
+          set -e
+          
+          echo "Step 1: Clone latest code..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "Step 2: Build microservices images..."
+          docker build -t micro-auth:latest -f micro-auth/Dockerfile .
+          docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
+          docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
+          
+          echo "Step 3: Stop old containers..."
+          docker stop micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          docker rm micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 4: Start Auth Service..."
+          docker run -d --name micro-auth --restart unless-stopped \
+            -p 3000:3000 \
+            -e PORT=3000 \
+            -e NODE_ENV=production \
+            -e DB_HOST=13.220.99.207 \
+            -e DB_PORT=5432 \
+            -e DB_NAME=micro_auth \
+            -e DB_USER=postgres \
+            -e DB_PASSWORD=postgres \
+            -e REDIS_HOST=13.220.99.207 \
+            -e REDIS_PORT=6379 \
+            -e JWT_SECRET=your-secret-key \
+            micro-auth:latest
+          
+          echo "Step 5: Start Estudiantes Service..."
+          docker run -d --name micro-estudiantes --restart unless-stopped \
+            -p 3001:3001 \
+            -e PORT=3001 \
+            -e NODE_ENV=production \
+            -e DB_HOST=13.220.99.207 \
+            -e DB_PORT=5432 \
+            -e DB_NAME=micro_estudiantes \
+            -e DB_USER=postgres \
+            -e DB_PASSWORD=postgres \
+            -e REDIS_HOST=13.220.99.207 \
+            -e REDIS_PORT=6379 \
+            -e MAESTROS_URL=http://13.223.196.229:3002 \
+            -e REPORTES_EST_URL=http://100.28.217.159:5003 \
+            -e REPORTES_MAEST_URL=http://100.28.217.159:5004 \
+            micro-estudiantes:latest
+          
+          echo "Step 6: Start Maestros Service..."
+          docker run -d --name micro-maestros --restart unless-stopped \
+            -p 3002:3002 \
+            -e PORT=3002 \
+            -e NODE_ENV=production \
+            -e DB_HOST=13.220.99.207 \
+            -e DB_PORT=5432 \
+            -e DB_NAME=micro_maestros \
+            -e DB_USER=postgres \
+            -e DB_PASSWORD=postgres \
+            -e REDIS_HOST=13.220.99.207 \
+            -e REDIS_PORT=6379 \
+            -e ESTUDIANTES_URL=http://13.223.196.229:3001 \
+            micro-maestros:latest
+          
+          echo "Step 7: Wait for containers..."
+          sleep 8
+          
+          echo "Step 8: Check container status..."
+          docker ps | grep -E "micro-auth|micro-estudiantes|micro-maestros"
+          
+          echo "✅ Microservices deployed!"
+          DEPLOY_MICROSERVICES
+
+      - name: Verify Microservices
+        continue-on-error: true
+        run: |
+          echo "Testing microservices health..."
+          
+          echo "Auth service:"
+          curl -s http://13.223.196.229:3000/health || echo "Auth health check failed"
+          
+          echo ""
+          echo "Estudiantes service:"
+          curl -s http://13.223.196.229:3001/health || echo "Estudiantes health check failed"
+          
+          echo ""
+          echo "Maestros service:"
+          curl -s http://13.223.196.229:3002/health || echo "Maestros health check failed"
+
+      - name: Final Status
+        run: |
+          echo "=================================================="
+          echo "✅ MICROSERVICES DEPLOYMENT COMPLETED"
+          echo "=================================================="
+          echo ""
+          echo "Deployed services:"
+          echo "  • Auth: http://13.223.196.229:3000"
+          echo "  • Estudiantes: http://13.223.196.229:3001"
+          echo "  • Maestros: http://13.223.196.229:3002"
+          echo ""
+          echo "Database server: 13.220.99.207"
+          echo "  • PostgreSQL"
+          echo "  • MongoDB"
+          echo "  • Redis"
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/key.pem
