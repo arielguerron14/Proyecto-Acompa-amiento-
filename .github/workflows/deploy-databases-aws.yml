@@ -19,7 +19,7 @@ on:
 
 env:
   EC2_DB_SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
-  EC2_DB_SSH_USER: ec2-user
+  EC2_DB_SSH_USER: ubuntu
   POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_AWS }}
   POSTGRES_USER: postgres
   POSTGRES_DB: acompanamiento
