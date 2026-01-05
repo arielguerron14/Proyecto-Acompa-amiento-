@@ -78,6 +78,7 @@ jobs:
             -e DB_PASS=example \
             -e REDIS_HOST=98.84.26.109 \
             -e REDIS_PORT=6379 \
+            -e MONGO_URI=mongodb://98.84.26.109:27017/estudiantesdb \
             micro-estudiantes:latest
           
           docker run -d --name micro-maestros --restart unless-stopped \
@@ -88,6 +89,7 @@ jobs:
             -e DB_PASS=example \
             -e REDIS_HOST=98.84.26.109 \
             -e REDIS_PORT=6379 \
+            -e MONGO_URI=mongodb://98.84.26.109:27017/maestrosdb \
             micro-maestros:latest
           
           echo "Step 6: Wait for containers to fully start..."
