@@ -48,8 +48,24 @@ jobs:
           EOF
           chmod 600 ~/.ssh/aws-ec2-frontend.pem
           
-          # Create deployment script with variables substituted
-          cat > /tmp/deploy-frontend.sh << 'DEPLOY_SCRIPT'
+          # Test connection first
+          echo "Testing SSH connection..."
+          ssh -i ~/.ssh/aws-ec2-frontend.pem \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes \
+            ubuntu@172.31.69.203 "echo 'SSH connection OK' && uname -a"
+          
+          # Create deployment script on remote
+          ssh -i ~/.ssh/aws-ec2-frontend.pem \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o IdentitiesOnly=yes \
+            ubuntu@172.31.69.203 << 'REMOTESCRIPT'
+          
+          cat > ~/deploy-frontend.sh << 'DEPLOYEOF'
           #!/bin/bash
           set -e
           
@@ -103,17 +119,19 @@ jobs:
           timeout 5 bash -c "cat < /dev/null > /dev/tcp/${API_GW_PRIVATE_IP}/8080" 2>/dev/null && echo "✓ API Gateway accesible" || echo "⚠ API Gateway no accesible"
           
           echo "=== Despliegue de Frontend completado ==="
-          DEPLOY_SCRIPT
+          DEPLOYEOF
           
-          chmod +x /tmp/deploy-frontend.sh
+          chmod +x ~/deploy-frontend.sh
+          ~/deploy-frontend.sh "$1" "$2"
+          REMOTESCRIPT
           
-          # Execute via SSH
+          # Execute with arguments
           ssh -i ~/.ssh/aws-ec2-frontend.pem \
             -o ConnectTimeout=10 \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             -o IdentitiesOnly=yes \
-            ubuntu@172.31.69.203 'bash -s' < /tmp/deploy-frontend.sh "${{ env.EC2_API_GATEWAY_PUBLIC_IP }}" "${{ env.EC2_API_GATEWAY_PRIVATE_IP }}"
+            ubuntu@172.31.69.203 "bash ~/deploy-frontend.sh ${{ env.EC2_API_GATEWAY_PUBLIC_IP }} ${{ env.EC2_API_GATEWAY_PRIVATE_IP }}"
 
       - name: Cleanup SSH key
         if: always()
