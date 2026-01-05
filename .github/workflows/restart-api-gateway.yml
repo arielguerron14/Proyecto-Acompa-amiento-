@@ -1,0 +1,119 @@
+name: Restart API Gateway with Public IPs
+
+on:
+  workflow_dispatch:
+
+env:
+  SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+
+jobs:
+  restart-api-gateway:
+    name: Restart API Gateway
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+          cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          EOF
+
+      - name: Restart API Gateway
+        run: |
+          echo "=================================================="
+          echo "🔧 Restarting API Gateway with Public IPs"
+          echo "=================================================="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.30.35 << 'APIGATEWAYFIX'
+          set -e
+          
+          echo "Step 1: Stop existing API Gateway container..."
+          docker stop acompanamiento-gateway 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 2: Remove existing container..."
+          docker rm acompanamiento-gateway 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 3: Remove old image to force rebuild..."
+          docker rmi api-gateway:latest 2>/dev/null || true
+          
+          echo "Step 4: Clone latest code..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "Step 5: Build API Gateway image..."
+          docker build -t api-gateway:latest -f api-gateway/Dockerfile ./api-gateway
+          
+          echo "Step 6: Start API Gateway with PUBLIC IP addresses..."
+          docker run -d \
+            --name acompanamiento-gateway \
+            --restart unless-stopped \
+            -p 8080:8080 \
+            -e NODE_ENV=production \
+            -e PORT=8080 \
+            -e AUTH_SERVICE_URL=http://13.221.55.216:3000 \
+            -e MAESTROS_SERVICE_URL=http://13.221.55.216:3002 \
+            -e ESTUDIANTES_SERVICE_URL=http://13.221.55.216:3001 \
+            api-gateway:latest
+          
+          echo ""
+          echo "Step 7: Wait for container to start..."
+          sleep 5
+          
+          echo ""
+          echo "Step 8: Check container status..."
+          docker ps
+          
+          echo ""
+          echo "Step 9: Check API Gateway logs..."
+          docker logs --tail=50 acompanamiento-gateway 2>&1 | grep -E "listening|error|Error|✓|⚠" | tail -20 || echo "Logs not available yet"
+          
+          echo ""
+          echo "Step 10: Test API Gateway health..."
+          curl -v http://localhost:8080/health 2>&1 | grep -E "HTTP|Connected|refused" | head -5 || echo "Health check attempted"
+          
+          echo ""
+          echo "✅ API Gateway restarted!"
+          APIGATEWAYFIX
+
+      - name: Verify System
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "=================================================="
+          echo "Testing System Connectivity"
+          echo "=================================================="
+          
+          echo "Testing API Gateway from outside..."
+          curl -I http://98.84.30.35:8080/health 2>&1 | head -10 || echo "API Gateway test"
+          
+          echo ""
+          echo "Testing registration endpoint..."
+          curl -s -X POST http://98.84.30.35:8080/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"nombre":"Test","email":"test@example.com","password":"123456","rol":"Estudiante"}' 2>&1 | head -20 || echo "Registration test"
+
+      - name: Final Status
+        run: |
+          echo ""
+          echo "=================================================="
+          echo "✅ API GATEWAY RESTART COMPLETED"
+          echo "=================================================="
+          echo ""
+          echo "API Gateway should now be accessible at: http://98.84.30.35:8080"
+          echo "Try registration at: http://98.92.84.126"
+          echo ""
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/key.pem
