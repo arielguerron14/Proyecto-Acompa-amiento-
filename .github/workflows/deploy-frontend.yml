@@ -36,11 +36,42 @@ jobs:
           echo "=== Testing SSH connection ==="
           echo "Target IP: ${{ env.EC2_FRONTEND_IP }}"
           echo "Key file size: $(wc -c < ~/.ssh/aws-ec2-frontend.pem) bytes"
+          echo ""
           
-          ssh -i ~/.ssh/aws-ec2-frontend.pem \
-            -o ConnectTimeout=10 \
-            ubuntu@${{ env.EC2_FRONTEND_IP }} \
-            "echo 'SSH OK' && docker --version"
+          # Test SSH with retries
+          max_retries=5
+          retry_delay=10
+          
+          for ((i=1; i<=max_retries; i++)); do
+            echo "Attempt $i/$max_retries: Testing SSH connection..."
+            
+            if ssh -i ~/.ssh/aws-ec2-frontend.pem \
+              -o ConnectTimeout=10 \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ubuntu@${{ env.EC2_FRONTEND_IP }} \
+              "echo 'SSH OK' && docker --version" 2>&1; then
+              echo "✓ SSH connection successful"
+              exit 0
+            fi
+            
+            if [ $i -lt $max_retries ]; then
+              echo "⚠ Attempt $i failed, waiting ${retry_delay}s before retry..."
+              sleep $retry_delay
+            fi
+          done
+          
+          echo "✗ SSH connection failed after $max_retries attempts"
+          echo ""
+          echo "=== Diagnostic Info ==="
+          echo "SSH key permissions:"
+          ls -la ~/.ssh/aws-ec2-frontend.pem
+          echo ""
+          echo "SSH config:"
+          cat ~/.ssh/config
+          exit 1
+
 
       - name: Deploy Frontend via SSH
         run: |
