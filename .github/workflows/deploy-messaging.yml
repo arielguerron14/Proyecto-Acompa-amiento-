@@ -1,0 +1,136 @@
+name: Deploy Messaging Stack to AWS EC2-Messaging
+
+on:
+  workflow_dispatch:
+    inputs:
+      ec2_messaging_private_ip:
+        description: 'IP privada de instancia EC2-Messaging (ej: 172.31.73.6)'
+        required: true
+        type: string
+
+env:
+  EC2_MESSAGING_SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+  EC2_MESSAGING_SSH_USER: ubuntu
+
+jobs:
+  deploy:
+    name: Deploy Messaging Stack
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set EC2 variables
+        run: |
+          echo "EC2_MESSAGING_IP=${{ github.event.inputs.ec2_messaging_private_ip }}" >> $GITHUB_ENV
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/aws-ec2-messaging.pem << 'EOF'
+          ${{ env.EC2_MESSAGING_SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/aws-ec2-messaging.pem
+          cat > ~/.ssh/config << 'SSHCONFIG'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          SSHCONFIG
+
+      - name: Deploy Messaging Stack via SSH
+        run: |
+          ssh -i ~/.ssh/aws-ec2-messaging.pem \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ubuntu@${{ env.EC2_MESSAGING_IP }} << 'SSHEOF'
+            
+            echo "=== Verificando Docker y Docker Compose ==="
+            if ! command -v docker &> /dev/null; then
+              echo "Docker no encontrado, instalando..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo usermod -aG docker ubuntu
+              echo "Docker instalado correctamente"
+            else
+              echo "Docker ya está instalado"
+              docker --version
+            fi
+            
+            if ! command -v docker-compose &> /dev/null; then
+              echo "Docker Compose no encontrado, instalando..."
+              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+              echo "Docker Compose instalado correctamente"
+            else
+              echo "Docker Compose ya está instalado"
+              docker-compose --version
+            fi
+            
+            echo "=== Clonando repositorio ==="
+            cd /tmp
+            rm -rf Proyecto-Acompa-amiento-
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-/messaging
+            
+            echo "=== Preparando docker-compose con IP dinámica ==="
+            # Reemplazar IPs hardcodeadas con la IP de esta instancia
+            sed -i "s/172.31.72.111/${{ env.EC2_MESSAGING_IP }}/g" docker-compose.yml
+            
+            echo "=== Deteniendo stack anterior ==="
+            docker-compose down 2>/dev/null || true
+            
+            echo "=== Construyendo imágenes Docker ==="
+            docker-compose build --no-cache
+            
+            echo "=== Desplegando Zookeeper, Kafka, RabbitMQ y Kafka-UI ==="
+            docker-compose up -d
+            
+            echo "=== Esperando a que los servicios inicien ==="
+            sleep 30
+            
+            echo "=== Estado de contenedores ==="
+            docker-compose ps
+            
+            echo "=== Logs de Zookeeper ==="
+            docker-compose logs --tail=20 zookeeper
+            
+            echo "=== Logs de Kafka ==="
+            docker-compose logs --tail=20 kafka
+            
+            echo "=== Logs de RabbitMQ ==="
+            docker-compose logs --tail=20 rabbitmq
+            
+            echo "=== Logs de Kafka-UI ==="
+            docker-compose logs --tail=20 kafka-ui
+            
+            echo "=== Verificando conectividad ==="
+            echo "Intentando conexión a Zookeeper (172.31.73.6:2181)..."
+            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/localhost/2181' 2>/dev/null && echo "✓ Zookeeper accesible" || echo "⚠ Zookeeper no accesible"
+            
+            echo "Intentando conexión a Kafka (172.31.73.6:9092)..."
+            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/localhost/9092' 2>/dev/null && echo "✓ Kafka accesible" || echo "⚠ Kafka no accesible"
+            
+            echo "Intentando conexión a RabbitMQ (172.31.73.6:5672)..."
+            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/localhost/5672' 2>/dev/null && echo "✓ RabbitMQ accesible" || echo "⚠ RabbitMQ no accesible"
+            
+            echo "Intentando conexión a Kafka-UI (172.31.73.6:8081)..."
+            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/localhost/8081' 2>/dev/null && echo "✓ Kafka-UI accesible" || echo "⚠ Kafka-UI no accesible"
+            
+            echo "=== Despliegue del stack de messaging completado ==="
+            echo ""
+            echo "🎯 Servicios disponibles:"
+            echo "  - Zookeeper: localhost:2181"
+            echo "  - Kafka: localhost:9092 (intra-cluster: 172.31.73.6:29092)"
+            echo "  - RabbitMQ: localhost:5672 (UI: localhost:15672, user: guest, pass: guest)"
+            echo "  - Kafka-UI: localhost:8081"
+          SSHEOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/aws-ec2-messaging.pem
+
+
