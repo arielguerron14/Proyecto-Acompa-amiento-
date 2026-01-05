@@ -17,33 +17,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy Frontend via SSH
+      - name: Setup SSH key
         run: |
-          # Setup SSH
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          
-          # Write SSH key
-          cat > ~/.ssh/key.pem << 'EOF'
+          cat > ~/.ssh/aws-ec2-frontend.pem << 'EOF'
           ${{ env.EC2_FRONTEND_SSH_KEY }}
           EOF
-          chmod 600 ~/.ssh/key.pem
-          
-          # SSH config
-          cat > ~/.ssh/config << 'EOF'
+          chmod 600 ~/.ssh/aws-ec2-frontend.pem
+          cat > ~/.ssh/config << 'SSHCONFIG'
           Host *
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
             LogLevel=QUIET
-          EOF
-          
-          # Test connection
+          SSHCONFIG
+
+      - name: Test SSH connection
+        run: |
           echo "=== Testing SSH connection ==="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@${{ env.EC2_FRONTEND_IP }} "echo 'SSH OK' && docker --version || echo 'Docker not installed yet'"
+          echo "Target IP: ${{ env.EC2_FRONTEND_IP }}"
+          echo "Key file size: $(wc -c < ~/.ssh/aws-ec2-frontend.pem) bytes"
           
-          # Deploy
-          echo "=== Starting deployment ==="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@${{ env.EC2_FRONTEND_IP }} << 'DEPLOY'
+          ssh -i ~/.ssh/aws-ec2-frontend.pem \
+            -o ConnectTimeout=10 \
+            ubuntu@${{ env.EC2_FRONTEND_IP }} \
+            "echo 'SSH OK' && docker --version"
+
+      - name: Deploy Frontend via SSH
+        run: |
+          ssh -i ~/.ssh/aws-ec2-frontend.pem \
+            -o ConnectTimeout=10 \
+            ubuntu@${{ env.EC2_FRONTEND_IP }} << 'DEPLOY'
           
           set -e
           
@@ -84,4 +87,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: rm -f ~/.ssh/key.pem
+        run: rm -f ~/.ssh/aws-ec2-frontend.pem
