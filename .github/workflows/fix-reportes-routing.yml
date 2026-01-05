@@ -70,7 +70,7 @@ jobs:
           
           echo "✅ SSH connection successful"
           echo "Deploying API Gateway..."
-          ssh -i ~/.ssh/key.pem ubuntu@100.49.159.65 << 'SCRIPT'
+          ssh -i ~/.ssh/key.pem ubuntu@100.48.66.29 << 'SCRIPT'
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
@@ -106,11 +106,11 @@ jobs:
           echo "Deploying Reportes Services with Route Fixes"
           echo "=================================================="
           
-          echo "Testing SSH connection to database server..."
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@98.84.26.109 "echo SSH connection successful" || exit 1
+          echo "Testing SSH connection to reportes server..."
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@100.28.217.159 "echo SSH connection successful" || exit 1
           
           echo "Deploying Reportes Services..."
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.26.109 << 'SCRIPT'
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.28.217.159 << 'SCRIPT'
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
@@ -151,19 +151,19 @@ jobs:
           echo "=================================================="
           
           echo "Testing API Gateway health..."
-          curl -s http://100.49.159.65:8080/health | jq . || echo "API Gateway health check"
+          curl -s http://100.48.66.29:8080/health | jq . || echo "API Gateway health check"
           
           echo ""
           echo "Testing Reportes Estudiantes service directly..."
-          curl -s http://98.84.26.109:5003/health | jq . || echo "Reportes EST health check"
+          curl -s http://100.28.217.159:5003/health | jq . || echo "Reportes EST health check"
           
           echo ""
           echo "Testing Reportes endpoint through API Gateway..."
-          curl -s http://100.49.159.65:8080/api/reportes/estudiantes/reporte/test123 | jq . || echo "Testing /api/reportes routing"
+          curl -s http://100.48.66.29:8080/api/reportes/estudiantes/reporte/test123 | jq . || echo "Testing /api/reportes routing"
           
           echo ""
           echo "Testing legacy reportes endpoint..."
-          curl -s http://100.49.159.65:8080/reportes/reporte/test123 | jq . || echo "Testing /reportes routing"
+          curl -s http://100.48.66.29:8080/reportes/reporte/test123 | jq . || echo "Testing /reportes routing"
 
       - name: Final Status
         run: |
@@ -172,15 +172,15 @@ jobs:
           echo "=================================================="
           echo ""
           echo "Updated Services:"
-          echo "  • API Gateway: 100.49.159.65:8080"
+          echo "  • API Gateway: 100.48.66.29:8080"
           echo "    - Added /api/reportes/* route proxy"
           echo "    - Kept /reportes/* for backward compatibility"
           echo ""
-          echo "  • Micro-Reportes-Estudiantes: 98.84.26.109:5003"
+          echo "  • Micro-Reportes-Estudiantes: 100.28.217.159:5003"
           echo "    - Added /api/reportes/estudiantes/* routes"
           echo "    - Kept /registrar and /reporte/:id for compatibility"
           echo ""
-          echo "  • Micro-Reportes-Maestros: 98.84.26.109:5004"
+          echo "  • Micro-Reportes-Maestros: 100.28.217.159:5004"
           echo "    - Added /api/reportes/maestros/* routes"
           echo "    - Kept legacy routes for compatibility"
           echo ""
