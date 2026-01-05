@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       ec2_api_gateway_public_ip:
-        description: 'IP pública de instancia EC2-API-Gateway (ej: 98.84.30.35)'
-        required: true
+        description: 'IP pública de instancia EC2-API-Gateway (solo para referencia, no se usa)'
+        required: false
         type: string
 
 env:
@@ -125,13 +125,13 @@ jobs:
           ~/deploy-frontend.sh "$1" "$2"
           REMOTESCRIPT
           
-          # Execute with arguments
+          # Execute with arguments (use private IP for internal communication)
           ssh -i ~/.ssh/aws-ec2-frontend.pem \
             -o ConnectTimeout=10 \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             -o IdentitiesOnly=yes \
-            ubuntu@172.31.69.203 "bash ~/deploy-frontend.sh ${{ env.EC2_API_GATEWAY_PUBLIC_IP }} ${{ env.EC2_API_GATEWAY_PRIVATE_IP }}"
+            ubuntu@172.31.69.203 "bash ~/deploy-frontend.sh 172.31.76.105 172.31.76.105"
 
       - name: Cleanup SSH key
         if: always()
