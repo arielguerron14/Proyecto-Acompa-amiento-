@@ -4,7 +4,8 @@ class AuthManager {
     constructor() {
         this.token = localStorage.getItem('token');
         this.user = null;
-        this.baseURL = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+        // Use /api prefix which will be proxied by the frontend server
+        this.baseURL = '/api';
     }
 
     // Verificar si hay sesión activa
