@@ -45,16 +45,17 @@ jobs:
           
           echo "Step 3: Stop and remove old API Gateway container..."
           docker stop api-gateway 2>/dev/null || true
-          sleep 2
+          docker kill api-gateway 2>/dev/null || true
+          sleep 1
           docker rm -f api-gateway 2>/dev/null || true
           sleep 2
           
           echo "Checking if port 8080 is still in use..."
           netstat -tulnp 2>/dev/null | grep 8080 || echo "Port 8080 is free"
           
-          echo "Killing any remaining processes on port 8080..."
-          lsof -ti:8080 | xargs kill -9 2>/dev/null || true
-          sleep 2
+          echo "Pruning Docker system to clean up networking..."
+          docker system prune -f 2>/dev/null || true
+          sleep 3
           
           echo "Step 4: Start new API Gateway with routing fixes..."
           docker run -d --name api-gateway --restart unless-stopped \
