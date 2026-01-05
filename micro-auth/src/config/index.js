@@ -3,7 +3,7 @@ dotenv.config();
 
 module.exports = {
   PORT: process.env.PORT || 5005,
-  MONGO_URI: process.env.MONGO_URI || `mongodb://${process.env.DB_USER || 'root'}:${process.env.DB_PASS || 'password'}@${process.env.DB_HOST || '13.220.99.207'}:${process.env.DB_PORT || 27017}/authdb?authSource=admin`,
+  MONGO_URI: process.env.MONGO_URI || `mongodb://${process.env.DB_HOST || '13.220.99.207'}:${process.env.DB_PORT || 27017}/authdb`,
   REDIS_HOST: process.env.REDIS_HOST || '13.220.99.207',
   REDIS_PORT: process.env.REDIS_PORT || 6379,
 };
