@@ -2,15 +2,9 @@ name: Deploy Frontend to AWS EC2-Frontend
 
 on:
   workflow_dispatch:
-    inputs:
-      ec2_api_gateway_public_ip:
-        description: 'IP pública de instancia EC2-API-Gateway (solo para referencia, no se usa)'
-        required: false
-        type: string
 
 env:
   EC2_FRONTEND_SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
-  EC2_FRONTEND_SSH_USER: ubuntu
   EC2_FRONTEND_IP: 172.31.69.203
   EC2_API_GATEWAY_PRIVATE_IP: 172.31.76.105
 
@@ -23,71 +17,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set EC2 variables
+      - name: Deploy Frontend via SSH
         run: |
-          echo "EC2_API_GATEWAY_PUBLIC_IP=${{ github.event.inputs.ec2_api_gateway_public_ip }}" >> $GITHUB_ENV
-
-      - name: Setup SSH key and config
-        run: |
+          # Setup SSH
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          cat > ~/.ssh/config << 'SSHCONFIG'
+          
+          # Write SSH key
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.EC2_FRONTEND_SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+          
+          # SSH config
+          cat > ~/.ssh/config << 'EOF'
           Host *
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
             LogLevel=QUIET
-          SSHCONFIG
-          chmod 600 ~/.ssh/config
-
-      - name: Deploy Frontend via SSH
-        run: |
-          # Create SSH key
-          mkdir -p ~/.ssh
-          cat > ~/.ssh/aws-ec2-frontend.pem << 'EOF'
-          ${{ env.EC2_FRONTEND_SSH_KEY }}
           EOF
-          chmod 600 ~/.ssh/aws-ec2-frontend.pem
           
-          # Test connection first
-          echo "Testing SSH connection..."
-          ssh -i ~/.ssh/aws-ec2-frontend.pem \
-            -o ConnectTimeout=10 \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o IdentitiesOnly=yes \
-            ubuntu@172.31.69.203 "echo 'SSH connection OK' && uname -a"
+          # Test connection
+          echo "=== Testing SSH connection ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@${{ env.EC2_FRONTEND_IP }} "echo 'SSH OK' && docker --version || echo 'Docker not installed yet'"
           
-          # Create deployment script on remote
-          ssh -i ~/.ssh/aws-ec2-frontend.pem \
-            -o ConnectTimeout=10 \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o IdentitiesOnly=yes \
-            ubuntu@172.31.69.203 << 'REMOTESCRIPT'
+          # Deploy
+          echo "=== Starting deployment ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@${{ env.EC2_FRONTEND_IP }} << 'DEPLOY'
           
-          cat > ~/deploy-frontend.sh << 'DEPLOYEOF'
-          #!/bin/bash
           set -e
-          
-          API_GW_PUBLIC_IP="$1"
-          API_GW_PRIVATE_IP="$2"
-          
-          echo "=== Verificando Docker ==="
-          if ! command -v docker &> /dev/null; then
-            echo "Docker no encontrado, instalando..."
-            curl -fsSL https://get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh
-            sudo usermod -aG docker ubuntu
-            echo "Docker instalado correctamente"
-          else
-            echo "Docker ya está instalado"
-            docker --version
-          fi
           
           echo "=== Deteniendo contenedor existente ==="
           docker stop acompanamiento-frontend 2>/dev/null || true
-          
-          echo "=== Removiendo contenedor existente ==="
           docker rm acompanamiento-frontend 2>/dev/null || true
           
           echo "=== Clonando repositorio ==="
@@ -105,35 +66,22 @@ jobs:
             --restart unless-stopped \
             -p 80:80 \
             -p 3000:3000 \
-            -e API_GATEWAY_URL=http://${API_GW_PUBLIC_IP}:8080 \
+            -e API_GATEWAY_URL=http://172.31.76.105:8080 \
             frontend-web:latest
           
           echo "=== Estado de contenedor ==="
           docker ps
           
           echo "=== Logs de Frontend ==="
-          docker logs --tail=30 acompanamiento-frontend
+          docker logs --tail=30 acompanamiento-frontend || true
           
           echo "=== Verificando conectividad al API Gateway ==="
-          echo "Intentando conexión a API Gateway (IP privada: ${API_GW_PRIVATE_IP}:8080)..."
-          timeout 5 bash -c "cat < /dev/null > /dev/tcp/${API_GW_PRIVATE_IP}/8080" 2>/dev/null && echo "✓ API Gateway accesible" || echo "⚠ API Gateway no accesible"
+          timeout 5 bash -c 'cat < /dev/null > /dev/tcp/172.31.76.105/8080' 2>/dev/null && echo "✓ API Gateway accesible" || echo "⚠ API Gateway no accesible"
           
-          echo "=== Despliegue de Frontend completado ==="
-          DEPLOYEOF
+          echo "=== Despliegue completado ==="
           
-          chmod +x ~/deploy-frontend.sh
-          ~/deploy-frontend.sh "$1" "$2"
-          REMOTESCRIPT
-          
-          # Execute with arguments (use private IP for internal communication)
-          ssh -i ~/.ssh/aws-ec2-frontend.pem \
-            -o ConnectTimeout=10 \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o IdentitiesOnly=yes \
-            ubuntu@172.31.69.203 "bash ~/deploy-frontend.sh 172.31.76.105 172.31.76.105"
+          DEPLOY
 
-      - name: Cleanup SSH key
+      - name: Cleanup
         if: always()
-        run: |
-          rm -f ~/.ssh/aws-ec2-frontend.pem
+        run: rm -f ~/.ssh/key.pem
