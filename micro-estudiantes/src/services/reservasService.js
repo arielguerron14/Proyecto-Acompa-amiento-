@@ -1,9 +1,9 @@
 const Reserva = require('../models/Reserva');
 const httpClient = require('../utils/httpClient');
 
-const MAESTROS_URL = process.env.MAESTROS_URL || 'http://micro-maestros:5001';
-const REPORTES_EST_URL = process.env.REPORTES_EST_URL || 'http://micro-reportes-estudiantes:5003';
-const REPORTES_MAEST_URL = process.env.REPORTES_MAEST_URL || 'http://micro-reportes-maestros:5004';
+const MAESTROS_URL = process.env.MAESTROS_URL || 'http://100.24.118.233:3002';
+const REPORTES_EST_URL = process.env.REPORTES_EST_URL || 'http://100.24.118.233:5003';
+const REPORTES_MAEST_URL = process.env.REPORTES_MAEST_URL || 'http://100.24.118.233:5004';
 
 const REQUIRED_FIELDS = ['estudianteId', 'estudianteName', 'maestroId', 'dia', 'inicio', 'fin'];
 

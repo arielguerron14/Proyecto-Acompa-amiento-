@@ -90,6 +90,7 @@ jobs:
             -e REDIS_HOST=98.84.26.109 \
             -e REDIS_PORT=6379 \
             -e MONGO_URI=mongodb://98.84.26.109:27017/maestrosdb \
+            -e ESTUDIANTES_URL=http://100.24.118.233:3001 \
             micro-maestros:latest
           
           echo "Step 6: Wait for containers to fully start..."
