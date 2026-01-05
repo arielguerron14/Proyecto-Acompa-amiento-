@@ -1,313 +1,218 @@
-name: Deploy All Services to AWS
+name: Deploy All Services (Hardcoded IPs)
 
 on:
   workflow_dispatch:
-    inputs:
-      force_rebuild:
-        description: 'Force rebuild of all containers'
-        required: false
-        type: boolean
-        default: true
 
 env:
   SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
 
 jobs:
-  deploy-databases:
-    name: Deploy Databases
+  deploy-all:
+    name: Deploy All Services
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy to EC2-DB
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           cat > ~/.ssh/key.pem << 'EOF'
           ${{ env.SSH_KEY }}
           EOF
           chmod 600 ~/.ssh/key.pem
-          
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@44.222.116.0 << 'DEPLOY'
+          cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          EOF
+
+      - name: Deploy to EC2-DB (172.31.79.193)
+        run: |
+          echo "=== Deploying to EC2-DB ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@172.31.79.193 << 'DEPLOY'
           set -e
-          docker-compose -f /root/docker-compose.yml down || true
-          docker-compose -f /root/docker-compose.yml up -d
+          echo "Stopping existing containers..."
+          docker-compose -f /tmp/docker-compose.yml down 2>/dev/null || true
+          cd /tmp
+          rm -rf docker-compose.yml
+          echo "Updating databases..."
+          docker pull mongo:latest
+          docker pull postgres:15-alpine
+          docker pull redis:7-alpine
+          echo "Starting databases..."
+          docker run -d --name mongo --restart unless-stopped -p 27017:27017 mongo:latest
+          docker run -d --name postgres --restart unless-stopped -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:15-alpine
+          docker run -d --name redis --restart unless-stopped -p 6379:6379 redis:7-alpine
           docker ps
           DEPLOY
 
-  deploy-core:
-    name: Deploy Core Microservices
-    runs-on: ubuntu-latest
-    needs: deploy-databases
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to EC2-CORE
+      - name: Deploy to EC2-Core (13.221.55.216)
         run: |
-          mkdir -p ~/.ssh
-          cat > ~/.ssh/key.pem << 'EOF'
-          ${{ env.SSH_KEY }}
-          EOF
-          chmod 600 ~/.ssh/key.pem
-          
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@13.221.55.216 << 'DEPLOY'
+          echo "=== Deploying to EC2-Core ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@13.221.55.216 << 'DEPLOY'
           set -e
+          echo "Stopping existing containers..."
+          docker stop micro-auth micro-maestros micro-estudiantes 2>/dev/null || true
+          docker rm micro-auth micro-maestros micro-estudiantes 2>/dev/null || true
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
           cd Proyecto-Acompa-amiento-
-          
-          echo "=== Stopping existing containers ==="
-          docker stop micro-auth micro-maestros micro-estudiantes 2>/dev/null || true
-          docker rm micro-auth micro-maestros micro-estudiantes 2>/dev/null || true
-          
-          echo "=== Building and deploying ==="
+          echo "Building microservices..."
           docker build -t micro-auth:latest -f micro-auth/Dockerfile .
           docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
           docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
-          
-          docker run -d --name micro-auth --restart unless-stopped -p 3000:3000 -e DB_HOST=44.222.116.0 -e DB_PORT=5432 micro-auth:latest
-          docker run -d --name micro-maestros --restart unless-stopped -p 3002:3002 -e DB_HOST=44.222.116.0 -e DB_PORT=5432 micro-maestros:latest
-          docker run -d --name micro-estudiantes --restart unless-stopped -p 3001:3001 -e DB_HOST=44.222.116.0 -e DB_PORT=5432 micro-estudiantes:latest
-          
+          echo "Starting microservices..."
+          docker run -d --name micro-auth --restart unless-stopped -p 3000:3000 -e DB_HOST=172.31.79.193 micro-auth:latest
+          docker run -d --name micro-maestros --restart unless-stopped -p 3002:3002 -e DB_HOST=172.31.79.193 micro-maestros:latest
+          docker run -d --name micro-estudiantes --restart unless-stopped -p 3001:3001 -e DB_HOST=172.31.79.193 micro-estudiantes:latest
           docker ps
           DEPLOY
 
-  deploy-api-gateway:
-    name: Deploy API Gateway
-    runs-on: ubuntu-latest
-    needs: deploy-core
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to EC2-API-Gateway
+      - name: Deploy to EC2-API-Gateway (98.84.30.35)
         run: |
-          mkdir -p ~/.ssh
-          cat > ~/.ssh/key.pem << 'EOF'
-          ${{ env.SSH_KEY }}
-          EOF
-          chmod 600 ~/.ssh/key.pem
-          
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@98.84.30.35 << 'DEPLOY'
+          echo "=== Deploying to EC2-API-Gateway ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.30.35 << 'DEPLOY'
           set -e
-          cd /tmp
-          rm -rf Proyecto-Acompa-amiento-
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
-          cd Proyecto-Acompa-amiento-
-          
-          echo "=== Stopping existing container ==="
+          echo "Stopping existing containers..."
           docker stop api-gateway 2>/dev/null || true
           docker rm api-gateway 2>/dev/null || true
-          
-          echo "=== Building and deploying ==="
-          docker build -t api-gateway:latest -f api-gateway/Dockerfile .
-          
-          docker run -d --name api-gateway --restart unless-stopped -p 8080:8080 \
-            -e MICRO_AUTH_URL=http://13.221.55.216:3000 \
-            -e MICRO_MAESTROS_URL=http://13.221.55.216:3002 \
-            -e MICRO_ESTUDIANTES_URL=http://13.221.55.216:3001 \
-            api-gateway:latest
-          
-          docker ps
-          DEPLOY
-
-  deploy-frontend:
-    name: Deploy Frontend
-    runs-on: ubuntu-latest
-    needs: deploy-api-gateway
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to EC2-Frontend
-        run: |
-          mkdir -p ~/.ssh
-          cat > ~/.ssh/key.pem << 'EOF'
-          ${{ env.SSH_KEY }}
-          EOF
-          chmod 600 ~/.ssh/key.pem
-          
-          echo "=== Waiting for EC2-Frontend to be ready ==="
-          for i in {1..10}; do
-            if ssh -i ~/.ssh/key.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@98.92.84.126 "echo OK" 2>/dev/null; then
-              echo "✓ EC2-Frontend is ready"
-              break
-            fi
-            echo "Attempt $i/10 - waiting for instance..."
-            sleep 10
-          done
-          
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@98.92.84.126 << 'DEPLOY'
-          set -e
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
           cd Proyecto-Acompa-amiento-
-          
-          echo "=== Stopping existing container ==="
+          echo "Building API Gateway..."
+          docker build -t api-gateway:latest -f api-gateway/Dockerfile .
+          echo "Starting API Gateway..."
+          docker run -d --name api-gateway --restart unless-stopped -p 8080:8080 \
+            -e AUTH_SERVICE=http://13.221.55.216:3000 \
+            -e MAESTROS_SERVICE=http://13.221.55.216:3002 \
+            -e ESTUDIANTES_SERVICE=http://13.221.55.216:3001 \
+            api-gateway:latest
+          docker ps
+          DEPLOY
+
+      - name: Deploy to EC2-Frontend (98.92.84.126)
+        run: |
+          echo "=== Deploying to EC2-Frontend ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.92.84.126 << 'DEPLOY'
+          set -e
+          echo "Stopping existing containers..."
           docker stop acompanamiento-frontend 2>/dev/null || true
           docker rm acompanamiento-frontend 2>/dev/null || true
-          
-          echo "=== Building and deploying ==="
-          docker build -t frontend-web:latest -f frontend-web/Dockerfile .
-          
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          echo "Building Frontend..."
+          docker build -t frontend-web:latest -f frontend-web/Dockerfile ./frontend-web
+          echo "Starting Frontend..."
           docker run -d --name acompanamiento-frontend --restart unless-stopped -p 80:80 -p 3000:3000 \
             -e API_GATEWAY_URL=http://172.31.76.105:8080 \
             frontend-web:latest
-          
-          sleep 5
           docker ps
-          docker logs --tail=20 acompanamiento-frontend || true
+          docker logs --tail=20 acompanamiento-frontend
           DEPLOY
 
-  deploy-notifications:
-    name: Deploy Notifications
-    runs-on: ubuntu-latest
-    needs: deploy-core
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to EC2-Notificaciones
+      - name: Deploy to EC2-Notificaciones (100.28.124.73)
         run: |
-          mkdir -p ~/.ssh
-          cat > ~/.ssh/key.pem << 'EOF'
-          ${{ env.SSH_KEY }}
-          EOF
-          chmod 600 ~/.ssh/key.pem
-          
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@100.28.124.73 << 'DEPLOY'
+          echo "=== Deploying to EC2-Notificaciones ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.28.124.73 << 'DEPLOY'
           set -e
-          cd /tmp
-          rm -rf Proyecto-Acompa-amiento-
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
-          cd Proyecto-Acompa-amiento-
-          
+          echo "Stopping existing containers..."
           docker stop micro-notificaciones micro-soap-bridge 2>/dev/null || true
           docker rm micro-notificaciones micro-soap-bridge 2>/dev/null || true
-          
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          echo "Building notification services..."
           docker build -t micro-notificaciones:latest -f micro-notificaciones/Dockerfile .
           docker build -t micro-soap-bridge:latest -f micro-soap-bridge/Dockerfile .
-          
-          docker run -d --name micro-notificaciones --restart unless-stopped -p 5006:5006 -e DB_HOST=44.222.116.0 micro-notificaciones:latest
+          echo "Starting notification services..."
+          docker run -d --name micro-notificaciones --restart unless-stopped -p 5006:5006 -e DB_HOST=172.31.79.193 micro-notificaciones:latest
           docker run -d --name micro-soap-bridge --restart unless-stopped -p 5008:5008 micro-soap-bridge:latest
-          
           docker ps
           DEPLOY
 
-  deploy-messaging:
-    name: Deploy Messaging Stack
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to EC2-Messaging
+      - name: Deploy to EC2-Messaging (34.231.247.116)
         run: |
-          mkdir -p ~/.ssh
-          cat > ~/.ssh/key.pem << 'EOF'
-          ${{ env.SSH_KEY }}
-          EOF
-          chmod 600 ~/.ssh/key.pem
-          
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@34.231.247.116 << 'DEPLOY'
+          echo "=== Deploying to EC2-Messaging ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@34.231.247.116 << 'DEPLOY'
           set -e
+          echo "Stopping existing containers..."
+          docker-compose -f /tmp/docker-compose.yml down 2>/dev/null || true
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
-          cd Proyecto-Acompa-amiento-
-          
-          docker-compose -f messaging/docker-compose.yml down || true
-          docker-compose -f messaging/docker-compose.yml up -d
+          cd Proyecto-Acompa-amiento-/messaging
+          echo "Starting messaging stack (Kafka, RabbitMQ, Zookeeper)..."
+          docker-compose up -d
+          sleep 10
           docker ps
           DEPLOY
 
-  deploy-reporting:
-    name: Deploy Reporting Services
-    runs-on: ubuntu-latest
-    needs: deploy-core
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to EC2-Reportes
+      - name: Deploy to EC2-Reportes (3.239.86.68)
         run: |
-          mkdir -p ~/.ssh
-          cat > ~/.ssh/key.pem << 'EOF'
-          ${{ env.SSH_KEY }}
-          EOF
-          chmod 600 ~/.ssh/key.pem
-          
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@3.239.86.68 << 'DEPLOY'
+          echo "=== Deploying to EC2-Reportes ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@3.239.86.68 << 'DEPLOY'
           set -e
-          cd /tmp
-          rm -rf Proyecto-Acompa-amiento-
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
-          cd Proyecto-Acompa-amiento-
-          
+          echo "Stopping existing containers..."
           docker stop micro-analytics micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
           docker rm micro-analytics micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
-          
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          echo "Building reporting services..."
           docker build -t micro-analytics:latest -f micro-analytics/Dockerfile .
           docker build -t micro-reportes-estudiantes:latest -f micro-reportes-estudiantes/Dockerfile .
           docker build -t micro-reportes-maestros:latest -f micro-reportes-maestros/Dockerfile .
-          
-          docker run -d --name micro-analytics --restart unless-stopped -p 5007:5007 -e DB_HOST=44.222.116.0 micro-analytics:latest
-          docker run -d --name micro-reportes-estudiantes --restart unless-stopped -p 5003:5003 -e DB_HOST=44.222.116.0 micro-reportes-estudiantes:latest
-          docker run -d --name micro-reportes-maestros --restart unless-stopped -p 5004:5004 -e DB_HOST=44.222.116.0 micro-reportes-maestros:latest
-          
+          echo "Starting reporting services..."
+          docker run -d --name micro-analytics --restart unless-stopped -p 5007:5007 -e DB_HOST=172.31.79.193 micro-analytics:latest
+          docker run -d --name micro-reportes-estudiantes --restart unless-stopped -p 5003:5003 -e DB_HOST=172.31.79.193 micro-reportes-estudiantes:latest
+          docker run -d --name micro-reportes-maestros --restart unless-stopped -p 5004:5004 -e DB_HOST=172.31.79.193 micro-reportes-maestros:latest
           docker ps
           DEPLOY
 
-  deploy-monitoring:
-    name: Deploy Monitoring Stack
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to EC2-Monitoring
+      - name: Deploy to EC2-Monitoring (35.171.146.166)
         run: |
-          mkdir -p ~/.ssh
-          cat > ~/.ssh/key.pem << 'EOF'
-          ${{ env.SSH_KEY }}
-          EOF
-          chmod 600 ~/.ssh/key.pem
-          
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@35.171.146.166 << 'DEPLOY'
+          echo "=== Deploying to EC2-Monitoring ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@35.171.146.166 << 'DEPLOY'
           set -e
+          echo "Stopping existing containers..."
+          docker-compose -f /tmp/docker-compose.yml down 2>/dev/null || true
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
-          cd Proyecto-Acompa-amiento-
-          
-          docker-compose -f monitoring/docker-compose.yml down || true
-          docker-compose -f monitoring/docker-compose.yml up -d
+          cd Proyecto-Acompa-amiento-/monitoring
+          echo "Starting monitoring stack (Prometheus, Grafana)..."
+          docker-compose up -d
+          sleep 10
           docker ps
+          echo "Prometheus: http://35.171.146.166:9090"
+          echo "Grafana: http://35.171.146.166:3000"
           DEPLOY
 
-  verify:
-    name: Verify Deployment
-    runs-on: ubuntu-latest
-    needs: [deploy-frontend, deploy-notifications, deploy-messaging, deploy-reporting, deploy-monitoring]
-    steps:
       - name: Verify All Services
+        continue-on-error: true
         run: |
-          echo "=== Deployment Summary ==="
-          echo "✓ EC2-DB: PostgreSQL, MongoDB, Redis"
-          echo "✓ EC2-CORE: Auth, Maestros, Estudiantes"
-          echo "✓ EC2-API-Gateway: API Gateway"
-          echo "✓ EC2-Frontend: Frontend Web Server"
-          echo "✓ EC2-Notificaciones: Notifications, SOAP Bridge"
-          echo "✓ EC2-Messaging: Kafka, RabbitMQ, Zookeeper"
-          echo "✓ EC2-Reportes: Analytics, Reports"
-          echo "✓ EC2-Monitoring: Prometheus, Grafana"
           echo ""
-          echo "=== Access URLs ==="
+          echo "=== DEPLOYMENT SUMMARY ==="
+          echo ""
           echo "Frontend: http://98.92.84.126"
-          echo "Grafana: http://35.171.146.166:3000"
+          echo "API Gateway: http://98.84.30.35:8080"
           echo "Prometheus: http://35.171.146.166:9090"
+          echo "Grafana: http://35.171.146.166:3000"
           echo ""
-          echo "All services deployed successfully!"
+          echo "Testing frontend connectivity..."
+          curl -s -o /dev/null -w "Frontend HTTP Status: %{http_code}\n" http://98.92.84.126 || echo "Frontend not yet responding"
+          echo ""
+          echo "All services deployed!"
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/key.pem
