@@ -1,7 +1,7 @@
 // init-mongo.js: runs on first startup via docker-entrypoint-initdb.d
 print('Initializing MongoDB sample DBs...');
 
-const dbs = ['maestrosdb','estudiantesdb','reportesestdb','reportesmaestdb','acompanamiento'];
+const dbs = ['authdb','maestrosdb','estudiantesdb','reportesestdb','reportesmaestdb','acompanamiento'];
 dbs.forEach(function(name){
   const d = db.getSiblingDB(name);
   d.createCollection('init_collection');
