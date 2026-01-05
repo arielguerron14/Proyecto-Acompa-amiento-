@@ -164,10 +164,10 @@ services:
     container_name: acompanamiento-auth
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "5005:5005"
     environment:
       NODE_ENV: production
-      PORT: 3001
+      PORT: 5005
       SERVICE_NAME: micro-auth
       LOG_LEVEL: info
       POSTGRES_HOST: ${{ env.EC2_DB_IP }}
@@ -182,7 +182,7 @@ services:
     depends_on:
       - api-gateway
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -194,10 +194,10 @@ services:
     container_name: acompanamiento-maestros
     restart: unless-stopped
     ports:
-      - "3002:3002"
+      - "5001:5001"
     environment:
       NODE_ENV: production
-      PORT: 3002
+      PORT: 5001
       SERVICE_NAME: micro-maestros
       LOG_LEVEL: info
       POSTGRES_HOST: ${{ env.EC2_DB_IP }}
@@ -212,7 +212,7 @@ services:
     depends_on:
       - api-gateway
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -224,10 +224,10 @@ services:
     container_name: acompanamiento-estudiantes
     restart: unless-stopped
     ports:
-      - "3003:3003"
+      - "5002:5002"
     environment:
       NODE_ENV: production
-      PORT: 3003
+      PORT: 5002
       SERVICE_NAME: micro-estudiantes
       LOG_LEVEL: info
       POSTGRES_HOST: ${{ env.EC2_DB_IP }}
@@ -242,7 +242,7 @@ services:
     depends_on:
       - api-gateway
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -254,22 +254,21 @@ services:
     container_name: acompanamiento-gateway
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:8080"
     environment:
       NODE_ENV: production
-      PORT: 80
+      PORT: 8080
       SERVICE_NAME: api-gateway
       LOG_LEVEL: info
-      AUTH_SERVICE_URL: http://micro-auth:3001
-      MAESTROS_SERVICE_URL: http://micro-maestros:3002
-      ESTUDIANTES_SERVICE_URL: http://micro-estudiantes:3003
+      AUTH_SERVICE_URL: http://micro-auth:5005
+      MAESTROS_SERVICE_URL: http://micro-maestros:5001
+      ESTUDIANTES_SERVICE_URL: http://micro-estudiantes:5002
     networks:
       - acompanamiento-network
     volumes:
       - ./gateway-logs:/var/log/acompanamiento
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -312,20 +311,20 @@ COMPOSE_EOF
             sleep 10  # Wait for services to fully start
             
             # Test API Gateway
-            echo "Testing API Gateway (port 80)..."
-            curl -f http://localhost/health 2>/dev/null && echo "✓ API Gateway healthy" || echo "⚠ API Gateway not responding yet"
+            echo "Testing API Gateway (port 8080)..."
+            curl -f http://localhost:8080/health 2>/dev/null && echo "✓ API Gateway healthy" || echo "⚠ API Gateway not responding yet"
             
             # Test Auth Service
-            echo "Testing Auth Service (port 3001)..."
-            curl -f http://localhost:3001/health 2>/dev/null && echo "✓ Auth Service healthy" || echo "⚠ Auth Service not responding yet"
+            echo "Testing Auth Service (port 5005)..."
+            curl -f http://localhost:5005/health 2>/dev/null && echo "✓ Auth Service healthy" || echo "⚠ Auth Service not responding yet"
             
             # Test Maestros Service
-            echo "Testing Maestros Service (port 3002)..."
-            curl -f http://localhost:3002/health 2>/dev/null && echo "✓ Maestros Service healthy" || echo "⚠ Maestros Service not responding yet"
+            echo "Testing Maestros Service (port 5001)..."
+            curl -f http://localhost:5001/health 2>/dev/null && echo "✓ Maestros Service healthy" || echo "⚠ Maestros Service not responding yet"
             
             # Test Estudiantes Service
-            echo "Testing Estudiantes Service (port 3003)..."
-            curl -f http://localhost:3003/health 2>/dev/null && echo "✓ Estudiantes Service healthy" || echo "⚠ Estudiantes Service not responding yet"
+            echo "Testing Estudiantes Service (port 5002)..."
+            curl -f http://localhost:5002/health 2>/dev/null && echo "✓ Estudiantes Service healthy" || echo "⚠ Estudiantes Service not responding yet"
             
             echo ""
             echo "=== Docker Logs (last 20 lines) ==="
@@ -346,10 +345,10 @@ COMPOSE_EOF
           EC2-DB Private IP: ${{ env.EC2_DB_IP }}
           
           Deployed Microservices:
-          - API Gateway (port 80)
-          - Micro Auth (port 3001)
-          - Micro Maestros (port 3002)
-          - Micro Estudiantes (port 3003)
+          - API Gateway (port 8080)
+          - Micro Auth (port 5005)
+          - Micro Maestros (port 5001)
+          - Micro Estudiantes (port 5002)
           
           Database Configuration:
           - PostgreSQL Host: ${{ env.EC2_DB_IP }}:5432
@@ -357,10 +356,10 @@ COMPOSE_EOF
           - Redis Host: ${{ env.EC2_DB_IP }}:6379
           
           Service URLs:
-          - API Gateway: http://${{ env.EC2_CORE_IP }}/
-          - Auth Service: http://${{ env.EC2_CORE_IP }}:3001/
-          - Maestros Service: http://${{ env.EC2_CORE_IP }}:3002/
-          - Estudiantes Service: http://${{ env.EC2_CORE_IP }}:3003/
+          - API Gateway: http://${{ env.EC2_CORE_IP }}:8080/
+          - Auth Service: http://${{ env.EC2_CORE_IP }}:5005/
+          - Maestros Service: http://${{ env.EC2_CORE_IP }}:5001/
+          - Estudiantes Service: http://${{ env.EC2_CORE_IP }}:5002/
           
           Next Steps:
           1. Access health endpoints to verify all services are running
