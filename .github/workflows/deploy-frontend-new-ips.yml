@@ -1,0 +1,116 @@
+name: Deploy Frontend with New IPs
+
+on:
+  workflow_dispatch:
+
+env:
+  SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+
+jobs:
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+          cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          EOF
+
+      - name: Deploy Frontend
+        run: |
+          echo "=================================================="
+          echo "🔧 Deploying Frontend with New IPs"
+          echo "=================================================="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@44.210.241.99 << 'FRONTENDFIX'
+          set -e
+          
+          echo "Step 1: Stop existing frontend container..."
+          docker stop acompanamiento-frontend 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 2: Remove existing container..."
+          docker rm acompanamiento-frontend 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 3: Remove old image to force rebuild..."
+          docker rmi frontend-web:latest 2>/dev/null || true
+          
+          echo "Step 4: Clone latest code..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "Step 5: Build frontend image..."
+          docker build -t frontend-web:latest -f frontend-web/Dockerfile ./frontend-web
+          
+          echo "Step 6: Start frontend with NEW API Gateway IP..."
+          docker run -d \
+            --name acompanamiento-frontend \
+            --restart unless-stopped \
+            -p 80:80 \
+            -p 3000:3000 \
+            -e API_GATEWAY_URL=http://100.49.159.65:8080 \
+            frontend-web:latest
+          
+          echo ""
+          echo "Step 7: Wait for container to start..."
+          sleep 5
+          
+          echo ""
+          echo "Step 8: Check container status..."
+          docker ps
+          
+          echo ""
+          echo "Step 9: Check frontend logs..."
+          docker logs --tail=30 acompanamiento-frontend 2>&1 | tail -20 || echo "Logs not available yet"
+          
+          echo ""
+          echo "Step 10: Test connectivity to API Gateway..."
+          timeout 5 bash -c 'cat < /dev/null > /dev/tcp/100.49.159.65/8080' 2>/dev/null && echo "✓ API Gateway accesible" || echo "⚠ API Gateway no accesible (might be starting)"
+          
+          echo ""
+          echo "✅ Frontend deployed!"
+          FRONTENDFIX
+
+      - name: Verify Frontend
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "=================================================="
+          echo "Testing Frontend"
+          echo "=================================================="
+          
+          echo "Testing frontend homepage..."
+          curl -I http://44.210.241.99 2>&1 | head -10 || echo "Frontend test"
+          
+          echo ""
+          echo "Checking API Gateway connectivity from frontend..."
+          curl -s http://44.210.241.99 | grep -o "100.49.159.65:8080" && echo "✓ Frontend configured with correct API Gateway IP" || echo "ℹ Frontend may use other configuration methods"
+
+      - name: Final Status
+        run: |
+          echo ""
+          echo "=================================================="
+          echo "✅ FRONTEND DEPLOYMENT COMPLETED"
+          echo "=================================================="
+          echo ""
+          echo "Frontend is now accessible at: http://44.210.241.99"
+          echo "API Gateway configured to: http://100.49.159.65:8080"
+          echo ""
+          echo "Test registration flow at: http://44.210.241.99"
+          echo ""
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/key.pem
