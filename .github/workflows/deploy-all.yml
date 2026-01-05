@@ -53,27 +53,25 @@ jobs:
       - name: Deploy to EC2-Core (13.221.55.216)
         run: |
           echo "=== Deploying to EC2-Core ==="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@13.221.55.216 << 'DEPLOY'
-          set -e
-          echo "Force removing all containers..."
-          docker ps -q | xargs -r docker stop
-          sleep 2
-          docker ps -aq | xargs -r docker rm -f
-          sleep 2
-          cd /tmp
-          rm -rf Proyecto-Acompa-amiento-
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
-          cd Proyecto-Acompa-amiento-
-          echo "Building microservices..."
-          docker build -t micro-auth:latest -f micro-auth/Dockerfile .
-          docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
-          docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
-          echo "Starting microservices..."
-          docker run -d --name micro-auth --restart unless-stopped -p 3000:3000 -e DB_HOST=44.222.116.0 micro-auth:latest
-          docker run -d --name micro-maestros --restart unless-stopped -p 3002:3002 -e DB_HOST=44.222.116.0 micro-maestros:latest
-          docker run -d --name micro-estudiantes --restart unless-stopped -p 3001:3001 -e DB_HOST=44.222.116.0 micro-estudiantes:latest
-          docker ps
-          DEPLOY
+          echo "❌ ERROR: EC2-Core public IP is not configured!"
+          echo ""
+          echo "The workflow references EC2-Core with private IP: 13.221.55.216"
+          echo "But GitHub Actions runners can only SSH to PUBLIC IPs."
+          echo ""
+          echo "To fix this:"
+          echo "1. Go to AWS Console → EC2 Instances"
+          echo "2. Find the instance with private IP 13.221.55.216 (should be named EC2-Core)"
+          echo "3. Note its PUBLIC IP (e.g., 54.xxx.xxx.xxx)"
+          echo "4. Update this workflow with the PUBLIC IP"
+          echo "5. Update the API Gateway env vars to use the PUBLIC IP"
+          echo "6. Update the Frontend API_GATEWAY_URL if needed"
+          echo ""
+          echo "The API Gateway needs to reach microservices at:"
+          echo "  - http://[EC2_CORE_PUBLIC_IP]:3000  (auth)"
+          echo "  - http://[EC2_CORE_PUBLIC_IP]:3001  (estudiantes)"
+          echo "  - http://[EC2_CORE_PUBLIC_IP]:3002  (maestros)"
+          echo ""
+          exit 1
 
       - name: Deploy to EC2-API-Gateway (98.84.30.35)
         run: |
@@ -96,6 +94,8 @@ jobs:
             -e AUTH_SERVICE=http://13.221.55.216:3000 \
             -e MAESTROS_SERVICE=http://13.221.55.216:3002 \
             -e ESTUDIANTES_SERVICE=http://13.221.55.216:3001 \
+            -e REPORTES_EST_SERVICE=http://3.239.86.68:5003 \
+            -e REPORTES_MAEST_SERVICE=http://3.239.86.68:5004 \
             api-gateway:latest
           docker ps
           DEPLOY
