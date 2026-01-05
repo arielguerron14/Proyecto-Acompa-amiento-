@@ -34,10 +34,11 @@ jobs:
           echo "=== Deploying to EC2-DB ==="
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@44.222.116.0 << 'DEPLOY'
           set -e
-          echo "Stopping existing containers..."
-          docker-compose -f /tmp/docker-compose.yml down 2>/dev/null || true
-          cd /tmp
-          rm -rf docker-compose.yml
+          echo "Stopping and removing all containers..."
+          docker stop $(docker ps -aq) 2>/dev/null || true
+          docker rm $(docker ps -aq) 2>/dev/null || true
+          echo "Removing mongo, postgres, redis containers if exist..."
+          docker rm mongo postgres redis 2>/dev/null || true
           echo "Updating databases..."
           docker pull mongo:latest
           docker pull postgres:15-alpine
@@ -54,7 +55,7 @@ jobs:
           echo "=== Deploying to EC2-Core ==="
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@13.221.55.216 << 'DEPLOY'
           set -e
-          echo "Stopping existing containers..."
+          echo "Stopping and removing microservices..."
           docker stop micro-auth micro-maestros micro-estudiantes 2>/dev/null || true
           docker rm micro-auth micro-maestros micro-estudiantes 2>/dev/null || true
           cd /tmp
@@ -77,7 +78,7 @@ jobs:
           echo "=== Deploying to EC2-API-Gateway ==="
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.30.35 << 'DEPLOY'
           set -e
-          echo "Stopping existing containers..."
+          echo "Stopping and removing API Gateway..."
           docker stop api-gateway 2>/dev/null || true
           docker rm api-gateway 2>/dev/null || true
           cd /tmp
@@ -100,7 +101,7 @@ jobs:
           echo "=== Deploying to EC2-Frontend ==="
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.92.84.126 << 'DEPLOY'
           set -e
-          echo "Stopping existing containers..."
+          echo "Stopping and removing frontend..."
           docker stop acompanamiento-frontend 2>/dev/null || true
           docker rm acompanamiento-frontend 2>/dev/null || true
           cd /tmp
@@ -122,7 +123,7 @@ jobs:
           echo "=== Deploying to EC2-Notificaciones ==="
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.28.124.73 << 'DEPLOY'
           set -e
-          echo "Stopping existing containers..."
+          echo "Stopping and removing notification services..."
           docker stop micro-notificaciones micro-soap-bridge 2>/dev/null || true
           docker rm micro-notificaciones micro-soap-bridge 2>/dev/null || true
           cd /tmp
@@ -160,7 +161,7 @@ jobs:
           echo "=== Deploying to EC2-Reportes ==="
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@3.239.86.68 << 'DEPLOY'
           set -e
-          echo "Stopping existing containers..."
+          echo "Stopping and removing reporting services..."
           docker stop micro-analytics micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
           docker rm micro-analytics micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
           cd /tmp
