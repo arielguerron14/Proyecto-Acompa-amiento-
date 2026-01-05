@@ -26,7 +26,6 @@ env:
   POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_AWS }}
   POSTGRES_USER: postgres
   POSTGRES_DB: acompanamiento
-  POSTGRES_HOST_PLACEHOLDER: DB_IP_PLACEHOLDER
 
 jobs:
   deploy-microservices:
@@ -50,337 +49,135 @@ jobs:
           ${{ env.EC2_CORE_SSH_KEY }}
           EOF
           chmod 600 ~/.ssh/aws-ec2-core.pem
-          cat > ~/.ssh/config << 'SSHCONFIG'
-          Host *
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null
-            LogLevel=QUIET
-          SSHCONFIG
 
-      - name: Diagnose and test SSH connection to EC2-CORE
+      - name: Test SSH connection
         run: |
-          echo "=== SSH Configuration ==="
-          echo "Target IP: ${{ env.EC2_CORE_IP }}"
-          echo "Key file size: $(wc -c < ~/.ssh/aws-ec2-core.pem) bytes"
-          echo ""
-          
-          # Function to test SSH with retries
-          test_ssh_with_retries() {
-            local user=$1
-            local ip=$2
-            local max_retries=3
-            local retry_delay=5
-            
-            for ((i=1; i<=max_retries; i++)); do
-              echo "Attempt $i/$max_retries: Testing SSH with user '$user'..."
-              if ssh -i ~/.ssh/aws-ec2-core.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$user@$ip" "echo 'SSH connection successful' && uname -a" 2>&1; then
-                echo "✓ SSH connection successful with user: $user"
-                return 0
-              fi
-              
-              if [ $i -lt $max_retries ]; then
-                echo "⚠ Connection failed, waiting ${retry_delay}s before retry..."
-                sleep $retry_delay
-              fi
-            done
-            
-            return 1
-          }
-          
-          echo "=== Attempting SSH connection ==="
-          # Try ubuntu first (most common for Ubuntu AMIs)
-          if test_ssh_with_retries "ubuntu" "${{ env.EC2_CORE_IP }}"; then
+          echo "Testing SSH connection to EC2-CORE..."
+          if ssh -i ~/.ssh/aws-ec2-core.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${{ env.EC2_CORE_IP }} "echo 'SSH OK' && uname -a" 2>&1; then
             echo "EC2_SSH_USER=ubuntu" >> $GITHUB_ENV
-          # Then try ec2-user (Amazon Linux)
-          elif test_ssh_with_retries "ec2-user" "${{ env.EC2_CORE_IP }}"; then
+          elif ssh -i ~/.ssh/aws-ec2-core.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@${{ env.EC2_CORE_IP }} "echo 'SSH OK' && uname -a" 2>&1; then
             echo "EC2_SSH_USER=ec2-user" >> $GITHUB_ENV
           else
-            echo ""
-            echo "✗ SSH connection failed with both ubuntu and ec2-user after retries"
-            echo ""
-            echo "=== DEBUGGING INFO ==="
-            echo "EC2 Instance Details:"
-            echo "  IP: ${{ env.EC2_CORE_IP }}"
-            echo "  Expected Key: key-acompanamiento"
-            echo "  Security Group: SG-ACOMPANAMIENTO-ALL (has SSH port 22 rule)"
-            echo ""
-            echo "SSH Verbose Output (last attempt):"
-            ssh -vvv -i ~/.ssh/aws-ec2-core.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no "ubuntu@${{ env.EC2_CORE_IP }}" "whoami" 2>&1 | tail -20 || true
-            echo ""
-            echo "✗ SSH Authentication Failed"
+            echo "SSH connection failed"
             exit 1
           fi
 
-      - name: Clone repository and build Docker images on EC2-CORE
+      - name: Clone and build Docker images
         run: |
-          ssh -i ~/.ssh/aws-ec2-core.pem ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'CLONE_EOF'
-            echo "=== Cloning Repository ==="
-            
-            # Clone the repository
-            cd ~
-            rm -rf Proyecto-Acompa-amiento-
+          ssh -i ~/.ssh/aws-ec2-core.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'EOF'
+            cd ~ && rm -rf Proyecto-Acompa-amiento- 
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
-            
-            echo "✓ Repository cloned"
-            echo ""
-            echo "=== Building Docker Images ==="
-            
-            # Build micro-auth
-            echo "Building micro-auth..."
             docker build -t acompanamiento/micro-auth:latest ./micro-auth
-            
-            # Build micro-maestros
-            echo "Building micro-maestros..."
             docker build -t acompanamiento/micro-maestros:latest ./micro-maestros
-            
-            # Build micro-estudiantes
-            echo "Building micro-estudiantes..."
             docker build -t acompanamiento/micro-estudiantes:latest ./micro-estudiantes
-            
-            # Build api-gateway
-            echo "Building api-gateway..."
             docker build -t acompanamiento/api-gateway:latest ./api-gateway
-            
-            echo "✓ All Docker images built successfully"
             docker images | grep acompanamiento
-          CLONE_EOF
+          EOF
 
-      - name: Create docker-compose.yml on EC2-CORE
+      - name: Create and deploy docker-compose
         run: |
-          ssh -i ~/.ssh/aws-ec2-core.pem ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'DEPLOY_EOF'
-            # Crear directorio para microservicios
+          ssh -i ~/.ssh/aws-ec2-core.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'EOF'
             mkdir -p ~/acompanamiento/microservices
             cd ~/acompanamiento/microservices
-            
-            # Crear docker-compose.yml con los microservicios
-            cat > docker-compose.yml << 'COMPOSE_EOF'
+            cat > docker-compose.yml << 'DOCKER_EOF'
 version: '3.8'
-
 services:
-  # Microservicio de Autenticación
   micro-auth:
     image: acompanamiento/micro-auth:latest
     container_name: acompanamiento-auth
-    restart: unless-stopped
     ports:
       - "5005:5005"
     environment:
       NODE_ENV: production
       PORT: 5005
-      SERVICE_NAME: micro-auth
-      LOG_LEVEL: info
-      POSTGRES_HOST: ${{ env.EC2_DB_IP }}
+      POSTGRES_HOST: DB_IP_PLACEHOLDER
       POSTGRES_PORT: 5432
-      POSTGRES_USER: ${{ env.POSTGRES_USER }}
-      POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-      POSTGRES_DB: ${{ env.POSTGRES_DB }}
-      MONGODB_URI: mongodb://${{ env.EC2_DB_IP }}:27017/acompanamiento
-      REDIS_URL: redis://${{ env.EC2_DB_IP }}:6379
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: DB_PASS_PLACEHOLDER
+      POSTGRES_DB: acompanamiento
+      MONGODB_URI: mongodb://DB_IP_PLACEHOLDER:27017/acompanamiento
+      REDIS_URL: redis://DB_IP_PLACEHOLDER:6379
     networks:
       - acompanamiento-network
-    depends_on:
-      - api-gateway
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    restart: unless-stopped
 
-  # Microservicio de Maestros
   micro-maestros:
     image: acompanamiento/micro-maestros:latest
     container_name: acompanamiento-maestros
-    restart: unless-stopped
     ports:
       - "5001:5001"
     environment:
       NODE_ENV: production
       PORT: 5001
-      SERVICE_NAME: micro-maestros
-      LOG_LEVEL: info
-      POSTGRES_HOST: ${{ env.EC2_DB_IP }}
+      POSTGRES_HOST: DB_IP_PLACEHOLDER
       POSTGRES_PORT: 5432
-      POSTGRES_USER: ${{ env.POSTGRES_USER }}
-      POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-      POSTGRES_DB: ${{ env.POSTGRES_DB }}
-      MONGODB_URI: mongodb://${{ env.EC2_DB_IP }}:27017/acompanamiento
-      REDIS_URL: redis://${{ env.EC2_DB_IP }}:6379
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: DB_PASS_PLACEHOLDER
+      POSTGRES_DB: acompanamiento
+      MONGODB_URI: mongodb://DB_IP_PLACEHOLDER:27017/acompanamiento
+      REDIS_URL: redis://DB_IP_PLACEHOLDER:6379
     networks:
       - acompanamiento-network
-    depends_on:
-      - api-gateway
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    restart: unless-stopped
 
-  # Microservicio de Estudiantes
   micro-estudiantes:
     image: acompanamiento/micro-estudiantes:latest
     container_name: acompanamiento-estudiantes
-    restart: unless-stopped
     ports:
       - "5002:5002"
     environment:
       NODE_ENV: production
       PORT: 5002
-      SERVICE_NAME: micro-estudiantes
-      LOG_LEVEL: info
-      POSTGRES_HOST: ${{ env.EC2_DB_IP }}
+      POSTGRES_HOST: DB_IP_PLACEHOLDER
       POSTGRES_PORT: 5432
-      POSTGRES_USER: ${{ env.POSTGRES_USER }}
-      POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-      POSTGRES_DB: ${{ env.POSTGRES_DB }}
-      MONGODB_URI: mongodb://${{ env.EC2_DB_IP }}:27017/acompanamiento
-      REDIS_URL: redis://${{ env.EC2_DB_IP }}:6379
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: DB_PASS_PLACEHOLDER
+      POSTGRES_DB: acompanamiento
+      MONGODB_URI: mongodb://DB_IP_PLACEHOLDER:27017/acompanamiento
+      REDIS_URL: redis://DB_IP_PLACEHOLDER:6379
     networks:
       - acompanamiento-network
-    depends_on:
-      - api-gateway
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    restart: unless-stopped
 
-  # API Gateway
   api-gateway:
     image: acompanamiento/api-gateway:latest
     container_name: acompanamiento-gateway
-    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       NODE_ENV: production
       PORT: 8080
-      SERVICE_NAME: api-gateway
-      LOG_LEVEL: info
       AUTH_SERVICE_URL: http://micro-auth:5005
       MAESTROS_SERVICE_URL: http://micro-maestros:5001
       ESTUDIANTES_SERVICE_URL: http://micro-estudiantes:5002
     networks:
       - acompanamiento-network
-    volumes:
-      - ./gateway-logs:/var/log/acompanamiento
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    restart: unless-stopped
 
 networks:
   acompanamiento-network:
     driver: bridge
-COMPOSE_EOF
-
-            echo "✓ docker-compose.yml created"
-          DEPLOY_EOF
-
-      - name: Start microservices
-        run: |
-          ssh -i ~/.ssh/aws-ec2-core.pem ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'START_EOF'
-            cd ~/acompanamiento/microservices
-            
-            echo "=== Starting Docker Compose ==="
-            
-            # Stop existing services (if any)
+DOCKER_EOF
+            sed -i "s/DB_IP_PLACEHOLDER/${{ env.EC2_DB_IP }}/g" docker-compose.yml
+            sed -i "s/DB_PASS_PLACEHOLDER/${{ env.POSTGRES_PASSWORD }}/g" docker-compose.yml
             docker-compose down 2>/dev/null || true
-            
-            # Start services in detached mode
             docker-compose up -d
-            
-            echo "✓ Docker Compose started"
-            echo ""
-            echo "=== Container Status ==="
+            sleep 15
             docker-compose ps
-            echo ""
-            echo "=== Network Information ==="
-            docker network ls
-          START_EOF
-
-      - name: Test microservices health
-        run: |
-          ssh -i ~/.ssh/aws-ec2-core.pem ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'TEST_EOF'
-            echo "=== Testing Microservices Health ==="
-            sleep 10  # Wait for services to fully start
-            
-            # Test API Gateway
-            echo "Testing API Gateway (port 8080)..."
-            curl -f http://localhost:8080/health 2>/dev/null && echo "✓ API Gateway healthy" || echo "⚠ API Gateway not responding yet"
-            
-            # Test Auth Service
-            echo "Testing Auth Service (port 5005)..."
-            curl -f http://localhost:5005/health 2>/dev/null && echo "✓ Auth Service healthy" || echo "⚠ Auth Service not responding yet"
-            
-            # Test Maestros Service
-            echo "Testing Maestros Service (port 5001)..."
-            curl -f http://localhost:5001/health 2>/dev/null && echo "✓ Maestros Service healthy" || echo "⚠ Maestros Service not responding yet"
-            
-            # Test Estudiantes Service
-            echo "Testing Estudiantes Service (port 5002)..."
-            curl -f http://localhost:5002/health 2>/dev/null && echo "✓ Estudiantes Service healthy" || echo "⚠ Estudiantes Service not responding yet"
-            
-            echo ""
-            echo "=== Docker Logs (last 20 lines) ==="
-            docker-compose logs --tail=20
-          TEST_EOF
-
-      - name: Deployment Summary
-        if: always()
-        run: |
-          cat > /tmp/microservices-deployment-summary.txt << 'EOF'
-          =================================================================
-          AWS EC2-CORE MICROSERVICES DEPLOYMENT SUMMARY
-          =================================================================
-          
-          Deployment Date: $(date)
-          Environment: ${{ env.ENVIRONMENT }}
-          EC2-CORE Private IP: ${{ env.EC2_CORE_IP }}
-          EC2-DB Private IP: ${{ env.EC2_DB_IP }}
-          
-          Deployed Microservices:
-          - API Gateway (port 8080)
-          - Micro Auth (port 5005)
-          - Micro Maestros (port 5001)
-          - Micro Estudiantes (port 5002)
-          
-          Database Configuration:
-          - PostgreSQL Host: ${{ env.EC2_DB_IP }}:5432
-          - MongoDB Host: ${{ env.EC2_DB_IP }}:27017
-          - Redis Host: ${{ env.EC2_DB_IP }}:6379
-          
-          Service URLs:
-          - API Gateway: http://${{ env.EC2_CORE_IP }}:8080/
-          - Auth Service: http://${{ env.EC2_CORE_IP }}:5005/
-          - Maestros Service: http://${{ env.EC2_CORE_IP }}:5001/
-          - Estudiantes Service: http://${{ env.EC2_CORE_IP }}:5002/
-          
-          Next Steps:
-          1. Access health endpoints to verify all services are running
-          2. Check Docker logs if any service is not responding
-          3. Configure load balancer/reverse proxy if needed
-          4. Set up SSL certificates for HTTPS
-          5. Configure monitoring and alerts
-          
-          =================================================================
+            docker-compose logs --tail=50
           EOF
-          cat /tmp/microservices-deployment-summary.txt
 
-      - name: Upload deployment report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: microservices-deployment-report-${{ env.ENVIRONMENT }}
-          path: /tmp/microservices-deployment-summary.txt
-          retention-days: 30
+      - name: Test services
+        run: |
+          echo "Testing services..."
+          sleep 5
+          curl -f http://${{ env.EC2_CORE_IP }}:8080/health 2>/dev/null && echo "✓ Gateway OK" || echo "⚠ Gateway checking..."
+          curl -f http://${{ env.EC2_CORE_IP }}:5005/health 2>/dev/null && echo "✓ Auth OK" || echo "⚠ Auth checking..."
+          curl -f http://${{ env.EC2_CORE_IP }}:5001/health 2>/dev/null && echo "✓ Maestros OK" || echo "⚠ Maestros checking..."
+          curl -f http://${{ env.EC2_CORE_IP }}:5002/health 2>/dev/null && echo "✓ Estudiantes OK" || echo "⚠ Estudiantes checking..."
 
-      - name: Cleanup SSH key
+      - name: Cleanup
         if: always()
         run: |
           rm -f ~/.ssh/aws-ec2-core.pem
