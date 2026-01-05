@@ -29,10 +29,10 @@ jobs:
             LogLevel=QUIET
           EOF
 
-      - name: Deploy to EC2-DB (172.31.79.193)
+      - name: Deploy to EC2-DB (44.222.116.0)
         run: |
           echo "=== Deploying to EC2-DB ==="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@172.31.79.193 << 'DEPLOY'
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@44.222.116.0 << 'DEPLOY'
           set -e
           echo "Stopping existing containers..."
           docker-compose -f /tmp/docker-compose.yml down 2>/dev/null || true
@@ -66,9 +66,9 @@ jobs:
           docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
           docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
           echo "Starting microservices..."
-          docker run -d --name micro-auth --restart unless-stopped -p 3000:3000 -e DB_HOST=172.31.79.193 micro-auth:latest
-          docker run -d --name micro-maestros --restart unless-stopped -p 3002:3002 -e DB_HOST=172.31.79.193 micro-maestros:latest
-          docker run -d --name micro-estudiantes --restart unless-stopped -p 3001:3001 -e DB_HOST=172.31.79.193 micro-estudiantes:latest
+          docker run -d --name micro-auth --restart unless-stopped -p 3000:3000 -e DB_HOST=44.222.116.0 micro-auth:latest
+          docker run -d --name micro-maestros --restart unless-stopped -p 3002:3002 -e DB_HOST=44.222.116.0 micro-maestros:latest
+          docker run -d --name micro-estudiantes --restart unless-stopped -p 3001:3001 -e DB_HOST=44.222.116.0 micro-estudiantes:latest
           docker ps
           DEPLOY
 
@@ -111,7 +111,7 @@ jobs:
           docker build -t frontend-web:latest -f frontend-web/Dockerfile ./frontend-web
           echo "Starting Frontend..."
           docker run -d --name acompanamiento-frontend --restart unless-stopped -p 80:80 -p 3000:3000 \
-            -e API_GATEWAY_URL=http://172.31.76.105:8080 \
+            -e API_GATEWAY_URL=http://98.84.30.35:8080 \
             frontend-web:latest
           docker ps
           docker logs --tail=20 acompanamiento-frontend
@@ -133,7 +133,7 @@ jobs:
           docker build -t micro-notificaciones:latest -f micro-notificaciones/Dockerfile .
           docker build -t micro-soap-bridge:latest -f micro-soap-bridge/Dockerfile .
           echo "Starting notification services..."
-          docker run -d --name micro-notificaciones --restart unless-stopped -p 5006:5006 -e DB_HOST=172.31.79.193 micro-notificaciones:latest
+          docker run -d --name micro-notificaciones --restart unless-stopped -p 5006:5006 -e DB_HOST=44.222.116.0 micro-notificaciones:latest
           docker run -d --name micro-soap-bridge --restart unless-stopped -p 5008:5008 micro-soap-bridge:latest
           docker ps
           DEPLOY
@@ -172,9 +172,9 @@ jobs:
           docker build -t micro-reportes-estudiantes:latest -f micro-reportes-estudiantes/Dockerfile .
           docker build -t micro-reportes-maestros:latest -f micro-reportes-maestros/Dockerfile .
           echo "Starting reporting services..."
-          docker run -d --name micro-analytics --restart unless-stopped -p 5007:5007 -e DB_HOST=172.31.79.193 micro-analytics:latest
-          docker run -d --name micro-reportes-estudiantes --restart unless-stopped -p 5003:5003 -e DB_HOST=172.31.79.193 micro-reportes-estudiantes:latest
-          docker run -d --name micro-reportes-maestros --restart unless-stopped -p 5004:5004 -e DB_HOST=172.31.79.193 micro-reportes-maestros:latest
+          docker run -d --name micro-analytics --restart unless-stopped -p 5007:5007 -e DB_HOST=44.222.116.0 micro-analytics:latest
+          docker run -d --name micro-reportes-estudiantes --restart unless-stopped -p 5003:5003 -e DB_HOST=44.222.116.0 micro-reportes-estudiantes:latest
+          docker run -d --name micro-reportes-maestros --restart unless-stopped -p 5004:5004 -e DB_HOST=44.222.116.0 micro-reportes-maestros:latest
           docker ps
           DEPLOY
 
