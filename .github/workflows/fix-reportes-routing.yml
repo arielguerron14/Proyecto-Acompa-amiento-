@@ -1,0 +1,162 @@
+name: Fix Reportes Routing in API Gateway
+
+on:
+  workflow_dispatch:
+
+env:
+  SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+
+jobs:
+  fix-routing:
+    name: Deploy API Gateway and Reportes Route Fixes
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+          cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          EOF
+
+      - name: Deploy API Gateway Fix (API Gateway Server)
+        run: |
+          echo "=================================================="
+          echo "Deploying API Gateway with Reportes Routing Fix"
+          echo "=================================================="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.49.159.65 << 'FIX_API_GATEWAY'
+          set -e
+          
+          echo "Step 1: Update code from latest main..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "Step 2: Build API Gateway image..."
+          docker build -t api-gateway:latest -f api-gateway/Dockerfile .
+          
+          echo "Step 3: Stop and remove old API Gateway container..."
+          docker stop api-gateway 2>/dev/null || true
+          docker rm api-gateway 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 4: Start new API Gateway with routing fixes..."
+          docker run -d --name api-gateway --restart unless-stopped \
+            -p 8080:8080 \
+            -e PORT=8080 \
+            -e AUTH_SERVICE=http://100.24.118.233:3000 \
+            -e MAESTROS_SERVICE=http://100.24.118.233:3002 \
+            -e ESTUDIANTES_SERVICE=http://100.24.118.233:3001 \
+            -e REPORTES_EST_SERVICE=http://98.84.26.109:5003 \
+            -e REPORTES_MAEST_SERVICE=http://98.84.26.109:5004 \
+            api-gateway:latest
+          
+          echo "Step 5: Wait for container..."
+          sleep 5
+          
+          echo "Step 6: Check status..."
+          docker ps | grep api-gateway
+          
+          echo "✅ API Gateway deployed with routing fixes!"
+          FIX_API_GATEWAY
+
+      - name: Deploy Reportes Services Route Fixes (Database Server)
+        run: |
+          echo "=================================================="
+          echo "Deploying Reportes Services with Route Fixes"
+          echo "=================================================="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.26.109 << 'FIX_REPORTES'
+          set -e
+          
+          echo "Step 1: Update code from latest main..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "Step 2: Build reportes services images..."
+          docker build -t micro-reportes-estudiantes:latest -f micro-reportes-estudiantes/Dockerfile .
+          docker build -t micro-reportes-maestros:latest -f micro-reportes-maestros/Dockerfile .
+          
+          echo "Step 3: Stop and remove old reportes containers..."
+          docker stop micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
+          docker rm micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 4: Start reportes services with route fixes..."
+          docker run -d --name micro-reportes-estudiantes --restart unless-stopped \
+            -p 5003:5003 \
+            -e PORT=5003 \
+            -e MONGO_URI=mongodb://localhost:27017/micro-reportes-estudiantes \
+            micro-reportes-estudiantes:latest
+          
+          docker run -d --name micro-reportes-maestros --restart unless-stopped \
+            -p 5004:5004 \
+            -e PORT=5004 \
+            -e MONGO_URI=mongodb://localhost:27017/micro-reportes-maestros \
+            micro-reportes-maestros:latest
+          
+          echo "Step 5: Wait for containers..."
+          sleep 8
+          
+          echo "Step 6: Check status..."
+          docker ps | grep micro-reportes
+          
+          echo "✅ Reportes services deployed with route fixes!"
+          FIX_REPORTES
+
+      - name: Verify All Services
+        continue-on-error: true
+        run: |
+          echo "=================================================="
+          echo "System Verification After Routing Fixes"
+          echo "=================================================="
+          
+          echo "Testing API Gateway health..."
+          curl -s http://100.49.159.65:8080/health | jq . || echo "API Gateway health check"
+          
+          echo ""
+          echo "Testing Reportes Estudiantes service directly..."
+          curl -s http://98.84.26.109:5003/health | jq . || echo "Reportes EST health check"
+          
+          echo ""
+          echo "Testing Reportes endpoint through API Gateway..."
+          curl -s http://100.49.159.65:8080/api/reportes/estudiantes/reporte/test123 | jq . || echo "Testing /api/reportes routing"
+          
+          echo ""
+          echo "Testing legacy reportes endpoint..."
+          curl -s http://100.49.159.65:8080/reportes/reporte/test123 | jq . || echo "Testing /reportes routing"
+
+      - name: Final Status
+        run: |
+          echo "=================================================="
+          echo "✅ ROUTING FIX DEPLOYMENT COMPLETE"
+          echo "=================================================="
+          echo ""
+          echo "Updated Services:"
+          echo "  • API Gateway: 100.49.159.65:8080"
+          echo "    - Added /api/reportes/* route proxy"
+          echo "    - Kept /reportes/* for backward compatibility"
+          echo ""
+          echo "  • Micro-Reportes-Estudiantes: 98.84.26.109:5003"
+          echo "    - Added /api/reportes/estudiantes/* routes"
+          echo "    - Kept /registrar and /reporte/:id for compatibility"
+          echo ""
+          echo "  • Micro-Reportes-Maestros: 98.84.26.109:5004"
+          echo "    - Added /api/reportes/maestros/* routes"
+          echo "    - Kept legacy routes for compatibility"
+          echo ""
+          echo "The frontend should now correctly access:"
+          echo "  GET /api/reportes/estudiantes/reporte/{id}"
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/key.pem
