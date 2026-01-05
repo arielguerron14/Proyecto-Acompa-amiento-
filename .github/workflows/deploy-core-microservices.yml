@@ -69,10 +69,21 @@ jobs:
             docker rm acompanamiento-estudiantes 2>/dev/null || true
             docker rm acompanamiento-maestros 2>/dev/null || true
             
-            echo "=== Docker pull de imágenes ==="
-            docker pull arielguerron14/micro-auth:latest || echo "Nota: Puede ser necesario construir localmente"
-            docker pull arielguerron14/micro-estudiantes:latest || echo "Nota: Puede ser necesario construir localmente"
-            docker pull arielguerron14/micro-maestros:latest || echo "Nota: Puede ser necesario construir localmente"
+            echo "=== Clonando repositorio ==="
+            cd /tmp
+            rm -rf Proyecto-Acompa-amiento-
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+            
+            echo "=== Construyendo imágenes Docker ==="
+            echo "Construyendo micro-auth..."
+            docker build -t micro-auth:latest ./micro-auth
+            
+            echo "Construyendo micro-estudiantes..."
+            docker build -t micro-estudiantes:latest ./micro-estudiantes
+            
+            echo "Construyendo micro-maestros..."
+            docker build -t micro-maestros:latest ./micro-maestros
             
             echo "=== Desplegando micro-auth ==="
             docker run -d \
@@ -85,7 +96,7 @@ jobs:
               -e DB_POSTGRES_DB=acompanamiento \
               -e DB_MONGO_URI=mongodb://172.31.79.193:27017/acompanamiento \
               -e REDIS_URL=redis://172.31.79.193:6379 \
-              arielguerron14/micro-auth:latest
+              micro-auth:latest
             
             echo "=== Desplegando micro-estudiantes ==="
             docker run -d \
@@ -98,7 +109,7 @@ jobs:
               -e DB_POSTGRES_DB=acompanamiento \
               -e DB_MONGO_URI=mongodb://172.31.79.193:27017/acompanamiento \
               -e REDIS_URL=redis://172.31.79.193:6379 \
-              arielguerron14/micro-estudiantes:latest
+              micro-estudiantes:latest
             
             echo "=== Desplegando micro-maestros ==="
             docker run -d \
@@ -111,7 +122,7 @@ jobs:
               -e DB_POSTGRES_DB=acompanamiento \
               -e DB_MONGO_URI=mongodb://172.31.79.193:27017/acompanamiento \
               -e REDIS_URL=redis://172.31.79.193:6379 \
-              arielguerron14/micro-maestros:latest
+              micro-maestros:latest
             
             echo "=== Estado de contenedores ==="
             docker ps
