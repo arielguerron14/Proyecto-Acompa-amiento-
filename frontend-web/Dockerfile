@@ -4,14 +4,14 @@ FROM node:18-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy only frontend-web files (when building from repo root context)
+COPY frontend-web/package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy source code
-COPY . .
+# Copy frontend-web source code
+COPY frontend-web/ .
 
 # Expose port
 EXPOSE 80
