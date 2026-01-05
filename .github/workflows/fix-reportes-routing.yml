@@ -15,23 +15,31 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          cat > ~/.ssh/key.pem << 'EOF'
-          ${{ env.SSH_KEY }}
-          EOF
+          echo "${{ env.SSH_KEY }}" > ~/.ssh/key.pem
           chmod 600 ~/.ssh/key.pem
+          chmod 700 ~/.ssh
           cat > ~/.ssh/config << 'EOF'
           Host *
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
             LogLevel=QUIET
+            IdentitiesOnly=yes
+            User ubuntu
           EOF
+          chmod 600 ~/.ssh/config
+          
+          echo "SSH setup complete"
 
       - name: Deploy API Gateway Fix (API Gateway Server)
         run: |
           echo "=================================================="
           echo "Deploying API Gateway with Reportes Routing Fix"
           echo "=================================================="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.49.159.65 << 'FIX_API_GATEWAY'
+          
+          echo "Testing SSH connection..."
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@100.49.159.65 "echo SSH connection successful" || exit 1
+          
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.49.159.65 bash << 'FIX_API_GATEWAY'
           set -e
           
           echo "Step 1: Update code from latest main..."
@@ -82,7 +90,11 @@ jobs:
           echo "=================================================="
           echo "Deploying Reportes Services with Route Fixes"
           echo "=================================================="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.26.109 << 'FIX_REPORTES'
+          
+          echo "Testing SSH connection to database server..."
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@98.84.26.109 "echo SSH connection successful" || exit 1
+          
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.26.109 bash << 'FIX_REPORTES'
           set -e
           
           echo "Step 1: Update code from latest main..."
