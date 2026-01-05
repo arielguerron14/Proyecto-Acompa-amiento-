@@ -16,8 +16,29 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ env.SSH_KEY }}" > ~/.ssh/key.pem
+          
+          # Check if key was created
+          if [ ! -f ~/.ssh/key.pem ]; then
+            echo "ERROR: SSH key file was not created!"
+            echo "SSH_KEY length: ${#SSH_KEY}"
+            exit 1
+          fi
+          
+          # Check key format
+          if ! grep -q "BEGIN RSA PRIVATE KEY\|BEGIN EC PRIVATE KEY\|BEGIN OPENSSH PRIVATE KEY" ~/.ssh/key.pem; then
+            echo "WARNING: SSH key might not be in valid format"
+            head -1 ~/.ssh/key.pem
+          fi
+          
           chmod 600 ~/.ssh/key.pem
           chmod 700 ~/.ssh
+          
+          # Test SSH key validity
+          if ! ssh-keygen -l -f ~/.ssh/key.pem >/dev/null 2>&1; then
+            echo "ERROR: SSH key is invalid or corrupted"
+            exit 1
+          fi
+          
           cat > ~/.ssh/config << 'EOF'
           Host *
             StrictHostKeyChecking no
@@ -25,10 +46,11 @@ jobs:
             LogLevel=QUIET
             IdentitiesOnly=yes
             User ubuntu
+            ConnectTimeout=15
           EOF
           chmod 600 ~/.ssh/config
           
-          echo "SSH setup complete"
+          echo "✅ SSH setup complete and validated"
 
       - name: Deploy API Gateway Fix (API Gateway Server)
         run: |
@@ -36,11 +58,19 @@ jobs:
           echo "Deploying API Gateway with Reportes Routing Fix"
           echo "=================================================="
           
-          echo "Testing SSH connection..."
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@100.49.159.65 "echo SSH connection successful" || exit 1
+          echo "Testing SSH connection with verbose output..."
+          ssh -vvv -i ~/.ssh/key.pem -o ConnectTimeout=15 ubuntu@100.49.159.65 "echo SSH connection successful" 2>&1 | head -50
           
+          if [ $? -ne 0 ]; then
+            echo "❌ SSH connection failed"
+            echo "Checking if servers are reachable via ping..."
+            ping -c 1 100.49.159.65 || echo "Cannot ping 100.49.159.65"
+            exit 1
+          fi
+          
+          echo "✅ SSH connection successful"
           echo "Deploying API Gateway..."
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.49.159.65 << 'SCRIPT'
+          ssh -i ~/.ssh/key.pem ubuntu@100.49.159.65 << 'SCRIPT'
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
