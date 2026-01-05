@@ -31,7 +31,7 @@ jobs:
           echo "=================================================="
           echo "🔧 Restarting API Gateway with Public IPs"
           echo "=================================================="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.30.35 << 'APIGATEWAYFIX'
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.49.159.65 << 'APIGATEWAYFIX'
           set -e
           
           echo "Step 1: Stop existing API Gateway container..."
@@ -61,9 +61,9 @@ jobs:
             -p 8080:8080 \
             -e NODE_ENV=production \
             -e PORT=8080 \
-            -e AUTH_SERVICE_URL=http://13.221.55.216:3000 \
-            -e MAESTROS_SERVICE_URL=http://13.221.55.216:3002 \
-            -e ESTUDIANTES_SERVICE_URL=http://13.221.55.216:3001 \
+            -e AUTH_SERVICE_URL=http://100.24.118.233:3000 \
+            -e MAESTROS_SERVICE_URL=http://100.24.118.233:3002 \
+            -e ESTUDIANTES_SERVICE_URL=http://100.24.118.233:3001 \
             api-gateway:latest
           
           echo ""
@@ -95,11 +95,11 @@ jobs:
           echo "=================================================="
           
           echo "Testing API Gateway from outside..."
-          curl -I http://98.84.30.35:8080/health 2>&1 | head -10 || echo "API Gateway test"
+          curl -I http://100.49.159.65:8080/health 2>&1 | head -10 || echo "API Gateway test"
           
           echo ""
           echo "Testing registration endpoint..."
-          curl -s -X POST http://98.84.30.35:8080/api/auth/register \
+          curl -s -X POST http://100.49.159.65:8080/api/auth/register \
             -H "Content-Type: application/json" \
             -d '{"nombre":"Test","email":"test@example.com","password":"123456","rol":"Estudiante"}' 2>&1 | head -20 || echo "Registration test"
 
@@ -110,8 +110,8 @@ jobs:
           echo "✅ API GATEWAY RESTART COMPLETED"
           echo "=================================================="
           echo ""
-          echo "API Gateway should now be accessible at: http://98.84.30.35:8080"
-          echo "Try registration at: http://98.92.84.126"
+          echo "API Gateway should now be accessible at: http://100.49.159.65:8080"
+          echo "Try registration at: http://44.210.241.99"
           echo ""
 
       - name: Cleanup
