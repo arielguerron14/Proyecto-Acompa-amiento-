@@ -39,49 +39,26 @@ jobs:
           SSHCONFIG
           chmod 600 ~/.ssh/config
 
-      - name: Test SSH connection with retries
+      - name: Deploy Frontend via SSH
         run: |
-          echo "=== SSH Configuration ==="
-          echo "Target IP: ${{ env.EC2_FRONTEND_IP }}"
-          echo ""
-          
-          # Create SSH key with proper formatting
+          # Create SSH key
+          mkdir -p ~/.ssh
           cat > ~/.ssh/aws-ec2-frontend.pem << 'EOF'
           ${{ env.EC2_FRONTEND_SSH_KEY }}
           EOF
           chmod 600 ~/.ssh/aws-ec2-frontend.pem
-          echo "SSH key size: $(wc -c < ~/.ssh/aws-ec2-frontend.pem) bytes"
           
-          # Test SSH with retries
-          max_retries=3
-          retry_delay=5
+          # Export variables for SSH session
+          export EC2_API_GATEWAY_PUBLIC_IP="${{ env.EC2_API_GATEWAY_PUBLIC_IP }}"
+          export EC2_API_GATEWAY_PRIVATE_IP="${{ env.EC2_API_GATEWAY_PRIVATE_IP }}"
           
-          for ((i=1; i<=max_retries; i++)); do
-            echo "Attempt $i/$max_retries: Testing SSH connection..."
-            if ssh -i ~/.ssh/aws-ec2-frontend.pem \
-              -o ConnectTimeout=10 \
-              -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              -o IdentitiesOnly=yes \
-              ${{ env.EC2_FRONTEND_SSH_USER }}@${{ env.EC2_FRONTEND_IP }} "echo 'SSH OK' && uname -a" 2>&1; then
-              echo "✓ SSH connection successful"
-              break
-            fi
-            
-            if [ $i -lt $max_retries ]; then
-              echo "⚠ Connection failed, waiting ${retry_delay}s before retry..."
-              sleep $retry_delay
-            fi
-          done
-
-      - name: Deploy Frontend via SSH
-        run: |
+          # Run deployment script
           ssh -i ~/.ssh/aws-ec2-frontend.pem \
             -o ConnectTimeout=10 \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             -o IdentitiesOnly=yes \
-            ${{ env.EC2_FRONTEND_SSH_USER }}@${{ env.EC2_FRONTEND_IP }} << 'SSHEOF'
+            ubuntu@172.31.69.203 << 'SSHEOF'
             
             echo "=== Verificando Docker ==="
             if ! command -v docker &> /dev/null; then
