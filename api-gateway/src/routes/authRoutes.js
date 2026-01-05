@@ -2,7 +2,7 @@ const express = require('express');
 const HttpForwarder = require('../utils/httpForward');
 
 const router = express.Router();
-const microAuth = process.env.AUTH_URL || 'http://micro-auth:5005';
+const microAuth = process.env.AUTH_SERVICE || process.env.AUTH_URL || 'http://micro-auth:5005';
 
 // Simplified routes without complex middleware
 router.post('/register', async (req, res) => {

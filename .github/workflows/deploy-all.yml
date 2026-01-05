@@ -69,9 +69,9 @@ jobs:
           docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
           docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
           echo "Starting microservices..."
-          docker run -d --name micro-auth --restart unless-stopped -p 3000:3000 -e DB_HOST=44.222.116.0 micro-auth:latest
-          docker run -d --name micro-maestros --restart unless-stopped -p 3002:3002 -e DB_HOST=44.222.116.0 micro-maestros:latest
-          docker run -d --name micro-estudiantes --restart unless-stopped -p 3001:3001 -e DB_HOST=44.222.116.0 micro-estudiantes:latest
+          docker run -d --name micro-auth --restart unless-stopped -p 3000:3000 -e PORT=3000 -e DB_HOST=44.222.116.0 micro-auth:latest
+          docker run -d --name micro-maestros --restart unless-stopped -p 3002:3002 -e PORT=3002 -e DB_HOST=44.222.116.0 micro-maestros:latest
+          docker run -d --name micro-estudiantes --restart unless-stopped -p 3001:3001 -e PORT=3001 -e DB_HOST=44.222.116.0 micro-estudiantes:latest
           docker ps
           DEPLOY
 
