@@ -1,0 +1,138 @@
+name: Deploy Core Microservices to AWS EC2-CORE
+
+on:
+  workflow_dispatch:
+    inputs:
+      ec2_core_private_ip:
+        description: 'IP privada de instancia EC2-CORE (ej: 172.31.79.194)'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy Microservices to EC2-CORE
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/aws-ec2-core.pem << 'EOF'
+          ${{ secrets.AWS_EC2_CORE_SSH_PRIVATE_KEY }}
+          EOF
+          chmod 600 ~/.ssh/aws-ec2-core.pem
+
+      - name: Deploy microservices via SSH
+        env:
+          EC2_CORE_IP: ${{ github.event.inputs.ec2_core_private_ip }}
+          DB_POSTGRES_HOST: "172.31.79.193"
+          DB_POSTGRES_USER: "postgres"
+          DB_POSTGRES_PASSWORD: "postgres"
+          DB_POSTGRES_DB: "acompanamiento"
+          DB_MONGO_URI: "mongodb://172.31.79.193:27017/acompanamiento"
+          REDIS_URL: "redis://172.31.79.193:6379"
+        run: |
+          ssh -i ~/.ssh/aws-ec2-core.pem \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ubuntu@${EC2_CORE_IP} << 'SSHEOF'
+            
+            echo "=== Verificando Docker ==="
+            if ! command -v docker &> /dev/null; then
+              echo "Docker no encontrado, instalando..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo usermod -aG docker ubuntu
+              echo "Docker instalado correctamente"
+            else
+              echo "Docker ya está instalado"
+              docker --version
+            fi
+            
+            echo "=== Deteniendo contenedores existentes ==="
+            docker stop acompanamiento-auth 2>/dev/null || true
+            docker stop acompanamiento-estudiantes 2>/dev/null || true
+            docker stop acompanamiento-maestros 2>/dev/null || true
+            
+            echo "=== Removiendo contenedores existentes ==="
+            docker rm acompanamiento-auth 2>/dev/null || true
+            docker rm acompanamiento-estudiantes 2>/dev/null || true
+            docker rm acompanamiento-maestros 2>/dev/null || true
+            
+            echo "=== Docker pull de imágenes ==="
+            docker pull arielguerron14/micro-auth:latest || echo "Nota: Puede ser necesario construir localmente"
+            docker pull arielguerron14/micro-estudiantes:latest || echo "Nota: Puede ser necesario construir localmente"
+            docker pull arielguerron14/micro-maestros:latest || echo "Nota: Puede ser necesario construir localmente"
+            
+            echo "=== Desplegando micro-auth ==="
+            docker run -d \
+              --name acompanamiento-auth \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -e DB_POSTGRES_HOST=172.31.79.193 \
+              -e DB_POSTGRES_USER=postgres \
+              -e DB_POSTGRES_PASSWORD=postgres \
+              -e DB_POSTGRES_DB=acompanamiento \
+              -e DB_MONGO_URI=mongodb://172.31.79.193:27017/acompanamiento \
+              -e REDIS_URL=redis://172.31.79.193:6379 \
+              arielguerron14/micro-auth:latest
+            
+            echo "=== Desplegando micro-estudiantes ==="
+            docker run -d \
+              --name acompanamiento-estudiantes \
+              --restart unless-stopped \
+              -p 3001:3001 \
+              -e DB_POSTGRES_HOST=172.31.79.193 \
+              -e DB_POSTGRES_USER=postgres \
+              -e DB_POSTGRES_PASSWORD=postgres \
+              -e DB_POSTGRES_DB=acompanamiento \
+              -e DB_MONGO_URI=mongodb://172.31.79.193:27017/acompanamiento \
+              -e REDIS_URL=redis://172.31.79.193:6379 \
+              arielguerron14/micro-estudiantes:latest
+            
+            echo "=== Desplegando micro-maestros ==="
+            docker run -d \
+              --name acompanamiento-maestros \
+              --restart unless-stopped \
+              -p 3002:3002 \
+              -e DB_POSTGRES_HOST=172.31.79.193 \
+              -e DB_POSTGRES_USER=postgres \
+              -e DB_POSTGRES_PASSWORD=postgres \
+              -e DB_POSTGRES_DB=acompanamiento \
+              -e DB_MONGO_URI=mongodb://172.31.79.193:27017/acompanamiento \
+              -e REDIS_URL=redis://172.31.79.193:6379 \
+              arielguerron14/micro-maestros:latest
+            
+            echo "=== Estado de contenedores ==="
+            docker ps
+            
+            echo "=== Logs de micro-auth ==="
+            docker logs --tail=20 acompanamiento-auth
+            
+            echo "=== Logs de micro-estudiantes ==="
+            docker logs --tail=20 acompanamiento-estudiantes
+            
+            echo "=== Logs de micro-maestros ==="
+            docker logs --tail=20 acompanamiento-maestros
+            
+            echo "=== Verificando conectividad a bases de datos ==="
+            echo "Intentando conexión a PostgreSQL (172.31.79.193:5432)..."
+            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/172.31.79.193/5432' 2>/dev/null && echo "✓ PostgreSQL accesible" || echo "⚠ PostgreSQL no accesible"
+            
+            echo "Intentando conexión a MongoDB (172.31.79.193:27017)..."
+            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/172.31.79.193/27017' 2>/dev/null && echo "✓ MongoDB accesible" || echo "⚠ MongoDB no accesible"
+            
+            echo "Intentando conexión a Redis (172.31.79.193:6379)..."
+            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/172.31.79.193/6379' 2>/dev/null && echo "✓ Redis accesible" || echo "⚠ Redis no accesible"
+            
+            echo "=== Despliegue completado ==="
+          SSHEOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/aws-ec2-core.pem
