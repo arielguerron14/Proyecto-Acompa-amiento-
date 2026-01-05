@@ -8,6 +8,10 @@ on:
         required: true
         type: string
 
+env:
+  EC2_CORE_SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+  EC2_CORE_SSH_USER: ubuntu
+
 jobs:
   deploy:
     name: Deploy Microservices to EC2-CORE
@@ -17,29 +21,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set EC2 variables
+        run: |
+          echo "EC2_CORE_IP=${{ github.event.inputs.ec2_core_private_ip }}" >> $GITHUB_ENV
+
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           cat > ~/.ssh/aws-ec2-core.pem << 'EOF'
-          ${{ secrets.AWS_EC2_CORE_SSH_PRIVATE_KEY }}
+          ${{ env.EC2_CORE_SSH_KEY }}
           EOF
           chmod 600 ~/.ssh/aws-ec2-core.pem
+          cat > ~/.ssh/config << 'SSHCONFIG'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          SSHCONFIG
 
       - name: Deploy microservices via SSH
-        env:
-          EC2_CORE_IP: ${{ github.event.inputs.ec2_core_private_ip }}
-          DB_POSTGRES_HOST: "172.31.79.193"
-          DB_POSTGRES_USER: "postgres"
-          DB_POSTGRES_PASSWORD: "postgres"
-          DB_POSTGRES_DB: "acompanamiento"
-          DB_MONGO_URI: "mongodb://172.31.79.193:27017/acompanamiento"
-          REDIS_URL: "redis://172.31.79.193:6379"
         run: |
           ssh -i ~/.ssh/aws-ec2-core.pem \
             -o ConnectTimeout=10 \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
-            ubuntu@${EC2_CORE_IP} << 'SSHEOF'
+            ubuntu@${{ env.EC2_CORE_IP }} << 'SSHEOF'
             
             echo "=== Verificando Docker ==="
             if ! command -v docker &> /dev/null; then
