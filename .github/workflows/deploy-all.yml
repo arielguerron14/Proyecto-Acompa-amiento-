@@ -144,8 +144,8 @@ jobs:
           docker build -t micro-notificaciones:latest -f micro-notificaciones/Dockerfile .
           docker build -t micro-soap-bridge:latest -f micro-soap-bridge/Dockerfile .
           echo "Starting notification services..."
-          docker run -d --name micro-notificaciones --restart unless-stopped -p 5006:5006 -e DB_HOST=44.222.116.0 micro-notificaciones:latest
-          docker run -d --name micro-soap-bridge --restart unless-stopped -p 5008:5008 micro-soap-bridge:latest
+          docker run -d --name micro-notificaciones --restart unless-stopped -p 5006:5006 -e PORT=5006 -e DB_HOST=44.222.116.0 micro-notificaciones:latest
+          docker run -d --name micro-soap-bridge --restart unless-stopped -p 5008:5008 -e PORT=5008 micro-soap-bridge:latest
           docker ps
           DEPLOY
 
@@ -185,9 +185,9 @@ jobs:
           docker build -t micro-reportes-estudiantes:latest -f micro-reportes-estudiantes/Dockerfile .
           docker build -t micro-reportes-maestros:latest -f micro-reportes-maestros/Dockerfile .
           echo "Starting reporting services..."
-          docker run -d --name micro-analytics --restart unless-stopped -p 5007:5007 -e DB_HOST=44.222.116.0 micro-analytics:latest
-          docker run -d --name micro-reportes-estudiantes --restart unless-stopped -p 5003:5003 -e DB_HOST=44.222.116.0 micro-reportes-estudiantes:latest
-          docker run -d --name micro-reportes-maestros --restart unless-stopped -p 5004:5004 -e DB_HOST=44.222.116.0 micro-reportes-maestros:latest
+          docker run -d --name micro-analytics --restart unless-stopped -p 5007:5007 -e PORT=5007 -e DB_HOST=44.222.116.0 micro-analytics:latest
+          docker run -d --name micro-reportes-estudiantes --restart unless-stopped -p 5003:5003 -e PORT=5003 -e DB_HOST=44.222.116.0 micro-reportes-estudiantes:latest
+          docker run -d --name micro-reportes-maestros --restart unless-stopped -p 5004:5004 -e PORT=5004 -e DB_HOST=44.222.116.0 micro-reportes-maestros:latest
           docker ps
           DEPLOY
 
