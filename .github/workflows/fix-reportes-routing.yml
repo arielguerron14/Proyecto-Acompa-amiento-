@@ -39,33 +39,22 @@ jobs:
           echo "Testing SSH connection..."
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@100.49.159.65 "echo SSH connection successful" || exit 1
           
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.49.159.65 bash << 'FIX_API_GATEWAY'
-          set -e
-          
-          echo "Step 1: Update code from latest main..."
+          echo "Deploying API Gateway..."
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.49.159.65 << 'SCRIPT'
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
           cd Proyecto-Acompa-amiento-
           
-          echo "Step 2: Build API Gateway image..."
           docker build -t api-gateway:latest -f api-gateway/Dockerfile .
-          
-          echo "Step 3: Stop and remove old API Gateway container..."
           docker stop api-gateway 2>/dev/null || true
           docker kill api-gateway 2>/dev/null || true
           sleep 1
           docker rm -f api-gateway 2>/dev/null || true
           sleep 2
-          
-          echo "Checking if port 8080 is still in use..."
-          netstat -tulnp 2>/dev/null | grep 8080 || echo "Port 8080 is free"
-          
-          echo "Pruning Docker system to clean up networking..."
           docker system prune -f 2>/dev/null || true
           sleep 3
           
-          echo "Step 4: Start new API Gateway with routing fixes..."
           docker run -d --name api-gateway --restart unless-stopped \
             -p 8080:8080 \
             -e PORT=8080 \
@@ -76,14 +65,10 @@ jobs:
             -e REPORTES_MAEST_SERVICE=http://98.84.26.109:5004 \
             api-gateway:latest
           
-          echo "Step 5: Wait for container..."
           sleep 5
-          
-          echo "Step 6: Check status..."
           docker ps | grep api-gateway
-          
-          echo "✅ API Gateway deployed with routing fixes!"
-          FIX_API_GATEWAY
+          echo "✅ API Gateway deployed!"
+          SCRIPT
 
       - name: Deploy Reportes Services Route Fixes (Database Server)
         run: |
@@ -94,27 +79,22 @@ jobs:
           echo "Testing SSH connection to database server..."
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@98.84.26.109 "echo SSH connection successful" || exit 1
           
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.26.109 bash << 'FIX_REPORTES'
-          set -e
-          
-          echo "Step 1: Update code from latest main..."
+          echo "Deploying Reportes Services..."
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.26.109 << 'SCRIPT'
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
           cd Proyecto-Acompa-amiento-
           
-          echo "Step 2: Build reportes services images..."
           docker build -t micro-reportes-estudiantes:latest -f micro-reportes-estudiantes/Dockerfile .
           docker build -t micro-reportes-maestros:latest -f micro-reportes-maestros/Dockerfile .
           
-          echo "Step 3: Stop and remove old reportes containers..."
           docker stop micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
           docker kill micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
           sleep 1
           docker rm -f micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
           sleep 2
           
-          echo "Step 4: Start reportes services with route fixes..."
           docker run -d --name micro-reportes-estudiantes --restart unless-stopped \
             -p 5003:5003 \
             -e PORT=5003 \
@@ -127,18 +107,11 @@ jobs:
             -e MONGO_URI=mongodb://localhost:27017/micro-reportes-maestros \
             micro-reportes-maestros:latest
           
-          echo "Step 5: Wait for containers..."
           sleep 8
-          
-          echo "Step 6: Check status..."
           docker ps | grep micro-reportes
-          
-          echo "Step 7: Test reportes services health..."
-          curl -s http://localhost:5003/health || echo "Reportes EST health check attempt"
-          curl -s http://localhost:5004/health || echo "Reportes MAEST health check attempt"
-          
-          echo "✅ Reportes services deployed with route fixes!"
-          FIX_REPORTES
+          curl -s http://localhost:5003/health || echo "Reportes EST check"
+          echo "✅ Reportes services deployed!"
+          SCRIPT
 
       - name: Verify All Services
         continue-on-error: true
