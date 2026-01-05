@@ -48,14 +48,31 @@ jobs:
           
           echo "Step 4: Clone latest code..."
           cd /tmp
-          rm -rf Projeto-Acompa-amiento-
-          git clone https://github.com/arielguerron14/Projeto-Acompa-amiento-.git
-          cd Projeto-Acompa-imiento-
+          rm -rf Proyecto-Acompa-amiento-
           
-          echo "Step 5: Build frontend image..."
+          # Try with SSH key if available, fall back to HTTPS
+          if [ -f ~/.ssh/id_rsa ]; then
+            echo "Using SSH key for git clone..."
+            git clone git@github.com:arielguerron14/Proyecto-Acompa-amiento-.git
+          else
+            echo "Using HTTPS for git clone (no SSH key)..."
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          fi
+          
+          cd Proyecto-Acompa-amiento-
+          
+          echo ""
+          echo "Step 5: Verify directory structure..."
+          pwd
+          ls -la frontend-web/Dockerfile || echo "⚠️  Dockerfile not found!"
+          ls -la frontend-web/js/config.js || echo "⚠️  config.js not found!"
+          
+          echo ""
+          echo "Step 6: Build frontend image..."
           docker build -t frontend-web:latest -f frontend-web/Dockerfile ./frontend-web
           
-          echo "Step 6: Start frontend with API Gateway configuration..."
+          echo ""
+          echo "Step 7: Start frontend with API Gateway configuration..."
           docker run -d \
             --name acompanamiento-frontend \
             --restart unless-stopped \
@@ -65,19 +82,19 @@ jobs:
             frontend-web:latest
           
           echo ""
-          echo "Step 7: Wait for container to start..."
+          echo "Step 8: Wait for container to start..."
           sleep 5
           
           echo ""
-          echo "Step 8: Check container status..."
+          echo "Step 9: Check container status..."
           docker ps | grep frontend
           
           echo ""
-          echo "Step 9: Check frontend logs..."
-          docker logs --tail=20 acompanamiento-frontend 2>&1 || echo "Logs not available yet"
+          echo "Step 10: Check frontend logs..."
+          docker logs --tail=30 acompanamiento-frontend 2>&1 || echo "Logs not available yet"
           
           echo ""
-          echo "✅ Frontend redeployed!"
+          echo "✅ Frontend redeployed successfully!"
           FRONTENDFIX
 
       - name: Verify Frontend
