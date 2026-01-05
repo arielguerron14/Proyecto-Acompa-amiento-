@@ -65,9 +65,9 @@ jobs:
             -p 8080:8080 \
             -e NODE_ENV=production \
             -e PORT=8080 \
-            -e AUTH_SERVICE_URL=http://100.24.118.233:3000 \
-            -e MAESTROS_SERVICE_URL=http://100.24.118.233:3002 \
-            -e ESTUDIANTES_SERVICE_URL=http://100.24.118.233:3001 \
+            -e AUTH_SERVICE=http://100.24.118.233:3000 \
+            -e MAESTROS_SERVICE=http://100.24.118.233:3002 \
+            -e ESTUDIANTES_SERVICE=http://100.24.118.233:3001 \
             api-gateway:latest
           
           echo ""
