@@ -32,7 +32,7 @@ jobs:
           echo "=================================================="
           echo "🔧 Redeploying Frontend with Latest Code"
           echo "=================================================="
-          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@44.210.241.99 << 'FRONTENDFIX'
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@44.210.134.93 << 'FRONTENDFIX'
           set -e
           
           echo "Step 1: Stop existing frontend container..."
@@ -69,7 +69,7 @@ jobs:
           
           echo ""
           echo "Step 6: Build frontend image..."
-          docker build -t frontend-web:latest -f frontend-web/Dockerfile ./frontend-web
+          docker build -t frontend-web:latest -f frontend-web/Dockerfile .
           
           echo ""
           echo "Step 7: Start frontend with API Gateway configuration..."
@@ -78,7 +78,7 @@ jobs:
             --restart unless-stopped \
             -p 80:80 \
             -p 3000:3000 \
-            -e API_GATEWAY_URL=http://100.49.159.65:8080 \
+            -e API_GATEWAY_URL=http://100.48.66.29:8080 \
             frontend-web:latest
           
           echo ""
@@ -106,11 +106,11 @@ jobs:
           echo "=================================================="
           
           echo "Testing frontend homepage..."
-          curl -I http://44.210.241.99 2>&1 | head -10
+          curl -I http://44.210.134.93 2>&1 | head -10
           
           echo ""
           echo "Testing API proxy health check..."
-          curl -s http://44.210.241.99/api/health 2>&1 | head -5
+          curl -s http://44.210.134.93/api/health 2>&1 | head -5
 
       - name: Final Status
         run: |
@@ -119,14 +119,14 @@ jobs:
           echo "✅ FRONTEND REDEPLOY COMPLETED"
           echo "=================================================="
           echo ""
-          echo "Frontend redeployed at: http://44.210.241.99"
+          echo "Frontend redeployed at: http://44.210.134.93"
           echo ""
           echo "Changes made:"
           echo "  • Updated API configuration to use /api proxy"
           echo "  • Frontend server now proxies requests to API Gateway"
           echo "  • No more CORS issues between frontend and gateway"
           echo ""
-          echo "Try testing at: http://44.210.241.99"
+          echo "Try testing at: http://44.210.134.93"
           echo ""
 
       - name: Cleanup

@@ -16,5 +16,8 @@ COPY . .
 # Expose port
 EXPOSE 80
 
+# Set API Gateway URL environment variable
+ENV API_GATEWAY_URL=http://100.48.66.29:8080
+
 # Start the development server
 CMD ["npm", "start"]
