@@ -111,6 +111,41 @@ jobs:
             exit 1
           fi
 
+      - name: Clone repository and build Docker images on EC2-CORE
+        run: |
+          ssh -i ~/.ssh/aws-ec2-core.pem ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'CLONE_EOF'
+            echo "=== Cloning Repository ==="
+            
+            # Clone the repository
+            cd ~
+            rm -rf Proyecto-Acompa-amiento-
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+            
+            echo "✓ Repository cloned"
+            echo ""
+            echo "=== Building Docker Images ==="
+            
+            # Build micro-auth
+            echo "Building micro-auth..."
+            docker build -t acompanamiento/micro-auth:latest ./micro-auth
+            
+            # Build micro-maestros
+            echo "Building micro-maestros..."
+            docker build -t acompanamiento/micro-maestros:latest ./micro-maestros
+            
+            # Build micro-estudiantes
+            echo "Building micro-estudiantes..."
+            docker build -t acompanamiento/micro-estudiantes:latest ./micro-estudiantes
+            
+            # Build api-gateway
+            echo "Building api-gateway..."
+            docker build -t acompanamiento/api-gateway:latest ./api-gateway
+            
+            echo "✓ All Docker images built successfully"
+            docker images | grep acompanamiento
+          CLONE_EOF
+
       - name: Create docker-compose.yml on EC2-CORE
         run: |
           ssh -i ~/.ssh/aws-ec2-core.pem ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'DEPLOY_EOF'
@@ -247,20 +282,6 @@ COMPOSE_EOF
 
             echo "✓ docker-compose.yml created"
           DEPLOY_EOF
-
-      - name: Pull Docker images
-        run: |
-          ssh -i ~/.ssh/aws-ec2-core.pem ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'PULL_EOF'
-            echo "=== Pulling Docker Images ==="
-            
-            # Pull all microservice images
-            docker pull acompanamiento/micro-auth:latest || echo "Note: Image may not exist yet"
-            docker pull acompanamiento/micro-maestros:latest || echo "Note: Image may not exist yet"
-            docker pull acompanamiento/micro-estudiantes:latest || echo "Note: Image may not exist yet"
-            docker pull acompanamiento/api-gateway:latest || echo "Note: Image may not exist yet"
-            
-            echo "✓ Docker images pull attempted"
-          PULL_EOF
 
       - name: Start microservices
         run: |
