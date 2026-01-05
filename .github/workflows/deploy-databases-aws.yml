@@ -48,33 +48,54 @@ jobs:
           ${{ env.EC2_DB_SSH_KEY }}
           EOF
           chmod 600 ~/.ssh/aws-ec2-db.pem
-          echo "StrictHostKeyChecking=no" >> ~/.ssh/config
-          echo "UserKnownHostsFile=/dev/null" >> ~/.ssh/config
+          cat > ~/.ssh/config << 'SSHCONFIG'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          SSHCONFIG
 
-      - name: Diagnose SSH key
+      - name: Diagnose and test SSH connection
         run: |
-          echo "=== SSH Key Diagnostics ==="
-          echo "Key file exists: $(test -f ~/.ssh/aws-ec2-db.pem && echo 'YES' || echo 'NO')"
-          echo "Key file permissions: $(ls -l ~/.ssh/aws-ec2-db.pem | awk '{print $1}')"
+          echo "=== SSH Configuration ==="
+          echo "Target IP: ${{ env.EC2_DB_IP }}"
+          echo "Primary User: ${{ env.EC2_DB_SSH_USER }}"
           echo "Key file size: $(wc -c < ~/.ssh/aws-ec2-db.pem) bytes"
-          echo "Key file first line: $(head -n 1 ~/.ssh/aws-ec2-db.pem)"
-          echo "Key file last line: $(tail -n 1 ~/.ssh/aws-ec2-db.pem)"
-          echo "EC2 IP: ${{ env.EC2_DB_IP }}"
-          echo "EC2 User: ${{ env.EC2_DB_SSH_USER }}"
           echo ""
-          echo "=== SSH Config ==="
-          cat ~/.ssh/config
-          echo ""
-          echo "=== Testing SSH verbose mode ==="
-          ssh -vvv -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=10 ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} "echo 'SSH connection successful'" 2>&1 | tail -30 || true
-
-      - name: Test SSH connection
-        run: |
-          ssh -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=10 ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} "echo 'SSH connection successful' && uname -a"
+          
+          # Try primary user first
+          echo "=== Attempting SSH connection ==="
+          if ssh -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=5 -o BatchMode=yes ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} "echo 'SSH connection successful' && uname -a" 2>&1; then
+            echo ""
+            echo "✓ SSH connection successful with user: ${{ env.EC2_DB_SSH_USER }}"
+            echo "EC2_SSH_USER=${{ env.EC2_DB_SSH_USER }}" >> $GITHUB_ENV
+          else
+            echo ""
+            echo "⚠ Connection failed with ${{ env.EC2_DB_SSH_USER }}, trying alternative users..."
+            
+            # Try ubuntu user
+            if ssh -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=5 -o BatchMode=yes ubuntu@${{ env.EC2_DB_IP }} "echo 'SSH connection successful' && uname -a" 2>&1; then
+              echo "✓ SSH connection successful with user: ubuntu"
+              echo "EC2_SSH_USER=ubuntu" >> $GITHUB_ENV
+            else
+              echo "✗ SSH connection failed with both ec2-user and ubuntu"
+              echo ""
+              echo "=== DEBUGGING INFO ==="
+              echo "Attempting SSH with verbose mode..."
+              ssh -vvv -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=5 ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} "whoami" 2>&1 | grep -A5 -B5 "Authentications\|denied\|key" || true
+              echo ""
+              echo "✗ SSH Authentication Failed - Please check:"
+              echo "  1. EC2 instance was launched with the 'key-acompanamiento' key pair"
+              echo "  2. Security Group allows SSH (port 22) from your location"
+              echo "  3. The private key in GitHub Secret matches the EC2 key pair"
+              echo "  4. The correct username (ec2-user vs ubuntu) for your AMI type"
+              exit 1
+            fi
+          fi
 
       - name: Create data directories on EC2-DB
         run: |
-          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
             # Crear directorios para volúmenes
             mkdir -p ${{ env.MONGODB_VOLUME }}
             mkdir -p ${{ env.POSTGRES_VOLUME }}
@@ -90,7 +111,7 @@ jobs:
 
       - name: Stop and remove existing database containers
         run: |
-          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
             # Detener contenedores existentes (sin error si no existen)
             docker stop acompanamiento-postgres acompanamiento-mongo acompanamiento-redis 2>/dev/null || true
             
