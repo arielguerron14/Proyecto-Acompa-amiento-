@@ -1,0 +1,279 @@
+name: Deploy Databases to AWS EC2-DB
+
+on:
+  workflow_dispatch:
+    inputs:
+      ec2_db_private_ip:
+        description: 'IP privada de instancia EC2-DB (ej: 172.31.79.193)'
+        required: true
+        type: string
+      environment:
+        description: 'Ambiente (dev, staging, prod)'
+        required: true
+        type: choice
+        default: 'dev'
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  EC2_DB_SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+  EC2_DB_SSH_USER: ec2-user
+  POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_AWS }}
+  POSTGRES_USER: postgres
+  POSTGRES_DB: acompanamiento
+  MONGODB_VOLUME: /data/mongo
+  POSTGRES_VOLUME: /data/postgres
+  REDIS_VOLUME: /data/redis
+
+jobs:
+  deploy-databases:
+    name: Deploy Databases to EC2-DB
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set EC2 variables
+        run: |
+          echo "EC2_DB_IP=${{ github.event.inputs.ec2_db_private_ip }}" >> $GITHUB_ENV
+          echo "ENVIRONMENT=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ env.EC2_DB_SSH_KEY }}" > ~/.ssh/aws-ec2-db.pem
+          chmod 600 ~/.ssh/aws-ec2-db.pem
+          echo "StrictHostKeyChecking=no" >> ~/.ssh/config
+          echo "UserKnownHostsFile=/dev/null" >> ~/.ssh/config
+
+      - name: Test SSH connection
+        run: |
+          ssh -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=10 ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} "echo 'SSH connection successful' && uname -a"
+
+      - name: Create data directories on EC2-DB
+        run: |
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+            # Crear directorios para volúmenes
+            mkdir -p ${{ env.MONGODB_VOLUME }}
+            mkdir -p ${{ env.POSTGRES_VOLUME }}
+            mkdir -p ${{ env.REDIS_VOLUME }}
+            
+            # Dar permisos
+            chmod 755 ${{ env.MONGODB_VOLUME }}
+            chmod 755 ${{ env.POSTGRES_VOLUME }}
+            chmod 755 ${{ env.REDIS_VOLUME }}
+            
+            echo "✓ Data directories created"
+          EOF
+
+      - name: Stop and remove existing database containers
+        run: |
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+            # Detener contenedores existentes (sin error si no existen)
+            docker stop acompanamiento-postgres acompanamiento-mongo acompanamiento-redis 2>/dev/null || true
+            
+            # Remover contenedores (sin error si no existen)
+            docker rm acompanamiento-postgres acompanamiento-mongo acompanamiento-redis 2>/dev/null || true
+            
+            # Remover volúmenes (sin error si no existen)
+            docker volume rm acompanamiento-postgres-vol acompanamiento-mongo-vol acompanamiento-redis-vol 2>/dev/null || true
+            
+            echo "✓ Existing containers cleaned up"
+          EOF
+
+      - name: Create Docker volumes on EC2-DB
+        run: |
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+            # Crear volúmenes nombrados
+            docker volume create acompanamiento-postgres-vol || echo "Volume already exists"
+            docker volume create acompanamiento-mongo-vol || echo "Volume already exists"
+            docker volume create acompanamiento-redis-vol || echo "Volume already exists"
+            
+            echo "✓ Docker volumes created/verified"
+          EOF
+
+      - name: Deploy PostgreSQL container
+        run: |
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+            docker run \
+              --name acompanamiento-postgres \
+              --detach \
+              --restart unless-stopped \
+              --publish 5432:5432 \
+              --volume acompanamiento-postgres-vol:/var/lib/postgresql/data \
+              --env POSTGRES_USER=${{ env.POSTGRES_USER }} \
+              --env POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }} \
+              --env POSTGRES_DB=${{ env.POSTGRES_DB }} \
+              --health-cmd="pg_isready -U ${{ env.POSTGRES_USER }}" \
+              --health-interval=10s \
+              --health-timeout=5s \
+              --health-retries=5 \
+              postgres:15-alpine
+            
+            echo "✓ PostgreSQL deployed"
+            sleep 5
+          EOF
+
+      - name: Deploy MongoDB container
+        run: |
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+            docker run \
+              --name acompanamiento-mongo \
+              --detach \
+              --restart unless-stopped \
+              --publish 27017:27017 \
+              --volume acompanamiento-mongo-vol:/data/db \
+              --health-cmd="mongosh --eval 'db.adminCommand(\"ping\")' --quiet" \
+              --health-interval=10s \
+              --health-timeout=5s \
+              --health-retries=5 \
+              mongo:latest
+            
+            echo "✓ MongoDB deployed"
+            sleep 5
+          EOF
+
+      - name: Deploy Redis container
+        run: |
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+            docker run \
+              --name acompanamiento-redis \
+              --detach \
+              --restart unless-stopped \
+              --publish 6379:6379 \
+              --volume acompanamiento-redis-vol:/data \
+              --health-cmd="redis-cli ping" \
+              --health-interval=10s \
+              --health-timeout=5s \
+              --health-retries=5 \
+              redis:7-alpine
+            
+            echo "✓ Redis deployed"
+            sleep 5
+          EOF
+
+      - name: Verify database containers health
+        run: |
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+            echo "=== Container Status ===" 
+            docker ps -a --filter "name=acompanamiento" --format "table {{.Names}}\t{{.Status}}"
+            
+            echo ""
+            echo "=== Health Checks ===" 
+            
+            # PostgreSQL
+            echo -n "PostgreSQL: "
+            docker exec acompanamiento-postgres pg_isready -U ${{ env.POSTGRES_USER }} && echo "✓" || echo "✗"
+            
+            # MongoDB
+            echo -n "MongoDB: "
+            docker exec acompanamiento-mongo mongosh --eval 'db.adminCommand("ping")' --quiet && echo "✓" || echo "✗"
+            
+            # Redis
+            echo -n "Redis: "
+            docker exec acompanamiento-redis redis-cli ping && echo "✓" || echo "✗"
+            
+            echo ""
+            echo "=== Network Information ===" 
+            docker ps -a --filter "name=acompanamiento" --format "{{.Names}}: {{.Ports}}"
+          EOF
+
+      - name: Run database initialization scripts (if needed)
+        run: |
+          ssh -i ~/.ssh/aws-ec2-db.pem ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} << 'EOF'
+            # Dar tiempo a PostgreSQL para estar completamente listo
+            sleep 10
+            
+            # Aquí puedes añadir scripts de inicialización de BD
+            # Ejemplo: crear esquemas, usuarios adicionales, etc.
+            
+            echo "✓ Database initialization completed"
+          EOF
+
+      - name: Create connection test script
+        run: |
+          cat > /tmp/test-db-connections.sh << 'EOF'
+          #!/bin/bash
+          
+          EC2_IP=$1
+          POSTGRES_PASS=$2
+          
+          echo "=== Testing Database Connections ==="
+          echo ""
+          
+          # Test PostgreSQL
+          echo "Testing PostgreSQL (port 5432)..."
+          nc -zv -w 2 $EC2_IP 5432 2>&1 | grep -q "succeeded" && echo "✓ PostgreSQL port open" || echo "✗ PostgreSQL port closed"
+          
+          # Test MongoDB
+          echo "Testing MongoDB (port 27017)..."
+          nc -zv -w 2 $EC2_IP 27017 2>&1 | grep -q "succeeded" && echo "✓ MongoDB port open" || echo "✗ MongoDB port closed"
+          
+          # Test Redis
+          echo "Testing Redis (port 6379)..."
+          nc -zv -w 2 $EC2_IP 6379 2>&1 | grep -q "succeeded" && echo "✓ Redis port open" || echo "✗ Redis port closed"
+          
+          echo ""
+          echo "=== Connection Strings ==="
+          echo "MongoDB:   mongodb://$EC2_IP:27017/acompanamiento"
+          echo "PostgreSQL: postgresql://postgres:****@$EC2_IP:5432/acompanamiento"
+          echo "Redis:     redis://$EC2_IP:6379"
+          EOF
+          
+          chmod +x /tmp/test-db-connections.sh
+
+      - name: Test database connectivity from runner
+        run: |
+          echo "Testing port connectivity from GitHub Actions runner..."
+          # Nota: Esto puede fallar si las instancias EC2 no son accesibles desde GitHub.
+          # Es solo informativo.
+          /tmp/test-db-connections.sh ${{ env.EC2_DB_IP }} ${{ env.POSTGRES_PASSWORD }} || echo "Note: Port connectivity test skipped (may not be accessible from GitHub)"
+
+      - name: Deployment Summary
+        run: |
+          cat > /tmp/deployment-summary.txt << 'EOF'
+          =================================================================
+          AWS EC2-DB DEPLOYMENT SUMMARY
+          =================================================================
+          
+          Deployment Date: $(date)
+          Environment: ${{ env.ENVIRONMENT }}
+          EC2-DB Private IP: ${{ env.EC2_DB_IP }}
+          
+          Deployed Containers:
+          - PostgreSQL 15 (port 5432)
+          - MongoDB (port 27017)
+          - Redis 7 (port 6379)
+          
+          Connection Information:
+          - MongoDB:   mongodb://${{ env.EC2_DB_IP }}:27017/acompanamiento
+          - PostgreSQL: postgresql://postgres:***@${{ env.EC2_DB_IP }}:5432/acompanamiento
+          - Redis:     redis://${{ env.EC2_DB_IP }}:6379
+          
+          Next Steps:
+          1. Configure EC2-Microservicios with .env pointing to these databases
+          2. Update GitHub Secrets with:
+             - AWS_EC2_DB_PRIVATE_IP: ${{ env.EC2_DB_IP }}
+             - POSTGRES_PASSWORD_AWS: (your secure password)
+          3. Deploy microservices using the updated .env.aws
+          4. Run smoke tests to verify connectivity
+          
+          =================================================================
+          EOF
+          cat /tmp/deployment-summary.txt
+
+      - name: Upload deployment report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-report-${{ env.ENVIRONMENT }}
+          path: /tmp/deployment-summary.txt
+          retention-days: 30
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/aws-ec2-db.pem

@@ -162,7 +162,7 @@ services:
     ports:
       - "5006:5006"
     env_file:
-      - .env
+      - ./micro-notificaciones/.env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
     networks:
@@ -178,7 +178,7 @@ services:
     ports:
       - "5008:5008"
     env_file:
-      - .env
+      - ./micro-soap-bridge/.env
     volumes:
       - ./shared-auth:/usr/src/shared-auth:delegated
     networks:
