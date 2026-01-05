@@ -77,13 +77,13 @@ jobs:
             
             echo "=== Construyendo imágenes Docker ==="
             echo "Construyendo micro-auth..."
-            docker build -t micro-auth:latest ./micro-auth
+            docker build -t micro-auth:latest -f micro-auth/Dockerfile .
             
             echo "Construyendo micro-estudiantes..."
-            docker build -t micro-estudiantes:latest ./micro-estudiantes
+            docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
             
             echo "Construyendo micro-maestros..."
-            docker build -t micro-maestros:latest ./micro-maestros
+            docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
             
             echo "=== Desplegando micro-auth ==="
             docker run -d \
