@@ -48,66 +48,72 @@ jobs:
           EOF
           chmod 600 ~/.ssh/aws-ec2-frontend.pem
           
-          # Export variables for SSH session
-          export EC2_API_GATEWAY_PUBLIC_IP="${{ env.EC2_API_GATEWAY_PUBLIC_IP }}"
-          export EC2_API_GATEWAY_PRIVATE_IP="${{ env.EC2_API_GATEWAY_PRIVATE_IP }}"
+          # Create deployment script with variables substituted
+          cat > /tmp/deploy-frontend.sh << 'DEPLOY_SCRIPT'
+          #!/bin/bash
+          set -e
           
-          # Run deployment script
+          API_GW_PUBLIC_IP="$1"
+          API_GW_PRIVATE_IP="$2"
+          
+          echo "=== Verificando Docker ==="
+          if ! command -v docker &> /dev/null; then
+            echo "Docker no encontrado, instalando..."
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sudo sh get-docker.sh
+            sudo usermod -aG docker ubuntu
+            echo "Docker instalado correctamente"
+          else
+            echo "Docker ya está instalado"
+            docker --version
+          fi
+          
+          echo "=== Deteniendo contenedor existente ==="
+          docker stop acompanamiento-frontend 2>/dev/null || true
+          
+          echo "=== Removiendo contenedor existente ==="
+          docker rm acompanamiento-frontend 2>/dev/null || true
+          
+          echo "=== Clonando repositorio ==="
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "=== Construyendo imagen Docker ==="
+          docker build -t frontend-web:latest -f frontend-web/Dockerfile ./frontend-web
+          
+          echo "=== Desplegando Frontend ==="
+          docker run -d \
+            --name acompanamiento-frontend \
+            --restart unless-stopped \
+            -p 80:80 \
+            -p 3000:3000 \
+            -e API_GATEWAY_URL=http://${API_GW_PUBLIC_IP}:8080 \
+            frontend-web:latest
+          
+          echo "=== Estado de contenedor ==="
+          docker ps
+          
+          echo "=== Logs de Frontend ==="
+          docker logs --tail=30 acompanamiento-frontend
+          
+          echo "=== Verificando conectividad al API Gateway ==="
+          echo "Intentando conexión a API Gateway (IP privada: ${API_GW_PRIVATE_IP}:8080)..."
+          timeout 5 bash -c "cat < /dev/null > /dev/tcp/${API_GW_PRIVATE_IP}/8080" 2>/dev/null && echo "✓ API Gateway accesible" || echo "⚠ API Gateway no accesible"
+          
+          echo "=== Despliegue de Frontend completado ==="
+          DEPLOY_SCRIPT
+          
+          chmod +x /tmp/deploy-frontend.sh
+          
+          # Execute via SSH
           ssh -i ~/.ssh/aws-ec2-frontend.pem \
             -o ConnectTimeout=10 \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             -o IdentitiesOnly=yes \
-            ubuntu@172.31.69.203 << 'SSHEOF'
-            
-            echo "=== Verificando Docker ==="
-            if ! command -v docker &> /dev/null; then
-              echo "Docker no encontrado, instalando..."
-              curl -fsSL https://get.docker.com -o get-docker.sh
-              sudo sh get-docker.sh
-              sudo usermod -aG docker ubuntu
-              echo "Docker instalado correctamente"
-            else
-              echo "Docker ya está instalado"
-              docker --version
-            fi
-            
-            echo "=== Deteniendo contenedor existente ==="
-            docker stop acompanamiento-frontend 2>/dev/null || true
-            
-            echo "=== Removiendo contenedor existente ==="
-            docker rm acompanamiento-frontend 2>/dev/null || true
-            
-            echo "=== Clonando repositorio ==="
-            cd /tmp
-            rm -rf Proyecto-Acompa-amiento-
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
-            cd Proyecto-Acompa-amiento-
-            
-            echo "=== Construyendo imagen Docker ==="
-            docker build -t frontend-web:latest -f frontend-web/Dockerfile ./frontend-web
-            
-            echo "=== Desplegando Frontend ==="
-            docker run -d \
-              --name acompanamiento-frontend \
-              --restart unless-stopped \
-              -p 80:80 \
-              -p 3000:3000 \
-              -e API_GATEWAY_URL=http://$EC2_API_GATEWAY_PUBLIC_IP:8080 \
-              frontend-web:latest
-            
-            echo "=== Estado de contenedor ==="
-            docker ps
-            
-            echo "=== Logs de Frontend ==="
-            docker logs --tail=30 acompanamiento-frontend
-            
-            echo "=== Verificando conectividad al API Gateway ==="
-            echo "Intentando conexión a API Gateway (IP privada: $EC2_API_GATEWAY_PRIVATE_IP:8080)..."
-            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/$EC2_API_GATEWAY_PRIVATE_IP/8080' 2>/dev/null && echo "✓ API Gateway accesible" || echo "⚠ API Gateway no accesible"
-            
-            echo "=== Despliegue de Frontend completado ==="
-          SSHEOF
+            ubuntu@172.31.69.203 'bash -s' < /tmp/deploy-frontend.sh "${{ env.EC2_API_GATEWAY_PUBLIC_IP }}" "${{ env.EC2_API_GATEWAY_PRIVATE_IP }}"
 
       - name: Cleanup SSH key
         if: always()
