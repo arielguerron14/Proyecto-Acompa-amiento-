@@ -45,8 +45,9 @@ jobs:
           
           echo "Step 3: Stop and remove old API Gateway container..."
           docker stop api-gateway 2>/dev/null || true
-          docker rm api-gateway 2>/dev/null || true
-          sleep 2
+          sleep 1
+          docker rm -f api-gateway 2>/dev/null || true
+          sleep 3
           
           echo "Step 4: Start new API Gateway with routing fixes..."
           docker run -d --name api-gateway --restart unless-stopped \
