@@ -34,11 +34,11 @@ jobs:
           echo "=== Deploying to EC2-DB ==="
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@44.222.116.0 << 'DEPLOY'
           set -e
-          echo "Stopping and removing all containers..."
-          docker stop $(docker ps -aq) 2>/dev/null || true
-          docker rm $(docker ps -aq) 2>/dev/null || true
-          echo "Removing mongo, postgres, redis containers if exist..."
-          docker rm mongo postgres redis 2>/dev/null || true
+          echo "Force removing all containers..."
+          docker ps -q | xargs -r docker stop
+          sleep 2
+          docker ps -aq | xargs -r docker rm -f
+          sleep 2
           echo "Updating databases..."
           docker pull mongo:latest
           docker pull postgres:15-alpine
@@ -55,9 +55,11 @@ jobs:
           echo "=== Deploying to EC2-Core ==="
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@13.221.55.216 << 'DEPLOY'
           set -e
-          echo "Stopping and removing microservices..."
-          docker stop micro-auth micro-maestros micro-estudiantes 2>/dev/null || true
-          docker rm micro-auth micro-maestros micro-estudiantes 2>/dev/null || true
+          echo "Force removing all containers..."
+          docker ps -q | xargs -r docker stop
+          sleep 2
+          docker ps -aq | xargs -r docker rm -f
+          sleep 2
           cd /tmp
           rm -rf Proyecto-Acompa-amiento-
           git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
