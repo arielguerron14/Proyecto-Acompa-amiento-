@@ -11,6 +11,10 @@ on:
         description: 'IP privada de instancia EC2-API-Gateway (ej: 172.31.76.105)'
         required: true
         type: string
+      ec2_api_gateway_public_ip:
+        description: 'IP pública de instancia EC2-API-Gateway (ej: 98.84.30.35)'
+        required: true
+        type: string
 
 env:
   EC2_FRONTEND_SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
@@ -28,7 +32,8 @@ jobs:
       - name: Set EC2 variables
         run: |
           echo "EC2_FRONTEND_IP=${{ github.event.inputs.ec2_frontend_private_ip }}" >> $GITHUB_ENV
-          echo "EC2_API_GATEWAY_IP=${{ github.event.inputs.ec2_api_gateway_private_ip }}" >> $GITHUB_ENV
+          echo "EC2_API_GATEWAY_PRIVATE_IP=${{ github.event.inputs.ec2_api_gateway_private_ip }}" >> $GITHUB_ENV
+          echo "EC2_API_GATEWAY_PUBLIC_IP=${{ github.event.inputs.ec2_api_gateway_public_ip }}" >> $GITHUB_ENV
 
       - name: Setup SSH key
         run: |
@@ -85,7 +90,7 @@ jobs:
               --restart unless-stopped \
               -p 80:80 \
               -p 3000:3000 \
-              -e API_GATEWAY_URL=http://172.31.76.105:8080 \
+              -e API_GATEWAY_URL=http://${{ env.EC2_API_GATEWAY_PUBLIC_IP }}:8080 \
               frontend-web:latest
             
             echo "=== Estado de contenedor ==="
@@ -95,8 +100,8 @@ jobs:
             docker logs --tail=30 acompanamiento-frontend
             
             echo "=== Verificando conectividad al API Gateway ==="
-            echo "Intentando conexión a API Gateway (172.31.76.105:8080)..."
-            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/172.31.76.105/8080' 2>/dev/null && echo "✓ API Gateway accesible" || echo "⚠ API Gateway no accesible"
+            echo "Intentando conexión a API Gateway (IP privada: ${{ env.EC2_API_GATEWAY_PRIVATE_IP }}:8080)..."
+            timeout 5 bash -c 'cat < /dev/null > /dev/tcp/${{ env.EC2_API_GATEWAY_PRIVATE_IP }}/8080' 2>/dev/null && echo "✓ API Gateway accesible" || echo "⚠ API Gateway no accesible"
             
             echo "=== Despliegue de Frontend completado ==="
           SSHEOF
