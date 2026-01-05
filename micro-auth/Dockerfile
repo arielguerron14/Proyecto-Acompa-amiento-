@@ -20,6 +20,5 @@ RUN mkdir -p node_modules && \
 	ln -sf /usr/src/shared-monitoring node_modules/@proyecto/shared-monitoring
 
 ENV NODE_ENV=production
-ENV PORT=5005
 EXPOSE 5005
 CMD ["node", "src/app.js"]

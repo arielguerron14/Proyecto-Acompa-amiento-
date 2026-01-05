@@ -15,7 +15,6 @@ WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent
 
 ENV NODE_ENV=production
-ENV PORT=5001
 EXPOSE 5001
 
 CMD ["npm", "start"]
