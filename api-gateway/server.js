@@ -163,7 +163,7 @@ app.use('/estudiantes', createProxyMiddleware({
   }
 }));
 
-// Reportes routes proxy
+// Reportes routes proxy (legacy path)
 app.use('/reportes', createProxyMiddleware({
   target: reportesEst,
   changeOrigin: true,
@@ -171,6 +171,18 @@ app.use('/reportes', createProxyMiddleware({
   pathRewrite: { '^/reportes': '' },
   onError: (err, req, res) => {
     console.error(`❌ Reportes proxy error: ${err.message}`);
+    res.status(503).json({ success: false, error: 'Reportes service unavailable' });
+  }
+}));
+
+// API Reportes routes proxy (for /api/reportes/estudiantes/... paths)
+app.use('/api/reportes', createProxyMiddleware({
+  target: reportesEst,
+  changeOrigin: true,
+  logLevel: 'info',
+  pathRewrite: { '^/api/reportes': '/api/reportes' },
+  onError: (err, req, res) => {
+    console.error(`❌ API Reportes proxy error: ${err.message}`);
     res.status(503).json({ success: false, error: 'Reportes service unavailable' });
   }
 }));
