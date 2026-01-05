@@ -75,12 +75,14 @@ jobs:
             docker images | grep acompanamiento
           EOF
 
-      - name: Create and deploy docker-compose
+      - name: Deploy docker-compose
+        env:
+          EC2_DB_IP: ${{ env.EC2_DB_IP }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          EC2_CORE_IP: ${{ env.EC2_CORE_IP }}
+          EC2_SSH_USER: ${{ env.EC2_SSH_USER }}
         run: |
-          ssh -i ~/.ssh/aws-ec2-core.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'EOF'
-            mkdir -p ~/acompanamiento/microservices
-            cd ~/acompanamiento/microservices
-            cat > docker-compose.yml << 'DOCKER_EOF'
+          cat > docker-compose.yml << 'EOF'
 version: '3.8'
 services:
   micro-auth:
@@ -91,13 +93,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5005
-      POSTGRES_HOST: DB_IP_PLACEHOLDER
+      POSTGRES_HOST: EC2_DB_IP_PLACEHOLDER
       POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: DB_PASS_PLACEHOLDER
+      POSTGRES_PASSWORD: EC2_PASSWORD_PLACEHOLDER
       POSTGRES_DB: acompanamiento
-      MONGODB_URI: mongodb://DB_IP_PLACEHOLDER:27017/acompanamiento
-      REDIS_URL: redis://DB_IP_PLACEHOLDER:6379
+      MONGODB_URI: mongodb://EC2_DB_IP_PLACEHOLDER:27017/acompanamiento
+      REDIS_URL: redis://EC2_DB_IP_PLACEHOLDER:6379
     networks:
       - acompanamiento-network
     restart: unless-stopped
@@ -110,13 +112,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5001
-      POSTGRES_HOST: DB_IP_PLACEHOLDER
+      POSTGRES_HOST: EC2_DB_IP_PLACEHOLDER
       POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: DB_PASS_PLACEHOLDER
+      POSTGRES_PASSWORD: EC2_PASSWORD_PLACEHOLDER
       POSTGRES_DB: acompanamiento
-      MONGODB_URI: mongodb://DB_IP_PLACEHOLDER:27017/acompanamiento
-      REDIS_URL: redis://DB_IP_PLACEHOLDER:6379
+      MONGODB_URI: mongodb://EC2_DB_IP_PLACEHOLDER:27017/acompanamiento
+      REDIS_URL: redis://EC2_DB_IP_PLACEHOLDER:6379
     networks:
       - acompanamiento-network
     restart: unless-stopped
@@ -129,13 +131,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5002
-      POSTGRES_HOST: DB_IP_PLACEHOLDER
+      POSTGRES_HOST: EC2_DB_IP_PLACEHOLDER
       POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: DB_PASS_PLACEHOLDER
+      POSTGRES_PASSWORD: EC2_PASSWORD_PLACEHOLDER
       POSTGRES_DB: acompanamiento
-      MONGODB_URI: mongodb://DB_IP_PLACEHOLDER:27017/acompanamiento
-      REDIS_URL: redis://DB_IP_PLACEHOLDER:6379
+      MONGODB_URI: mongodb://EC2_DB_IP_PLACEHOLDER:27017/acompanamiento
+      REDIS_URL: redis://EC2_DB_IP_PLACEHOLDER:6379
     networks:
       - acompanamiento-network
     restart: unless-stopped
@@ -158,15 +160,22 @@ services:
 networks:
   acompanamiento-network:
     driver: bridge
-DOCKER_EOF
-            sed -i "s/DB_IP_PLACEHOLDER/${{ env.EC2_DB_IP }}/g" docker-compose.yml
-            sed -i "s/DB_PASS_PLACEHOLDER/${{ env.POSTGRES_PASSWORD }}/g" docker-compose.yml
+EOF
+          
+          sed -i "s|EC2_DB_IP_PLACEHOLDER|${{ env.EC2_DB_IP }}|g" docker-compose.yml
+          sed -i "s|EC2_PASSWORD_PLACEHOLDER|${{ env.POSTGRES_PASSWORD }}|g" docker-compose.yml
+          
+          ssh -i ~/.ssh/aws-ec2-core.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }} << 'SSHEOF'
+            mkdir -p ~/acompanamiento/microservices
+            cd ~/acompanamiento/microservices
             docker-compose down 2>/dev/null || true
             docker-compose up -d
             sleep 15
             docker-compose ps
             docker-compose logs --tail=50
-          EOF
+          SSHEOF
+          
+          scp -i ~/.ssh/aws-ec2-core.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null docker-compose.yml ${{ env.EC2_SSH_USER }}@${{ env.EC2_CORE_IP }}:~/acompanamiento/microservices/
 
       - name: Test services
         run: |
