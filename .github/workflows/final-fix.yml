@@ -59,19 +59,31 @@ jobs:
             -p 3000:3000 \
             -e PORT=3000 \
             -e DB_HOST=44.222.116.0 \
+            -e DB_USER=root \
+            -e DB_PASS=password \
             -e REDIS_HOST=44.222.116.0 \
+            -e REDIS_PORT=6379 \
+            -e MONGO_URI=mongodb://44.222.116.0:27017/authdb \
             micro-auth:latest
           
           docker run -d --name micro-estudiantes --restart unless-stopped \
             -p 3001:3001 \
             -e PORT=3001 \
             -e DB_HOST=44.222.116.0 \
+            -e DB_USER=postgres \
+            -e DB_PASS=example \
+            -e REDIS_HOST=44.222.116.0 \
+            -e REDIS_PORT=6379 \
             micro-estudiantes:latest
           
           docker run -d --name micro-maestros --restart unless-stopped \
             -p 3002:3002 \
             -e PORT=3002 \
             -e DB_HOST=44.222.116.0 \
+            -e DB_USER=postgres \
+            -e DB_PASS=example \
+            -e REDIS_HOST=44.222.116.0 \
+            -e REDIS_PORT=6379 \
             micro-maestros:latest
           
           echo "Step 6: Wait for containers to fully start..."
