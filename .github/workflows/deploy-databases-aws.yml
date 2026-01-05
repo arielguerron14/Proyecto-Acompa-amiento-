@@ -63,32 +63,75 @@ jobs:
           echo "Key file size: $(wc -c < ~/.ssh/aws-ec2-db.pem) bytes"
           echo ""
           
-          # Try primary user first
+          # Configure SSH with retries
+          cat >> ~/.ssh/config << 'SSHCONFIG'
+          Host ${{ env.EC2_DB_IP }}
+            User ${{ env.EC2_DB_SSH_USER }}
+            IdentityFile ~/.ssh/aws-ec2-db.pem
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            ConnectTimeout 10
+            ServerAliveInterval 60
+            ServerAliveCountMax 3
+            BatchMode yes
+          SSHCONFIG
+          
+          # Function to test SSH with retries
+          test_ssh_with_retries() {
+            local user=$1
+            local ip=$2
+            local max_retries=3
+            local retry_delay=5
+            
+            for ((i=1; i<=max_retries; i++)); do
+              echo "Attempt $i/$max_retries: Testing SSH with user '$user'..."
+              if ssh -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=10 "$user@$ip" "echo 'SSH connection successful' && uname -a" 2>&1; then
+                echo "✓ SSH connection successful with user: $user"
+                return 0
+              fi
+              
+              if [ $i -lt $max_retries ]; then
+                echo "⚠ Connection failed, waiting ${retry_delay}s before retry..."
+                sleep $retry_delay
+              fi
+            done
+            
+            return 1
+          }
+          
           echo "=== Attempting SSH connection ==="
-          if ssh -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=5 -o BatchMode=yes ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} "echo 'SSH connection successful' && uname -a" 2>&1; then
-            echo ""
-            echo "✓ SSH connection successful with user: ${{ env.EC2_DB_SSH_USER }}"
+          # Try primary user first with retries
+          if test_ssh_with_retries "${{ env.EC2_DB_SSH_USER }}" "${{ env.EC2_DB_IP }}"; then
             echo "EC2_SSH_USER=${{ env.EC2_DB_SSH_USER }}" >> $GITHUB_ENV
           else
-            echo ""
-            echo "⚠ Connection failed with ${{ env.EC2_DB_SSH_USER }}, trying alternative users..."
+            echo "⚠ Connection failed with ${{ env.EC2_DB_SSH_USER }}, trying ubuntu..."
             
-            # Try ubuntu user
-            if ssh -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=5 -o BatchMode=yes ubuntu@${{ env.EC2_DB_IP }} "echo 'SSH connection successful' && uname -a" 2>&1; then
-              echo "✓ SSH connection successful with user: ubuntu"
+            # Try ubuntu user with retries
+            if test_ssh_with_retries "ubuntu" "${{ env.EC2_DB_IP }}"; then
               echo "EC2_SSH_USER=ubuntu" >> $GITHUB_ENV
             else
-              echo "✗ SSH connection failed with both ec2-user and ubuntu"
+              echo ""
+              echo "✗ SSH connection failed with both ec2-user and ubuntu after retries"
               echo ""
               echo "=== DEBUGGING INFO ==="
-              echo "Attempting SSH with verbose mode..."
-              ssh -vvv -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=5 ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} "whoami" 2>&1 | grep -A5 -B5 "Authentications\|denied\|key" || true
+              echo "EC2 Instance Details:"
+              echo "  IP: ${{ env.EC2_DB_IP }}"
+              echo "  Expected Key: key-acompanamiento"
+              echo "  Security Group: SG-ACOMPANAMIENTO-ALL"
               echo ""
-              echo "✗ SSH Authentication Failed - Please check:"
-              echo "  1. EC2 instance was launched with the 'key-acompanamiento' key pair"
-              echo "  2. Security Group allows SSH (port 22) from your location"
-              echo "  3. The private key in GitHub Secret matches the EC2 key pair"
-              echo "  4. The correct username (ec2-user vs ubuntu) for your AMI type"
+              echo "SSH Verbose Output (last attempt):"
+              ssh -vvv -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=5 "${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }}" "whoami" 2>&1 | tail -20 || true
+              echo ""
+              echo "✗ SSH Authentication Failed - Please verify:"
+              echo "  1. ✓ Key pair matches: EC2-DB uses 'key-acompanamiento' (confirmed)"
+              echo "  2. ? Security Group: SG-ACOMPANAMIENTO-ALL has SSH (port 22) inbound rule"
+              echo "  3. ? Private key in GitHub Secret AWS_EC2_DB_SSH_PRIVATE_KEY is complete"
+              echo "  4. ? Instance network accessibility from GitHub Actions"
+              echo ""
+              echo "Common fixes:"
+              echo "  - Add Inbound rule to SG-ACOMPANAMIENTO-ALL: SSH, TCP, port 22, source 0.0.0.0/0"
+              echo "  - Verify ~/.ssh/config has correct StrictHostKeyChecking and UserKnownHostsFile settings"
+              echo "  - Check GitHub Secret has complete PEM key (BEGIN and END lines included)"
               exit 1
             fi
           fi
