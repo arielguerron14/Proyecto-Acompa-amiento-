@@ -1,0 +1,77 @@
+name: Quick Fix - Restart Microservices with Correct PORTs
+
+on:
+  workflow_dispatch:
+
+env:
+  SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+
+jobs:
+  quick-fix:
+    name: Quick Fix Microservices
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+          cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          EOF
+
+      - name: Quick Fix - Restart Microservices on EC2-Core
+        run: |
+          echo "=== Quick Fix: Restarting Microservices with Correct PORT Variables ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@13.221.55.216 << 'FIX'
+          set -e
+          
+          echo "Stopping old containers..."
+          docker stop micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          sleep 2
+          docker rm micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          sleep 2
+          
+          echo "Rebuilding microservice images..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          docker build -t micro-auth:latest -f micro-auth/Dockerfile .
+          docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
+          docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
+          
+          echo "Starting microservices with correct PORT variables..."
+          docker run -d --name micro-auth --restart unless-stopped -p 3000:3000 -e PORT=3000 -e DB_HOST=44.222.116.0 micro-auth:latest
+          docker run -d --name micro-maestros --restart unless-stopped -p 3002:3002 -e PORT=3002 -e DB_HOST=44.222.116.0 micro-maestros:latest
+          docker run -d --name micro-estudiantes --restart unless-stopped -p 3001:3001 -e PORT=3001 -e DB_HOST=44.222.116.0 micro-estudiantes:latest
+          
+          sleep 5
+          
+          echo "Container Status:"
+          docker ps
+          
+          echo ""
+          echo "Testing Auth Service Health:"
+          curl -v http://localhost:3000/health 2>&1 | head -20 || echo "Still starting..."
+          FIX
+
+      - name: Verify API Gateway Connectivity
+        continue-on-error: true
+        run: |
+          echo "=== Checking API Gateway Connection ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.30.35 << 'CHECK'
+          echo "Testing API Gateway connectivity to auth service:"
+          docker exec api-gateway curl -v http://13.221.55.216:3000/health 2>&1 | head -30 || echo "Cannot reach auth yet"
+          CHECK
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/key.pem
