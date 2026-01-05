@@ -97,7 +97,9 @@ jobs:
           
           echo "Step 3: Stop and remove old reportes containers..."
           docker stop micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
-          docker rm micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
+          docker kill micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
+          sleep 1
+          docker rm -f micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
           sleep 2
           
           echo "Step 4: Start reportes services with route fixes..."
@@ -118,6 +120,10 @@ jobs:
           
           echo "Step 6: Check status..."
           docker ps | grep micro-reportes
+          
+          echo "Step 7: Test reportes services health..."
+          curl -s http://localhost:5003/health || echo "Reportes EST health check attempt"
+          curl -s http://localhost:5004/health || echo "Reportes MAEST health check attempt"
           
           echo "✅ Reportes services deployed with route fixes!"
           FIX_REPORTES
