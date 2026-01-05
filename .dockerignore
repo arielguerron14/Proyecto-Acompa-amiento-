@@ -27,3 +27,6 @@ Thumbs.db
 
 # OS files
 __pycache__/
+
+# Allow docker compose files
+!docker-compose*.yml
