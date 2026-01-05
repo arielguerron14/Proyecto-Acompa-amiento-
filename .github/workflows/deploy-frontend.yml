@@ -3,14 +3,6 @@ name: Deploy Frontend to AWS EC2-Frontend
 on:
   workflow_dispatch:
     inputs:
-      ec2_frontend_private_ip:
-        description: 'IP privada de instancia EC2-Frontend (ej: 172.31.69.203)'
-        required: true
-        type: string
-      ec2_api_gateway_private_ip:
-        description: 'IP privada de instancia EC2-API-Gateway (ej: 172.31.76.105)'
-        required: true
-        type: string
       ec2_api_gateway_public_ip:
         description: 'IP pública de instancia EC2-API-Gateway (ej: 98.84.30.35)'
         required: true
@@ -19,6 +11,8 @@ on:
 env:
   EC2_FRONTEND_SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
   EC2_FRONTEND_SSH_USER: ubuntu
+  EC2_FRONTEND_IP: 172.31.69.203
+  EC2_API_GATEWAY_PRIVATE_IP: 172.31.76.105
 
 jobs:
   deploy:
@@ -31,8 +25,6 @@ jobs:
 
       - name: Set EC2 variables
         run: |
-          echo "EC2_FRONTEND_IP=${{ github.event.inputs.ec2_frontend_private_ip }}" >> $GITHUB_ENV
-          echo "EC2_API_GATEWAY_PRIVATE_IP=${{ github.event.inputs.ec2_api_gateway_private_ip }}" >> $GITHUB_ENV
           echo "EC2_API_GATEWAY_PUBLIC_IP=${{ github.event.inputs.ec2_api_gateway_public_ip }}" >> $GITHUB_ENV
 
       - name: Setup SSH key and config
