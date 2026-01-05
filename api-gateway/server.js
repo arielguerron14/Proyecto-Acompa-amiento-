@@ -61,12 +61,38 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'API Gateway is running', timestamp: new Date().toISOString() });
 });
 
-// Service URLs from environment or defaults
-const auth = process.env.AUTH_SERVICE || 'http://13.223.196.229:3000';
-const maestros = process.env.MAESTROS_SERVICE || 'http://13.223.196.229:3002';
-const estudiantes = process.env.ESTUDIANTES_SERVICE || 'http://13.223.196.229:3001';
-const reportesEst = process.env.REPORTES_EST_SERVICE || 'http://100.28.217.159:5003';
-const reportesMaest = process.env.REPORTES_MAEST_SERVICE || 'http://100.28.217.159:5004';
+// Service URLs from config (with environment and infrastructure.config.js fallback)
+const { 
+  AUTH_SERVICE, 
+  MAESTROS_SERVICE, 
+  ESTUDIANTES_SERVICE,
+} = require('./src/config');
+
+// Load infrastructure config for reportes services
+let infraConfig;
+try {
+  infraConfig = require('./infrastructure.config.js');
+} catch (err) {
+  infraConfig = null;
+}
+
+const getReportesEstUrl = () => {
+  if (process.env.REPORTES_EST_SERVICE) return process.env.REPORTES_EST_SERVICE;
+  if (infraConfig && infraConfig.PUBLIC.REPORTES_ESTUDIANTES_URL) return infraConfig.PUBLIC.REPORTES_ESTUDIANTES_URL();
+  return 'http://100.28.217.159:5003';
+};
+
+const getReportesMaestUrl = () => {
+  if (process.env.REPORTES_MAEST_SERVICE) return process.env.REPORTES_MAEST_SERVICE;
+  if (infraConfig && infraConfig.PUBLIC.REPORTES_MAESTROS_URL) return infraConfig.PUBLIC.REPORTES_MAESTROS_URL();
+  return 'http://100.28.217.159:5004';
+};
+
+const auth = AUTH_SERVICE;
+const maestros = MAESTROS_SERVICE;
+const estudiantes = ESTUDIANTES_SERVICE;
+const reportesEst = getReportesEstUrl();
+const reportesMaest = getReportesMaestUrl();
 
 console.log('🔗 Configured Services:');
 console.log(`  Auth: ${auth}`);

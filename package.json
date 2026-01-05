@@ -1,6 +1,21 @@
 {
+  "name": "proyecto-acompanamiento",
+  "version": "1.0.0",
+  "description": "Sistema de Acompañamiento Educativo - Microservicios",
+  "main": "index.js",
+  "scripts": {
+    "build:infrastructure": "node scripts/build-infrastructure.js",
+    "validate:infrastructure": "node scripts/validate-infrastructure.js",
+    "build:all": "npm run build:infrastructure && docker-compose build",
+    "rebuild:services": "npm run build:infrastructure && docker-compose up -d --build",
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "logs": "docker-compose logs -f",
+    "ps": "docker-compose ps"
+  },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
     "express": "^5.2.1",
     "mongoose": "^9.0.2",
     "node-fetch": "^3.3.2"

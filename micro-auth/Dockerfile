@@ -6,6 +6,12 @@ COPY shared-auth/ /usr/src/shared-auth/
 COPY shared-monitoring/ /usr/src/shared-monitoring/
 COPY micro-auth/ /usr/src/app/
 
+# Copiar configuración centralizada
+COPY infrastructure.config.js /usr/src/
+COPY scripts/ /usr/src/scripts/
+COPY docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # install dependencies for shared modules first
 WORKDIR /usr/src/shared-auth
 RUN npm ci --only=production --silent || npm install --production --silent
@@ -20,5 +26,7 @@ RUN mkdir -p node_modules && \
 	ln -sf /usr/src/shared-monitoring node_modules/@proyecto/shared-monitoring
 
 ENV NODE_ENV=production
-EXPOSE 5005
+EXPOSE 3000
+
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "src/app.js"]

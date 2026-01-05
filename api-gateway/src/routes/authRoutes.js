@@ -1,15 +1,15 @@
 const express = require('express');
 const HttpForwarder = require('../utils/httpForward');
+const { AUTH_SERVICE } = require('../config');
 
 const router = express.Router();
-const microAuth = process.env.AUTH_SERVICE || process.env.AUTH_URL || 'http://13.223.196.229:3000';
 
 // Simplified routes without complex middleware
 router.post('/register', async (req, res) => {
   console.log('📝 Register request received:', req.body);
   try {
-    console.log('📡 Forwarding to auth service:', microAuth + '/auth/register');
-    const { status, data } = await HttpForwarder.forward(microAuth, '/auth/register', 'POST', req.body);
+    console.log('📡 Forwarding to auth service:', AUTH_SERVICE + '/auth/register');
+    const { status, data } = await HttpForwarder.forward(AUTH_SERVICE, '/auth/register', 'POST', req.body);
     console.log('📡 Auth service response:', status, JSON.stringify(data));
     console.log('📝 Sending response to client');
     res.status(status).json(data);
@@ -24,7 +24,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     console.log('🔑 Login request received:', req.body.email);
-    const { status, data } = await HttpForwarder.forward(microAuth, '/auth/login', 'POST', req.body);
+    const { status, data } = await HttpForwarder.forward(AUTH_SERVICE, '/auth/login', 'POST', req.body);
     console.log('🔑 Login response:', status, data.success ? 'success' : 'failed');
     res.status(status).json(data);
   } catch (err) {
@@ -37,7 +37,7 @@ router.post('/login', async (req, res) => {
 router.post('/verify-token', async (req, res) => {
   try {
     console.log('🔍 Verify token request received');
-    const { status, data } = await HttpForwarder.forward(microAuth, '/auth/verify-token', 'POST', req.body);
+    const { status, data } = await HttpForwarder.forward(AUTH_SERVICE, '/auth/verify-token', 'POST', req.body);
     console.log('🔍 Verify token response:', status);
     res.status(status).json(data);
   } catch (err) {
