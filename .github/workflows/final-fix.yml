@@ -1,0 +1,130 @@
+name: FINAL FIX - Rebuild and Restart All Microservices
+
+on:
+  workflow_dispatch:
+
+env:
+  SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+
+jobs:
+  final-fix:
+    name: Final Fix - Rebuild with Fixed Dockerfiles
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+          cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          EOF
+
+      - name: FINAL FIX - Rebuild and Restart Microservices
+        run: |
+          echo "=================================================="
+          echo "🔧 FINAL FIX: Rebuild Dockerfiles (removed hardcoded PORTs)"
+          echo "=================================================="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@13.221.55.216 << 'FINALFIX'
+          set -e
+          
+          echo "Step 1: Stop all old containers..."
+          docker stop micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          sleep 2
+          docker rm micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 2: Remove old images to force rebuild..."
+          docker rmi micro-auth:latest micro-estudiantes:latest micro-maestros:latest 2>/dev/null || true
+          
+          echo "Step 3: Update code from latest main branch..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "Step 4: Rebuild microservice images (without hardcoded PORTs)..."
+          docker build -t micro-auth:latest -f micro-auth/Dockerfile .
+          docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
+          docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
+          
+          echo "Step 5: Start microservices with custom PORT env vars..."
+          docker run -d --name micro-auth --restart unless-stopped \
+            -p 3000:3000 \
+            -e PORT=3000 \
+            -e DB_HOST=44.222.116.0 \
+            -e REDIS_HOST=44.222.116.0 \
+            micro-auth:latest
+          
+          docker run -d --name micro-estudiantes --restart unless-stopped \
+            -p 3001:3001 \
+            -e PORT=3001 \
+            -e DB_HOST=44.222.116.0 \
+            micro-estudiantes:latest
+          
+          docker run -d --name micro-maestros --restart unless-stopped \
+            -p 3002:3002 \
+            -e PORT=3002 \
+            -e DB_HOST=44.222.116.0 \
+            micro-maestros:latest
+          
+          echo "Step 6: Wait for containers to fully start..."
+          sleep 8
+          
+          echo "Step 7: Check container status..."
+          docker ps
+          
+          echo ""
+          echo "Step 8: Check logs for any errors..."
+          echo "=== Micro-Auth Logs ==="
+          docker logs micro-auth 2>&1 | tail -30 || echo "Logs not available yet"
+          
+          echo ""
+          echo "Step 9: Test auth service..."
+          curl -v http://localhost:3000/health 2>&1 | grep -E "HTTP|Connected|refused" | head -10 || echo "Testing..."
+          
+          echo ""
+          echo "✅ Microservices rebuilt and started!"
+          FINALFIX
+
+      - name: Verify System is Working
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "=================================================="
+          echo "Step 10: Verify full system connectivity"
+          echo "=================================================="
+          
+          echo "Testing Frontend..."
+          curl -I http://98.92.84.126 2>&1 | head -5 || echo "Frontend test"
+          
+          echo ""
+          echo "Testing API Gateway health..."
+          curl -I http://98.84.30.35:8080/health 2>&1 | head -5 || echo "API Gateway test"
+          
+          echo ""
+          echo "Testing registration endpoint..."
+          curl -s -X POST http://98.92.84.126/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"nombre":"Test","email":"test@example.com","password":"123456","rol":"Estudiante"}' 2>&1 | head -20 || echo "Registration test"
+
+      - name: Final Status
+        run: |
+          echo ""
+          echo "=================================================="
+          echo "✅ FIX COMPLETED"
+          echo "=================================================="
+          echo ""
+          echo "If you see HTTP 200 or proper responses above, the fix worked!"
+          echo "Try accessing the frontend now: http://98.92.84.126"
+          echo ""
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/key.pem
