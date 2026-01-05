@@ -26,7 +26,7 @@ class HttpForwarder {
           'Content-Type': 'application/json',
           ...headers
         },
-        timeout: 10000 // 10 second timeout
+        timeout: 30000 // 30 second timeout
       };
 
       if (body) {

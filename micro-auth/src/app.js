@@ -12,13 +12,40 @@ const { metricsMiddleware, metricsRoute } = createMetrics(promClient);
 
 const app = express();
 
+// Global state for database connection
+let mongoConnected = false;
+let mongoConnecting = false;
+let mongoConnectionPromise = null;
+
+// Middleware to ensure Mongo is connected before processing requests
+const ensureMongoConnected = async (req, res, next) => {
+  // If already connected, continue
+  if (mongoConnected) {
+    return next();
+  }
+
+  // If currently connecting, wait for it
+  if (mongoConnecting && mongoConnectionPromise) {
+    try {
+      await mongoConnectionPromise;
+      mongoConnected = true;
+      return next();
+    } catch (err) {
+      return res.status(503).json({ error: 'Database connection failed' });
+    }
+  }
+
+  // If not connecting and not connected, something's wrong
+  return res.status(503).json({ error: 'Database not initialized' });
+};
+
 // Middleware
 app.use(express.json());
 app.use(requestLogger);
 app.use(metricsMiddleware());
 
 // Routes
-app.use('/auth', authRoutes);
+app.use('/auth', ensureMongoConnected, authRoutes);
 app.get('/health', (req, res) =>
   res.json({ status: 'healthy', service: 'micro-auth', timestamp: new Date().toISOString() })
 );
@@ -39,10 +66,20 @@ async function startServer() {
     // Start the server first
     const server = app.listen(PORT, () => logger.info(`micro-auth listening on ${PORT}`));
 
-    // Initialize MongoDB connection for auth (optional, runs in background)
-    mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-      .then(() => logger.info(`Mongo connected for micro-auth`))
-      .catch(error => logger.warn(`Mongo connection failed: ${error.message}`));
+    // Initialize MongoDB connection for auth (runs in background)
+    mongoConnecting = true;
+    mongoConnectionPromise = mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+    
+    mongoConnectionPromise
+      .then(() => {
+        mongoConnected = true;
+        mongoConnecting = false;
+        logger.info(`Mongo connected for micro-auth`);
+      })
+      .catch(error => {
+        mongoConnecting = false;
+        logger.warn(`Mongo connection failed: ${error.message}`);
+      });
 
     process.on('SIGTERM', () => {
       logger.info('SIGTERM received, shutting down gracefully');
