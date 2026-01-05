@@ -79,20 +79,22 @@ jobs:
           ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.24.118.233 << 'RESTART_SERVICES'
           set -e
           
-          echo "Step 1: Stop all services..."
+          echo "Step 1: Stop and remove all old services..."
           docker stop micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          sleep 1
+          docker rm micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
           sleep 2
           
           echo "Step 2: Update code from latest main..."
-          cd /tmp/Proyecto-Acompa-amiento-
-          git pull origin main
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
           
           echo "Step 3: Rebuild microservice images..."
           docker build -t micro-auth:latest -f micro-auth/Dockerfile .
           docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
           docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
-          
-          echo "Step 4: Start auth service..."
           docker run -d --name micro-auth --restart unless-stopped \
             -p 3000:3000 \
             -e PORT=3000 \
