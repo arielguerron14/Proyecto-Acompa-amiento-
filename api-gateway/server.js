@@ -79,6 +79,7 @@ console.log(`  Reportes Maest: ${reportesMaest}`);
 // This avoids problematic proxy behavior for streaming/bodies and gives better logging
 try {
   const authRoutes = require('./src/routes/authRoutes');
+  console.log('✅ authRoutes module loaded successfully');
   // Parse JSON only for auth internal routes; capture raw body for debugging
   const authJson = express.json({
     verify: (req, res, buf, encoding) => {
@@ -87,8 +88,10 @@ try {
   });
   app.use('/auth', authJson, authRoutes);
   console.log('✅ Auth routes mounted via internal forwarder (with JSON parser)');
+  console.log('📍 Available auth endpoints: /auth/register, /auth/login, /auth/logout, /auth/verify-token, /auth/me');
 } catch (err) {
   console.error('❌ Failed to mount auth routes, falling back to proxy:', err.message);
+  console.error('❌ Error details:', err.stack);
   // Fallback proxy
   app.use('/auth', createProxyMiddleware({
     target: auth,
@@ -180,7 +183,13 @@ app.get('/test', (req, res) => {
 // 404 handler
 app.use((req, res) => {
   console.log(`⚠️  Not found: ${req.method} ${req.url}`);
-  res.status(404).json({ error: 'Endpoint not found' });
+  console.log(`🔗 Registered routes should include: /health, /test, /auth/*, /maestros/*, /estudiantes/*, /horarios/*`);
+  res.status(404).json({ 
+    error: 'Endpoint not found',
+    path: req.url,
+    method: req.method,
+    hint: 'Did you mean /auth/register, /auth/login, /maestros/*, /estudiantes/*, or /horarios/*?'
+  });
 });
 
 // Error handler
