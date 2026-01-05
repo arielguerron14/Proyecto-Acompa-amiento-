@@ -3,6 +3,8 @@ name: Deploy Reportes Services and Restart Core Services
 on:
   workflow_dispatch:
 
+# Force execution timestamp: 2026-01-05T10:30:00Z
+
 env:
   SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
 
