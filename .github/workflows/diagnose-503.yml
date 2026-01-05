@@ -1,0 +1,64 @@
+name: Diagnose 503 Error
+
+on:
+  workflow_dispatch:
+
+env:
+  SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+
+jobs:
+  diagnose:
+    name: Diagnose API Gateway 503
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+          cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          EOF
+
+      - name: Check EC2-Core (13.221.55.216)
+        continue-on-error: true
+        run: |
+          echo "=== Checking EC2-Core Microservices ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@13.221.55.216 << 'DIAG'
+          echo "Docker processes on EC2-Core:"
+          docker ps
+          echo ""
+          echo "Auth service logs:"
+          docker logs micro-auth --tail=10 2>&1 || echo "micro-auth not running"
+          echo ""
+          echo "Testing auth health:"
+          curl -v http://localhost:3000/health 2>&1 | head -20 || echo "Cannot reach auth service"
+          DIAG
+
+      - name: Check EC2-API-Gateway (98.84.30.35)
+        continue-on-error: true
+        run: |
+          echo "=== Checking API Gateway ==="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.30.35 << 'DIAG'
+          echo "Docker processes on API Gateway:"
+          docker ps
+          echo ""
+          echo "API Gateway logs:"
+          docker logs api-gateway --tail=20 2>&1 || echo "api-gateway not running"
+          echo ""
+          echo "Testing API Gateway health:"
+          curl -v http://localhost:8080/health 2>&1 | head -30 || echo "Cannot reach API Gateway"
+          echo ""
+          echo "Testing connectivity from API Gateway to auth service:"
+          docker exec api-gateway curl -v http://13.221.55.216:3000/health 2>&1 | head -50 || echo "Cannot test from container"
+          DIAG
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/key.pem
