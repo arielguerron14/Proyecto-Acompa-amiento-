@@ -51,6 +51,23 @@ jobs:
           echo "StrictHostKeyChecking=no" >> ~/.ssh/config
           echo "UserKnownHostsFile=/dev/null" >> ~/.ssh/config
 
+      - name: Diagnose SSH key
+        run: |
+          echo "=== SSH Key Diagnostics ==="
+          echo "Key file exists: $(test -f ~/.ssh/aws-ec2-db.pem && echo 'YES' || echo 'NO')"
+          echo "Key file permissions: $(ls -l ~/.ssh/aws-ec2-db.pem | awk '{print $1}')"
+          echo "Key file size: $(wc -c < ~/.ssh/aws-ec2-db.pem) bytes"
+          echo "Key file first line: $(head -n 1 ~/.ssh/aws-ec2-db.pem)"
+          echo "Key file last line: $(tail -n 1 ~/.ssh/aws-ec2-db.pem)"
+          echo "EC2 IP: ${{ env.EC2_DB_IP }}"
+          echo "EC2 User: ${{ env.EC2_DB_SSH_USER }}"
+          echo ""
+          echo "=== SSH Config ==="
+          cat ~/.ssh/config
+          echo ""
+          echo "=== Testing SSH verbose mode ==="
+          ssh -vvv -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=10 ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} "echo 'SSH connection successful'" 2>&1 | tail -30 || true
+
       - name: Test SSH connection
         run: |
           ssh -i ~/.ssh/aws-ec2-db.pem -o ConnectTimeout=10 ${{ env.EC2_DB_SSH_USER }}@${{ env.EC2_DB_IP }} "echo 'SSH connection successful' && uname -a"
