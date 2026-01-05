@@ -34,7 +34,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set EC2 variables
         run: |
@@ -267,7 +267,7 @@ jobs:
 
       - name: Upload deployment report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deployment-report-${{ env.ENVIRONMENT }}
           path: /tmp/deployment-summary.txt
