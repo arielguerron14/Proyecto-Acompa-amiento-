@@ -36,11 +36,13 @@ async function startServer() {
     // Try to initialize Redis (optional, falls back to memory cache)
     await initRedis();
 
-    // Initialize MongoDB connection for auth (required)
-    await mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-    logger.info(`Mongo connected for micro-auth`);
-    
+    // Start the server first
     const server = app.listen(PORT, () => logger.info(`micro-auth listening on ${PORT}`));
+
+    // Initialize MongoDB connection for auth (optional, runs in background)
+    mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+      .then(() => logger.info(`Mongo connected for micro-auth`))
+      .catch(error => logger.warn(`Mongo connection failed: ${error.message}`));
 
     process.on('SIGTERM', () => {
       logger.info('SIGTERM received, shutting down gracefully');
