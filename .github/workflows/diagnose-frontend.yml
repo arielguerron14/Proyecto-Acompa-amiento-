@@ -1,0 +1,70 @@
+name: Diagnose EC2-Frontend SSH
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+
+jobs:
+  diagnose:
+    name: Diagnose Frontend SSH
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.EC2_SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+
+      - name: Test EC2-DB (should work)
+        continue-on-error: true
+        run: |
+          echo "=== Testing EC2-DB (172.31.79.193) ==="
+          ssh -i ~/.ssh/key.pem \
+            -o ConnectTimeout=5 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -vvv \
+            ubuntu@172.31.79.193 \
+            "echo 'EC2-DB: SSH OK' && uname -a" 2>&1 | head -50
+
+      - name: Test EC2-Frontend (failing)
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "=== Testing EC2-Frontend (172.31.69.203) ==="
+          ssh -i ~/.ssh/key.pem \
+            -o ConnectTimeout=5 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -vvv \
+            ubuntu@172.31.69.203 \
+            "echo 'EC2-Frontend: SSH OK' && uname -a" 2>&1 | head -50
+
+      - name: Try different users on Frontend
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "=== Trying ec2-user instead of ubuntu ==="
+          ssh -i ~/.ssh/key.pem \
+            -o ConnectTimeout=5 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ec2-user@172.31.69.203 \
+            "echo 'EC2-Frontend (ec2-user): SSH OK' && uname -a" 2>&1 | head -30
+
+      - name: Test public IP
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "=== Testing via public IP (98.92.84.126) ==="
+          ssh -i ~/.ssh/key.pem \
+            -o ConnectTimeout=5 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ubuntu@98.92.84.126 \
+            "echo 'EC2-Frontend (public): SSH OK' && uname -a" 2>&1 | head -30
