@@ -59,12 +59,12 @@ jobs:
           echo "=================================================="
           
           echo "Testing SSH connection with verbose output..."
-          ssh -vvv -i ~/.ssh/key.pem -o ConnectTimeout=15 ubuntu@100.49.159.65 "echo SSH connection successful" 2>&1 | head -50
+          ssh -vvv -i ~/.ssh/key.pem -o ConnectTimeout=15 ubuntu@100.48.66.29 "echo SSH connection successful" 2>&1 | head -50
           
           if [ $? -ne 0 ]; then
             echo "❌ SSH connection failed"
             echo "Checking if servers are reachable via ping..."
-            ping -c 1 100.49.159.65 || echo "Cannot ping 100.49.159.65"
+            ping -c 1 100.48.66.29 || echo "Cannot ping 100.48.66.29"
             exit 1
           fi
           
