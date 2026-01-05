@@ -1,0 +1,190 @@
+name: Deploy Reportes Services and Restart Core Services
+
+on:
+  workflow_dispatch:
+
+env:
+  SSH_KEY: ${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}
+
+jobs:
+  deploy-reportes:
+    name: Deploy Reportes Services and Restart with Fixes
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/key.pem << 'EOF'
+          ${{ env.SSH_KEY }}
+          EOF
+          chmod 600 ~/.ssh/key.pem
+          cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel=QUIET
+          EOF
+
+      - name: Deploy Reportes Services on Database Server
+        run: |
+          echo "=================================================="
+          echo "Deploying Reportes Services"
+          echo "=================================================="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@98.84.26.109 << 'DEPLOY_REPORTES'
+          set -e
+          
+          echo "Step 1: Update code from latest main branch..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento-
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "Step 2: Build reportes services..."
+          docker build -t micro-reportes-estudiantes:latest -f micro-reportes-estudiantes/Dockerfile .
+          docker build -t micro-reportes-maestros:latest -f micro-reportes-maestros/Dockerfile .
+          
+          echo "Step 3: Stop old reportes containers..."
+          docker stop micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
+          docker rm micro-reportes-estudiantes micro-reportes-maestros 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 4: Start reportes services..."
+          docker run -d --name micro-reportes-estudiantes --restart unless-stopped \
+            -p 5003:5003 \
+            -e PORT=5003 \
+            -e MONGO_URI=mongodb://localhost:27017/micro-reportes-estudiantes \
+            micro-reportes-estudiantes:latest
+          
+          docker run -d --name micro-reportes-maestros --restart unless-stopped \
+            -p 5004:5004 \
+            -e PORT=5004 \
+            -e MONGO_URI=mongodb://localhost:27017/micro-reportes-maestros \
+            micro-reportes-maestros:latest
+          
+          echo "Step 5: Wait for containers..."
+          sleep 8
+          
+          echo "Step 6: Check container status..."
+          docker ps | grep -E "micro-reportes|mongo|postgres|redis"
+          
+          echo "✅ Reportes services deployed!"
+          DEPLOY_REPORTES
+
+      - name: Restart Microservices with Fixes on Microservices Server
+        run: |
+          echo "=================================================="
+          echo "Restarting Microservices with Fixed Env Vars"
+          echo "=================================================="
+          ssh -i ~/.ssh/key.pem -o ConnectTimeout=10 ubuntu@100.24.118.233 << 'RESTART_SERVICES'
+          set -e
+          
+          echo "Step 1: Stop all services..."
+          docker stop micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          sleep 2
+          
+          echo "Step 2: Update code from latest main..."
+          cd /tmp/Proyecto-Acompa-amiento-
+          git pull origin main
+          
+          echo "Step 3: Rebuild microservice images..."
+          docker build -t micro-auth:latest -f micro-auth/Dockerfile .
+          docker build -t micro-estudiantes:latest -f micro-estudiantes/Dockerfile .
+          docker build -t micro-maestros:latest -f micro-maestros/Dockerfile .
+          
+          echo "Step 4: Start auth service..."
+          docker run -d --name micro-auth --restart unless-stopped \
+            -p 3000:3000 \
+            -e PORT=3000 \
+            -e DB_HOST=98.84.26.109 \
+            -e DB_USER=root \
+            -e DB_PASS=password \
+            -e REDIS_HOST=98.84.26.109 \
+            -e REDIS_PORT=6379 \
+            -e MONGO_URI=mongodb://98.84.26.109:27017/authdb \
+            micro-auth:latest
+          
+          echo "Step 5: Start estudiantes service with reportes URLs..."
+          docker run -d --name micro-estudiantes --restart unless-stopped \
+            -p 3001:3001 \
+            -e PORT=3001 \
+            -e DB_HOST=98.84.26.109 \
+            -e DB_USER=postgres \
+            -e DB_PASS=example \
+            -e REDIS_HOST=98.84.26.109 \
+            -e REDIS_PORT=6379 \
+            -e MONGO_URI=mongodb://98.84.26.109:27017/estudiantesdb \
+            -e MAESTROS_URL=http://100.24.118.233:3002 \
+            -e REPORTES_EST_URL=http://98.84.26.109:5003 \
+            -e REPORTES_MAEST_URL=http://98.84.26.109:5004 \
+            micro-estudiantes:latest
+          
+          echo "Step 6: Start maestros service with estudiantes URL..."
+          docker run -d --name micro-maestros --restart unless-stopped \
+            -p 3002:3002 \
+            -e PORT=3002 \
+            -e DB_HOST=98.84.26.109 \
+            -e DB_USER=postgres \
+            -e DB_PASS=example \
+            -e REDIS_HOST=98.84.26.109 \
+            -e REDIS_PORT=6379 \
+            -e MONGO_URI=mongodb://98.84.26.109:27017/maestrosdb \
+            -e ESTUDIANTES_URL=http://100.24.118.233:3001 \
+            micro-maestros:latest
+          
+          echo "Step 7: Wait for services..."
+          sleep 8
+          
+          echo "Step 8: Check status..."
+          docker ps | grep micro-
+          
+          echo "✅ All services restarted with fixes!"
+          RESTART_SERVICES
+
+      - name: Verify All Services
+        continue-on-error: true
+        run: |
+          echo "=================================================="
+          echo "System Verification"
+          echo "=================================================="
+          
+          echo "Testing Microservices Health..."
+          curl -s http://100.24.118.233:3000/health | jq . || echo "Auth service test"
+          curl -s http://100.24.118.233:3001/health | jq . || echo "Estudiantes service test"
+          curl -s http://100.24.118.233:3002/health | jq . || echo "Maestros service test"
+          
+          echo ""
+          echo "Testing Reportes Services..."
+          curl -s http://98.84.26.109:5003/health | jq . || echo "Reportes Estudiantes test"
+          curl -s http://98.84.26.109:5004/health | jq . || echo "Reportes Maestros test"
+          
+          echo ""
+          echo "Testing API Gateway..."
+          curl -s http://100.49.159.65:8080/health | jq . || echo "API Gateway test"
+          
+          echo ""
+          echo "Testing Horarios endpoint..."
+          curl -s http://100.49.159.65:8080/horarios | jq . | head -20 || echo "Horarios test"
+
+      - name: Final Status
+        run: |
+          echo "=================================================="
+          echo "✅ DEPLOYMENT COMPLETE"
+          echo "=================================================="
+          echo ""
+          echo "Deployed Services:"
+          echo "  • Micro-Reportes-Estudiantes: 98.84.26.109:5003"
+          echo "  • Micro-Reportes-Maestros: 98.84.26.109:5004"
+          echo ""
+          echo "Restarted Services (with fixes):"
+          echo "  • Micro-Auth: 100.24.118.233:3000"
+          echo "  • Micro-Estudiantes: 100.24.118.233:3001"
+          echo "  • Micro-Maestros: 100.24.118.233:3002"
+          echo ""
+          echo "API Gateway: 100.49.159.65:8080"
+          echo "Frontend: 44.210.241.99"
+          echo ""
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/key.pem
