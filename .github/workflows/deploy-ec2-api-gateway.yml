@@ -44,7 +44,8 @@ jobs:
           rm /tmp/repo.tar.gz
           
           echo "🏗️ Building Docker image..."
-          docker build -t api-gateway:latest -f api-gateway/Dockerfile .
+          docker builder prune -af 2>/dev/null || true
+          docker build --no-cache -t api-gateway:latest -f api-gateway/Dockerfile .
           
           echo "🚀 Starting API Gateway..."
           docker run -d \
