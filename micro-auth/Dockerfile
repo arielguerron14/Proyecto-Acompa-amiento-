@@ -30,3 +30,6 @@ EXPOSE 3000
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "src/app.js"]
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["node", "src/app.js"]
