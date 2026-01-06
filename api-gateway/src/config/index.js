@@ -1,11 +1,18 @@
-// Cargar configuración centralizada de infraestructura
-let infraConfig;
+// Cargar configuración centralizada de infraestructura de forma segura
+let infraConfig = null;
 try {
-  infraConfig = require('../../../infrastructure.config.js');
+  const fs = require('fs');
+  const path = require('path');
+  const infraPath = path.join(__dirname, '../../../infrastructure.config.js');
+  if (fs.existsSync(infraPath)) {
+    infraConfig = require(infraPath);
+  }
 } catch (err) {
-  console.warn('⚠️  No se pudo cargar infrastructure.config.js, usando fallbacks');
+  console.warn('⚠️  No se pudo cargar infrastructure.config.js, usando fallbacks:', err.message);
   infraConfig = null;
 }
+
+console.log('📋 Infrastructure config loaded:', infraConfig ? 'Yes' : 'No');
 
 const getAuthUrl = () => {
   if (process.env.AUTH_SERVICE) return process.env.AUTH_SERVICE;

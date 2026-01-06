@@ -10,8 +10,9 @@ try {
 }
 
 console.log('🚀 Starting API Gateway server...');
+console.log('Attempting to load configuration...');
 
-let config;
+let config = {};
 try {
   config = require('./src/config');
   console.log('✅ Config loaded successfully');
@@ -20,8 +21,15 @@ try {
   console.log('MAESTROS_SERVICE:', config.MAESTROS_SERVICE);
 } catch (e) {
   console.error('❌ Failed to load config:', e.message);
-  console.error(e.stack);
-  process.exit(1);
+  console.error('Stack:', e.stack);
+  // Use sensible defaults
+  config = {
+    AUTH_SERVICE: process.env.AUTH_SERVICE || 'http://localhost:3000',
+    ESTUDIANTES_SERVICE: process.env.ESTUDIANTES_SERVICE || 'http://localhost:3001',
+    MAESTROS_SERVICE: process.env.MAESTROS_SERVICE || 'http://localhost:3002',
+    PORT: process.env.PORT || 8080,
+  };
+  console.log('⚠️  Using fallback config:', JSON.stringify(config, null, 2));
 }
 
 const app = express();
@@ -80,12 +88,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'API Gateway is running', timestamp: new Date().toISOString() });
 });
 
-// Service URLs from config (with environment and infrastructure.config.js fallback)
-const { 
-  AUTH_SERVICE, 
-  MAESTROS_SERVICE, 
-  ESTUDIANTES_SERVICE,
-} = require('./src/config');
+// Use config already loaded
+const AUTH_SERVICE = config.AUTH_SERVICE;
+const MAESTROS_SERVICE = config.MAESTROS_SERVICE;
+const ESTUDIANTES_SERVICE = config.ESTUDIANTES_SERVICE;
 
 // Load infrastructure config for reportes services
 let infraConfig;
