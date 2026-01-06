@@ -16,7 +16,7 @@ on:
 env:
   EC2_DB_PUBLIC_IP: 44.222.119.15
   EC2_DB_PRIVATE_IP: 172.31.79.193
-  SSH_USER: ec2-user
+  SSH_USER: ubuntu
   AWS_REGION: us-east-1
 
 jobs:
@@ -60,17 +60,17 @@ jobs:
             set -e
             
             echo "📝 Updating system packages..."
-            sudo yum update -y > /dev/null 2>&1
+            sudo apt-get update -y > /dev/null 2>&1
             
             echo "📦 Installing Docker..."
-            sudo yum install -y docker > /dev/null 2>&1
+            sudo apt-get install -y docker.io > /dev/null 2>&1
             
             echo "🔧 Starting Docker service..."
             sudo systemctl start docker
             sudo systemctl enable docker > /dev/null 2>&1
             
             echo "👤 Adding user to docker group..."
-            sudo usermod -aG docker ec2-user > /dev/null 2>&1
+            sudo usermod -aG docker ubuntu > /dev/null 2>&1
             
             echo "🐳 Installing Docker Compose..."
             DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep -oP '"tag_name": "\K[^"]+')
@@ -196,6 +196,34 @@ jobs:
           echo "✅ .env file created"
           ENV_EOF
 
+      # 6.5 Check and Clean Old Containers
+      - name: 🧹 Check and Clean Old Containers
+        run: |
+          echo "🔍 Checking for existing containers..."
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} << 'CLEAN_EOF'
+          
+          cd /opt/databases
+          
+          echo "📊 Current containers:"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}" || echo "No containers found"
+          
+          echo ""
+          echo "🧹 Stopping old containers if they exist..."
+          docker-compose down 2>/dev/null || echo "No docker-compose containers to stop"
+          
+          echo ""
+          echo "🗑️  Removing old volumes (if any)..."
+          docker volume prune -f || echo "No volumes to prune"
+          
+          echo ""
+          echo "📊 Cleaned containers status:"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}" || echo "No containers running"
+          
+          echo "✅ Cleanup completed"
+          CLEAN_EOF
+
       # 7. Start Docker Containers
       - name: 🚀 Start Database Containers
         run: |
@@ -206,14 +234,14 @@ jobs:
           
           cd /opt/databases
           
-          echo "📦 Starting containers..."
+          echo "📦 Starting containers with docker-compose..."
           docker-compose up -d
           
-          echo "⏳ Waiting 30 seconds for services to be ready..."
-          sleep 30
+          echo "⏳ Waiting 10 seconds for services to initialize..."
+          sleep 10
           
           echo "📊 Container Status:"
-          docker ps -a
+          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
           
           echo ""
           echo "✅ All containers started"
@@ -227,21 +255,107 @@ jobs:
             -o StrictHostKeyChecking=no \
             ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} << 'VALIDATE_EOF'
           
-          echo ""
-          echo "🔍 MongoDB Health Check..."
-          docker exec mongodb mongosh --version && echo "✅ MongoDB is running" || echo "❌ MongoDB failed"
+          cd /opt/databases
           
           echo ""
-          echo "🔍 PostgreSQL Health Check..."
-          docker exec postgresql pg_isready -U postgres && echo "✅ PostgreSQL is running" || echo "❌ PostgreSQL failed"
+          echo "════════════════════════════════════════════════════"
+          echo "🔍 COMPREHENSIVE DATABASE VALIDATION"
+          echo "════════════════════════════════════════════════════"
+          echo ""
+          
+          # 1. Check MongoDB
+          echo "1️⃣  MongoDB Health Check"
+          echo "─────────────────────────"
+          if docker exec mongodb mongosh --version > /dev/null 2>&1; then
+            echo "✅ MongoDB container is running"
+            
+            # Test MongoDB connection
+            if docker exec mongodb mongosh --eval "db.adminCommand('ping')" --quiet > /dev/null 2>&1; then
+              echo "✅ MongoDB is responding to ping"
+            else
+              echo "❌ MongoDB ping failed"
+            fi
+            
+            # Show MongoDB logs
+            echo ""
+            echo "📋 MongoDB logs (last 5 lines):"
+            docker logs mongodb | tail -5
+          else
+            echo "❌ MongoDB container is not running"
+            docker logs mongodb || echo "No logs available"
+          fi
           
           echo ""
-          echo "🔍 Redis Health Check..."
-          docker exec redis redis-cli ping && echo "✅ Redis is running" || echo "❌ Redis failed"
+          echo "2️⃣  PostgreSQL Health Check"
+          echo "─────────────────────────"
+          if docker exec postgresql pg_isready -U postgres > /dev/null 2>&1; then
+            echo "✅ PostgreSQL is running and responding"
+            
+            # Check database
+            if docker exec postgresql psql -U postgres -d acompanamiento -c "SELECT version();" > /dev/null 2>&1; then
+              echo "✅ PostgreSQL database 'acompanamiento' is accessible"
+              docker exec postgresql psql -U postgres -d acompanamiento -c "SELECT version();" | head -1
+            else
+              echo "❌ PostgreSQL database 'acompanamiento' is not accessible"
+            fi
+            
+            # Show PostgreSQL logs
+            echo ""
+            echo "📋 PostgreSQL logs (last 5 lines):"
+            docker logs postgresql | tail -5
+          else
+            echo "❌ PostgreSQL container is not running or not responding"
+            docker logs postgresql || echo "No logs available"
+          fi
           
           echo ""
-          echo "📊 Final Status:"
-          docker ps --format "table {{.Names}}\t{{.Status}}"
+          echo "3️⃣  Redis Health Check"
+          echo "─────────────────────────"
+          if docker exec redis redis-cli -a redis123 ping > /dev/null 2>&1; then
+            echo "✅ Redis is running and responding"
+            
+            # Check Redis version
+            REDIS_VERSION=$(docker exec redis redis-cli -a redis123 INFO server | grep redis_version | cut -d: -f2 | tr -d '\r')
+            echo "   Redis version: $REDIS_VERSION"
+            
+            # Show Redis logs
+            echo ""
+            echo "📋 Redis logs (last 5 lines):"
+            docker logs redis | tail -5
+          else
+            echo "❌ Redis is not responding"
+            docker logs redis || echo "No logs available"
+          fi
+          
+          echo ""
+          echo "4️⃣  Network and Port Check"
+          echo "─────────────────────────"
+          echo "📍 MongoDB port (27017):"
+          netstat -tlnp 2>/dev/null | grep 27017 || echo "   ⚠️  netstat not available, checking via docker"
+          docker port mongodb 2>/dev/null | grep 27017 || echo "   ⚠️  Port mapping not visible"
+          
+          echo "📍 PostgreSQL port (5432):"
+          netstat -tlnp 2>/dev/null | grep 5432 || echo "   ⚠️  netstat not available, checking via docker"
+          docker port postgresql 2>/dev/null | grep 5432 || echo "   ⚠️  Port mapping not visible"
+          
+          echo "📍 Redis port (6379):"
+          netstat -tlnp 2>/dev/null | grep 6379 || echo "   ⚠️  netstat not available, checking via docker"
+          docker port redis 2>/dev/null | grep 6379 || echo "   ⚠️  Port mapping not visible"
+          
+          echo ""
+          echo "5️⃣  Docker Volumes Check"
+          echo "─────────────────────────"
+          echo "Available volumes:"
+          docker volume ls --filter name=databases
+          
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "📊 FINAL CONTAINER STATUS"
+          echo "════════════════════════════════════════════════════"
+          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+          
+          echo ""
+          echo "✅ Validation completed successfully!"
           VALIDATE_EOF
 
       # 9. Display Connection Information
