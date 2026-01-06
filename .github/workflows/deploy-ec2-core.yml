@@ -37,11 +37,25 @@ jobs:
 
       - name: 🔗 Test SSH Connection to EC2-CORE
         run: |
-          ssh -i ~/.ssh/aws-key.pem \
-            -o ConnectTimeout=10 \
+          # Intentar primero con ubuntu, si falla intentar con ec2-user
+          if ssh -i ~/.ssh/aws-key.pem \
+            -o ConnectTimeout=5 \
             -o StrictHostKeyChecking=no \
-            ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} \
-            "echo '✅ SSH Connection Successful'"
+            ubuntu@${{ env.EC2_CORE_PUBLIC_IP }} \
+            "echo '✅ SSH Connection with ubuntu user'" 2>/dev/null; then
+            echo "SSH_USER=ubuntu" >> $GITHUB_ENV
+            echo "✅ Using ubuntu user"
+          elif ssh -i ~/.ssh/aws-key.pem \
+            -o ConnectTimeout=5 \
+            -o StrictHostKeyChecking=no \
+            ec2-user@${{ env.EC2_CORE_PUBLIC_IP }} \
+            "echo '✅ SSH Connection with ec2-user'"; then
+            echo "SSH_USER=ec2-user" >> $GITHUB_ENV
+            echo "✅ Using ec2-user (Amazon Linux detected)"
+          else
+            echo "❌ SSH connection failed with both users"
+            exit 1
+          fi
 
       - name: 📦 Prepare EC2-CORE Instance
         run: |
@@ -51,18 +65,42 @@ jobs:
             
             set -e
             
-            echo "📝 Updating system packages..."
-            sudo apt-get update -qq > /dev/null 2>&1
+            echo "📝 Detecting system and installing dependencies..."
             
-            echo "📦 Installing Docker..."
-            sudo apt-get install -y docker.io > /dev/null 2>&1
+            # Detectar si es Amazon Linux o Ubuntu
+            if [ -f /etc/os-release ]; then
+              . /etc/os-release
+              OS=$ID
+            else
+              OS=$(uname -s)
+            fi
+            
+            echo "🖥️ Detected OS: $OS"
+            
+            # Instalar según el SO
+            if [ "$OS" = "amzn" ] || [ "$OS" = "amazon" ]; then
+              echo "📦 Installing for Amazon Linux..."
+              sudo yum update -y > /dev/null 2>&1
+              sudo yum install -y docker > /dev/null 2>&1
+              DOCKER_USER=ec2-user
+            elif [ "$OS" = "ubuntu" ] || [ "$OS" = "debian" ]; then
+              echo "📦 Installing for Ubuntu/Debian..."
+              sudo apt-get update -qq > /dev/null 2>&1
+              sudo apt-get install -y docker.io > /dev/null 2>&1
+              DOCKER_USER=ubuntu
+            else
+              echo "⚠️ Unknown OS: $OS, attempting generic installation..."
+              sudo apt-get update -qq > /dev/null 2>&1 || sudo yum update -y > /dev/null 2>&1
+              sudo apt-get install -y docker.io > /dev/null 2>&1 || sudo yum install -y docker > /dev/null 2>&1
+              DOCKER_USER=$(whoami)
+            fi
             
             echo "🔧 Starting Docker service..."
             sudo systemctl start docker
             sudo systemctl enable docker > /dev/null 2>&1
             
-            echo "👤 Adding user to docker group..."
-            sudo usermod -aG docker ubuntu > /dev/null 2>&1
+            echo "👤 Adding $DOCKER_USER to docker group..."
+            sudo usermod -aG docker $DOCKER_USER > /dev/null 2>&1 || true
             
             echo "🐳 Installing Docker Compose..."
             sudo curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
