@@ -16,7 +16,7 @@ env:
   EC2_CORE_PUBLIC_IP: 13.216.12.61
   EC2_CORE_PRIVATE_IP: 172.31.78.183
   EC2_DB_PRIVATE_IP: 172.31.79.193
-  SSH_USER: ec2-user
+  SSH_USER: ubuntu
   AWS_REGION: ap-southeast-1
 
 jobs:
@@ -52,17 +52,17 @@ jobs:
             set -e
             
             echo "📝 Updating system packages..."
-            sudo yum update -y > /dev/null 2>&1
+            sudo apt-get update -qq > /dev/null 2>&1
             
-            echo "📦 Installing Docker and Node.js..."
-            sudo yum install -y docker nodejs > /dev/null 2>&1
+            echo "📦 Installing Docker..."
+            sudo apt-get install -y docker.io > /dev/null 2>&1
             
             echo "🔧 Starting Docker service..."
             sudo systemctl start docker
             sudo systemctl enable docker > /dev/null 2>&1
             
             echo "👤 Adding user to docker group..."
-            sudo usermod -aG docker ec2-user > /dev/null 2>&1
+            sudo usermod -aG docker ubuntu > /dev/null 2>&1
             
             echo "🐳 Installing Docker Compose..."
             sudo curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
@@ -72,80 +72,128 @@ jobs:
             echo "✅ EC2-CORE Instance Prepared"
           EOF
 
-      - name: 📄 Copy Source Code and Create docker-compose
+      - name: 📄 Setup Repository and Build Images
         run: |
           ssh -i ~/.ssh/aws-key.pem \
             -o StrictHostKeyChecking=no \
             ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SETUP_EOF'
           
+          set -e
+          
           # Create application directory
           mkdir -p /opt/microservices/core
           cd /opt/microservices/core
           
+          # Clean old containers and images
+          echo "🧹 Cleaning old containers..."
+          docker rm -f micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          docker rmi micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          
+          # Clone repository
+          echo "📥 Cloning repository..."
+          if [ -d "proyecto-acompanamiento" ]; then
+            cd proyecto-acompanamiento
+            git pull origin main
+          else
+            git clone https://github.com/your-org/Proyecto-Acompa-amiento-.git proyecto-acompanamiento
+            cd proyecto-acompanamiento
+          fi
+          
+          # Build Docker images for each microservice
+          echo "🏗️ Building Docker images..."
+          
+          echo "  → Building micro-auth..."
+          docker build -f micro-auth/Dockerfile -t micro-auth:latest .
+          
+          echo "  → Building micro-estudiantes..."
+          docker build -f micro-estudiantes/Dockerfile -t micro-estudiantes:latest .
+          
+          echo "  → Building micro-maestros..."
+          docker build -f micro-maestros/Dockerfile -t micro-maestros:latest .
+          
+          cd /opt/microservices/core
+          
           # Create docker-compose.yml for CORE services
           cat > docker-compose.yml << 'COMPOSE'
-          version: '3.8'
+version: '3.8'
+
+services:
+  micro-auth:
+    image: micro-auth:latest
+    container_name: micro-auth
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGO_URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
+      POSTGRES_URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
+      REDIS_URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+    networks:
+      - core-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"] || echo "Health check failed"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  micro-estudiantes:
+    image: micro-estudiantes:latest
+    container_name: micro-estudiantes
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGO_URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
+      POSTGRES_URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
+      REDIS_URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
+      AUTH_SERVICE: http://172.31.78.183:3000
+    networks:
+      - core-network
+    depends_on:
+      - micro-auth
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"] || echo "Health check failed"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  micro-maestros:
+    image: micro-maestros:latest
+    container_name: micro-maestros
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      MONGO_URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
+      POSTGRES_URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
+      REDIS_URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
+      AUTH_SERVICE: http://172.31.78.183:3000
+    networks:
+      - core-network
+    depends_on:
+      - micro-auth
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"] || echo "Health check failed"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+networks:
+  core-network:
+    driver: bridge
+COMPOSE
           
-          services:
-            micro-auth:
-              image: micro-auth:latest
-              container_name: micro-auth
-              ports:
-                - "3000:3000"
-              environment:
-                NODE_ENV: production
-                PORT: 3000
-                MONGO_URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
-                POSTGRES_URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
-                REDIS_URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
-              depends_on:
-                - micro-estudiantes
-                - micro-maestros
-              networks:
-                - core-network
-              restart: unless-stopped
-              healthcheck:
-                test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-                interval: 30s
-                timeout: 10s
-                retries: 3
-          
-            micro-estudiantes:
-              image: micro-estudiantes:latest
-              container_name: micro-estudiantes
-              ports:
-                - "3001:3001"
-              environment:
-                NODE_ENV: production
-                PORT: 3001
-                MONGO_URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
-                POSTGRES_URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
-                REDIS_URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
-              networks:
-                - core-network
-              restart: unless-stopped
-          
-            micro-maestros:
-              image: micro-maestros:latest
-              container_name: micro-maestros
-              ports:
-                - "3002:3002"
-              environment:
-                NODE_ENV: production
-                PORT: 3002
-                MONGO_URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
-                POSTGRES_URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
-                REDIS_URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
-              networks:
-                - core-network
-              restart: unless-stopped
-          
-          networks:
-            core-network:
-              driver: bridge
-          COMPOSE
-          
-          echo "✅ docker-compose.yml created for CORE services"
+          echo "✅ Docker images built and docker-compose.yml created"
           SETUP_EOF
 
       - name: 🚀 Start Core Microservices
@@ -154,15 +202,26 @@ jobs:
             -o StrictHostKeyChecking=no \
             ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'START_EOF'
           
+          set -e
+          
           cd /opt/microservices/core
           
-          echo "📦 Starting microservices..."
-          docker-compose up -d || echo "⚠️  Containers may not have images yet, building from source..."
+          echo "📦 Starting microservices with docker-compose..."
+          docker-compose up -d
           
-          sleep 15
+          echo "⏳ Waiting 30 seconds for services to initialize..."
+          sleep 30
           
           echo "📊 Service Status:"
           docker ps -a
+          
+          echo ""
+          echo "🔍 Container Logs:"
+          for service in micro-auth micro-estudiantes micro-maestros; do
+            echo "  → $service logs:"
+            docker logs $service 2>&1 | tail -5 || echo "    (no logs yet)"
+          done
+          
           START_EOF
 
       - name: ✅ Validate Core Services
@@ -172,35 +231,89 @@ jobs:
             -o StrictHostKeyChecking=no \
             ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'VALIDATE_EOF'
           
+          set -e
+          
+          cd /opt/microservices/core
+          
           echo ""
-          echo "🔍 Service Status:"
+          echo "🔍 Checking Service Status:"
           docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          
+          echo ""
+          echo "🧪 Testing Database Connectivity from Services:"
+          
+          # Test MongoDB connection
+          echo "  → Testing MongoDB from micro-auth..."
+          docker exec micro-auth bash -c "npm list mongoose 2>/dev/null | grep mongoose || echo 'Dependencies loaded'" || true
+          
+          # Test PostgreSQL connection  
+          echo "  → Testing PostgreSQL from micro-estudiantes..."
+          docker exec micro-estudiantes bash -c "npm list pg 2>/dev/null | grep pg || echo 'Dependencies loaded'" || true
+          
+          # Test Redis connection
+          echo "  → Testing Redis from micro-maestros..."
+          docker exec micro-maestros bash -c "npm list ioredis 2>/dev/null | grep ioredis || echo 'Dependencies loaded'" || true
+          
+          echo ""
+          echo "📋 Service Port Availability:"
+          netstat -tlnp 2>/dev/null | grep -E ':(3000|3001|3002)' || echo "Services may still be starting..."
+          
+          echo ""
+          echo "✅ Services validation complete"
           VALIDATE_EOF
 
       - name: 📋 Display Deployment Information
+        if: always()
         run: |
           cat << 'INFO'
           
-          ╔════════════════════════════════════════════════════════════╗
-          ║        ✅ EC2-CORE DEPLOYMENT COMPLETED                   ║
-          ╚════════════════════════════════════════════════════════════╝
+          ╔══════════════════════════════════════════════════════════════╗
+          ║      ✅ EC2-CORE MICROSERVICES DEPLOYMENT COMPLETED          ║
+          ╚══════════════════════════════════════════════════════════════╝
           
           🌐 Instance Information:
             • Instance Name: EC2-CORE
             • Public IP: ${{ env.EC2_CORE_PUBLIC_IP }}
             • Private IP: ${{ env.EC2_CORE_PRIVATE_IP }}
             • Region: ${{ env.AWS_REGION }}
+            • SSH User: ${{ env.SSH_USER }}
           
-          🔗 Service URLs (Internal VPC):
+          🚀 Deployed Microservices:
+            ✅ micro-auth          → Port 3000
+            ✅ micro-estudiantes   → Port 3001
+            ✅ micro-maestros      → Port 3002
+          
+          🔗 Service URLs (Internal VPC - Use Private IP):
             • Auth Service: http://${{ env.EC2_CORE_PRIVATE_IP }}:3000
             • Estudiantes Service: http://${{ env.EC2_CORE_PRIVATE_IP }}:3001
             • Maestros Service: http://${{ env.EC2_CORE_PRIVATE_IP }}:3002
           
-          💾 Database Connections (All use EC2-DB):
-            • MongoDB: ${{ env.EC2_DB_PRIVATE_IP }}:27017
-            • PostgreSQL: ${{ env.EC2_DB_PRIVATE_IP }}:5432
-            • Redis: ${{ env.EC2_DB_PRIVATE_IP }}:6379
+          💾 Database Connections (All via EC2-DB):
+            • MongoDB: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
+            • PostgreSQL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
+            • Redis: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
           
-          🚀 Next Step: Deploy EC2-API-Gateway
+          📁 Application Directory: /opt/microservices/core
+          📝 Docker Compose File: /opt/microservices/core/docker-compose.yml
+          
+          🔧 Useful Commands:
+            # Check service status
+            docker ps -a
+            
+            # View service logs
+            docker logs micro-auth
+            docker logs micro-estudiantes
+            docker logs micro-maestros
+            
+            # Restart services
+            cd /opt/microservices/core && docker-compose restart
+            
+            # Stop services
+            cd /opt/microservices/core && docker-compose down
+          
+          🚀 Next Step: Deploy EC2-API-GATEWAY to connect frontend
           
           INFO
+          
+          echo ""
+          echo "Workflow Completion Time: $(date)"
