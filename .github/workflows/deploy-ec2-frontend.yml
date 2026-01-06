@@ -36,24 +36,12 @@ jobs:
           docker rm -f frontend-web 2>/dev/null || true
           docker rmi -f frontend-web:latest 2>/dev/null || true
           
-          echo "📥 Deep cleaning /tmp..."
-          rm -rf /tmp/Proyecto-Acompa-amiento- /tmp/.git* 2>/dev/null || true
-          sudo rm -rf /tmp/Proyecto-Acompa-amiento- /tmp/.git* 2>/dev/null || true
-          
-          echo "📥 Cloning repository (retry up to 3 times)..."
-          for attempt in 1 2 3; do
-            echo "Attempt $attempt..."
-            cd /tmp
-            rm -rf /tmp/Proyecto-Acompa-amiento- 2>/dev/null || true
-            if git clone --depth 1 https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git; then
-              break
-            fi
-            if [ $attempt -eq 3 ]; then
-              echo "❌ Failed to clone after 3 attempts"
-              exit 1
-            fi
-            sleep 5
-          done
+          echo "📥 Downloading code via archive..."
+          mkdir -p /tmp/frontend-deploy
+          cd /tmp/frontend-deploy
+          curl -L -o repo.tar.gz https://github.com/arielguerron14/Proyecto-Acompa-amiento-/archive/refs/heads/main.tar.gz
+          tar -xzf repo.tar.gz
+          cd Proyecto-Acompa-amiento--main
           
           echo "🏗️ Building Docker image..."
           docker build -t frontend-web:latest -f frontend-web/Dockerfile .
