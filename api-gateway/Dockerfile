@@ -15,8 +15,5 @@ COPY . .
 ENV PORT=9000
 EXPOSE 9000
 
-# Copy and use startup script
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
-
-CMD ["/start.sh"]
+# Start server directly
+CMD ["node", "simple-server.js"]
