@@ -22,7 +22,8 @@ jobs:
         run: |
           ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} "bash -s" << 'DEPLOY'
           set -e
-          mkdir -p /opt/microservices
+          sudo mkdir -p /opt/microservices
+          sudo chown -R $USER:$USER /opt/microservices
           cd /opt/microservices
           echo "🧹 Cleaning old deployments..."
           docker rm -f micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
