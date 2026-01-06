@@ -19,12 +19,12 @@ RUN mkdir -p node_modules && \
     ln -sf /usr/src/shared-auth node_modules/shared-auth && \
     ln -sf /usr/src/shared-monitoring node_modules/shared-monitoring
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Copy entrypoint script (from repo root)
+COPY docker-entrypoint.sh /usr/src/app/entrypoint.sh
+RUN chmod +x /usr/src/app/entrypoint.sh
 
 ENV NODE_ENV=production
 EXPOSE 5006
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
 CMD ["node", "src/app.js"]

@@ -9,7 +9,7 @@ on:
       - '.github/workflows/deploy-ec2-notificaciones.yml'
 
 env:
-  AWS_EC2_NOTIFICACIONES_IP: 98.93.62.200
+  AWS_EC2_NOTIFICACIONES_IP: 98.92.255.219
   AWS_EC2_CORE_PRIVATE_IP: 172.31.78.183
 
 jobs:

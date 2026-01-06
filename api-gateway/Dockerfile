@@ -12,12 +12,13 @@ RUN npm install --production
 COPY . .
 
 # Copy entrypoint script (from repo root)
-COPY docker-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY docker-entrypoint.sh /usr/src/app/entrypoint.sh
+RUN chmod +x /usr/src/app/entrypoint.sh
 
 # Expose gateway port
 ENV PORT=8080
 EXPOSE 8080
 
-ENTRYPOINT ["/entrypoint.sh"]
+WORKDIR /usr/src/app
+ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
 CMD ["node", "server.js"]

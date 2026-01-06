@@ -16,11 +16,12 @@ WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent
 
 # Copy entrypoint script
-COPY docker-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY docker-entrypoint.sh /usr/src/app/entrypoint.sh
+RUN chmod +x /usr/src/app/entrypoint.sh
 
 ENV NODE_ENV=production
 EXPOSE 5003
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
+CMD ["node", "src/app.js"]
 CMD ["node", "src/app.js"]
