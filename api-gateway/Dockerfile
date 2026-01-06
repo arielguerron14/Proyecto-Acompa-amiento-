@@ -12,8 +12,11 @@ RUN npm install --production
 COPY . .
 
 # Expose gateway port
-ENV PORT=8080
-EXPOSE 8080
+ENV PORT=9000
+EXPOSE 9000
 
-# Start simple server
-CMD ["node", "simple-server.js"]
+# Copy and use startup script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
