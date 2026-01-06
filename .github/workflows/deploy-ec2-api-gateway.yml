@@ -53,9 +53,9 @@ jobs:
             -p 8080:8080 \
             -e NODE_ENV=production \
             -e PORT=8080 \
-            -e MICRO_AUTH_URL=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3000 \
-            -e MICRO_ESTUDIANTES_URL=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3001 \
-            -e MICRO_MAESTROS_URL=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3002 \
+            -e AUTH_SERVICE=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3000 \
+            -e ESTUDIANTES_SERVICE=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3001 \
+            -e MAESTROS_SERVICE=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3002 \
             api-gateway:latest
           
           echo "⏳ Waiting for API Gateway to start..."

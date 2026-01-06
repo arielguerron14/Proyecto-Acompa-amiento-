@@ -1,7 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-require('dotenv').config();
+
+// Load .env file if it exists
+try {
+  require('dotenv').config();
+} catch (e) {
+  console.log('⚠️  dotenv not available or .env file missing, using environment variables only');
+}
 
 console.log('🚀 Starting API Gateway server...');
 
