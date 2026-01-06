@@ -6,7 +6,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install production dependencies
-RUN npm install --production
+RUN npm install --production 2>&1 | tail -20
 
 # Copy source files
 COPY . .
@@ -15,4 +15,5 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["node", "simple-server.js"]
+# Start simple server with debugging
+CMD ["sh", "-c", "echo '=== Starting API Gateway ===' && node simple-server.js"]
