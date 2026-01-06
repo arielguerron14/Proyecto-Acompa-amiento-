@@ -98,9 +98,8 @@ jobs:
           cd /opt/microservices
           
           echo "📝 Creating docker-compose.yml..."
-          cat > docker-compose.yml << 'COMPOSE'
+          cat > docker-compose.yml << 'EOF'
 version: '3.8'
-
 services:
   micro-auth:
     image: micro-auth:latest
@@ -170,7 +169,7 @@ services:
 networks:
   core:
     driver: bridge
-COMPOSE
+EOF
 
           echo "🚀 Starting services..."
           docker-compose up -d
