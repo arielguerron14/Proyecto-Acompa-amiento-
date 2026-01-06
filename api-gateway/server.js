@@ -2,6 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
+// Global error handler for unhandled exceptions
+process.on('uncaughtException', (err) => {
+  console.error('🚨 UNCAUGHT EXCEPTION:', err.message);
+  console.error('Stack:', err.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🚨 UNHANDLED REJECTION:', reason);
+  process.exit(1);
+});
+
 // Load .env file if it exists
 try {
   require('dotenv').config();
