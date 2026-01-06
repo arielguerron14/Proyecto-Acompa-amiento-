@@ -24,7 +24,7 @@ jobs:
 
       - name: 🚀 Deploy API Gateway to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i <(echo "${{ secrets.AWS_EC2_API_SSH_PRIVATE_KEY }}" | base64 -d) ubuntu@${{ env.AWS_EC2_API_IP }} "bash -s" << 'DEPLOY'
+          ssh -o StrictHostKeyChecking=no -i <(echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" | base64 -d) ubuntu@${{ env.AWS_EC2_API_IP }} "bash -s" << 'DEPLOY'
           set -e
           
           echo "🔄 Cleaning up old deployments..."
