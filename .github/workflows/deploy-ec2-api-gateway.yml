@@ -40,9 +40,9 @@ jobs:
           echo "📥 Downloading repository archive..."
           mkdir -p /tmp/Proyecto-Acompa-amiento-
           cd /tmp/Proyecto-Acompa-amiento-
-          wget -q https://github.com/arielguerron14/Proyecto-Acompa-amiento-/archive/refs/heads/main.tar.gz -O /tmp/repo.tar.gz
+          wget -q https://github.com/arielguerron14/Proyecto-Acompa-imiento-/archive/refs/heads/main.tar.gz -O /tmp/repo.tar.gz
           tar -xzf /tmp/repo.tar.gz --strip-components=1
-          rm /tmp/repo.tar.gz
+          rm -f /tmp/repo.tar.gz
           
           echo "🏗️ Building Docker image..."
           docker builder prune -af 2>/dev/null || true
