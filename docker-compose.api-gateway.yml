@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  api-gateway:
+    container_name: api-gateway
+    image: proyecto-acompanamiento:api-gateway
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      LOG_LEVEL: info
+      
+      # Rutas internas (IP privada)
+      AUTH_SERVICE: http://172.31.78.183:3000
+      ESTUDIANTES_SERVICE: http://172.31.78.183:3001
+      MAESTROS_SERVICE: http://172.31.78.183:3002
+      REPORTES_EST_SERVICE: http://172.31.69.133:5003
+      REPORTES_MAEST_SERVICE: http://172.31.69.133:5004
+      NOTIFICACIONES_SERVICE: http://172.31.65.57:5006
+      ANALYTICS_SERVICE: http://172.31.73.6:5007
+      
+      # Configuración
+      JWT_SECRET: ${JWT_SECRET}
+      RATE_LIMIT: 100
+      TIMEOUT: 30000
+    networks:
+      - vpc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  vpc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16

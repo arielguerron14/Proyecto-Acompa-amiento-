@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  micro-notificaciones:
+    container_name: micro-notificaciones
+    image: proyecto-acompanamiento:micro-notificaciones
+    build:
+      context: ./micro-notificaciones
+      dockerfile: Dockerfile
+    ports:
+      - "5006:5006"
+    environment:
+      NODE_ENV: production
+      PORT: 5006
+      DB_HOST: 172.31.79.193
+      DB_PORT: 5432
+      DB_NAME: notificaciones
+      KAFKA_BROKERS: 172.31.73.6:9092
+      RABBITMQ_URL: amqp://guest:guest@172.31.73.6:5672
+      AUTH_SERVICE: http://172.31.78.183:3000
+      REDIS_URL: redis://172.31.79.193:6379
+      
+      # Email
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      
+      # SMS
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+    networks:
+      - vpc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5006/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  vpc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16

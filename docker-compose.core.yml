@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # Instancia EC2-CORE: Microservicios de núcleo
+  # IPs: Pública 13.216.12.61 | Privada 172.31.78.183
+
+  micro-auth:
+    container_name: micro-auth
+    image: proyecto-acompanamiento:micro-auth
+    build:
+      context: ./micro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: 172.31.79.193
+      DB_PORT: 5432
+      DB_NAME: auth_db
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://172.31.79.193:6379
+    networks:
+      - vpc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  micro-estudiantes:
+    container_name: micro-estudiantes
+    image: proyecto-acompanamiento:micro-estudiantes
+    build:
+      context: ./micro-estudiantes
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: 172.31.79.193
+      DB_PORT: 27017
+      DB_NAME: estudiantes
+      AUTH_SERVICE: http://172.31.78.183:3000
+      REDIS_URL: redis://172.31.79.193:6379
+    networks:
+      - vpc-network
+    depends_on:
+      - micro-auth
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  micro-maestros:
+    container_name: micro-maestros
+    image: proyecto-acompanamiento:micro-maestros
+    build:
+      context: ./micro-maestros
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DB_HOST: 172.31.79.193
+      DB_PORT: 27017
+      DB_NAME: maestros
+      AUTH_SERVICE: http://172.31.78.183:3000
+      REDIS_URL: redis://172.31.79.193:6379
+    networks:
+      - vpc-network
+    depends_on:
+      - micro-auth
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  vpc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
