@@ -14,7 +14,7 @@ RUN npm install
 COPY frontend-web/ .
 
 # Copy entrypoint script
-COPY docker-entrypoint.sh /app/entrypoint.sh
+COPY frontend-web/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Expose port
@@ -22,8 +22,10 @@ EXPOSE 80
 
 # Set API Gateway URL environment variable
 ENV API_GATEWAY_URL=http://52.71.188.181:8080
+ENV NODE_ENV=production
+ENV PORT=3000
 
 # Start the development server
 WORKDIR /app
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["npm", "start"]
+CMD []
