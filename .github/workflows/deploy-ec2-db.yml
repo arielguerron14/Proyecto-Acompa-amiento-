@@ -131,7 +131,6 @@ jobs:
                 POSTGRES_USER: postgres
                 POSTGRES_PASSWORD: postgres123
                 POSTGRES_DB: acompanamiento
-                POSTGRES_INITDB_ARGS: "-c shared_buffers=256MB -c max_connections=200"
               volumes:
                 - postgresql_data:/var/lib/postgresql/data
               networks:
