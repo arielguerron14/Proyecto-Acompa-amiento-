@@ -57,10 +57,13 @@ exports.register = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`[userController.register] ${error.message}`);
+    logger.error(`[userController.register] Error: ${error.message}`);
+    logger.error(`[userController.register] Stack: ${error.stack}`);
+    logger.error(`[userController.register] Error code: ${error.code}`);
     return res.status(500).json({
       success: false,
-      error: 'Error al registrar usuario'
+      error: 'Error al registrar usuario',
+      debug: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
