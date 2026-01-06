@@ -61,7 +61,7 @@ jobs:
           echo "1️⃣  Limpiando contenedores y volúmenes..."
           docker-compose down -v --remove-orphans 2>/dev/null || true
           docker rm -f postgresql mongodb redis 2>/dev/null || true
-          docker volume rm -f $(docker volume ls -q --filter name=databases) 2>/dev/null || true
+          docker volume rm -f postgresql_data mongodb_data redis_data databases_postgresql_data databases_mongodb_data databases_redis_data 2>/dev/null || true
           echo "   ✅ Limpieza completada"
           echo ""
           
