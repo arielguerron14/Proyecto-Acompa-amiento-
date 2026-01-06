@@ -11,10 +11,8 @@ RUN npm install --production
 # Copy api-gateway source files
 COPY . .
 
-# Copiar configuración centralizada (desde raíz del proyecto)
-COPY ../infrastructure.config.js /usr/src/
-COPY ../scripts/ /usr/src/scripts/
-COPY ../docker-entrypoint.sh /entrypoint.sh
+# Copy entrypoint script (from repo root)
+COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Expose gateway port
