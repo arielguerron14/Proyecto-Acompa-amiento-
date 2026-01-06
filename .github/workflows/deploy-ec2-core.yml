@@ -181,9 +181,8 @@ COMPOSE
           echo ""
           echo "📊 Service Status:"
           docker ps -a
-          
           DEPLOY
-
+          
       - name: Validate deployment
         run: |
           ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'VALIDATE'
