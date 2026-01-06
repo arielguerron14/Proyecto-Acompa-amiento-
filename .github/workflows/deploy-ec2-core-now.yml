@@ -24,6 +24,14 @@ jobs:
           set -e
           sudo mkdir -p /opt/microservices
           sudo chown -R $USER:$USER /opt/microservices
+          
+          # Install Docker Compose if not present
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Installing Docker Compose..."
+            sudo curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
           cd /opt/microservices
           echo "🧹 Cleaning old deployments..."
           docker rm -f micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
