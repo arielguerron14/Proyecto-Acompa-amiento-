@@ -70,7 +70,7 @@ jobs:
 
       - name: Deploy microservices
         run: |
-          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'DEPLOY'
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} "bash -s" << 'BASHSCRIPT'
           set -e
           
           mkdir -p /opt/microservices
@@ -98,7 +98,7 @@ jobs:
           cd /opt/microservices
           
           echo "📝 Creating docker-compose.yml..."
-          cat > docker-compose.yml << 'EOF'
+          cat > docker-compose.yml << 'COMPOSE'
 version: '3.8'
 services:
   micro-auth:
@@ -169,7 +169,7 @@ services:
 networks:
   core:
     driver: bridge
-EOF
+COMPOSE
 
           echo "🚀 Starting services..."
           docker-compose up -d
@@ -180,7 +180,7 @@ EOF
           echo ""
           echo "📊 Service Status:"
           docker ps -a
-          DEPLOY
+          BASHSCRIPT
           
       - name: Validate deployment
         run: |
