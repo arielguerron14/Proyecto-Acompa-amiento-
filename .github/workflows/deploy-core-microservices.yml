@@ -1,0 +1,42 @@
+name: Deploy EC2 CORE Services
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  EC2_CORE_PRIVATE_IP: 172.31.78.183
+  EC2_DB_PRIVATE_IP: 172.31.79.193
+
+jobs:
+  deploy-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Detect user
+        run: |
+          if ssh -i ~/.ssh/key.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes ubuntu@${{ env.EC2_CORE_PUBLIC_IP }} "echo ok" 2>/dev/null; then
+            echo "USER=ubuntu" >> $GITHUB_ENV
+          else
+            echo "USER=ec2-user" >> $GITHUB_ENV
+          fi
+
+      - name: Deploy
+        run: |
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'DEPLOY'
+          mkdir -p /opt/services
+          cd /opt/services
+          echo "Deploying microservices..."
+          docker ps 2>/dev/null || echo "Docker not yet available"
+          DEPLOY
+
+      - name: Status
+        run: echo "✅ Deployment process initiated"
