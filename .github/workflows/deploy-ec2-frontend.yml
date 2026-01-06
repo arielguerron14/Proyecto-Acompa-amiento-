@@ -57,7 +57,7 @@ jobs:
             -e PORT=3000 \
             -e FRONTEND_PORT=3000 \
             -e API_GATEWAY_URL=http://${{ env.AWS_EC2_API_GATEWAY_IP }}:8080 \
-            -e API_GATEWAY_HOST=${{ env.AWS_EC2_API_GATEWAY_PRIVATE_IP }} \
+            -e API_GATEWAY_HOST=${{ env.AWS_EC2_API_GATEWAY_IP }} \
             frontend-web:latest
           
           echo "⏳ Waiting for Frontend to start..."
