@@ -150,13 +150,26 @@ try {
     }
   });
   app.use('/auth', authJson, authRoutes);
+  app.use('/api/auth', authJson, authRoutes);  // Also support /api/auth prefix
   console.log('✅ Auth routes mounted via internal forwarder (with JSON parser)');
   console.log('📍 Available auth endpoints: /auth/register, /auth/login, /auth/logout, /auth/verify-token, /auth/me');
+  console.log('📍 Also available with /api prefix: /api/auth/register, /api/auth/login, etc.');
 } catch (err) {
   console.error('❌ Failed to mount auth routes, falling back to proxy:', err.message);
   console.error('❌ Error details:', err.stack);
   // Fallback proxy
   app.use('/auth', createProxyMiddleware({
+    target: auth,
+    changeOrigin: true,
+    logLevel: 'info',
+    proxyTimeout: 20000,
+    onError: (err2, req, res) => {
+      console.error(`❌ Auth proxy error: ${err2.message}`);
+      res.status(503).json({ success: false, error: 'Auth service unavailable' });
+    }
+  }));
+  // Also add /api/auth proxy fallback
+  app.use('/api/auth', createProxyMiddleware({
     target: auth,
     changeOrigin: true,
     logLevel: 'info',
