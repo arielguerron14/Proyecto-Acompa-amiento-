@@ -16,7 +16,6 @@ env:
   EC2_CORE_PUBLIC_IP: 13.216.12.61
   EC2_CORE_PRIVATE_IP: 172.31.78.183
   EC2_DB_PRIVATE_IP: 172.31.79.193
-  SSH_USER: ubuntu
   AWS_REGION: ap-southeast-1
 
 jobs:
@@ -38,24 +37,31 @@ jobs:
       - name: 🔗 Test SSH Connection to EC2-CORE
         run: |
           # Intentar primero con ubuntu, si falla intentar con ec2-user
+          DETECTED_USER=""
+          
           if ssh -i ~/.ssh/aws-key.pem \
             -o ConnectTimeout=5 \
             -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
             ubuntu@${{ env.EC2_CORE_PUBLIC_IP }} \
-            "echo '✅ SSH Connection with ubuntu user'" 2>/dev/null; then
-            echo "SSH_USER=ubuntu" >> $GITHUB_ENV
-            echo "✅ Using ubuntu user"
+            "echo 'Test'" > /dev/null 2>&1; then
+            DETECTED_USER="ubuntu"
+            echo "✅ Ubuntu user detected"
           elif ssh -i ~/.ssh/aws-key.pem \
             -o ConnectTimeout=5 \
             -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
             ec2-user@${{ env.EC2_CORE_PUBLIC_IP }} \
-            "echo '✅ SSH Connection with ec2-user'"; then
-            echo "SSH_USER=ec2-user" >> $GITHUB_ENV
-            echo "✅ Using ec2-user (Amazon Linux detected)"
+            "echo 'Test'" > /dev/null 2>&1; then
+            DETECTED_USER="ec2-user"
+            echo "✅ Amazon Linux (ec2-user) detected"
           else
             echo "❌ SSH connection failed with both users"
             exit 1
           fi
+          
+          echo "SSH_USER=$DETECTED_USER" >> $GITHUB_ENV
+          echo "Using SSH user: $DETECTED_USER"
 
       - name: 📦 Prepare EC2-CORE Instance
         run: |
