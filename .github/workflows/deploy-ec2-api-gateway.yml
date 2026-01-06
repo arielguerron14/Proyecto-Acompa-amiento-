@@ -32,9 +32,10 @@ jobs:
           
           echo "🔄 Cleaning up old deployments..."
           docker stop api-gateway 2>/dev/null || true
-          docker rm api-gateway 2>/dev/null || true
-          docker rmi api-gateway:latest 2>/dev/null || true
+          docker rm -f api-gateway 2>/dev/null || true
+          docker rmi -f api-gateway:latest 2>/dev/null || true
           rm -rf /tmp/Proyecto-Acompa-amiento- 2>/dev/null || true
+          sleep 2
           
           echo "📥 Downloading repository archive..."
           mkdir -p /tmp/Proyecto-Acompa-amiento-
