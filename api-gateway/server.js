@@ -11,6 +11,19 @@ try {
 
 console.log('🚀 Starting API Gateway server...');
 
+let config;
+try {
+  config = require('./src/config');
+  console.log('✅ Config loaded successfully');
+  console.log('AUTH_SERVICE:', config.AUTH_SERVICE);
+  console.log('ESTUDIANTES_SERVICE:', config.ESTUDIANTES_SERVICE);
+  console.log('MAESTROS_SERVICE:', config.MAESTROS_SERVICE);
+} catch (e) {
+  console.error('❌ Failed to load config:', e.message);
+  console.error(e.stack);
+  process.exit(1);
+}
+
 const app = express();
 
 // Log all requests

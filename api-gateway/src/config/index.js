@@ -1,6 +1,3 @@
-const dotenv = require('dotenv');
-dotenv.config();
-
 // Cargar configuración centralizada de infraestructura
 let infraConfig;
 try {
