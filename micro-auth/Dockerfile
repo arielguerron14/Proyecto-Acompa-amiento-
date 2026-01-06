@@ -28,7 +28,6 @@ RUN mkdir -p node_modules && \
 ENV NODE_ENV=production
 EXPOSE 3000
 
-ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "src/app.js"]
 
 ENTRYPOINT ["/entrypoint.sh"]

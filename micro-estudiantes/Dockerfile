@@ -22,5 +22,4 @@ RUN npm ci --only=production --silent || npm install --production --silent
 ENV NODE_ENV=production
 EXPOSE 3001
 
-ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "src/app.js"]

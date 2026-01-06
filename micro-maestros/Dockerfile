@@ -23,5 +23,4 @@ RUN npm ci --only=production --silent || npm install --production --silent
 ENV NODE_ENV=production
 EXPOSE 3002
 
-ENTRYPOINT ["/entrypoint.sh"]
 CMD ["npm", "start"]
