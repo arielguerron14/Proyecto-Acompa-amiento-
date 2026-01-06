@@ -1,0 +1,26 @@
+INFORMACIÓN RECIBIDA:
+- EC2-API-Gateway ID: i-0aeb75c2af94e626d
+- EC2-API-Gateway IP pública: 52.71.188.181
+- EC2-API-Gateway IP privada: 172.31.76.105
+
+PRÓXIMAS ACCIONES REQUERIDAS:
+1. Confirmar IPs privadas de:
+   - EC2-Frontend (107.21.124.81)
+   - EC2-Notificaciones (98.93.62.200)
+
+2. Opción A: Abrir Security Groups para SSH en AWS Console
+   - Agregar regla ingress puerto 22 para cada instancia
+
+3. Opción B: Usar EC2-CORE como jump host
+   - Crear workflows que se conecten a EC2-CORE primero
+   - Desde EC2-CORE, SSH a instancias privadas
+
+4. Opción C: Desplegar todo desde EC2-CORE
+   - Correr todo como contenedores en EC2-CORE
+   - Exponer puertos en la red local
+
+ESTADO ACTUAL:
+✅ EC2-CORE: 13.216.12.61 (172.31.78.183) - FUNCIONANDO
+❌ API-Gateway: SSH timeout
+❌ Frontend: SSH timeout
+❌ Notificaciones: SSH timeout
