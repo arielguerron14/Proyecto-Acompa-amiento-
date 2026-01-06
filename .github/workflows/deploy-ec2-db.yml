@@ -209,16 +209,20 @@ jobs:
           docker ps -a --format "table {{.Names}}\t{{.Status}}" || echo "No containers found"
           
           echo ""
-          echo "🧹 Stopping old containers if they exist..."
-          docker-compose down 2>/dev/null || echo "No docker-compose containers to stop"
+          echo "🧹 Stopping all containers..."
+          docker-compose down -v 2>/dev/null || true
           
           echo ""
-          echo "🗑️  Removing old volumes (if any)..."
-          docker volume prune -f || echo "No volumes to prune"
+          echo "🗑️  Removing all databases volumes..."
+          docker volume rm -f $(docker volume ls -q --filter name=databases) 2>/dev/null || echo "No volumes to remove"
+          
+          echo ""
+          echo "🧹 Force removing old containers if any..."
+          docker rm -f postgresql mongodb redis 2>/dev/null || echo "No containers to force remove"
           
           echo ""
           echo "📊 Cleaned containers status:"
-          docker ps -a --format "table {{.Names}}\t{{.Status}}" || echo "No containers running"
+          docker ps -a || echo "No containers running"
           
           echo "✅ Cleanup completed"
           CLEAN_EOF
@@ -236,11 +240,11 @@ jobs:
           echo "📦 Starting containers with docker-compose..."
           docker-compose up -d
           
-          echo "⏳ Waiting 10 seconds for services to initialize..."
-          sleep 10
+          echo "⏳ Waiting 30 seconds for services to initialize..."
+          sleep 30
           
           echo "📊 Container Status:"
-          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
           
           echo ""
           echo "✅ All containers started"
