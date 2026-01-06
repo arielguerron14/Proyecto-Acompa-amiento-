@@ -1,32 +1,13 @@
-# Development server using Node.js
-FROM node:18-alpine
+FROM nginx:alpine
 
-# Set working directory
-WORKDIR /app
+# Copy frontend files to nginx
+COPY frontend-web/public /usr/share/nginx/html/
+COPY frontend-web/index.html /usr/share/nginx/html/
+COPY frontend-web/*.html /usr/share/nginx/html/
 
-# Copy only frontend-web files (when building from repo root context)
-COPY frontend-web/package*.json ./
+# Create nginx config for SPA routing
+RUN echo 'server { listen 3000; root /usr/share/nginx/html; index index.html; location / { try_files $uri $uri/ /index.html; } }' > /etc/nginx/conf.d/default.conf
 
-# Install dependencies
-RUN npm install
-
-# Copy frontend-web source code
-COPY frontend-web/ .
-
-# Copy entrypoint script
-COPY frontend-web/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
-# Expose port
 EXPOSE 3000
 
-# Set API Gateway URL environment variable
-ENV API_GATEWAY_URL=http://52.71.188.181:8080
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV FRONTEND_PORT=3000
-
-# Start the development server
-WORKDIR /app
-ENTRYPOINT ["/app/entrypoint.sh"]
-CMD []
+CMD ["nginx", "-g", "daemon off;"]
