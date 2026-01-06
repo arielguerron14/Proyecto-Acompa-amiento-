@@ -1,6 +1,8 @@
 const express = require('express');
 
 console.log('🚀 Starting simple test server...');
+console.log('Process ID:', process.pid);
+console.log('Environment PORT:', process.env.PORT);
 
 const app = express();
 
@@ -20,7 +22,22 @@ app.post('/api/auth/register', (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => {
+const PORT = process.env.PORT || 9000;  // Changed from 8080 to 9000
+console.log(`Attempting to listen on port ${PORT}...`);
+
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Simple server running on port ${PORT}`);
+  console.log(`Server listening on all interfaces`);
+});
+
+server.on('error', (err) => {
+  console.error('❌ Server error:', err);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught exception:', err);
+  process.exit(1);
+});
+
 });

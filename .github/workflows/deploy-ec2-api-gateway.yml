@@ -50,9 +50,9 @@ jobs:
           docker run -d \
             --name api-gateway \
             --restart unless-stopped \
-            -p 8080:8080 \
+            -p 8080:9000 \
             -e NODE_ENV=production \
-            -e PORT=8080 \
+            -e PORT=9000 \
             -e AUTH_SERVICE=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3000 \
             -e ESTUDIANTES_SERVICE=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3001 \
             -e MAESTROS_SERVICE=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3002 \
