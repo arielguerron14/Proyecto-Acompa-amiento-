@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
 
 env:
-  EC2_MESSAGING_PUBLIC_IP: 3.235.24.36
+  EC2_MESSAGING_PUBLIC_IP: 100.27.251.86
   EC2_MESSAGING_PRIVATE_IP: 172.31.73.6
-  SSH_USER: ec2-user
+  SSH_USER: ubuntu
 
 jobs:
   deploy-messaging:
@@ -17,63 +17,40 @@ jobs:
       - name: 🔑 Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/aws-key.pem
-          chmod 600 ~/.ssh/aws-key.pem
-          ssh-keyscan -H ${{ env.EC2_MESSAGING_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
       
-      - name: 📦 Prepare & Deploy
+      - name: 📦 Deploy Messaging Services
         run: |
-          ssh -i ~/.ssh/aws-key.pem -o StrictHostKeyChecking=no \
-            ${{ env.SSH_USER }}@${{ env.EC2_MESSAGING_PUBLIC_IP }} << 'EOF'
-            
-            set -e
-            sudo yum update -y > /dev/null 2>&1
-            sudo yum install -y docker > /dev/null 2>&1
-            sudo systemctl start docker && sudo systemctl enable docker > /dev/null 2>&1
-            sudo usermod -aG docker ec2-user > /dev/null 2>&1
-            sudo curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-              -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose
-            
-            mkdir -p /opt/messaging
-            cd /opt/messaging
-            
-            cat > docker-compose.yml << 'COMPOSE'
-            version: '3.8'
-            services:
-              zookeeper:
-                image: zookeeper:latest
-                container_name: zookeeper
-                ports:
-                  - "2181:2181"
-                restart: unless-stopped
-              
-              kafka:
-                image: confluentinc/cp-kafka:latest
-                container_name: kafka
-                ports:
-                  - "9092:9092"
-                environment:
-                  KAFKA_BROKER_ID: 1
-                  KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-                  KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${{ env.EC2_MESSAGING_PRIVATE_IP }}:9092
-                  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-                depends_on:
-                  - zookeeper
-                restart: unless-stopped
-              
-              rabbitmq:
-                image: rabbitmq:3-management
-                container_name: rabbitmq
-                ports:
-                  - "5672:5672"
-                  - "15672:15672"
-                environment:
-                  RABBITMQ_DEFAULT_USER: guest
-                  RABBITMQ_DEFAULT_PASS: guest
-                restart: unless-stopped
-            COMPOSE
-            
-            docker-compose up -d
-            sleep 15
-            docker ps -a
-          EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/key.pem ubuntu@${{ env.EC2_MESSAGING_PUBLIC_IP }} "bash -s" << 'DEPLOY'
+          set -e
+          
+          echo "📦 Installing Docker and Docker Compose..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq docker.io docker-compose git > /dev/null 2>&1
+          sudo systemctl start docker
+          sudo systemctl enable docker
+          sudo usermod -aG docker ubuntu
+          
+          echo "🔄 Cleaning up old deployments..."
+          docker stop kafka zookeeper rabbitmq 2>/dev/null || true
+          sleep 2
+          docker rm -f kafka zookeeper rabbitmq 2>/dev/null || true
+          
+          echo "📥 Cloning repository..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento- 2>/dev/null || true
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-/messaging
+          
+          echo "🚀 Starting Messaging Services..."
+          docker-compose up -d
+          
+          echo "⏳ Waiting for services to start..."
+          sleep 30
+          
+          echo "📊 Service Status:"
+          docker ps -a
+          
+          echo "✅ Messaging deployment complete!"
+          DEPLOY

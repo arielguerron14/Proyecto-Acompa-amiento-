@@ -1,0 +1,76 @@
+name: 🚀 Deploy EC2-Monitoring
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_MONITORING_PUBLIC_IP: 54.198.235.28
+  EC2_CORE_PRIVATE_IP: 172.31.78.183
+  EC2_DB_PRIVATE_IP: 172.31.79.193
+  SSH_USER: ubuntu
+
+jobs:
+  deploy-monitoring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 🔑 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+      
+      - name: 📦 Deploy Monitoring Stack
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/key.pem ubuntu@${{ env.EC2_MONITORING_PUBLIC_IP }} "bash -s" << 'DEPLOY'
+          set -e
+          
+          echo "📦 Installing Docker and Docker Compose..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq docker.io docker-compose git > /dev/null 2>&1
+          sudo systemctl start docker
+          sudo systemctl enable docker
+          sudo usermod -aG docker ubuntu
+          
+          echo "🔄 Cleaning up old deployments..."
+          docker stop prometheus grafana 2>/dev/null || true
+          sleep 2
+          docker rm -f prometheus grafana 2>/dev/null || true
+          docker rmi monitoring-prometheus monitoring-grafana 2>/dev/null || true
+          
+          echo "📥 Cloning repository..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento- 2>/dev/null || true
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "🏗️ Building Docker images..."
+          docker build -t monitoring-prometheus:latest -f monitoring/prometheus/Dockerfile .
+          docker build -t monitoring-grafana:latest -f monitoring/grafana/Dockerfile .
+          
+          echo "🚀 Starting Monitoring Stack..."
+          docker run -d \
+            --name prometheus \
+            --restart unless-stopped \
+            -p 9090:9090 \
+            -v $(pwd)/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro \
+            monitoring-prometheus:latest
+          
+          docker run -d \
+            --name grafana \
+            --restart unless-stopped \
+            -p 3000:3000 \
+            -e GF_SECURITY_ADMIN_PASSWORD=admin \
+            monitoring-grafana:latest
+          
+          echo "⏳ Waiting for services to start..."
+          sleep 30
+          
+          echo "📊 Service Status:"
+          docker ps -a
+          
+          echo "✅ Monitoring deployment complete!"
+          echo "📈 Prometheus: http://${{ env.EC2_MONITORING_PUBLIC_IP }}:9090"
+          echo "📊 Grafana: http://${{ env.EC2_MONITORING_PUBLIC_IP }}:3000 (admin/admin)"
+          DEPLOY
