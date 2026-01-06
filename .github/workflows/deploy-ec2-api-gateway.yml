@@ -60,10 +60,13 @@ jobs:
             api-gateway:latest
           
           echo "⏳ Waiting for API Gateway to start..."
-          sleep 30
+          sleep 5
           
           echo "📊 Service Status:"
           docker ps -a | grep api-gateway || echo "API Gateway not found"
+          
+          echo "📋 Container Logs (Last 100 lines):"
+          docker logs api-gateway 2>&1 | tail -100
           
           echo "✅ API Gateway deployment complete!"
           DEPLOY
