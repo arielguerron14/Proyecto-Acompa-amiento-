@@ -48,9 +48,11 @@ jobs:
           docker run -d \
             --name frontend-web \
             --restart unless-stopped \
-            -p 80:80 \
-            -p 443:443 \
+            -p 80:3000 \
+            -p 443:3000 \
             -e NODE_ENV=production \
+            -e PORT=3000 \
+            -e FRONTEND_PORT=3000 \
             -e API_GATEWAY_URL=http://${{ env.AWS_EC2_API_GATEWAY_IP }}:8080 \
             frontend-web:latest
           
