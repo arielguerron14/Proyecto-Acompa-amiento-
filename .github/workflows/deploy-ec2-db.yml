@@ -92,7 +92,7 @@ jobs:
           ssh -i ~/.ssh/aws-key.pem \
             -o StrictHostKeyChecking=no \
             ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} \
-            "mkdir -p /opt/databases && cd /opt/databases && pwd"
+            "sudo mkdir -p /opt/databases && sudo chown ubuntu:ubuntu /opt/databases && cd /opt/databases && pwd"
           
           # Create docker-compose on remote server
           ssh -i ~/.ssh/aws-key.pem \
