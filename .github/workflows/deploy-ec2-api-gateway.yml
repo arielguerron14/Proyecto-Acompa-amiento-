@@ -38,9 +38,9 @@ jobs:
           sleep 2
           
           echo "📥 Downloading repository archive..."
-          mkdir -p /tmp/Proyecto-Acompa-imiento-
-          cd /tmp/Proyecto-Acompa-imiento-
-          wget -q --retry-connrefused --tries=3 https://github.com/arielguerron14/Proyecto-Acompa-imiento-/archive/refs/heads/main.tar.gz -O /tmp/repo.tar.gz
+          mkdir -p /tmp/Proyecto-Acompa-amiento-
+          cd /tmp/Proyecto-Acompa-amiento-
+          wget -q --retry-connrefused --tries=3 https://github.com/arielguerron14/Proyecto-Acompa-amiento-/archive/refs/heads/main.tar.gz -O /tmp/repo.tar.gz
           tar -xzf /tmp/repo.tar.gz --strip-components=1
           rm -f /tmp/repo.tar.gz
           
