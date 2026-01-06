@@ -100,8 +100,6 @@ jobs:
             ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} << 'COMPOSE_EOF'
           
           cat > /opt/databases/docker-compose.yml << 'DOCKER_COMPOSE'
-          version: '3.8'
-          
           services:
             mongodb:
               image: mongo:6.0
@@ -131,6 +129,10 @@ jobs:
                 POSTGRES_USER: postgres
                 POSTGRES_PASSWORD: postgres123
                 POSTGRES_DB: acompanamiento
+                PGDATA: /var/lib/postgresql/data/pgdata
+                LANG: en_US.utf8
+                LC_ALL: en_US.utf8
+                POSTGRES_INITDB_ARGS: "-c shared_buffers=128MB"
               volumes:
                 - postgresql_data:/var/lib/postgresql/data
               networks:
