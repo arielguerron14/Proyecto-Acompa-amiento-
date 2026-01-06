@@ -77,8 +77,8 @@ module.exports = {
       return `http://${this.CORE_IP}:${this.MAESTROS_PORT}`;
     },
 
-    // Database - IP privada
-    DB_IP: process.env.DB_IP || '13.220.99.207',
+    // Database - IP privada (EC2-DB private IP within VPC)
+    DB_IP: process.env.DB_IP || '172.31.79.193',
     MONGO_PORT: process.env.MONGO_PORT || 27017,
     POSTGRES_PORT: process.env.POSTGRES_PORT || 5432,
     REDIS_PORT: process.env.REDIS_PORT || 6379,
