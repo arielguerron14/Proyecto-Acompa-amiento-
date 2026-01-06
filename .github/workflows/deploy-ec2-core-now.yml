@@ -60,9 +60,9 @@ jobs:
               environment:
                 NODE_ENV: production
                 PORT: 3000
-                MONGO_URL: mongodb://admin:mongodb123@172.31.79.193:27017/acompanamiento?authSource=admin
-                POSTGRES_URL: postgresql://postgres:postgres123@172.31.79.193:5432/acompanamiento
-                REDIS_URL: redis://:redis123@172.31.79.193:6379
+                MONGO_URL: mongodb://172.31.79.193:27017/acompanamiento
+                POSTGRES_URL: postgresql://postgres:example@172.31.79.193:5432/acompanamiento
+                REDIS_URL: redis://172.31.79.193:6379
               restart: unless-stopped
               networks:
                 - core
@@ -80,9 +80,9 @@ jobs:
               environment:
                 NODE_ENV: production
                 PORT: 3001
-                MONGO_URL: mongodb://admin:mongodb123@172.31.79.193:27017/acompanamiento?authSource=admin
-                POSTGRES_URL: postgresql://postgres:postgres123@172.31.79.193:5432/acompanamiento
-                REDIS_URL: redis://:redis123@172.31.79.193:6379
+                MONGO_URL: mongodb://172.31.79.193:27017/acompanamiento
+                POSTGRES_URL: postgresql://postgres:example@172.31.79.193:5432/acompanamiento
+                REDIS_URL: redis://172.31.79.193:6379
                 AUTH_SERVICE: http://172.31.78.183:3000
               restart: unless-stopped
               networks:
@@ -101,9 +101,9 @@ jobs:
               environment:
                 NODE_ENV: production
                 PORT: 3002
-                MONGO_URL: mongodb://admin:mongodb123@172.31.79.193:27017/acompanamiento?authSource=admin
-                POSTGRES_URL: postgresql://postgres:postgres123@172.31.79.193:5432/acompanamiento
-                REDIS_URL: redis://:redis123@172.31.79.193:6379
+                MONGO_URL: mongodb://172.31.79.193:27017/acompanamiento
+                POSTGRES_URL: postgresql://postgres:example@172.31.79.193:5432/acompanamiento
+                REDIS_URL: redis://172.31.79.193:6379
                 AUTH_SERVICE: http://172.31.78.183:3000
               restart: unless-stopped
               networks:
