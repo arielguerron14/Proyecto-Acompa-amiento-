@@ -5,6 +5,21 @@ echo "🚀 Starting microservice..."
 echo "Current directory: $(pwd)"
 echo "Node version: $(node --version)"
 echo "npm version: $(npm --version)"
+echo "User: $(whoami)"
+echo "PWD: $PWD"
+
+# Show environment variables (non-sensitive)
+echo ""
+echo "Environment variables:"
+echo "  NODE_ENV: $NODE_ENV"
+echo "  PORT: $PORT"
+
+# List dependencies
+echo ""
+echo "Checking node_modules..."
+ls -la /usr/src/app/node_modules 2>&1 | head -20
 
 # Execute the command passed to the container
+echo ""
+echo "Executing: $@"
 exec "$@"
