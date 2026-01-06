@@ -1,0 +1,40 @@
+name: Test Deploy EC2-CORE
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  EC2_CORE_PRIVATE_IP: 172.31.78.183
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  test-connection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/aws-key.pem
+          chmod 600 ~/.ssh/aws-key.pem
+
+      - name: Test Connection
+        run: |
+          # Try ubuntu first
+          if ssh -i ~/.ssh/aws-key.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes ubuntu@${{ env.EC2_CORE_PUBLIC_IP }} "echo 'ubuntu'" 2>/dev/null; then
+            echo "✅ Ubuntu user works"
+            echo "SSH_USER=ubuntu" >> $GITHUB_ENV
+          elif ssh -i ~/.ssh/aws-key.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes ec2-user@${{ env.EC2_CORE_PUBLIC_IP }} "echo 'ec2-user'" 2>/dev/null; then
+            echo "✅ EC2-user works"
+            echo "SSH_USER=ec2-user" >> $GITHUB_ENV
+          else
+            echo "❌ No SSH connection"
+            exit 1
+          fi
+
+      - name: Info
+        run: |
+          echo "Using user: ${{ env.SSH_USER }}"
