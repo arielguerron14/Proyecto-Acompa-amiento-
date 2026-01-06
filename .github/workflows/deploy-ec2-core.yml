@@ -2,6 +2,15 @@ name: 🚀 Deploy EC2-CORE (Auth, Estudiantes, Maestros)
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
 
 env:
   EC2_CORE_PUBLIC_IP: 13.216.12.61
