@@ -34,12 +34,14 @@ jobs:
           docker stop api-gateway 2>/dev/null || true
           docker rm api-gateway 2>/dev/null || true
           docker rmi api-gateway:latest 2>/dev/null || true
+          rm -rf /tmp/Proyecto-Acompa-amiento- 2>/dev/null || true
           
-          echo "📥 Cloning repository..."
-          cd /tmp
-          rm -rf Proyecto-Acompa-amiento- 2>/dev/null || true
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
-          cd Proyecto-Acompa-amiento-
+          echo "📥 Downloading repository archive..."
+          mkdir -p /tmp/Proyecto-Acompa-amiento-
+          cd /tmp/Proyecto-Acompa-amiento-
+          wget -q https://github.com/arielguerron14/Proyecto-Acompa-amiento-/archive/refs/heads/main.tar.gz -O /tmp/repo.tar.gz
+          tar -xzf /tmp/repo.tar.gz --strip-components=1
+          rm /tmp/repo.tar.gz
           
           echo "🏗️ Building Docker image..."
           docker build -t api-gateway:latest -f api-gateway/Dockerfile .
