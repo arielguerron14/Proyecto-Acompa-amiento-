@@ -2,14 +2,14 @@ FROM node:18-slim
 
 WORKDIR /usr/src/app
 
-# Copy package manifests
-COPY package*.json ./
+# Copy package manifests from api-gateway directory
+COPY api-gateway/package*.json ./
 
 # Install production dependencies
 RUN npm install --production
 
-# Copy source files
-COPY . .
+# Copy source files from api-gateway directory  
+COPY api-gateway/ .
 
 # Expose gateway port
 ENV PORT=9000
