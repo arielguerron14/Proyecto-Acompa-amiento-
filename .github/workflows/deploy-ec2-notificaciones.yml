@@ -32,7 +32,8 @@ jobs:
           
           echo "🔄 Cleaning up old deployments..."
           docker stop micro-notificaciones 2>/dev/null || true
-          docker rm micro-notificaciones 2>/dev/null || true
+          sleep 2
+          docker rm -f micro-notificaciones 2>/dev/null || true
           docker rmi micro-notificaciones:latest 2>/dev/null || true
           
           echo "📥 Cloning repository..."
