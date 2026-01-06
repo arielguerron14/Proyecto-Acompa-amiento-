@@ -9,7 +9,7 @@ on:
       - '.github/workflows/deploy-ec2-api-gateway.yml'
 
 env:
-  AWS_EC2_API_IP: 13.216.13.54
+  AWS_EC2_API_IP: 52.71.188.181
   AWS_EC2_CORE_PRIVATE_IP: 172.31.78.183
 
 jobs:

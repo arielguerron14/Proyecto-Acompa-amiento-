@@ -1,59 +1,64 @@
-name: 🚀 Deploy EC2-Frontend
+name: Deploy EC2-Frontend
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend-web/**'
+      - '.github/workflows/deploy-ec2-frontend.yml'
 
 env:
-  EC2_FRONTEND_PUBLIC_IP: 107.21.124.81
-  EC2_FRONTEND_PRIVATE_IP: 172.31.69.203
-  EC2_API_GATEWAY_PRIVATE_IP: 172.31.76.105
-  SSH_USER: ec2-user
+  AWS_EC2_FRONTEND_IP: 107.21.124.81
+  AWS_EC2_API_GATEWAY_IP: 52.71.188.181
 
 jobs:
-  deploy-frontend:
+  deploy:
     runs-on: ubuntu-latest
+    name: Deploy
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: 🔑 Setup SSH
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: 🚀 Deploy Frontend to EC2
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/aws-key.pem
-          chmod 600 ~/.ssh/aws-key.pem
-          ssh-keyscan -H ${{ env.EC2_FRONTEND_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
-      
-      - name: 📦 Prepare & Deploy
-        run: |
-          ssh -i ~/.ssh/aws-key.pem -o StrictHostKeyChecking=no \
-            ${{ env.SSH_USER }}@${{ env.EC2_FRONTEND_PUBLIC_IP }} << 'EOF'
-            
-            set -e
-            sudo yum update -y > /dev/null 2>&1
-            sudo yum install -y docker nodejs > /dev/null 2>&1
-            sudo systemctl start docker && sudo systemctl enable docker > /dev/null 2>&1
-            sudo usermod -aG docker ec2-user > /dev/null 2>&1
-            sudo curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-              -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose
-            
-            mkdir -p /opt/frontend
-            cd /opt/frontend
-            
-            cat > docker-compose.yml << 'COMPOSE'
-            version: '3.8'
-            services:
-              frontend:
-                image: frontend-web:latest
-                container_name: frontend-web
-                ports:
-                  - "80:80"
-                  - "443:443"
-                environment:
-                  NODE_ENV: production
-                  API_GATEWAY_URL: http://${{ env.EC2_API_GATEWAY_PRIVATE_IP }}:8080
-                restart: unless-stopped
-            COMPOSE
-            
-            docker-compose up -d
-            sleep 10
-            docker ps -a
-          EOF
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/key.pem ubuntu@${{ env.AWS_EC2_FRONTEND_IP }} "bash -s" << 'DEPLOY'
+          set -e
+          
+          echo "🔄 Cleaning up old deployments..."
+          docker stop frontend-web 2>/dev/null || true
+          docker rm frontend-web 2>/dev/null || true
+          docker rmi frontend-web:latest 2>/dev/null || true
+          
+          echo "📥 Cloning repository..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento- 2>/dev/null || true
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+          
+          echo "🏗️ Building Docker image..."
+          docker build -t frontend-web:latest -f frontend-web/Dockerfile .
+          
+          echo "🚀 Starting Frontend..."
+          docker run -d \
+            --name frontend-web \
+            --restart unless-stopped \
+            -p 80:80 \
+            -p 443:443 \
+            -e NODE_ENV=production \
+            -e API_GATEWAY_URL=http://${{ env.AWS_EC2_API_GATEWAY_IP }}:8080 \
+            frontend-web:latest
+          
+          echo "⏳ Waiting for Frontend to start..."
+          sleep 30
+          
+          echo "📊 Service Status:"
+          docker ps -a | grep frontend-web || echo "Frontend not found"
+          
+          echo "✅ Frontend deployment complete!"
+          DEPLOY
