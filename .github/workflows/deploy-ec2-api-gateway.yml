@@ -1,103 +1,63 @@
-name: 🚀 Deploy EC2-API-Gateway
+name: Deploy EC2-API-Gateway
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
+  push:
+    branches: [main]
+    paths:
+      - 'api-gateway/**'
+      - '.github/workflows/deploy-ec2-api-gateway.yml'
 
 env:
-  EC2_API_GATEWAY_PUBLIC_IP: 52.71.188.181
-  EC2_API_GATEWAY_PRIVATE_IP: 172.31.76.105
-  EC2_CORE_PRIVATE_IP: 172.31.78.183
-  SSH_USER: ec2-user
-  AWS_REGION: us-east-1
+  AWS_EC2_API_IP: 13.216.13.54
+  AWS_EC2_CORE_PRIVATE_IP: 172.31.78.183
 
 jobs:
-  deploy-api-gateway:
-    name: Deploy API Gateway
+  deploy:
     runs-on: ubuntu-latest
-    
+    name: Deploy
     steps:
-      - name: ✅ Checkout Repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-      - name: 🔑 Setup SSH Key
+      - name: 🚀 Deploy API Gateway to EC2
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/aws-key.pem
-          chmod 600 ~/.ssh/aws-key.pem
-          ssh-keyscan -H ${{ env.EC2_API_GATEWAY_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: 🔗 Test Connection
-        run: |
-          ssh -i ~/.ssh/aws-key.pem \
-            -o StrictHostKeyChecking=no \
-            ${{ env.SSH_USER }}@${{ env.EC2_API_GATEWAY_PUBLIC_IP }} \
-            "echo '✅ Connection OK'"
-
-      - name: 📦 Prepare Instance
-        run: |
-          ssh -i ~/.ssh/aws-key.pem \
-            -o StrictHostKeyChecking=no \
-            ${{ env.SSH_USER }}@${{ env.EC2_API_GATEWAY_PUBLIC_IP }} << 'EOF'
-            
-            set -e
-            sudo yum update -y > /dev/null 2>&1
-            sudo yum install -y docker nodejs > /dev/null 2>&1
-            sudo systemctl start docker && sudo systemctl enable docker > /dev/null 2>&1
-            sudo usermod -aG docker ec2-user > /dev/null 2>&1
-            sudo curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-              -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose
-            
-            echo "✅ Instance Prepared"
-          EOF
-
-      - name: 🚀 Deploy API Gateway
-        run: |
-          ssh -i ~/.ssh/aws-key.pem \
-            -o StrictHostKeyChecking=no \
-            ${{ env.SSH_USER }}@${{ env.EC2_API_GATEWAY_PUBLIC_IP }} << 'DEPLOY_EOF'
+          ssh -o StrictHostKeyChecking=no -i <(echo "${{ secrets.AWS_EC2_API_SSH_PRIVATE_KEY }}" | base64 -d) ubuntu@${{ env.AWS_EC2_API_IP }} "bash -s" << 'DEPLOY'
+          set -e
           
-          mkdir -p /opt/api-gateway
-          cd /opt/api-gateway
+          echo "🔄 Cleaning up old deployments..."
+          docker stop api-gateway 2>/dev/null || true
+          docker rm api-gateway 2>/dev/null || true
+          docker rmi api-gateway:latest 2>/dev/null || true
           
-          cat > docker-compose.yml << 'COMPOSE'
-          version: '3.8'
-          services:
-            api-gateway:
-              image: api-gateway:latest
-              container_name: api-gateway
-              ports:
-                - "8080:8080"
-              environment:
-                NODE_ENV: production
-                PORT: 8080
-                AUTH_SERVICE: http://${{ env.EC2_CORE_PRIVATE_IP }}:3000
-                ESTUDIANTES_SERVICE: http://${{ env.EC2_CORE_PRIVATE_IP }}:3001
-                MAESTROS_SERVICE: http://${{ env.EC2_CORE_PRIVATE_IP }}:3002
-              restart: unless-stopped
-              healthcheck:
-                test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-                interval: 30s
-                timeout: 10s
-                retries: 3
-          COMPOSE
+          echo "📥 Cloning repository..."
+          cd /tmp
+          rm -rf Proyecto-Acompa-amiento- 2>/dev/null || true
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
           
-          docker-compose up -d
-          sleep 10
-          docker ps -a
-          DEPLOY_EOF
-
-      - name: ✅ Validation
-        run: |
-          ssh -i ~/.ssh/aws-key.pem \
-            -o StrictHostKeyChecking=no \
-            ${{ env.SSH_USER }}@${{ env.EC2_API_GATEWAY_PUBLIC_IP }} \
-            "docker ps --format 'table {{.Names}}\t{{.Status}}' && echo '' && echo '✅ API Gateway deployed successfully'"
+          echo "🏗️ Building Docker image..."
+          docker build -t api-gateway:latest -f api-gateway/Dockerfile .
+          
+          echo "🚀 Starting API Gateway..."
+          docker run -d \
+            --name api-gateway \
+            --restart unless-stopped \
+            -p 8080:8080 \
+            -e NODE_ENV=production \
+            -e PORT=8080 \
+            -e MICRO_AUTH_URL=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3000 \
+            -e MICRO_ESTUDIANTES_URL=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3001 \
+            -e MICRO_MAESTROS_URL=http://${{ env.AWS_EC2_CORE_PRIVATE_IP }}:3002 \
+            api-gateway:latest
+          
+          echo "⏳ Waiting for API Gateway to start..."
+          sleep 30
+          
+          echo "📊 Service Status:"
+          docker ps -a | grep api-gateway || echo "API Gateway not found"
+          
+          echo "✅ API Gateway deployment complete!"
+          DEPLOY
