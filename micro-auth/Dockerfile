@@ -9,7 +9,7 @@ COPY micro-auth/ /usr/src/app/
 # Copiar configuración centralizada
 COPY infrastructure.config.js /usr/src/
 COPY scripts/ /usr/src/scripts/
-COPY docker-entrypoint.sh /entrypoint.sh
+COPY ./docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # install dependencies for shared modules first
