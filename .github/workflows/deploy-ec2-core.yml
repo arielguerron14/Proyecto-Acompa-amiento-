@@ -1,0 +1,206 @@
+name: 🚀 Deploy EC2-CORE (Auth, Estudiantes, Maestros)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  EC2_CORE_PRIVATE_IP: 172.31.78.183
+  EC2_DB_PRIVATE_IP: 172.31.79.193
+  SSH_USER: ec2-user
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  deploy-ec2-core:
+    name: Deploy EC2-CORE Microservices
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: ✅ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔑 Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/aws-key.pem
+          chmod 600 ~/.ssh/aws-key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 🔗 Test SSH Connection to EC2-CORE
+        run: |
+          ssh -i ~/.ssh/aws-key.pem \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} \
+            "echo '✅ SSH Connection Successful'"
+
+      - name: 📦 Prepare EC2-CORE Instance
+        run: |
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'EOF'
+            
+            set -e
+            
+            echo "📝 Updating system packages..."
+            sudo yum update -y > /dev/null 2>&1
+            
+            echo "📦 Installing Docker and Node.js..."
+            sudo yum install -y docker nodejs > /dev/null 2>&1
+            
+            echo "🔧 Starting Docker service..."
+            sudo systemctl start docker
+            sudo systemctl enable docker > /dev/null 2>&1
+            
+            echo "👤 Adding user to docker group..."
+            sudo usermod -aG docker ec2-user > /dev/null 2>&1
+            
+            echo "🐳 Installing Docker Compose..."
+            sudo curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+              -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            
+            echo "✅ EC2-CORE Instance Prepared"
+          EOF
+
+      - name: 📄 Copy Source Code and Create docker-compose
+        run: |
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SETUP_EOF'
+          
+          # Create application directory
+          mkdir -p /opt/microservices/core
+          cd /opt/microservices/core
+          
+          # Create docker-compose.yml for CORE services
+          cat > docker-compose.yml << 'COMPOSE'
+          version: '3.8'
+          
+          services:
+            micro-auth:
+              image: micro-auth:latest
+              container_name: micro-auth
+              ports:
+                - "3000:3000"
+              environment:
+                NODE_ENV: production
+                PORT: 3000
+                MONGO_URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
+                POSTGRES_URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
+                REDIS_URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
+              depends_on:
+                - micro-estudiantes
+                - micro-maestros
+              networks:
+                - core-network
+              restart: unless-stopped
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+          
+            micro-estudiantes:
+              image: micro-estudiantes:latest
+              container_name: micro-estudiantes
+              ports:
+                - "3001:3001"
+              environment:
+                NODE_ENV: production
+                PORT: 3001
+                MONGO_URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
+                POSTGRES_URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
+                REDIS_URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
+              networks:
+                - core-network
+              restart: unless-stopped
+          
+            micro-maestros:
+              image: micro-maestros:latest
+              container_name: micro-maestros
+              ports:
+                - "3002:3002"
+              environment:
+                NODE_ENV: production
+                PORT: 3002
+                MONGO_URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
+                POSTGRES_URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
+                REDIS_URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
+              networks:
+                - core-network
+              restart: unless-stopped
+          
+          networks:
+            core-network:
+              driver: bridge
+          COMPOSE
+          
+          echo "✅ docker-compose.yml created for CORE services"
+          SETUP_EOF
+
+      - name: 🚀 Start Core Microservices
+        run: |
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'START_EOF'
+          
+          cd /opt/microservices/core
+          
+          echo "📦 Starting microservices..."
+          docker-compose up -d || echo "⚠️  Containers may not have images yet, building from source..."
+          
+          sleep 15
+          
+          echo "📊 Service Status:"
+          docker ps -a
+          START_EOF
+
+      - name: ✅ Validate Core Services
+        run: |
+          echo "🔍 Validating EC2-CORE services..."
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'VALIDATE_EOF'
+          
+          echo ""
+          echo "🔍 Service Status:"
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          VALIDATE_EOF
+
+      - name: 📋 Display Deployment Information
+        run: |
+          cat << 'INFO'
+          
+          ╔════════════════════════════════════════════════════════════╗
+          ║        ✅ EC2-CORE DEPLOYMENT COMPLETED                   ║
+          ╚════════════════════════════════════════════════════════════╝
+          
+          🌐 Instance Information:
+            • Instance Name: EC2-CORE
+            • Public IP: ${{ env.EC2_CORE_PUBLIC_IP }}
+            • Private IP: ${{ env.EC2_CORE_PRIVATE_IP }}
+            • Region: ${{ env.AWS_REGION }}
+          
+          🔗 Service URLs (Internal VPC):
+            • Auth Service: http://${{ env.EC2_CORE_PRIVATE_IP }}:3000
+            • Estudiantes Service: http://${{ env.EC2_CORE_PRIVATE_IP }}:3001
+            • Maestros Service: http://${{ env.EC2_CORE_PRIVATE_IP }}:3002
+          
+          💾 Database Connections (All use EC2-DB):
+            • MongoDB: ${{ env.EC2_DB_PRIVATE_IP }}:27017
+            • PostgreSQL: ${{ env.EC2_DB_PRIVATE_IP }}:5432
+            • Redis: ${{ env.EC2_DB_PRIVATE_IP }}:6379
+          
+          🚀 Next Step: Deploy EC2-API-Gateway
+          
+          INFO

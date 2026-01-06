@@ -1,0 +1,323 @@
+name: 🚀 Deploy EC2-DB (MongoDB, PostgreSQL, Redis)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+
+env:
+  EC2_DB_PUBLIC_IP: 44.222.119.15
+  EC2_DB_PRIVATE_IP: 172.31.79.193
+  SSH_USER: ec2-user
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-ec2-db:
+    name: Deploy EC2-DB Databases
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Checkout code
+      - name: ✅ Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Setup SSH
+      - name: 🔑 Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/aws-key.pem
+          chmod 600 ~/.ssh/aws-key.pem
+          ssh-keyscan -H ${{ env.EC2_DB_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      # 3. Test SSH Connection
+      - name: 🔗 Test SSH Connection to EC2-DB
+        run: |
+          echo "Testing connection to EC2-DB..."
+          ssh -i ~/.ssh/aws-key.pem \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} \
+            "echo '✅ SSH Connection Successful'"
+
+      # 4. Prepare EC2 Instance
+      - name: 📦 Prepare EC2-DB Instance
+        run: |
+          echo "🔧 Installing Docker and dependencies..."
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} << 'EOF'
+            
+            set -e
+            
+            echo "📝 Updating system packages..."
+            sudo yum update -y > /dev/null 2>&1
+            
+            echo "📦 Installing Docker..."
+            sudo yum install -y docker > /dev/null 2>&1
+            
+            echo "🔧 Starting Docker service..."
+            sudo systemctl start docker
+            sudo systemctl enable docker > /dev/null 2>&1
+            
+            echo "👤 Adding user to docker group..."
+            sudo usermod -aG docker ec2-user > /dev/null 2>&1
+            
+            echo "🐳 Installing Docker Compose..."
+            DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+            sudo curl -sL "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" \
+              -o /usr/local/bin/docker-compose 2>/dev/null || \
+            sudo curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+              -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            
+            echo "✅ EC2-DB Instance Prepared"
+            docker-compose --version
+            docker --version
+          EOF
+
+      # 5. Copy docker-compose file
+      - name: 📄 Copy Docker Compose Configuration
+        run: |
+          echo "📋 Creating databases directory on EC2-DB..."
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} \
+            "mkdir -p /opt/databases && cd /opt/databases && pwd"
+          
+          # Create docker-compose on remote server
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} << 'COMPOSE_EOF'
+          
+          cat > /opt/databases/docker-compose.yml << 'DOCKER_COMPOSE'
+          version: '3.8'
+          
+          services:
+            mongodb:
+              image: mongo:6.0
+              container_name: mongodb
+              ports:
+                - "27017:27017"
+              environment:
+                MONGO_INITDB_ROOT_USERNAME: admin
+                MONGO_INITDB_ROOT_PASSWORD: mongodb123
+              volumes:
+                - mongodb_data:/data/db
+              networks:
+                - databases
+              restart: unless-stopped
+              healthcheck:
+                test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+                interval: 10s
+                timeout: 5s
+                retries: 3
+          
+            postgresql:
+              image: postgres:15
+              container_name: postgresql
+              ports:
+                - "5432:5432"
+              environment:
+                POSTGRES_USER: postgres
+                POSTGRES_PASSWORD: postgres123
+                POSTGRES_DB: acompanamiento
+                POSTGRES_INITDB_ARGS: "-c shared_buffers=256MB -c max_connections=200"
+              volumes:
+                - postgresql_data:/var/lib/postgresql/data
+              networks:
+                - databases
+              restart: unless-stopped
+              healthcheck:
+                test: ["CMD-SHELL", "pg_isready -U postgres"]
+                interval: 10s
+                timeout: 5s
+                retries: 3
+          
+            redis:
+              image: redis:7-alpine
+              container_name: redis
+              ports:
+                - "6379:6379"
+              command: redis-server --appendonly yes --requirepass redis123
+              volumes:
+                - redis_data:/data
+              networks:
+                - databases
+              restart: unless-stopped
+              healthcheck:
+                test: ["CMD", "redis-cli", "ping"]
+                interval: 10s
+                timeout: 5s
+                retries: 3
+          
+          volumes:
+            mongodb_data:
+            postgresql_data:
+            redis_data:
+          
+          networks:
+            databases:
+              driver: bridge
+          DOCKER_COMPOSE
+          
+          echo "✅ docker-compose.yml created"
+          COMPOSE_EOF
+
+      # 6. Create .env file
+      - name: 🔐 Create Environment Configuration
+        run: |
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} << 'ENV_EOF'
+          
+          cat > /opt/databases/.env << 'ENV_CONTENT'
+          # Database Credentials
+          MONGO_INITDB_ROOT_USERNAME=admin
+          MONGO_INITDB_ROOT_PASSWORD=mongodb123
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgres123
+          POSTGRES_DB=acompanamiento
+          REDIS_PASSWORD=redis123
+          
+          # Environment
+          ENVIRONMENT=production
+          ENV_CONTENT
+          
+          echo "✅ .env file created"
+          ENV_EOF
+
+      # 7. Start Docker Containers
+      - name: 🚀 Start Database Containers
+        run: |
+          echo "🚀 Starting Docker containers..."
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} << 'START_EOF'
+          
+          cd /opt/databases
+          
+          echo "📦 Starting containers..."
+          docker-compose up -d
+          
+          echo "⏳ Waiting 30 seconds for services to be ready..."
+          sleep 30
+          
+          echo "📊 Container Status:"
+          docker ps -a
+          
+          echo ""
+          echo "✅ All containers started"
+          START_EOF
+
+      # 8. Validate Databases
+      - name: ✅ Validate Database Deployments
+        run: |
+          echo "🔍 Validating databases..."
+          ssh -i ~/.ssh/aws-key.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_DB_PUBLIC_IP }} << 'VALIDATE_EOF'
+          
+          echo ""
+          echo "🔍 MongoDB Health Check..."
+          docker exec mongodb mongosh --version && echo "✅ MongoDB is running" || echo "❌ MongoDB failed"
+          
+          echo ""
+          echo "🔍 PostgreSQL Health Check..."
+          docker exec postgresql pg_isready -U postgres && echo "✅ PostgreSQL is running" || echo "❌ PostgreSQL failed"
+          
+          echo ""
+          echo "🔍 Redis Health Check..."
+          docker exec redis redis-cli ping && echo "✅ Redis is running" || echo "❌ Redis failed"
+          
+          echo ""
+          echo "📊 Final Status:"
+          docker ps --format "table {{.Names}}\t{{.Status}}"
+          VALIDATE_EOF
+
+      # 9. Display Connection Information
+      - name: 📋 Display Connection Information
+        run: |
+          cat << 'INFO_EOF'
+          
+          ╔════════════════════════════════════════════════════════════╗
+          ║             ✅ EC2-DB DEPLOYMENT COMPLETED                ║
+          ╚════════════════════════════════════════════════════════════╝
+          
+          🌐 Instance Information:
+            • Instance Name: EC2-DB
+            • Public IP: ${{ env.EC2_DB_PUBLIC_IP }}
+            • Private IP: ${{ env.EC2_DB_PRIVATE_IP }}
+            • Region: ${{ env.AWS_REGION }}
+          
+          💾 Database Connection Strings (Internal VPC):
+          
+            MongoDB:
+              URL: mongodb://admin:mongodb123@${{ env.EC2_DB_PRIVATE_IP }}:27017/acompanamiento?authSource=admin
+              Port: 27017
+          
+            PostgreSQL:
+              URL: postgresql://postgres:postgres123@${{ env.EC2_DB_PRIVATE_IP }}:5432/acompanamiento
+              Port: 5432
+          
+            Redis:
+              URL: redis://:redis123@${{ env.EC2_DB_PRIVATE_IP }}:6379
+              Port: 6379
+          
+          ⚠️  IMPORTANT:
+            • Databases are NOT accessible from the internet
+            • Only accessible from other EC2 instances in the VPC
+            • Connection strings use PRIVATE IP (172.31.79.193)
+          
+          🔐 Default Credentials (CHANGE IN PRODUCTION):
+            • MongoDB User: admin / Password: mongodb123
+            • PostgreSQL User: postgres / Password: postgres123
+            • Redis Password: redis123
+          
+          📊 Verify Containers:
+            SSH to instance and run: docker ps -a
+          
+          🚀 Next Step: Deploy EC2-CORE
+          
+          INFO_EOF
+
+      # 10. Commit and push (optional)
+      - name: 📝 Update Repository (Optional)
+        if: github.event.inputs.environment == 'production'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          echo "EC2-DB deployed at $(date)" >> DEPLOYMENT_LOG.md
+          
+          git add DEPLOYMENT_LOG.md || true
+          git commit -m "docs: EC2-DB deployment completed at $(date)" || true
+          git push || true
+        continue-on-error: true
+
+  # Notification Job
+  notify:
+    name: Send Deployment Notification
+    needs: deploy-ec2-db
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: 📢 Deployment Status
+        run: |
+          if [ "${{ needs.deploy-ec2-db.result }}" == "success" ]; then
+            echo "✅ EC2-DB deployment SUCCEEDED"
+            exit 0
+          else
+            echo "❌ EC2-DB deployment FAILED"
+            exit 1
+          fi

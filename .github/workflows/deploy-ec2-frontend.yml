@@ -1,0 +1,59 @@
+name: 🚀 Deploy EC2-Frontend
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_FRONTEND_PUBLIC_IP: 107.21.124.81
+  EC2_FRONTEND_PRIVATE_IP: 172.31.69.203
+  EC2_API_GATEWAY_PRIVATE_IP: 172.31.76.105
+  SSH_USER: ec2-user
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 🔑 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/aws-key.pem
+          chmod 600 ~/.ssh/aws-key.pem
+          ssh-keyscan -H ${{ env.EC2_FRONTEND_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+      
+      - name: 📦 Prepare & Deploy
+        run: |
+          ssh -i ~/.ssh/aws-key.pem -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.EC2_FRONTEND_PUBLIC_IP }} << 'EOF'
+            
+            set -e
+            sudo yum update -y > /dev/null 2>&1
+            sudo yum install -y docker nodejs > /dev/null 2>&1
+            sudo systemctl start docker && sudo systemctl enable docker > /dev/null 2>&1
+            sudo usermod -aG docker ec2-user > /dev/null 2>&1
+            sudo curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+              -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose
+            
+            mkdir -p /opt/frontend
+            cd /opt/frontend
+            
+            cat > docker-compose.yml << 'COMPOSE'
+            version: '3.8'
+            services:
+              frontend:
+                image: frontend-web:latest
+                container_name: frontend-web
+                ports:
+                  - "80:80"
+                  - "443:443"
+                environment:
+                  NODE_ENV: production
+                  API_GATEWAY_URL: http://${{ env.EC2_API_GATEWAY_PRIVATE_IP }}:8080
+                restart: unless-stopped
+            COMPOSE
+            
+            docker-compose up -d
+            sleep 10
+            docker ps -a
+          EOF
