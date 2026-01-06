@@ -16,4 +16,4 @@ ENV PORT=9000
 EXPOSE 9000
 
 # Start server directly
-CMD ["node", "simple-server.js"]
+CMD ["node", "server.js"]
