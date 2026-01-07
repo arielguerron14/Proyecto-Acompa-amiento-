@@ -32,9 +32,21 @@ jobs:
           echo "=== Ensure docker network exists (skip if overlaps) ==="
           if docker network inspect proyecto_vpc-network >/dev/null 2>&1; then
             echo "network proyecto_vpc-network already exists"
+            echo "Inspecting labels and attached containers..."
+            docker network inspect proyecto_vpc-network --format 'Labels: {{json .Labels}}' || true
+            docker network inspect proyecto_vpc-network --format 'Containers: {{json .Containers}}' || true
+            # If the network has no attached containers, recreate it with the expected compose label
+            has_containers=$(docker network inspect -f '{{json .Containers}}' proyecto_vpc-network)
+            if [ "$has_containers" = "{}" ]; then
+              echo "Network has no containers; recreating with compose label to satisfy docker-compose"
+              docker network rm proyecto_vpc-network || true
+              docker network create --label com.docker.compose.network=vpc-network proyecto_vpc-network || true
+            else
+              echo "Network has attached containers; leaving it as-is"
+            fi
           else
             echo "creating network proyecto_vpc-network (no explicit subnet)"
-            docker network create proyecto_vpc-network || true
+            docker network create --label com.docker.compose.network=vpc-network proyecto_vpc-network || true
           fi
 
           echo "=== Attempting to bring up api-gateway using docker-compose file ==="
