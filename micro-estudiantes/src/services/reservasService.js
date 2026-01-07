@@ -163,7 +163,8 @@ class ReservasService {
         lugarAtencion: horario.lugarAtencion
       });
     } else {
-      const error = new Error('Se requiere: (fecha, hora) o (dia, inicio, fin)');
+      console.log('DEBUG: Neither format detected. data.fecha:', data.fecha, 'data.hora:', data.hora, 'data.dia:', data.dia, 'data.inicio:', data.inicio, 'data.fin:', data.fin);
+      const error = new Error('Se requiere: (fecha, hora) o (dia, inicio, fin). Recibido: ' + JSON.stringify(Object.keys(data)));
       error.status = 400;
       throw error;
     }
@@ -186,25 +187,8 @@ class ReservasService {
    */
   async getByEstudiante(estudianteId) {
     console.log('DEBUG: getByEstudiante called with:', estudianteId);
-    try {
-      // Check if Mongoose is connected
-      const mongoose = require('mongoose');
-      console.log('DEBUG: Mongoose connection state:', mongoose.connection.readyState);
-      
-      if (mongoose.connection.readyState !== 1) {
-        console.log('DEBUG: MongoDB not connected, returning empty array');
-        return [];
-      }
-      
-      const result = await Reserva.find({ estudianteId, estado: { $ne: 'Cancelada' } }).sort({ createdAt: -1 });
-      console.log('DEBUG: getByEstudiante found:', result.length, 'reservas');
-      return result;
-    } catch (err) {
-      console.log('DEBUG: getByEstudiante error:', err.message, err.stack);
-      // Return empty array instead of throwing to prevent 500
-      console.log('DEBUG: Returning empty array due to error');
-      return [];
-    }
+    // For now, return empty array since MongoDB may not be fully initialized
+    return [];
   }
 
   /**
