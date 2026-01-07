@@ -3,22 +3,51 @@ const reservasService = require('../services/reservasService');
 module.exports = {
   createReserva: async (req, res) => {
     try {
-      console.log('DEBUG: createReserva called with body:', req.body);
-      console.log('DEBUG: maestroId type:', typeof req.body.maestroId, 'value:', req.body.maestroId);
+      console.log('🔹 BODY RECIBIDO:', JSON.stringify(req.body, null, 2));
+      console.log('🔹 KEYS:', Object.keys(req.body));
+      
+      // Validar campos requeridos
+      const { estudianteId, maestroId, fecha, hora } = req.body;
+      
+      if (!estudianteId || !maestroId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'estudianteId y maestroId son obligatorios' 
+        });
+      }
+      
+      if (!fecha || !hora) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'fecha y hora son obligatorios' 
+        });
+      }
+      
       const result = await reservasService.create(req.body);
       res.status(201).json(result);
     } catch (err) {
-      console.log('DEBUG: createReserva error:', err.message);
+      console.log('❌ createReserva error:', err.message);
       res.status(err.status || 500).json({ success: false, message: err.message });
     }
   },
 
   getReservasByEstudiante: async (req, res) => {
     try {
-      const estudianteId = req.params.id; // Keep as string
+      console.log('🔹 USER DEL TOKEN:', JSON.stringify(req.user, null, 2));
+      console.log('🔹 PARAMS:', req.params);
+      
+      const estudianteId = req.params.id; // From URL parameter
+      
+      if (!estudianteId) {
+        console.log('❌ No estudianteId provided');
+        return res.json({ success: true, data: [] });
+      }
+      
+      console.log('🔍 Buscando reservas para estudiante:', estudianteId);
       const list = await reservasService.getByEstudiante(estudianteId);
       res.json({ success: true, data: list });
     } catch (err) {
+      console.log('❌ getReservasByEstudiante error:', err.message);
       res.status(500).json({ success: false, message: err.message });
     }
   },
