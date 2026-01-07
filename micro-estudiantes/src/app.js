@@ -11,11 +11,27 @@ const app = express();
 
 app.use(express.json());
 app.use(requestLogger);
+
+// Middleware to ensure MongoDB is connected
+let mongoConnected = false;
+app.use((req, res, next) => {
+  if (req.path === '/health') {
+    return next(); // Health check doesn't require DB
+  }
+  if (!mongoConnected) {
+    return res.status(503).json({ error: 'Database not ready, try again later' });
+  }
+  next();
+});
+
 app.use(optionalAuth);
 applySecurity(app);
 
 connectDB()
-  .then(() => logger.info('Mongo connected'))
+  .then(() => {
+    logger.info('Mongo connected');
+    mongoConnected = true;
+  })
   .catch(e => {
     logger.error(e);
     process.exit(1);
