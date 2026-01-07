@@ -2,6 +2,11 @@ FROM node:18-slim
 
 WORKDIR /usr/src/app
 
+# Install curl for container healthcheck
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends curl ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
+
 # Copy package manifests from the build context (api-gateway/ when built by compose)
 COPY package*.json ./
 
