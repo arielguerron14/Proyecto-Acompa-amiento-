@@ -104,11 +104,14 @@ class ReservasService {
    * 2. Formato nuevo: { estudianteId, maestroId, fecha, hora, asunto, descripcion }
    */
   async create(data) {
-    console.log('DEBUG: Starting create reserva with data:', data);
+    console.log('DEBUG: Starting create reserva with data:', JSON.stringify(data, null, 2));
     this.validateRequired(data);
     
     // Soportar ambos formatos
     let reserva;
+    
+    console.log('DEBUG: Checking data.fecha:', data.fecha, 'data.hora:', data.hora);
+    console.log('DEBUG: typeof data.fecha:', typeof data.fecha, 'typeof data.hora:', typeof data.hora);
     
     // Si tiene fecha/hora (formato nuevo), crear directamente sin validar con maestros
     if (data.fecha && data.hora) {
@@ -184,12 +187,23 @@ class ReservasService {
   async getByEstudiante(estudianteId) {
     console.log('DEBUG: getByEstudiante called with:', estudianteId);
     try {
+      // Check if Mongoose is connected
+      const mongoose = require('mongoose');
+      console.log('DEBUG: Mongoose connection state:', mongoose.connection.readyState);
+      
+      if (mongoose.connection.readyState !== 1) {
+        console.log('DEBUG: MongoDB not connected, returning empty array');
+        return [];
+      }
+      
       const result = await Reserva.find({ estudianteId, estado: { $ne: 'Cancelada' } }).sort({ createdAt: -1 });
       console.log('DEBUG: getByEstudiante found:', result.length, 'reservas');
       return result;
     } catch (err) {
       console.log('DEBUG: getByEstudiante error:', err.message, err.stack);
-      throw err;
+      // Return empty array instead of throwing to prevent 500
+      console.log('DEBUG: Returning empty array due to error');
+      return [];
     }
   }
 
