@@ -31,6 +31,30 @@ connectDB()
 
 app.use('/', reservasRoutes);
 
+// Debug endpoint - check MongoDB connection status
+app.get('/debug/mongo', (req, res) => {
+  const mongoose = require('mongoose');
+  const status = mongoose.connection.readyState;
+  const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  res.json({ 
+    mongodb: states[status] || 'unknown',
+    status: status,
+    host: mongoose.connection.host || 'N/A',
+    name: mongoose.connection.name || 'N/A'
+  });
+});
+
+// Debug endpoint - test query
+app.get('/debug/test-query', async (req, res) => {
+  try {
+    const Reserva = require('./models/Reserva');
+    const count = await Reserva.countDocuments();
+    res.json({ success: true, count: count });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+  }
+});
+
 // Health endpoint for Postgres (optional)
 try {
   const db = require('./config/postgres');
