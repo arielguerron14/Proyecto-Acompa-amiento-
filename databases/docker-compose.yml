@@ -22,7 +22,7 @@ services:
     environment:
       MONGO_INITDB_DATABASE: auth_db
     volumes:
-      - mongo_data_fresh:/data/db
+      - mongo_data_8686:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     # Disabled: command line auth override is not needed for fresh instance
 
