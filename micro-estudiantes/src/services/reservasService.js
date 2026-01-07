@@ -98,88 +98,43 @@ class ReservasService {
   }
 
   /**
-   * Crea una nueva reserva
-   * Soporta dos formatos:
-   * 1. Formato antiguo: { estudianteId, estudianteName, maestroId, dia, inicio, fin, ... }
-   * 2. Formato nuevo: { estudianteId, maestroId, fecha, hora, asunto, descripcion }
+   * Crea una nueva reserva - SIMPLIFICADO
+   * Soporta: { estudianteId, maestroId, fecha, hora, asunto, descripcion }
    */
   async create(data) {
-    console.log('DEBUG: Starting create reserva with data:', JSON.stringify(data, null, 2));
-    this.validateRequired(data);
-    
-    // Soportar ambos formatos
-    let reserva;
-    
-    console.log('DEBUG: Checking data.fecha:', data.fecha, 'data.hora:', data.hora);
-    console.log('DEBUG: typeof data.fecha:', typeof data.fecha, 'typeof data.hora:', typeof data.hora);
-    
-    // Si tiene fecha/hora (formato nuevo), crear directamente sin validar con maestros
-    if (data.fecha && data.hora) {
-      console.log('DEBUG: Formato nuevo (fecha/hora) detectado');
-      reserva = await Reserva.create({
+    try {
+      console.log('DEBUG: create() called with:', data);
+      
+      // Validar campos minimos
+      if (!data.estudianteId || !data.maestroId) {
+        const error = new Error('estudianteId y maestroId son requeridos');
+        error.status = 400;
+        throw error;
+      }
+
+      // Crear directamente sin validaciones complejas
+      const reserva = await Reserva.create({
         estudianteId: data.estudianteId,
-        estudianteName: data.name || data.estudianteName || 'Usuario',
+        estudianteName: data.estudianteName || 'Usuario',
         maestroId: data.maestroId,
         maestroName: data.maestroName || 'Sin asignar',
         materia: data.asunto || data.materia || 'Sin especificar',
         semestre: data.semestre || '2026-01',
         paralelo: data.paralelo || 'A',
-        dia: data.fecha,
-        inicio: data.hora,
-        fin: data.hora,
+        dia: data.fecha || data.dia || new Date().toISOString().split('T')[0],
+        inicio: data.hora || data.inicio || '00:00',
+        fin: data.hora || data.fin || '00:00',
         modalidad: data.modalidad || 'Virtual',
         lugarAtencion: data.lugarAtencion || 'Por definir',
         estado: 'Activa'
       });
-    } else if (data.dia && data.inicio && data.fin) {
-      // Formato antiguo: validar con maestros
-      console.log('DEBUG: Formato antiguo (dia/inicio/fin) detectado');
-      const { estudianteId, estudianteName, maestroId, dia, inicio, fin } = data;
-      
-      // Validar disponibilidad en micro-maestros
-      console.log('DEBUG: Calling getAvailableHorario');
-      const horario = await this.getAvailableHorario(maestroId, dia, inicio, fin);
-      console.log('DEBUG: getAvailableHorario returned:', horario);
 
-      // Validar que no esté duplicada
-      console.log('DEBUG: Calling checkDuplicate');
-      await this.checkDuplicate(maestroId, dia, inicio, fin);
-      console.log('DEBUG: checkDuplicate passed');
-
-      // Crear reserva
-      console.log('DEBUG: Creating reserva in database');
-      reserva = await Reserva.create({
-        estudianteId,
-        estudianteName,
-        maestroId,
-        maestroName: horario.maestroName || data.maestroName || 'Sin nombre',
-        materia: horario.materia,
-        semestre: horario.semestre,
-        paralelo: horario.paralelo,
-        dia,
-        inicio,
-        fin,
-        modalidad: horario.modalidad,
-        lugarAtencion: horario.lugarAtencion
-      });
-    } else {
-      console.log('DEBUG: Neither format detected. data.fecha:', data.fecha, 'data.hora:', data.hora, 'data.dia:', data.dia, 'data.inicio:', data.inicio, 'data.fin:', data.fin);
-      const error = new Error('Se requiere: (fecha, hora) o (dia, inicio, fin). Recibido: ' + JSON.stringify(Object.keys(data)));
-      error.status = 400;
-      throw error;
+      console.log('DEBUG: Reserva created successfully:', reserva._id);
+      return { success: true, data: reserva };
+    } catch (err) {
+      console.error('DEBUG: Error in create():', err.message);
+      throw err;
     }
-    
-    console.log('DEBUG: Reserva created:', reserva._id);
-
-    // Notificar a reportes (ignorar errores)
-    try {
-      await this.notifyReportes(reserva);
-    } catch (e) {
-      console.log('DEBUG: Error notificando reportes (ignorado):', e.message);
-    }
-
-    console.log('DEBUG: Returning reserva');
-    return { success: true, data: reserva };
   }
 
   /**
