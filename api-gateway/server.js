@@ -89,10 +89,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// NOTE: Do not apply JSON body parser globally because some proxied routes
-// (e.g., /horarios) should be forwarded raw and may trigger parse errors
-// that prevent the proxy from forwarding the request. We only parse JSON
-// for internal routes (like /auth) that the gateway handles directly.
+// NOTE: Apply JSON body parser globally so all routes get parsed bodies,
+// EXCEPT we skip /horarios which needs raw body handling.
+// The rawBodyForHorarios middleware at the top handles /horarios separately.
+app.use(express.json());
 
 // Health check endpoint (doesn't depend on microservices)
 app.get('/health', (req, res) => {
