@@ -196,7 +196,7 @@ jobs:
       # 6.5 Check and Clean Old Containers
       - name: 🧹 Check and Clean Old Containers
           echo 'Removing old MongoDB volume to force fresh start...'
-          docker volume rm mongo_data_8686 2>/dev/null || true
+          docker volume rm mongo_fresh_volume 2>/dev/null || true
         run: |
           echo "🔍 Checking for existing containers..."
           ssh -i ~/.ssh/aws-key.pem \
