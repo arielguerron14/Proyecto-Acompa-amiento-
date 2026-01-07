@@ -1,0 +1,45 @@
+name: Exec EC2 Start API Gateway (Fixed)
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  SSH_USER: ubuntu
+
+jobs:
+  start-gateway-fixed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Start API Gateway (use project compose file) and verify
+        run: |
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SSH'
+          set -e
+          echo "=== Inspecting target directory ==="
+          cd /opt/microservices/proyecto
+          pwd
+          ls -la docker-compose.api-gateway.yml || true
+
+          echo "=== Attempting to bring up api-gateway using docker-compose file ==="
+          if [ -f docker-compose.api-gateway.yml ]; then
+            docker-compose -f docker-compose.api-gateway.yml up -d api-gateway || true
+          else
+            echo "docker-compose.api-gateway.yml not found"
+          fi
+
+          echo "=== Docker ps (api-gateway) ==="
+          docker ps --filter "name=api-gateway" --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' || true
+
+          echo "=== API Gateway logs (tail 200) ==="
+          docker logs api-gateway --tail 200 || true
+
+          echo "=== API Gateway health ==="
+          curl -sS --fail http://localhost:8080/health || echo "gateway-health-failed"
+          SSH
