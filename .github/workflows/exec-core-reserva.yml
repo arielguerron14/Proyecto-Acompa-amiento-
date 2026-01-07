@@ -1,0 +1,54 @@
+name: Exec EC2 Reserve Test
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  SSH_USER: ubuntu
+
+jobs:
+  run-reserva-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Run reservation test on EC2
+        run: |
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SSH'
+          set -e
+
+          TIMESTAMP=$(date +%s)
+          EMAIL=ec2-probe-$TIMESTAMP@example.com
+          PASSWORD='Test123!'
+
+          echo "=== Registering user: $EMAIL ==="
+          curl -sS -X POST http://localhost:8080/api/auth/register -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"name\":\"Probe User\",\"password\":\"$PASSWORD\"}" -o /tmp/reg.json || true
+          echo "--- register response ---"
+          cat /tmp/reg.json || true
+
+          echo "=== Logging in ==="
+          LOGIN=$(curl -sS -X POST http://localhost:8080/api/auth/login -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}") || true
+          echo "--- login raw ---"
+          echo "$LOGIN"
+
+          TOKEN=$(echo "$LOGIN" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token') or (d.get('data') or {}).get('accessToken') or '')") || true
+          USERID=$(echo "$LOGIN" | python3 -c "import sys,json; d=json.load(sys.stdin); print((d.get('user') or {}).get('userId') or (d.get('data') or {}).get('user',{}).get('_id') or '')") || true
+
+          echo "Token: $TOKEN"
+          echo "UserID: $USERID"
+
+          echo "=== POST /api/estudiantes/reservar ==="
+          curl -v -sS -X POST http://localhost:8080/api/estudiantes/reservar -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d "{\"estudianteId\":\"$USERID\",\"maestroId\":\"maestro123\",\"fecha\":\"2026-01-14\",\"hora\":\"14:00\",\"asunto\":\"probe\",\"descripcion\":\"probe\"}" -o /tmp/resp.json -w "\nHTTP_CODE:%{http_code}\n" || true
+          echo "--- reservar response ---"
+          cat /tmp/resp.json || true
+
+          echo "=== micro-estudiantes logs (last 200 lines) ==="
+          docker logs --tail 200 micro-estudiantes || true
+
+          SSH
