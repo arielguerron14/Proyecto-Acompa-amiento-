@@ -1,0 +1,33 @@
+name: Collect EC2 CORE Logs
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  SSH_USER: ubuntu
+
+jobs:
+  collect-logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Collect container logs
+        run: |
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SSH'
+          set -e
+          echo "=== micro-estudiantes (last 200 lines) ==="
+          docker logs --tail 200 micro-estudiantes || true
+          echo ""
+          echo "=== micro-maestros (last 200 lines) ==="
+          docker logs --tail 200 micro-maestros || true
+          echo ""
+          echo "=== micro-auth (last 200 lines) ==="
+          docker logs --tail 200 micro-auth || true
+          SSH
