@@ -2,7 +2,6 @@ version: "3.8"
 
 services:
   postgres:
-    # image is tagged locally during deploy to use the pushed image
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
@@ -14,19 +13,15 @@ services:
       - "5432:5432"
 
   mongo:
-    # image is tagged locally during deploy to use the pushed image
     image: mongo:6.0
     restart: unless-stopped
     ports:
       - "27017:27017"
-    environment:
-      MONGO_INITDB_DATABASE: auth_db
     volumes:
-      - mongo_data_8686:/data/db
-      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - mongo_fresh_volume:/data/db
+    # No authentication, no init scripts - just pure MongoDB
 
   redis:
-    # image is tagged locally during deploy to use the pushed image
     image: redis:7-alpine
     restart: unless-stopped
     ports:
@@ -36,5 +31,5 @@ services:
 
 volumes:
   postgres_data:
-  mongo_data_8686:
+  mongo_fresh_volume:
   redis_data:
