@@ -25,6 +25,15 @@ jobs:
           echo "=== micro-estudiantes (last 200 lines) ==="
           docker logs --tail 200 micro-estudiantes || true
           echo ""
+          echo "=== filesystem check: /usr/src/app/node_modules ==="
+          ls -la /usr/src/app/node_modules || true
+          echo ""
+          echo "=== filesystem check: /usr/src/shared-auth ==="
+          ls -la /usr/src/shared-auth || true
+          echo ""
+          echo "=== shared-auth package.json (if present) ==="
+          cat /usr/src/app/node_modules/shared-auth/package.json || true
+          echo ""
           echo "=== micro-maestros (last 200 lines) ==="
           docker logs --tail 200 micro-maestros || true
           echo ""
