@@ -19,9 +19,10 @@ services:
     restart: unless-stopped
     ports:
       - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: auth_db
     volumes:
       - mongo_data:/data/db
-    command: mongod --noauth
 
   redis:
     # image is tagged locally during deploy to use the pushed image
