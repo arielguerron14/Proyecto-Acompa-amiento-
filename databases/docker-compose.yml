@@ -22,7 +22,7 @@ services:
     environment:
       MONGO_INITDB_DATABASE: auth_db
     volumes:
-      - mongo_data:/data/db
+      - mongo_data_fresh:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     command: mongod --noauth
 
