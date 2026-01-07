@@ -1,0 +1,29 @@
+name: Exec EC2 Find Compose
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  SSH_USER: ubuntu
+
+jobs:
+  find-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Find docker-compose files and project directories
+        run: |
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SSH'
+          echo "=== Searching for docker-compose files under /home and /opt ==="
+          sudo find /home -maxdepth 4 -type f -name "docker-compose*.yml" -o -name "docker-compose*.yaml" -o -name "docker-compose.yml" -print || true
+          sudo find /opt -maxdepth 4 -type f -name "docker-compose*.yml" -o -name "docker-compose*.yaml" -o -name "docker-compose.yml" -print || true
+          echo "=== Grep for 'api-gateway' in /home and /opt ==="
+          sudo grep -RIn "api-gateway" /home /opt || true
+          SSH
