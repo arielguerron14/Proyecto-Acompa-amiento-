@@ -15,17 +15,8 @@ const horariosRoutes = require('./routes/horariosRoutes');
 
 const app = express();
 
-// Middleware to ensure MongoDB is connected
-let mongoConnected = false;
-app.use((req, res, next) => {
-  if (req.path === '/health') {
-    return next(); // Health check doesn't require DB
-  }
-  if (!mongoConnected) {
-    return res.status(503).json({ error: 'Database not ready, try again later' });
-  }
-  next();
-});
+// Health check endpoint (doesn't require DB)
+app.get('/health', (req, res) => res.json({ service: 'micro-maestros', status: 'ok' }));
 
 // Core middleware
 app.use(express.json());
@@ -37,7 +28,6 @@ applySecurity(app);
 connectDB()
   .then(() => {
     logger.info('Mongo connected');
-    mongoConnected = true;
   })
   .catch(e => {
     logger.error(e);
@@ -46,7 +36,6 @@ connectDB()
 
 // Routes
 app.use('/', horariosRoutes);
-app.get('/health', (req, res) => res.json({ service: 'micro-maestros', status: 'ok' }));
 
 // Error handling
 app.use(notFound);

@@ -12,25 +12,16 @@ const app = express();
 app.use(express.json());
 app.use(requestLogger);
 
-// Middleware to ensure MongoDB is connected
-let mongoConnected = false;
-app.use((req, res, next) => {
-  if (req.path === '/health') {
-    return next(); // Health check doesn't require DB
-  }
-  if (!mongoConnected) {
-    return res.status(503).json({ error: 'Database not ready, try again later' });
-  }
-  next();
-});
+// Health check endpoint (doesn't require DB)
+app.get('/health', (req, res) => res.json({ service: 'micro-estudiantes', status: 'ok' }));
 
 app.use(optionalAuth);
 applySecurity(app);
 
+// Connect to database
 connectDB()
   .then(() => {
     logger.info('Mongo connected');
-    mongoConnected = true;
   })
   .catch(e => {
     logger.error(e);
@@ -38,7 +29,6 @@ connectDB()
   });
 
 app.use('/', reservasRoutes);
-app.get('/health', (req, res) => res.json({ service: 'micro-estudiantes', status: 'ok' }));
 
 // Health endpoint for Postgres (optional)
 try {
