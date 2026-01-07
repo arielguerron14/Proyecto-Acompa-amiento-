@@ -1,0 +1,56 @@
+name: Exec EC2 Probe + Temp JWT for API Gateway
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  SSH_USER: ubuntu
+
+jobs:
+  probe-and-jwt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Probe inside api-gateway and set JWT_SECRET (temporary)
+        run: |
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SSH'
+          set -e
+          echo "=== Inspecting target directory ==="
+          cd /opt/microservices/proyecto
+          echo "=== Ensure container exists ==="
+          docker ps --filter "name=api-gateway" --format 'table {{.Names}}	{{.Image}}	{{.Ports}}' || true
+
+          echo "=== Internal /health probe using node (no curl dependency) ==="
+          docker exec api-gateway node -e "const http=require('http'); http.get('http://localhost:8080/health', res=>{console.log('status',res.statusCode); res.on('data', d=>process.stdout.write(d)); res.on('end', ()=>console.log('\\n--end--'));}).on('error', e=>{console.error('probe-error',e && e.message); process.exit(0);})" || true
+
+          echo "=== Container ENV ==="
+          docker inspect --format '{{json .Config.Env}}' api-gateway || true
+
+          echo "=== Container health state ==="
+          docker inspect --format '{{json .State.Health}}' api-gateway || true
+
+          echo "=== API Gateway logs (tail 200) ==="
+          docker logs --details --tail 200 api-gateway || true
+
+          echo "=== Temporarily set JWT_SECRET and recreate api-gateway ==="
+          # Note: this sets an in-memory env var for the compose invocation only
+          JWT_SECRET='temporary-secret' docker compose -f docker-compose.api-gateway.yml up -d --force-recreate --no-deps api-gateway || true
+
+          echo "=== Wait and re-check ==="
+          sleep 4
+          echo "=== Logs (tail 200) after recreate ==="
+          docker logs --details --tail 200 api-gateway || true
+
+          echo "=== Internal /health probe after setting JWT_SECRET ==="
+          docker exec api-gateway node -e "const http=require('http'); http.get('http://localhost:8080/health', res=>{console.log('status', res.statusCode); res.on('data', d=>process.stdout.write(d)); res.on('end', ()=>console.log('\\n--end--'));}).on('error', e=>{console.error('probe-error',e && e.message); process.exit(0);})" || true
+
+          echo "=== Final container health ==="
+          docker inspect --format '{{json .State.Health}}' api-gateway || true
+          SSH
