@@ -23,6 +23,8 @@ services:
       MONGO_INITDB_DATABASE: auth_db
     volumes:
       - mongo_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: mongod --noauth
 
   redis:
     # image is tagged locally during deploy to use the pushed image
