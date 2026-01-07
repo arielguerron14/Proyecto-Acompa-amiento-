@@ -142,8 +142,22 @@ class ReservasService {
    */
   async getByEstudiante(estudianteId) {
     console.log('DEBUG: getByEstudiante called with:', estudianteId);
-    // For now, return empty array since MongoDB may not be fully initialized
-    return [];
+
+    // Validate input
+    if (!estudianteId || typeof estudianteId !== 'string') {
+      console.warn('getByEstudiante: invalid estudianteId provided');
+      return [];
+    }
+
+    try {
+      const list = await Reserva.find({ estudianteId }).sort({ dia: 1, inicio: 1 });
+      return list || [];
+    } catch (err) {
+      console.error('ERROR: getByEstudiante DB error:', err && err.stack ? err.stack : err);
+      const error = new Error('Error al obtener reservas del estudiante');
+      error.status = 500;
+      throw error;
+    }
   }
 
   /**

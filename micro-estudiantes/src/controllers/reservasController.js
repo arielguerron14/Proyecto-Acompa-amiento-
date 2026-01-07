@@ -42,13 +42,19 @@ module.exports = {
         console.log('❌ No estudianteId provided');
         return res.json({ success: true, data: [] });
       }
+
+      // Validate basic format
+      if (typeof estudianteId !== 'string' || estudianteId.trim() === '') {
+        console.warn('getReservasByEstudiante: invalid estudianteId param');
+        return res.status(400).json({ success: false, message: 'ID de estudiante inválido' });
+      }
       
       console.log('🔍 Buscando reservas para estudiante:', estudianteId);
       const list = await reservasService.getByEstudiante(estudianteId);
       res.json({ success: true, data: list });
     } catch (err) {
-      console.log('❌ getReservasByEstudiante error:', err.message);
-      res.status(500).json({ success: false, message: err.message });
+      console.error('❌ getReservasByEstudiante error:', err && err.stack ? err.stack : err);
+      res.status(err.status || 500).json({ success: false, message: err.message || 'Error al obtener reservas' });
     }
   },
 
