@@ -222,6 +222,29 @@ app.use('/horarios', createProxyMiddleware({
   }
 }));
 
+// Also support /api/horarios for clients that use the /api prefix
+app.use('/api/horarios', createProxyMiddleware({
+  target: maestros,
+  changeOrigin: true,
+  logLevel: 'info',
+  pathRewrite: { '^/api/horarios': '/horarios' },
+  onProxyReq: (proxyReq, req, res) => {
+    if (typeof req.rawBody === 'string' && req.rawBody.length > 0) {
+      console.log('➡️ Forwarding /api/horarios raw body (len=' + req.rawBody.length + ')');
+      try {
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(req.rawBody));
+        proxyReq.write(req.rawBody);
+      } catch (e) {
+        console.error('❌ Failed to write raw body to /api/horarios proxy request:', e.message);
+      }
+    }
+  },
+  onError: (err, req, res) => {
+    console.error(`❌ /api/horarios proxy error: ${err.message}`);
+    res.status(503).json({ success: false, error: 'Horarios service unavailable' });
+  }
+}));
+
 // Maestros routes proxy
 app.use('/maestros', createProxyMiddleware({
   target: maestros,
@@ -290,12 +313,12 @@ app.get('/test', (req, res) => {
 // 404 handler
 app.use((req, res) => {
   console.log(`⚠️  Not found: ${req.method} ${req.url}`);
-  console.log(`🔗 Registered routes should include: /health, /test, /auth/*, /maestros/*, /estudiantes/*, /horarios/*`);
+  console.log(`🔗 Registered routes should include: /health, /test, /auth/*, /maestros/*, /estudiantes/*, /horarios/*, /api/horarios`);
   res.status(404).json({ 
     error: 'Endpoint not found',
     path: req.url,
     method: req.method,
-    hint: 'Did you mean /auth/register, /auth/login, /maestros/*, /estudiantes/*, or /horarios/*?'
+    hint: 'Did you mean /auth/register, /auth/login, /maestros/*, /estudiantes/*, /horarios/* or /api/horarios?'
   });
 });
 
