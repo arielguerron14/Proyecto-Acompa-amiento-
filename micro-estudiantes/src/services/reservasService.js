@@ -182,7 +182,15 @@ class ReservasService {
    * Obtiene reservas por estudiante
    */
   async getByEstudiante(estudianteId) {
-    return Reserva.find({ estudianteId, estado: { $ne: 'Cancelada' } }).sort({ createdAt: -1 });
+    console.log('DEBUG: getByEstudiante called with:', estudianteId);
+    try {
+      const result = await Reserva.find({ estudianteId, estado: { $ne: 'Cancelada' } }).sort({ createdAt: -1 });
+      console.log('DEBUG: getByEstudiante found:', result.length, 'reservas');
+      return result;
+    } catch (err) {
+      console.log('DEBUG: getByEstudiante error:', err.message, err.stack);
+      throw err;
+    }
   }
 
   /**
