@@ -58,10 +58,13 @@ jobs:
               ports:
                 - "3000:3000"
               environment:
-                NODE_ENV: production
+                NODE_ENV: development
                 PORT: 3000
-                MONGO_URL: mongodb://172.31.79.193:27017/acompanamiento
-                POSTGRES_URL: postgresql://postgres:example@172.31.79.193:5432/acompanamiento
+                DB_HOST: 172.31.79.193
+                DB_PORT: 27017
+                DB_NAME: auth_db
+                MONGO_URI: mongodb://172.31.79.193:27017/auth_db
+                JWT_SECRET: ${JWT_SECRET:-default-secret}
                 REDIS_URL: redis://172.31.79.193:6379
               restart: unless-stopped
               networks:
