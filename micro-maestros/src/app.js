@@ -4,13 +4,8 @@ const { connectDB } = require('./database');
 const { applySecurity } = require('./middlewares/security');
 const { requestLogger, logger } = require('./middlewares/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
-let optionalAuth;
-try {
-  optionalAuth = require('/usr/src/shared-auth/src/middlewares/authMiddleware').optionalAuth;
-} catch (e) {
-  // Fallback to local path when running outside container
-  optionalAuth = require('../../shared-auth/src/middlewares/authMiddleware').optionalAuth;
-}
+// Import auth middleware from shared package (works both locally and in containers)
+const { optionalAuth } = require('shared-auth');
 const horariosRoutes = require('./routes/horariosRoutes');
 
 const app = express();
