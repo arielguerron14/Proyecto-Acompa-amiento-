@@ -21,11 +21,12 @@ applySecurity(app);
 // Connect to database
 connectDB()
   .then(() => {
-    logger.info('Mongo connected');
+    logger.info('✅ Mongo connected successfully');
   })
   .catch(e => {
-    logger.error(e);
-    process.exit(1);
+    logger.error('❌ MongoDB connection failed (will retry):', e.message);
+    // Don't exit - let the app run anyway and try to reconnect later
+    // process.exit(1);
   });
 
 app.use('/', reservasRoutes);
