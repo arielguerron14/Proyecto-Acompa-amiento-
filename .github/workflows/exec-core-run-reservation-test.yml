@@ -1,0 +1,71 @@
+name: Exec EC2 Reservation E2E Test
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  SSH_USER: ubuntu
+
+jobs:
+  run-reserva:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Run E2E reservation test on EC2
+        run: |
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SSH'
+          set -e
+          echo "=== Running reservation E2E test on host ==="
+          timestamp=$(date +%s)
+          EMAIL="test.reserva.$timestamp@example.com"
+          PASSWORD='Test123!'
+          NAME='Test Reserva'
+
+          echo "Registering user: $EMAIL"
+          REGISTER=$(curl -sS -X POST http://localhost:8080/api/auth/register -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"name\":\"$NAME\"}") || true
+          echo "Register response: $REGISTER"
+
+          echo "Logging in user"
+          LOGIN=$(curl -sS -X POST http://localhost:8080/api/auth/login -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}") || true
+          echo "Login response: $LOGIN"
+          TOKEN=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))") || true
+          echo "Token length: ${#TOKEN}"
+
+          if [ -z "$TOKEN" ]; then
+            echo "ERROR: token not found; aborting"
+            exit 2
+          fi
+
+          echo "Creating reservation (authenticated)"
+          RES_BODY=$(cat <<-JSON
+          {
+            "fecha": "$(date -u -d '+1 day' --iso-8601=seconds)",
+            "asunto": "Test Reserva E2E",
+            "descripcion": "Reserva creada por workflow"
+          }
+          JSON
+          )
+
+          CREATE=$(curl -sS -X POST http://localhost:8080/api/estudiantes/reservar -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$RES_BODY") || true
+          echo "Create reservation response: $CREATE"
+
+          echo "Fetching reservas for user"
+          # Get userId from REGISTER or LOGIN response (prefer login.user.userId or register.user.userId)
+          USERID=$(echo "$REGISTER" | python3 -c "import sys,json; print(json.load(sys.stdin).get('user',{}).get('userId','') )" ) || true
+          if [ -z "$USERID" ]; then
+            USERID=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('user',{}).get('userId','') )" ) || true
+          fi
+          echo "UserId: $USERID"
+
+          GETRES=$(curl -sS -X GET "http://localhost:8080/api/estudiantes/reservas/estudiante/$USERID" -H "Authorization: Bearer $TOKEN") || true
+          echo "GET reservas response: $GETRES"
+
+          echo "=== Done ==="
+          SSH
