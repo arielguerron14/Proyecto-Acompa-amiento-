@@ -24,7 +24,7 @@ services:
     volumes:
       - mongo_data_fresh:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-    command: mongod --noauth
+    # Disabled: command line auth override is not needed for fresh instance
 
   redis:
     # image is tagged locally during deploy to use the pushed image
