@@ -179,6 +179,13 @@ try {
       res.status(503).json({ success: false, error: 'Auth service unavailable' });
     }
   }));
+
+  // Debug endpoint for MongoDB status
+  app.use('/debug/mongo-status', createProxyMiddleware({
+    target: auth,
+    changeOrigin: true,
+    logLevel: 'info'
+  }));
 }
 
 // Horarios routes proxy (to maestros service)

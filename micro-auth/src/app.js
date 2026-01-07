@@ -49,6 +49,15 @@ app.use('/auth', ensureMongoConnected, authRoutes);
 app.get('/health', (req, res) =>
   res.json({ status: 'healthy', service: 'micro-auth', timestamp: new Date().toISOString() })
 );
+app.get('/debug/mongo-status', (req, res) =>
+  res.json({ 
+    mongoConnected, 
+    mongoConnecting, 
+    mongoUri: MONGO_URI,
+    mongoReadyState: mongoose.connection.readyState, // 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
+    timestamp: new Date().toISOString() 
+  })
+);
 app.get('/metrics', metricsRoute);
 
 // Error handling
