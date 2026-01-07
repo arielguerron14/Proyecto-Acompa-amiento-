@@ -27,6 +27,11 @@ jobs:
 
           echo "=== Attempting to bring up api-gateway (docker compose) ==="
           docker compose up -d api-gateway --build || true
+          # If api-gateway container not present, try legacy docker-compose
+          if ! docker ps --format '{{.Names}}' | grep -q '^api-gateway$'; then
+            echo "api-gateway container not found after 'docker compose' attempt; trying 'docker-compose'"
+            docker-compose up -d api-gateway --build || true
+          fi
 
           echo "=== Docker ps ==="
           docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' || true
