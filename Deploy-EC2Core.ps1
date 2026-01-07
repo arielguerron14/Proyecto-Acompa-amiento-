@@ -186,6 +186,7 @@ services:
       NODE_ENV: production
       PORT: 3001
       MONGO_URL: mongodb://admin:mongodb123@172.31.79.193:27017/acompanamiento?authSource=admin
+      MONGO_URI: mongodb://admin:mongodb123@172.31.79.193:27017/acompanamiento?authSource=admin
       POSTGRES_URL: postgresql://postgres:postgres123@172.31.79.193:5432/acompanamiento
       REDIS_URL: redis://:redis123@172.31.79.193:6379
       AUTH_SERVICE: http://172.31.78.183:3000
@@ -210,6 +211,7 @@ services:
       NODE_ENV: production
       PORT: 3002
       MONGO_URL: mongodb://admin:mongodb123@172.31.79.193:27017/acompanamiento?authSource=admin
+      MONGO_URI: mongodb://admin:mongodb123@172.31.79.193:27017/acompanamiento?authSource=admin
       POSTGRES_URL: postgresql://postgres:postgres123@172.31.79.193:5432/acompanamiento
       REDIS_URL: redis://:redis123@172.31.79.193:6379
       AUTH_SERVICE: http://172.31.78.183:3000
