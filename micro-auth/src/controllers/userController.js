@@ -24,6 +24,7 @@ exports.register = async (req, res) => {
     }
 
     // Verificar si el usuario ya existe
+    logger.info(`[userController.register] Checking if user exists: ${email}`);
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(409).json({
@@ -40,7 +41,9 @@ exports.register = async (req, res) => {
       role: role || 'estudiante'
     });
 
+    logger.info(`[userController.register] Attempting to save user: ${email}`);
     await user.save();
+    logger.info(`[userController.register] User saved successfully: ${user._id}`);
 
     // Inicializar sesión con tokenVersion = 0
     await SessionService.setTokenVersion(user._id.toString(), 0);
