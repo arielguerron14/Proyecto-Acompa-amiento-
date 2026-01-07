@@ -27,13 +27,21 @@ jobs:
           EMAIL=ec2-probe-$TIMESTAMP@example.com
           PASSWORD='Test123!'
 
-          echo "=== Registering user: $EMAIL ==="
+          echo "=== Registering user: $EMAIL (try gateway:8080) ==="
           curl -sS -X POST http://localhost:8080/api/auth/register -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"name\":\"Probe User\",\"password\":\"$PASSWORD\"}" -o /tmp/reg.json || true
+          if [ ! -s /tmp/reg.json ]; then
+            echo "Gateway 8080 unreachable or empty response; trying micro-auth on 3000"
+            curl -sS -X POST http://localhost:3000/auth/register -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"name\":\"Probe User\",\"password\":\"$PASSWORD\"}" -o /tmp/reg.json || true
+          fi
           echo "--- register response ---"
           cat /tmp/reg.json || true
 
           echo "=== Logging in ==="
           LOGIN=$(curl -sS -X POST http://localhost:8080/api/auth/login -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}") || true
+          if [ -z "$LOGIN" ]; then
+            echo "Gateway login failed/empty; trying micro-auth on 3000"
+            LOGIN=$(curl -sS -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}") || true
+          fi
           echo "--- login raw ---"
           echo "$LOGIN"
 
@@ -43,8 +51,12 @@ jobs:
           echo "Token: $TOKEN"
           echo "UserID: $USERID"
 
-          echo "=== POST /api/estudiantes/reservar ==="
+          echo "=== POST /api/estudiantes/reservar (gateway:8080 first) ==="
           curl -v -sS -X POST http://localhost:8080/api/estudiantes/reservar -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d "{\"estudianteId\":\"$USERID\",\"maestroId\":\"maestro123\",\"fecha\":\"2026-01-14\",\"hora\":\"14:00\",\"asunto\":\"probe\",\"descripcion\":\"probe\"}" -o /tmp/resp.json -w "\nHTTP_CODE:%{http_code}\n" || true
+          if [ ! -s /tmp/resp.json ]; then
+            echo "Gateway 8080 returned empty; calling micro-estudiantes directly on 3001"
+            curl -v -sS -X POST http://localhost:3001/reservar -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d "{\"estudianteId\":\"$USERID\",\"maestroId\":\"maestro123\",\"fecha\":\"2026-01-14\",\"hora\":\"14:00\",\"asunto\":\"probe\",\"descripcion\":\"probe\"}" -o /tmp/resp.json -w "\nHTTP_CODE:%{http_code}\n" || true
+          fi
           echo "--- reservar response ---"
           cat /tmp/resp.json || true
 
