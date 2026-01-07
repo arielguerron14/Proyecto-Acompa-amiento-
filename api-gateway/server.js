@@ -46,9 +46,23 @@ try {
 
 const app = express();
 
-// Log all requests
+// Basic request logger + timing and client connection events
 app.use((req, res, next) => {
+  req._startTime = Date.now();
   console.log(`📨 ${req.method} ${req.url}`);
+
+  // Log when response finishes normally
+  res.on('finish', () => {
+    const elapsed = Date.now() - req._startTime;
+    console.log(`✅ Response finished: ${req.method} ${req.url} -> ${res.statusCode} (${elapsed}ms)`);
+  });
+
+  // Log if the client connection closes before response finished
+  res.on('close', () => {
+    const elapsed = Date.now() - req._startTime;
+    console.log(`⚠️  Client connection closed early: ${req.method} ${req.url} after ${elapsed}ms`);
+  });
+
   next();
 });
 
@@ -257,15 +271,49 @@ app.use('/maestros', createProxyMiddleware({
   }
 }));
 
-// Estudiantes routes proxy
+// Estudiantes routes proxy (instrumented for request/response lifecycle)
 app.use('/estudiantes', createProxyMiddleware({
   target: estudiantes,
   changeOrigin: true,
-  logLevel: 'info',
+  logLevel: 'debug',
+  proxyTimeout: 30000,
+  timeout: 30000,
   pathRewrite: { '^/estudiantes': '' },
+  onProxyReq: (proxyReq, req, res) => {
+    try {
+      req._proxyStart = Date.now();
+      console.log(`➡️ [estudiantes] Proxying request to ${proxyReq.getHeader('host')}${proxyReq.path} ${req.method}`);
+      if (req.body && Object.keys(req.body).length > 0 && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
+        const bodyStr = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyStr));
+        proxyReq.write(bodyStr);
+        console.log(`   ✍️ Wrote ${Buffer.byteLength(bodyStr)} bytes of JSON body to proxy request`);
+      }
+    } catch (e) {
+      console.error('❌ Error in onProxyReq [estudiantes]:', e && e.message ? e.message : e);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    try {
+      console.log(`⬅️ [estudiantes] Backend responded: ${proxyRes.statusCode}`);
+      let bytes = 0;
+      proxyRes.on('data', chunk => { bytes += chunk.length; });
+      proxyRes.on('end', () => {
+        const took = Date.now() - (req._proxyStart || req._startTime);
+        console.log(`🔁 [estudiantes] Completed proxy response: ${proxyRes.statusCode} (${bytes} bytes) in ${took}ms`);
+      });
+    } catch (e) {
+      console.error('❌ Error in onProxyRes [estudiantes]:', e && e.message ? e.message : e);
+    }
+  },
   onError: (err, req, res) => {
-    console.error(`❌ Estudiantes proxy error: ${err.message}`);
-    res.status(503).json({ success: false, error: 'Estudiantes service unavailable' });
+    console.error(`❌ Estudiantes proxy error: ${err && err.message ? err.message : err}`);
+    if (!res.headersSent) {
+      res.status(504).json({ success: false, error: 'Estudiantes service unavailable (proxy error)' });
+    } else {
+      console.error('❌ Headers already sent when proxy error occurred');
+    }
   }
 }));
 
@@ -273,11 +321,45 @@ app.use('/estudiantes', createProxyMiddleware({
 app.use('/api/estudiantes', createProxyMiddleware({
   target: estudiantes,
   changeOrigin: true,
-  logLevel: 'info',
+  logLevel: 'debug',
+  proxyTimeout: 30000,
+  timeout: 30000,
   pathRewrite: { '^/api/estudiantes': '' },
+  onProxyReq: (proxyReq, req, res) => {
+    try {
+      req._proxyStart = Date.now();
+      console.log(`➡️ [/api/estudiantes] Proxying request to ${proxyReq.getHeader('host')}${proxyReq.path} ${req.method}`);
+      if (req.body && Object.keys(req.body).length > 0 && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
+        const bodyStr = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyStr));
+        proxyReq.write(bodyStr);
+        console.log(`   ✍️ Wrote ${Buffer.byteLength(bodyStr)} bytes of JSON body to proxy request`);
+      }
+    } catch (e) {
+      console.error('❌ Error in onProxyReq [/api/estudiantes]:', e && e.message ? e.message : e);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    try {
+      console.log(`⬅️ [/api/estudiantes] Backend responded: ${proxyRes.statusCode}`);
+      let bytes = 0;
+      proxyRes.on('data', chunk => { bytes += chunk.length; });
+      proxyRes.on('end', () => {
+        const took = Date.now() - (req._proxyStart || req._startTime);
+        console.log(`🔁 [/api/estudiantes] Completed proxy response: ${proxyRes.statusCode} (${bytes} bytes) in ${took}ms`);
+      });
+    } catch (e) {
+      console.error('❌ Error in onProxyRes [/api/estudiantes]:', e && e.message ? e.message : e);
+    }
+  },
   onError: (err, req, res) => {
-    console.error(`❌ API Estudiantes proxy error: ${err.message}`);
-    res.status(503).json({ success: false, error: 'Estudiantes service unavailable' });
+    console.error(`❌ API Estudiantes proxy error: ${err && err.message ? err.message : err}`);
+    if (!res.headersSent) {
+      res.status(504).json({ success: false, error: 'Estudiantes service unavailable (proxy error)' });
+    } else {
+      console.error('❌ Headers already sent when proxy error occurred');
+    }
   }
 }));
 
