@@ -63,7 +63,7 @@ jobs:
                 DB_HOST: 172.31.79.193
                 DB_PORT: 27017
                 DB_NAME: auth_db
-                MONGO_URI: mongodb://172.31.79.193:27017/auth_db
+                MONGO_URI: mongodb://172.31.79.193:27017/auth_db?authSource=admin&retryWrites=false
                 JWT_SECRET: ${JWT_SECRET:-default-secret}
                 REDIS_URL: redis://172.31.79.193:6379
               restart: unless-stopped
