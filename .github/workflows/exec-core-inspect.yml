@@ -1,0 +1,32 @@
+name: Exec EC2 Inspect
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  SSH_USER: ubuntu
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Inspect EC2 Docker
+        run: |
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SSH'
+          echo "=== Docker PS ==="
+          docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' || true
+          echo "\n=== Docker Compose PS (if available) ==="
+          docker compose ps --all || true
+          echo "\n=== Listening ports ==="
+          ss -lntp || true
+          echo "\n=== /etc/hosts ==="
+          cat /etc/hosts || true
+          SSH
