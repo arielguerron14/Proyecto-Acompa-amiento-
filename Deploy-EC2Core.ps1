@@ -237,7 +237,8 @@ echo ""
 
 # Step 7: Start services
 echo -e "${YELLOW}🚀 Step 7: Starting services...${NC}"
-docker-compose up -d 2>&1 | grep -E "Creating|Done|Error" || true
+# Force recreation and rebuild to ensure updated environment variables (e.g. MONGO_URI)
+docker-compose up -d --force-recreate --build 2>&1 | grep -E "Creating|Done|Error" || true
 echo -e "${GREEN}✅ Services started${NC}"
 echo ""
 
