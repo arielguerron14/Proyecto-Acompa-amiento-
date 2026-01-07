@@ -246,6 +246,18 @@ app.use('/estudiantes', createProxyMiddleware({
   }
 }));
 
+// API Estudiantes routes proxy (for /api/estudiantes/... paths)
+app.use('/api/estudiantes', createProxyMiddleware({
+  target: estudiantes,
+  changeOrigin: true,
+  logLevel: 'info',
+  pathRewrite: { '^/api/estudiantes': '' },
+  onError: (err, req, res) => {
+    console.error(`❌ API Estudiantes proxy error: ${err.message}`);
+    res.status(503).json({ success: false, error: 'Estudiantes service unavailable' });
+  }
+}));
+
 // Reportes routes proxy (legacy path)
 app.use('/reportes', createProxyMiddleware({
   target: reportesEst,
