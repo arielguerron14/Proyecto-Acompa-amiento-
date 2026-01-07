@@ -1,0 +1,71 @@
+name: Exec EC2 Reserva Retry
+
+on:
+  workflow_dispatch:
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  SSH_USER: ubuntu
+
+jobs:
+  retry-reserva:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_DB_SSH_PRIVATE_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Retry creating reservation and collect logs
+        run: |
+          ssh -i ~/.ssh/key.pem -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.EC2_CORE_PUBLIC_IP }} << 'SSH'
+          set -euo pipefail
+          echo "=== Retry reservation create with timeout and collect logs ==="
+
+          TIMESTAMP=$(date +%s)
+          EMAIL="test.reserva.retry.$TIMESTAMP@example.com"
+          PASSWORD='Test123!'
+
+          echo "Registering user (if not exists): $EMAIL"
+          REGISTER=$(curl -sS -X POST http://localhost:8080/api/auth/register -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"name\":\"Retry Test\"}" ) || true
+          echo "Register response: $REGISTER"
+
+          echo "Logging in user"
+          LOGIN=$(curl -sS -X POST http://localhost:8080/api/auth/login -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}") || true
+          echo "Login response: $LOGIN"
+          TOKEN=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))") || true
+          echo "Token length: ${#TOKEN}"
+
+          if [ -z "$TOKEN" ]; then
+            echo "ERROR: token not found; will still gather logs"
+          fi
+
+          # Build payload and run POST with a short max-time to avoid long hangs
+          RES_BODY=$(cat <<-JSON
+          {
+            "fecha": "$(date -u -d '+1 day' --iso-8601=seconds)",
+            "asunto": "Retry Test Reserva",
+            "descripcion": "Retry request from workflow"
+          }
+          JSON
+          )
+
+          echo "Running POST /api/estudiantes/reservar with verbose and 15s timeout"
+          if [ -n "$TOKEN" ]; then
+            curl -v --max-time 15 -X POST http://localhost:8080/api/estudiantes/reservar \
+              -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$RES_BODY" 2>&1 || true
+          else
+            echo "Skipping POST: no token"
+          fi
+
+          echo "=== Collecting container logs (api-gateway, micro-estudiantes) ==="
+          docker logs --details --tail 500 api-gateway || true
+          docker logs --details --tail 500 micro-estudiantes || true
+
+          echo "=== Inspecting api-gateway health ==="
+          docker inspect --format '{{json .State.Health}}' api-gateway || true
+
+          echo "=== Done retry ==="
+          SSH
