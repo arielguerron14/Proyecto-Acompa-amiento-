@@ -59,8 +59,15 @@ jobs:
           echo "=== Docker ps (api-gateway) ==="
           docker ps --filter "name=api-gateway" --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' || true
 
-          echo "=== API Gateway logs (tail 200) ==="
-          docker logs api-gateway --tail 200 || true
+          echo "=== API Gateway logs (tail 500) ==="
+          sleep 2
+          docker logs --details --tail 500 api-gateway || true
+
+          echo "=== API Gateway inspect ==="
+          docker inspect api-gateway || true
+
+          echo "=== Listening ports (host) ==="
+          ss -lntp || true
 
           echo "=== API Gateway health ==="
           curl -sS --fail http://localhost:8080/health || echo "gateway-health-failed"
