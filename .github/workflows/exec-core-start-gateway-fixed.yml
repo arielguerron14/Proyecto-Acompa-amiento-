@@ -24,6 +24,8 @@ jobs:
           set -e
           echo "=== Inspecting target directory ==="
           cd /opt/microservices/proyecto
+          echo "=== Updating repository to latest main ==="
+          git pull origin main || true
           pwd
           ls -la docker-compose.api-gateway.yml || true
 
