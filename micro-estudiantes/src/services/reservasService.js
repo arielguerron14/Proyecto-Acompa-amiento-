@@ -5,7 +5,7 @@ const MAESTROS_URL = process.env.MAESTROS_URL || 'http://13.223.196.229:3002';
 const REPORTES_EST_URL = process.env.REPORTES_EST_URL || 'http://100.28.217.159:5003';
 const REPORTES_MAEST_URL = process.env.REPORTES_MAEST_URL || 'http://100.28.217.159:5004';
 
-const REQUIRED_FIELDS = ['estudianteId', 'estudianteName', 'maestroId', 'dia', 'inicio', 'fin'];
+const REQUIRED_FIELDS = ['estudianteId', 'maestroId'];
 
 class ReservasService {
   /**
@@ -99,46 +99,83 @@ class ReservasService {
 
   /**
    * Crea una nueva reserva
+   * Soporta dos formatos:
+   * 1. Formato antiguo: { estudianteId, estudianteName, maestroId, dia, inicio, fin, ... }
+   * 2. Formato nuevo: { estudianteId, maestroId, fecha, hora, asunto, descripcion }
    */
   async create(data) {
     console.log('DEBUG: Starting create reserva with data:', data);
     this.validateRequired(data);
-    const { estudianteId, estudianteName, maestroId, dia, inicio, fin } = data;
-    console.log('DEBUG: Validation passed, maestroId:', maestroId);
+    
+    // Soportar ambos formatos
+    let reserva;
+    
+    // Si tiene fecha/hora (formato nuevo), crear directamente sin validar con maestros
+    if (data.fecha && data.hora) {
+      console.log('DEBUG: Formato nuevo (fecha/hora) detectado');
+      reserva = await Reserva.create({
+        estudianteId: data.estudianteId,
+        estudianteName: data.name || data.estudianteName || 'Usuario',
+        maestroId: data.maestroId,
+        maestroName: data.maestroName || 'Sin asignar',
+        materia: data.asunto || data.materia || 'Sin especificar',
+        semestre: data.semestre || '2026-01',
+        paralelo: data.paralelo || 'A',
+        dia: data.fecha,
+        inicio: data.hora,
+        fin: data.hora,
+        modalidad: data.modalidad || 'Virtual',
+        lugarAtencion: data.lugarAtencion || 'Por definir',
+        estado: 'Activa'
+      });
+    } else if (data.dia && data.inicio && data.fin) {
+      // Formato antiguo: validar con maestros
+      console.log('DEBUG: Formato antiguo (dia/inicio/fin) detectado');
+      const { estudianteId, estudianteName, maestroId, dia, inicio, fin } = data;
+      
+      // Validar disponibilidad en micro-maestros
+      console.log('DEBUG: Calling getAvailableHorario');
+      const horario = await this.getAvailableHorario(maestroId, dia, inicio, fin);
+      console.log('DEBUG: getAvailableHorario returned:', horario);
 
-    // Validar disponibilidad en micro-maestros
-    console.log('DEBUG: Calling getAvailableHorario');
-    const horario = await this.getAvailableHorario(maestroId, dia, inicio, fin);
-    console.log('DEBUG: getAvailableHorario returned:', horario);
+      // Validar que no esté duplicada
+      console.log('DEBUG: Calling checkDuplicate');
+      await this.checkDuplicate(maestroId, dia, inicio, fin);
+      console.log('DEBUG: checkDuplicate passed');
 
-    // Validar que no esté duplicada
-    console.log('DEBUG: Calling checkDuplicate');
-    await this.checkDuplicate(maestroId, dia, inicio, fin);
-    console.log('DEBUG: checkDuplicate passed');
-
-    // Crear reserva
-    console.log('DEBUG: Creating reserva in database');
-    const reserva = await Reserva.create({
-      estudianteId,
-      estudianteName,
-      maestroId,
-      maestroName: horario.maestroName || data.maestroName || 'Sin nombre',
-      materia: horario.materia,
-      semestre: horario.semestre,
-      paralelo: horario.paralelo,
-      dia,
-      inicio,
-      fin,
-      modalidad: horario.modalidad,
-      lugarAtencion: horario.lugarAtencion
-    });
+      // Crear reserva
+      console.log('DEBUG: Creating reserva in database');
+      reserva = await Reserva.create({
+        estudianteId,
+        estudianteName,
+        maestroId,
+        maestroName: horario.maestroName || data.maestroName || 'Sin nombre',
+        materia: horario.materia,
+        semestre: horario.semestre,
+        paralelo: horario.paralelo,
+        dia,
+        inicio,
+        fin,
+        modalidad: horario.modalidad,
+        lugarAtencion: horario.lugarAtencion
+      });
+    } else {
+      const error = new Error('Se requiere: (fecha, hora) o (dia, inicio, fin)');
+      error.status = 400;
+      throw error;
+    }
+    
     console.log('DEBUG: Reserva created:', reserva._id);
 
-    // Notificar a reportes (obligatorio)
-    await this.notifyReportes(reserva);
+    // Notificar a reportes (ignorar errores)
+    try {
+      await this.notifyReportes(reserva);
+    } catch (e) {
+      console.log('DEBUG: Error notificando reportes (ignorado):', e.message);
+    }
 
     console.log('DEBUG: Returning reserva');
-    return reserva;
+    return { success: true, data: reserva };
   }
 
   /**

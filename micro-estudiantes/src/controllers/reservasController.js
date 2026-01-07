@@ -5,11 +5,11 @@ module.exports = {
     try {
       console.log('DEBUG: createReserva called with body:', req.body);
       console.log('DEBUG: maestroId type:', typeof req.body.maestroId, 'value:', req.body.maestroId);
-      const reserva = await reservasService.create(req.body);
-      res.status(201).json(reserva);
+      const result = await reservasService.create(req.body);
+      res.status(201).json(result);
     } catch (err) {
       console.log('DEBUG: createReserva error:', err.message);
-      res.status(err.status || 500).json({ message: err.message });
+      res.status(err.status || 500).json({ success: false, message: err.message });
     }
   },
 
@@ -17,9 +17,9 @@ module.exports = {
     try {
       const estudianteId = req.params.id; // Keep as string
       const list = await reservasService.getByEstudiante(estudianteId);
-      res.json(list);
+      res.json({ success: true, data: list });
     } catch (err) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ success: false, message: err.message });
     }
   },
 
