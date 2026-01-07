@@ -1,3 +1,5 @@
+
+# Trivial change to force workflow refresh (2026-01-07)
 name: Exec EC2 Reserva Controlled Test
 
 on:
