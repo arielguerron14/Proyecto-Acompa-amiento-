@@ -52,11 +52,12 @@ else
   git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git proyecto
 fi
 
-echo "🏗️ Building Docker images..."
+echo "🏗️ Building Docker images (no cache, verbose)..."
 cd proyecto
-docker build -f micro-auth/Dockerfile -t micro-auth:latest . --quiet
-docker build -f micro-estudiantes/Dockerfile -t micro-estudiantes:latest . --quiet
-docker build -f micro-maestros/Dockerfile -t micro-maestros:latest . --quiet
+docker image rm micro-auth:latest micro-estudiantes:latest micro-maestros:latest 2>/dev/null || true
+docker build -f micro-auth/Dockerfile -t micro-auth:latest . --no-cache
+docker build -f micro-estudiantes/Dockerfile -t micro-estudiantes:latest . --no-cache
+docker build -f micro-maestros/Dockerfile -t micro-maestros:latest . --no-cache
 
 cd /opt/microservices
 

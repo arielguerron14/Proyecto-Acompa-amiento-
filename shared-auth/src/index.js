@@ -3,12 +3,12 @@
 
 module.exports = {
   // Services
-  AuthService: require('./src/services/authService'),
+  AuthService: require('./services/authService'),
 
   // Middleware & decorators
-  ...require('./src/middlewares/authMiddleware'),
+  ...require('./middlewares/authMiddleware'),
 
   // Constants
-  ROLES: require('./src/constants/roles').ROLES,
-  ROLE_PERMISSIONS: require('./src/constants/roles').ROLE_PERMISSIONS,
+  ROLES: require('./constants/roles').ROLES,
+  ROLE_PERMISSIONS: require('./constants/roles').ROLE_PERMISSIONS,
 };

@@ -134,16 +134,19 @@ echo ""
 # Step 5: Build Docker images
 echo -e "${YELLOW}🏗️  Step 5: Building Docker images...${NC}"
 
-echo -e "${YELLOW}  → Building micro-auth...${NC}"
-docker build -t micro-auth:latest ./micro-auth --quiet 2>&1 | tail -1
+echo -e "${YELLOW}  → Building micro-auth (no cache, verbose)...${NC}"
+docker image rm micro-auth:latest 2>/dev/null || true
+docker build -t micro-auth:latest ./micro-auth --no-cache
 echo -e "${GREEN}  ✅ micro-auth built${NC}"
 
-echo -e "${YELLOW}  → Building micro-estudiantes...${NC}"
-docker build -t micro-estudiantes:latest ./micro-estudiantes --quiet 2>&1 | tail -1
+echo -e "${YELLOW}  → Building micro-estudiantes (no cache, verbose)...${NC}"
+docker image rm micro-estudiantes:latest 2>/dev/null || true
+docker build -t micro-estudiantes:latest ./micro-estudiantes --no-cache
 echo -e "${GREEN}  ✅ micro-estudiantes built${NC}"
 
-echo -e "${YELLOW}  → Building micro-maestros...${NC}"
-docker build -t micro-maestros:latest ./micro-maestros --quiet 2>&1 | tail -1
+echo -e "${YELLOW}  → Building micro-maestros (no cache, verbose)...${NC}"
+docker image rm micro-maestros:latest 2>/dev/null || true
+docker build -t micro-maestros:latest ./micro-maestros --no-cache
 echo -e "${GREEN}  ✅ micro-maestros built${NC}"
 echo ""
 
