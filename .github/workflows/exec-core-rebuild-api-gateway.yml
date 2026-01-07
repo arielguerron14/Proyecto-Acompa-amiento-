@@ -27,10 +27,10 @@ jobs:
           git pull origin main || true
 
           echo "=== Rebuild api-gateway image ==="
-          docker compose -f docker-compose.api-gateway.yml build --no-cache api-gateway || true
+          docker-compose -f docker-compose.api-gateway.yml build --no-cache api-gateway || true
 
           echo "=== Restart api-gateway ==="
-          docker compose -f docker-compose.api-gateway.yml up -d --no-deps --force-recreate api-gateway || true
+          docker-compose -f docker-compose.api-gateway.yml up -d --no-deps --force-recreate api-gateway || true
 
           echo "=== Wait and show logs ==="
           sleep 3
