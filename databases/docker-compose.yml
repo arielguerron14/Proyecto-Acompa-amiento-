@@ -21,6 +21,7 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    command: mongod --noauth
 
   redis:
     # image is tagged locally during deploy to use the pushed image
