@@ -28,6 +28,12 @@ jobs:
           echo "=== filesystem check: /usr/src/app/node_modules ==="
           ls -la /usr/src/app/node_modules || true
           echo ""
+          echo "=== inside container: node_modules for micro-estudiantes ==="
+          docker exec micro-estudiantes ls -la /usr/src/app/node_modules || true
+          echo ""
+          echo "=== inside container: shared-auth package.json ==="
+          docker exec micro-estudiantes cat /usr/src/app/node_modules/shared-auth/package.json || true
+          echo ""
           echo "=== filesystem check: /usr/src/shared-auth ==="
           ls -la /usr/src/shared-auth || true
           echo ""
