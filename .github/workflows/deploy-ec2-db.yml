@@ -14,7 +14,7 @@ on:
           - development
 
 env:
-  EC2_DB_PUBLIC_IP: 3.236.45.128
+  EC2_DB_PUBLIC_IP: 44.222.62.83
   EC2_DB_PRIVATE_IP: 172.31.79.193
   SSH_USER: ubuntu
   AWS_REGION: us-east-1
