@@ -48,5 +48,5 @@ try {
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5002;
-app.listen(PORT, () => logger.info(`micro-estudiantes listening on ${PORT}`));
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, '0.0.0.0', () => logger.info(`micro-estudiantes listening on 0.0.0.0:${PORT}`));

@@ -41,5 +41,5 @@ app.use('/', horariosRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => logger.info(`micro-maestros listening on ${PORT}`));
+const PORT = process.env.PORT || 3002;
+app.listen(PORT, '0.0.0.0', () => logger.info(`micro-maestros listening on 0.0.0.0:${PORT}`));
