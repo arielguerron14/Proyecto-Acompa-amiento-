@@ -1,0 +1,128 @@
+version: '3.8'
+
+# Este archivo es para ser usado en EC2-CORE SOLAMENTE
+# Servicios: api-gateway, micro-auth, micro-estudiantes, micro-maestros
+# Base de datos externa: EC2-DB (172.31.79.193)
+
+services:
+  # ============= Micro-Auth (Puerto 3000) =============
+  micro-auth:
+    image: micro-auth:latest
+    container_name: micro-auth
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGO_URL: mongodb://admin:MyMongoProd123!@172.31.79.193:27017/acompaamiento?authSource=admin
+      JWT_SECRET: prod-jwt-secret-key-minimum-32-chars-change-this
+      LOG_LEVEL: info
+    networks:
+      - core-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============= Micro-Estudiantes (Puerto 3001) =============
+  micro-estudiantes:
+    image: micro-estudiantes:latest
+    container_name: micro-estudiantes
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGO_URL: mongodb://admin:MyMongoProd123!@172.31.79.193:27017/acompaamiento?authSource=admin
+      REPORTES_EST_URL: http://172.31.69.133:5003
+      LOG_LEVEL: info
+    depends_on:
+      - micro-auth
+    networks:
+      - core-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ============= Micro-Maestros (Puerto 3002) =============
+  micro-maestros:
+    image: micro-maestros:latest
+    container_name: micro-maestros
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      MONGO_URL: mongodb://admin:MyMongoProd123!@172.31.79.193:27017/acompaamiento?authSource=admin
+      LOG_LEVEL: info
+    depends_on:
+      - micro-auth
+    networks:
+      - core-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ============= API Gateway (Puerto 8080) =============
+  api-gateway:
+    image: api-gateway:latest
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      
+      # Servicios internos (localhost dentro de EC2-CORE)
+      AUTH_SERVICE: http://micro-auth:3000
+      MAESTROS_SERVICE: http://micro-maestros:3002
+      ESTUDIANTES_SERVICE: http://micro-estudiantes:3001
+      
+      # Servicios externos (IPs privadas de otras instancias)
+      REPORTES_EST_SERVICE: http://172.31.69.133:5003
+      REPORTES_MAEST_SERVICE: http://172.31.69.133:5004
+      NOTIFICACIONES_SERVICE: http://172.31.65.57:5005
+      
+      # JWT & Security
+      JWT_SECRET: prod-jwt-secret-key-minimum-32-chars-change-this
+      
+      # CORS (permitir frontend en EC2-Frontend)
+      CORS_ORIGIN: "http://107.21.124.81,http://172.31.69.203:5500,http://localhost:5500"
+      
+      # Logging
+      LOG_LEVEL: info
+      
+    depends_on:
+      - micro-auth
+      - micro-estudiantes
+      - micro-maestros
+    networks:
+      - core-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  core-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volumes (opcional para persistencia local)
+volumes: {}
