@@ -1,4 +1,6 @@
 const dotenv = require('dotenv');
+const sharedConfig = require('../../../shared-config');
+
 dotenv.config();
 
 // Cargar configuración centralizada de infraestructura
@@ -16,9 +18,11 @@ const getMongoUri = () => {
     return process.env.MONGO_URI;
   }
   
-  // Luego usa infraConfig si está disponible
-  if (infraConfig && infraConfig.PRIVATE.MONGO_URL) {
-    return infraConfig.PRIVATE.MONGO_URL();
+  // Luego usa shared-config (recomendado)
+  try {
+    return sharedConfig.getMongoUrl();
+  } catch (err) {
+    console.warn('⚠️  sharedConfig no disponible:', err.message);
   }
   
   // Fallback: construir desde variables individuales
@@ -32,8 +36,10 @@ const getRedisHost = () => {
   if (process.env.REDIS_HOST) {
     return process.env.REDIS_HOST;
   }
-  if (infraConfig && infraConfig.PRIVATE.REDIS_HOST) {
-    return infraConfig.PRIVATE.REDIS_HOST();
+  try {
+    return sharedConfig.getPrivateIp('db');
+  } catch (err) {
+    console.warn('⚠️  sharedConfig no disponible:', err.message);
   }
   return 'redis';
 };
@@ -42,8 +48,10 @@ const getRedisPort = () => {
   if (process.env.REDIS_PORT) {
     return parseInt(process.env.REDIS_PORT);
   }
-  if (infraConfig && infraConfig.PRIVATE.REDIS_PORT) {
-    return infraConfig.PRIVATE.REDIS_PORT;
+  try {
+    return sharedConfig.getPort('redis');
+  } catch (err) {
+    console.warn('⚠️  sharedConfig no disponible:', err.message);
   }
   return 6379;
 };

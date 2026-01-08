@@ -1,4 +1,6 @@
 const dotenv = require('dotenv');
+const sharedConfig = require('../../../shared-config');
+
 dotenv.config();
 
 // Cargar configuración centralizada de infraestructura
@@ -12,6 +14,13 @@ try {
 
 const getMongoUri = () => {
   if (process.env.MONGO_URI) return process.env.MONGO_URI;
+  
+  try {
+    return sharedConfig.getMongoUrl();
+  } catch (err) {
+    console.warn('⚠️  sharedConfig no disponible:', err.message);
+  }
+  
   if (infraConfig && infraConfig.PRIVATE.MONGO_URL) return infraConfig.PRIVATE.MONGO_URL();
   const host = process.env.DB_HOST || 'mongo';
   const port = process.env.DB_PORT || 27017;
