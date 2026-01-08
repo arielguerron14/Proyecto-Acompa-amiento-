@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Note: NOT using 'set -e' so errors don't cause immediate exit - helps capture logs
 
 echo "🚀 Starting microservice..."
