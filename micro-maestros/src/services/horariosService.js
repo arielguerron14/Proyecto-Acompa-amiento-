@@ -1,5 +1,6 @@
 const Horario = require('../models/Horario');
 const axios = require('axios');
+const sharedConfig = require('../../../shared-config');
 
 // Axios instance with a sensible timeout to avoid hanging when other services are slow/unavailable
 const axiosInstance = axios.create({ timeout: 10000 });
@@ -65,7 +66,7 @@ class HorariosService {
       // Obtener reservas activas del servicio de estudiantes
       let reservasCount = {};
       try {
-        const estudiantesUrl = process.env.ESTUDIANTES_URL || 'http://13.223.196.229:3001';
+        const estudiantesUrl = sharedConfig.getServiceUrl('estudiantes');
         const response = await axiosInstance.get(`${estudiantesUrl}/reservas/maestro/${maestroId}`);
         if (response.data && Array.isArray(response.data)) {
           response.data.forEach(r => {
@@ -213,7 +214,7 @@ class HorariosService {
 
     // Cancelar reservas asociadas
     try {
-      const estudiantesUrl = process.env.ESTUDIANTES_URL || 'http://13.223.196.229:3001';
+      const estudiantesUrl = sharedConfig.getServiceUrl('estudiantes');
       await axiosInstance.post(`${estudiantesUrl}/reservas/cancel-by-horario`, {
         maestroId: deleted.maestroId,
         dia: deleted.dia,
@@ -242,7 +243,7 @@ class HorariosService {
     // Si se está cambiando a inactivo, cancelar reservas
     if (data.estado === 'Inactivo' && horario.estado === 'Activo') {
       try {
-        const estudiantesUrl = process.env.ESTUDIANTES_URL || 'http://13.223.196.229:3001';
+        const estudiantesUrl = sharedConfig.getServiceUrl('estudiantes');
         await axiosInstance.post(`${estudiantesUrl}/reservas/cancel-by-horario`, {
           maestroId: horario.maestroId,
           dia: horario.dia,

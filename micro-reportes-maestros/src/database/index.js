@@ -1,5 +1,6 @@
 const pg = require('../config/postgres');
 const mongoose = require('mongoose');
+const sharedConfig = require('../../../shared-config');
 
 async function connectDB() {
   // Connect to Postgres first (used by some parts of the service)
@@ -7,7 +8,8 @@ async function connectDB() {
 
   // Connect to MongoDB for ReporteMaestro documents
   mongoose.set('bufferTimeoutMS', 30000);
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://172.31.67.47:27017/micro-reportes-maestros', {
+  const mongoUrl = process.env.MONGO_URI || sharedConfig.getMongoUrl();
+  await mongoose.connect(mongoUrl, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     serverSelectionTimeoutMS: 30000,

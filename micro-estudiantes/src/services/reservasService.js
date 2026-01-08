@@ -1,10 +1,12 @@
 const Reserva = require('../models/Reserva');
 const Maestro = require('../models/maestro');
 const httpClient = require('../utils/httpClient');
+const sharedConfig = require('../../../shared-config');
 
-const MAESTROS_URL = process.env.MAESTROS_URL || 'http://13.223.196.229:3002';
-const REPORTES_EST_URL = process.env.REPORTES_EST_URL || 'http://100.28.217.159:5003';
-const REPORTES_MAEST_URL = process.env.REPORTES_MAEST_URL || 'http://100.28.217.159:5004';
+// URLs de servicios centralizadas
+const getMaestrosUrl = () => sharedConfig.getServiceUrl('maestros');
+const getReportesEstUrl = () => sharedConfig.getServiceUrl('reportes-est');
+const getReportesMaestUrl = () => sharedConfig.getServiceUrl('reportes-maest');
 
 const REQUIRED_FIELDS = ['estudianteId', 'maestroId'];
 
@@ -26,13 +28,13 @@ class ReservasService {
    */
   async getAvailableHorario(maestroId, dia, inicio, fin) {
     console.log('DEBUG: getAvailableHorario called with:', { maestroId, dia, inicio, fin });
-    const url = `${MAESTROS_URL}/horarios/maestro/${maestroId}`;
+    const url = `${getMaestrosUrl()}/horarios/maestro/${maestroId}`;
     console.log('DEBUG: Calling URL:', url);
     let response = null;
     try {
       response = await httpClient.getSafe(url);
     } catch (e) {
-      console.log('DEBUG: Error calling MAESTROS_URL:', e.message);
+      console.log('DEBUG: Error calling maestros service:', e.message);
     }
     console.log('DEBUG: httpClient.getSafe returned:', response ? 'response' : 'null');
 
@@ -114,8 +116,8 @@ class ReservasService {
     };
 
     // Fire and forget (no esperamos respuestas)
-    await httpClient.postSafe(`${REPORTES_EST_URL}/registrar`, estPayload);
-    await httpClient.postSafe(`${REPORTES_MAEST_URL}/registrar`, maestPayload);
+    await httpClient.postSafe(`${getReportesEstUrl()}/registrar`, estPayload);
+    await httpClient.postSafe(`${getReportesMaestUrl()}/registrar`, maestPayload);
   }
 
   /**
