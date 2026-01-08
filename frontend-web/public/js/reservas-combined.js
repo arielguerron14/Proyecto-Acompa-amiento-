@@ -16,7 +16,7 @@ class ReservasManager {
         this.setupEventListeners();
         await this.loadHorarios();
         await this.loadReservas();
-        this.renderHorarios();
+        this.applyFilters();  // Apply filters after loading both horarios and reservas
         this.renderReservas();
     }
 
@@ -179,6 +179,15 @@ class ReservasManager {
         const filtroDia = document.getElementById('filtro-dia')?.value || '';
 
         let filteredHorarios = [...this.horarios];
+
+        // Excluir horarios que ya están reservados (activos)
+        const activeReservedSlots = this.reservas
+            .filter(r => r.estado === 'Activa')
+            .map(r => `${r.maestroId}|${r.dia}|${r.inicio}`);
+        
+        filteredHorarios = filteredHorarios.filter(h => 
+            !activeReservedSlots.includes(`${h.maestroId}|${h.dia}|${h.inicio}`)
+        );
 
         if (filtroSemestre) {
             filteredHorarios = filteredHorarios.filter(h => h.semestre == filtroSemestre);
