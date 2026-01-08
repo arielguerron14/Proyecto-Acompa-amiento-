@@ -17,36 +17,42 @@ module.exports = {
   // IPs PÚBLICAS (para acceso externo)
   // ============================================
   PUBLIC: {
+    // EC2-DB - IP pública
+    DB_IP: process.env.DB_PUBLIC_IP || '44.192.114.31',
+    
+    // EC2-CORE - IP pública
+    CORE_IP: process.env.CORE_PUBLIC_IP || '13.216.12.61',
+
     // API Gateway - IP pública para acceso desde frontend
-    API_GATEWAY_IP: process.env.API_GATEWAY_IP || '100.48.66.29',
+    API_GATEWAY_IP: process.env.API_GATEWAY_IP || '52.71.188.181',
     API_GATEWAY_PORT: process.env.API_GATEWAY_PORT || 8080,
     API_GATEWAY_URL: function() {
       return `http://${this.API_GATEWAY_IP}:${this.API_GATEWAY_PORT}`;
     },
 
     // Frontend - IP pública para acceso desde navegador
-    FRONTEND_IP: process.env.FRONTEND_IP || '44.210.134.93',
-    FRONTEND_PORT: process.env.FRONTEND_PORT || 80,
+    FRONTEND_IP: process.env.FRONTEND_IP || '107.21.124.81',
+    FRONTEND_PORT: process.env.FRONTEND_PORT || 5500,
     FRONTEND_URL: function() {
       return `http://${this.FRONTEND_IP}:${this.FRONTEND_PORT}`;
     },
 
     // Notificaciones - IP pública
-    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '100.28.217.159',
-    NOTIFICACIONES_PORT: process.env.NOTIFICACIONES_PORT || 5006,
+    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '44.192.74.171',
+    NOTIFICACIONES_PORT: process.env.NOTIFICACIONES_PORT || 5005,
     NOTIFICACIONES_URL: function() {
       return `http://${this.NOTIFICACIONES_IP}:${this.NOTIFICACIONES_PORT}`;
     },
 
     // Messaging - IP pública
-    MESSAGING_IP: process.env.MESSAGING_IP || '100.28.217.159',
-    MESSAGING_PORT: process.env.MESSAGING_PORT || 5007,
+    MESSAGING_IP: process.env.MESSAGING_IP || '18.205.26.214',
+    MESSAGING_PORT: process.env.MESSAGING_PORT || 1883,
     MESSAGING_URL: function() {
-      return `http://${this.MESSAGING_IP}:${this.MESSAGING_PORT}`;
+      return `mqtt://${this.MESSAGING_IP}:${this.MESSAGING_PORT}`;
     },
 
     // Reportes - IP pública
-    REPORTES_IP: process.env.REPORTES_IP || '100.28.217.159',
+    REPORTES_IP: process.env.REPORTES_IP || '54.175.62.79',
     REPORTES_ESTUDIANTES_PORT: process.env.REPORTES_ESTUDIANTES_PORT || 5003,
     REPORTES_MAESTROS_PORT: process.env.REPORTES_MAESTROS_PORT || 5004,
     REPORTES_ESTUDIANTES_URL: function() {
@@ -55,30 +61,19 @@ module.exports = {
     REPORTES_MAESTROS_URL: function() {
       return `http://${this.REPORTES_IP}:${this.REPORTES_MAESTROS_PORT}`;
     },
+
+    // Monitoring - IP pública
+    MONITORING_IP: process.env.MONITORING_IP || '54.198.235.28',
+    PROMETHEUS_PORT: process.env.PROMETHEUS_PORT || 9090,
+    GRAFANA_PORT: process.env.GRAFANA_PORT || 3000,
   },
 
   // ============================================
-  // IPs PRIVADAS (para comunicación interna EC2)
+  // IPs PRIVADAS (para comunicación interna VPC)
   // ============================================
   PRIVATE: {
-    // Core Microservices - IP privada dentro de EC2
-    CORE_IP: process.env.CORE_IP || '13.223.196.229',
-    AUTH_PORT: process.env.AUTH_PORT || 3000,
-    ESTUDIANTES_PORT: process.env.ESTUDIANTES_PORT || 3001,
-    MAESTROS_PORT: process.env.MAESTROS_PORT || 3002,
-
-    AUTH_URL: function() {
-      return `http://${this.CORE_IP}:${this.AUTH_PORT}`;
-    },
-    ESTUDIANTES_URL: function() {
-      return `http://${this.CORE_IP}:${this.ESTUDIANTES_PORT}`;
-    },
-    MAESTROS_URL: function() {
-      return `http://${this.CORE_IP}:${this.MAESTROS_PORT}`;
-    },
-
-    // Database - IP privada (EC2-DB private IP within VPC)
-    DB_IP: process.env.DB_IP || '172.31.79.193',
+    // EC2-DB - IP privada dentro de VPC
+    DB_IP: process.env.DB_PRIVATE_IP || '172.31.79.193',
     MONGO_PORT: process.env.MONGO_PORT || 27017,
     POSTGRES_PORT: process.env.POSTGRES_PORT || 5432,
     REDIS_PORT: process.env.REDIS_PORT || 6379,
@@ -92,8 +87,81 @@ module.exports = {
     POSTGRES_HOST: function() {
       return this.DB_IP;
     },
+    POSTGRES_URL: function() {
+      return `postgresql://${this.DB_IP}:${this.POSTGRES_PORT}`;
+    },
     REDIS_HOST: function() {
       return this.DB_IP;
+    },
+
+    // EC2-CORE - IP privada dentro de VPC
+    CORE_IP: process.env.CORE_PRIVATE_IP || '172.31.78.183',
+    AUTH_PORT: process.env.AUTH_PORT || 3000,
+    ESTUDIANTES_PORT: process.env.ESTUDIANTES_PORT || 3001,
+    MAESTROS_PORT: process.env.MAESTROS_PORT || 3002,
+    GATEWAY_PORT: process.env.GATEWAY_PORT || 8080,
+
+    AUTH_URL: function() {
+      return `http://${this.CORE_IP}:${this.AUTH_PORT}`;
+    },
+    ESTUDIANTES_URL: function() {
+      return `http://${this.CORE_IP}:${this.ESTUDIANTES_PORT}`;
+    },
+    MAESTROS_URL: function() {
+      return `http://${this.CORE_IP}:${this.MAESTROS_PORT}`;
+    },
+    GATEWAY_URL: function() {
+      return `http://${this.CORE_IP}:${this.GATEWAY_PORT}`;
+    },
+
+    // EC2-Reportes - IP privada dentro de VPC
+    REPORTES_IP: process.env.REPORTES_PRIVATE_IP || '172.31.69.133',
+    REPORTES_ESTUDIANTES_PORT: process.env.REPORTES_ESTUDIANTES_PORT || 5003,
+    REPORTES_MAESTROS_PORT: process.env.REPORTES_MAESTROS_PORT || 5004,
+    REPORTES_EST_URL: function() {
+      return `http://${this.REPORTES_IP}:${this.REPORTES_ESTUDIANTES_PORT}`;
+    },
+    REPORTES_MAEST_URL: function() {
+      return `http://${this.REPORTES_IP}:${this.REPORTES_MAESTROS_PORT}`;
+    },
+
+    // EC2-Notificaciones - IP privada dentro de VPC
+    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_PRIVATE_IP || '172.31.65.57',
+    NOTIFICACIONES_PORT: process.env.NOTIFICACIONES_PORT || 5005,
+    NOTIFICACIONES_URL: function() {
+      return `http://${this.NOTIFICACIONES_IP}:${this.NOTIFICACIONES_PORT}`;
+    },
+
+    // EC2-Messaging - IP privada dentro de VPC
+    MESSAGING_IP: process.env.MESSAGING_PRIVATE_IP || '172.31.73.6',
+    MESSAGING_PORT: process.env.MESSAGING_PORT || 1883,
+    MESSAGING_URL: function() {
+      return `mqtt://${this.MESSAGING_IP}:${this.MESSAGING_PORT}`;
+    },
+
+    // EC2-API-Gateway Replica - IP privada dentro de VPC
+    API_GATEWAY_REPLICA_IP: process.env.API_GATEWAY_REPLICA_PRIVATE_IP || '172.31.76.105',
+    API_GATEWAY_REPLICA_PORT: process.env.API_GATEWAY_REPLICA_PORT || 8080,
+    API_GATEWAY_REPLICA_URL: function() {
+      return `http://${this.API_GATEWAY_REPLICA_IP}:${this.API_GATEWAY_REPLICA_PORT}`;
+    },
+
+    // EC2-Frontend - IP privada dentro de VPC
+    FRONTEND_PRIVATE_IP: process.env.FRONTEND_PRIVATE_IP || '172.31.69.203',
+    FRONTEND_PRIVATE_PORT: process.env.FRONTEND_PRIVATE_PORT || 5500,
+    FRONTEND_PRIVATE_URL: function() {
+      return `http://${this.FRONTEND_PRIVATE_IP}:${this.FRONTEND_PRIVATE_PORT}`;
+    },
+
+    // EC2-Monitoring - IP privada dentro de VPC
+    MONITORING_IP: process.env.MONITORING_PRIVATE_IP || '172.31.71.151',
+    PROMETHEUS_PORT: process.env.PROMETHEUS_PORT || 9090,
+    GRAFANA_PORT: process.env.GRAFANA_PORT || 3000,
+    PROMETHEUS_URL: function() {
+      return `http://${this.MONITORING_IP}:${this.PROMETHEUS_PORT}`;
+    },
+    GRAFANA_URL: function() {
+      return `http://${this.MONITORING_IP}:${this.GRAFANA_PORT}`;
     },
   },
 
@@ -126,6 +194,8 @@ module.exports = {
   toEnvVars() {
     return {
       // Public IPs
+      DB_PUBLIC_IP: this.PUBLIC.DB_IP,
+      CORE_PUBLIC_IP: this.PUBLIC.CORE_IP,
       API_GATEWAY_IP: this.PUBLIC.API_GATEWAY_IP,
       API_GATEWAY_PORT: this.PUBLIC.API_GATEWAY_PORT,
       FRONTEND_IP: this.PUBLIC.FRONTEND_IP,
@@ -137,13 +207,25 @@ module.exports = {
       REPORTES_IP: this.PUBLIC.REPORTES_IP,
       REPORTES_ESTUDIANTES_PORT: this.PUBLIC.REPORTES_ESTUDIANTES_PORT,
       REPORTES_MAESTROS_PORT: this.PUBLIC.REPORTES_MAESTROS_PORT,
+      MONITORING_IP: this.PUBLIC.MONITORING_IP,
+      PROMETHEUS_PORT: this.PUBLIC.PROMETHEUS_PORT,
+      GRAFANA_PORT: this.PUBLIC.GRAFANA_PORT,
 
       // Private IPs
-      CORE_IP: this.PRIVATE.CORE_IP,
+      DB_PRIVATE_IP: this.PRIVATE.DB_IP,
+      CORE_PRIVATE_IP: this.PRIVATE.CORE_IP,
+      REPORTES_PRIVATE_IP: this.PRIVATE.REPORTES_IP,
+      NOTIFICACIONES_PRIVATE_IP: this.PRIVATE.NOTIFICACIONES_IP,
+      MESSAGING_PRIVATE_IP: this.PRIVATE.MESSAGING_IP,
+      API_GATEWAY_REPLICA_PRIVATE_IP: this.PRIVATE.API_GATEWAY_REPLICA_IP,
+      FRONTEND_PRIVATE_IP: this.PRIVATE.FRONTEND_PRIVATE_IP,
+      MONITORING_PRIVATE_IP: this.PRIVATE.MONITORING_IP,
+
+      // Ports
       AUTH_PORT: this.PRIVATE.AUTH_PORT,
       ESTUDIANTES_PORT: this.PRIVATE.ESTUDIANTES_PORT,
       MAESTROS_PORT: this.PRIVATE.MAESTROS_PORT,
-      DB_IP: this.PRIVATE.DB_IP,
+      GATEWAY_PORT: this.PRIVATE.GATEWAY_PORT,
       MONGO_PORT: this.PRIVATE.MONGO_PORT,
       POSTGRES_PORT: this.PRIVATE.POSTGRES_PORT,
       REDIS_PORT: this.PRIVATE.REDIS_PORT,
@@ -153,13 +235,22 @@ module.exports = {
       DB_POSTGRES_PASSWORD: this.CREDENTIALS.DB_POSTGRES_PASSWORD,
       DB_POSTGRES_DB: this.CREDENTIALS.DB_POSTGRES_DB,
 
-      // URLs
-      MONGO_URI: this.PRIVATE.MONGO_URL(),
+      // URLs (Private - for inter-service communication)
+      MONGO_URL: this.PRIVATE.MONGO_URL(),
+      POSTGRES_URL: this.PRIVATE.POSTGRES_URL(),
       AUTH_SERVICE: this.PRIVATE.AUTH_URL(),
       ESTUDIANTES_SERVICE: this.PRIVATE.ESTUDIANTES_URL(),
       MAESTROS_SERVICE: this.PRIVATE.MAESTROS_URL(),
-      API_GATEWAY_URL: this.PUBLIC.API_GATEWAY_URL(),
-      FRONTEND_URL: this.PUBLIC.FRONTEND_URL(),
+      GATEWAY_URL: this.PRIVATE.GATEWAY_URL(),
+      REPORTES_EST_URL: this.PRIVATE.REPORTES_EST_URL(),
+      REPORTES_MAEST_URL: this.PRIVATE.REPORTES_MAEST_URL(),
+      NOTIFICACIONES_URL: this.PRIVATE.NOTIFICACIONES_URL(),
+      MESSAGING_URL: this.PRIVATE.MESSAGING_URL(),
+
+      // URLs (Public - for external access)
+      API_GATEWAY_PUBLIC_URL: this.PUBLIC.API_GATEWAY_URL(),
+      FRONTEND_PUBLIC_URL: this.PUBLIC.FRONTEND_URL(),
+      REPORTING_PUBLIC_URL: this.PUBLIC.REPORTES_ESTUDIANTES_URL(),
     };
   },
 

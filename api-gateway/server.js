@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const sharedConfig = require('../shared-config');
 
 // Global error handler for unhandled exceptions
 process.on('uncaughtException', (err) => {
@@ -26,22 +27,41 @@ console.log('Attempting to load configuration...');
 
 let config = {};
 try {
-  config = require('./src/config');
-  console.log('✅ Config loaded successfully');
-  console.log('AUTH_SERVICE:', config.AUTH_SERVICE);
-  console.log('ESTUDIANTES_SERVICE:', config.ESTUDIANTES_SERVICE);
-  console.log('MAESTROS_SERVICE:', config.MAESTROS_SERVICE);
+  // Intentar cargar config centralizada primero
+  config = sharedConfig.getConfig();
+  console.log('✅ Configuración centralizada cargada');
+  console.log('AUTH_SERVICE:', sharedConfig.getServiceUrl('auth'));
+  console.log('ESTUDIANTES_SERVICE:', sharedConfig.getServiceUrl('estudiantes'));
+  console.log('MAESTROS_SERVICE:', sharedConfig.getServiceUrl('maestros'));
+  
+  // Mapear a variables conocidas
+  config.AUTH_SERVICE = sharedConfig.getServiceUrl('auth');
+  config.ESTUDIANTES_SERVICE = sharedConfig.getServiceUrl('estudiantes');
+  config.MAESTROS_SERVICE = sharedConfig.getServiceUrl('maestros');
+  config.REPORTES_EST_SERVICE = sharedConfig.getServiceUrl('reportes-est');
+  config.REPORTES_MAEST_SERVICE = sharedConfig.getServiceUrl('reportes-maest');
+  config.NOTIFICACIONES_SERVICE = sharedConfig.getServiceUrl('notificaciones');
+  config.PORT = process.env.PORT || sharedConfig.getPort('gateway') || 8080;
 } catch (e) {
-  console.error('❌ Failed to load config:', e.message);
-  console.error('Stack:', e.stack);
-  // Use sensible defaults
-  config = {
-    AUTH_SERVICE: process.env.AUTH_SERVICE || 'http://localhost:3000',
-    ESTUDIANTES_SERVICE: process.env.ESTUDIANTES_SERVICE || 'http://localhost:3001',
-    MAESTROS_SERVICE: process.env.MAESTROS_SERVICE || 'http://localhost:3002',
-    PORT: process.env.PORT || 8080,
-  };
-  console.log('⚠️  Using fallback config:', JSON.stringify(config, null, 2));
+  console.warn('⚠️  Error cargando config centralizada:', e.message);
+  // Fallback a config local
+  try {
+    const localConfig = require('./src/config');
+    config = localConfig;
+    console.log('✅ Config local cargada');
+  } catch (e2) {
+    console.error('❌ Error cargando config local:', e2.message);
+    config = {
+      AUTH_SERVICE: process.env.AUTH_SERVICE || 'http://localhost:3000',
+      ESTUDIANTES_SERVICE: process.env.ESTUDIANTES_SERVICE || 'http://localhost:3001',
+      MAESTROS_SERVICE: process.env.MAESTROS_SERVICE || 'http://localhost:3002',
+      REPORTES_EST_SERVICE: process.env.REPORTES_EST_SERVICE || 'http://localhost:5003',
+      REPORTES_MAEST_SERVICE: process.env.REPORTES_MAEST_SERVICE || 'http://localhost:5004',
+      NOTIFICACIONES_SERVICE: process.env.NOTIFICACIONES_SERVICE || 'http://localhost:5005',
+      PORT: process.env.PORT || 8080,
+    };
+    console.log('⚠️  Usando config por defecto (localhost)');
+  }
 }
 
 const app = express();
