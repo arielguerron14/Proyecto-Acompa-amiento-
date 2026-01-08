@@ -389,14 +389,26 @@ class ReservasManager {
             });
 
             if (response.ok) {
+                const newReserva = await response.json();
                 authManager.showMessage('Reserva creada exitosamente', 'success');
+                
+                // Optimistic update: add the new reservation to the list immediately
+                if (newReserva && newReserva._id) {
+                    this.reservas.push(newReserva);
+                }
+                
                 if (this.selectedHorario && this.selectedHorario._id) {
                     this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
                     this.applyFilters();
                 }
                 this.closeModal();
-                await this.loadReservas(true);
                 this.renderReservas();
+                
+                // Reload in background to sync with server
+                setTimeout(() => {
+                    this.loadReservas(true).then(() => this.renderReservas());
+                }, 500);
+                
                 await dashboardManager.refresh();
             } else if (response.status === 409) {
                 authManager.showMessage('Este horario ya fue reservado por otro estudiante', 'error');
@@ -577,17 +589,30 @@ class ReservasManager {
             });
 
             if (response.ok) {
-                alert('Reserva cancelada exitosamente');
-                await this.loadReservas(true);
+                const updatedReserva = await response.json();
+                
+                // Optimistic update: update the reservation in the list immediately
+                const index = this.reservas.findIndex(r => r._id === id);
+                if (index !== -1) {
+                    this.reservas[index] = updatedReserva;
+                }
+                
+                authManager.showMessage('Reserva cancelada exitosamente', 'success');
                 this.renderReservas();
+                
+                // Reload in background to sync with server
+                setTimeout(() => {
+                    this.loadReservas(true).then(() => this.renderReservas());
+                }, 500);
+                
                 await dashboardManager.refresh();
             } else {
                 const error = await response.json();
-                alert('Error al cancelar: ' + (error.message || 'Error desconocido'));
+                authManager.showMessage('Error al cancelar: ' + (error.message || 'Error desconocido'), 'error');
             }
         } catch (error) {
             console.error('Error cancelando reserva:', error);
-            alert('Error de conexión al cancelar la reserva');
+            authManager.showMessage('Error de conexión al cancelar la reserva', 'error');
         }
     }
 
