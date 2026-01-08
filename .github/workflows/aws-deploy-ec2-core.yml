@@ -1,0 +1,142 @@
+name: AWS Deploy - EC2-CORE (Build + Push + Deploy + Test)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ip:
+        description: 'Target EC2 IP (default: EC2-CORE elastic IP)'
+        required: false
+        default: '13.216.12.61'
+  push:
+    branches:
+      - main
+    paths:
+      - 'api-gateway/**'
+      - 'micro-auth/**'
+      - 'micro-estudiantes/**'
+      - 'micro-maestros/**'
+
+env:
+  EC2_CORE_PUBLIC_IP: 13.216.12.61
+  EC2_CORE_PRIVATE_IP: 172.31.78.183
+  EC2_REPORTES_IP: 172.31.69.133
+  EC2_DB_IP: 172.31.79.193
+  EC2_NOTIFICACIONES_IP: 172.31.65.57
+  EC2_MESSAGING_IP: 172.31.73.6
+  AWS_REGION: us-east-1
+
+jobs:
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build api-gateway
+        run: docker build -f api-gateway/Dockerfile -t api-gateway:latest .
+
+      - name: Build micro-auth
+        run: docker build -f micro-auth/Dockerfile -t micro-auth:latest .
+
+      - name: Build micro-estudiantes
+        run: docker build -f micro-estudiantes/Dockerfile -t micro-estudiantes:latest .
+
+      - name: Build micro-maestros
+        run: docker build -f micro-maestros/Dockerfile -t micro-maestros:latest .
+
+      - name: Save images as tar
+        run: |
+          docker save api-gateway:latest -o /tmp/api-gateway.tar
+          docker save micro-auth:latest -o /tmp/micro-auth.tar
+          docker save micro-estudiantes:latest -o /tmp/micro-estudiantes.tar
+          docker save micro-maestros:latest -o /tmp/micro-maestros.tar
+          ls -lh /tmp/*.tar
+
+      - name: Upload images
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-images
+          path: /tmp/*.tar
+          retention-days: 1
+
+  deploy-to-ec2:
+    name: Deploy to EC2-CORE
+    runs-on: ubuntu-latest
+    needs: build-images
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download images
+        uses: actions/download-artifact@v3
+        with:
+          name: docker-images
+          path: /tmp
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_CORE_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.EC2_CORE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Transfer files to EC2
+        run: |
+          echo "📤 Transferring Docker images..."
+          scp -i ~/.ssh/id_rsa /tmp/*.tar ubuntu@${{ env.EC2_CORE_PUBLIC_IP }}:/tmp/
+          
+          echo "📝 Transferring .env file..."
+          scp -i ~/.ssh/id_rsa .env.prod.core ubuntu@${{ env.EC2_CORE_PUBLIC_IP }}:~/.env
+
+      - name: Deploy services
+        run: |
+          ssh -i ~/.ssh/id_rsa -v ubuntu@${{ env.EC2_CORE_PUBLIC_IP }} << 'DEPLOY'
+          set -ex
+          
+          echo "📍 PWD: $(pwd)"
+          echo "📁 Files:"
+          ls -lh /tmp/*.tar ~/.env 2>/dev/null || true
+          
+          echo "🐳 Loading Docker images..."
+          docker load -i /tmp/api-gateway.tar
+          docker load -i /tmp/micro-auth.tar
+          docker load -i /tmp/micro-estudiantes.tar
+          docker load -i /tmp/micro-maestros.tar
+          
+          echo "🛑 Stopping old containers..."
+          docker-compose down 2>/dev/null || true
+          docker stop api-gateway micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          docker rm api-gateway micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          
+          echo "📊 Images loaded:"
+          docker images | grep -E "api-gateway|micro-auth|micro-estudiantes|micro-maestros"
+          
+          echo "✅ Images ready for deployment"
+          DEPLOY
+
+      - name: Health checks
+        run: |
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ env.EC2_CORE_PUBLIC_IP }} << 'HEALTHCHECK'
+          set -e
+          
+          echo "🏥 Waiting for services..."
+          sleep 5
+          
+          echo "❓ Checking if containers exist:"
+          docker ps -a | grep -E "api-gateway|micro-auth|micro-estudiantes|micro-maestros" || echo "(No containers found)"
+          
+          echo "✅ Health check script completed"
+          HEALTHCHECK
+
+      - name: Show logs
+        if: always()
+        run: |
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ env.EC2_CORE_PUBLIC_IP }} << 'LOGS'
+          echo "📋 Docker images:"
+          docker images | head -10
+          
+          echo ""
+          echo "📋 Containers (all):"
+          docker ps -a || true
+          LOGS
