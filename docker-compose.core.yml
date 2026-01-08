@@ -1,92 +1,101 @@
 version: '3.8'
-
 services:
-  # Instancia EC2-CORE: Microservicios de núcleo
-  # IPs: Pública 13.216.12.61 | Privada 172.31.78.183
-
-  micro-auth:
-    container_name: micro-auth
-    image: proyecto-acompanamiento:micro-auth
-    build:
-      context: ./micro-auth
-      dockerfile: Dockerfile
+  mongo:
+    image: mongo:6
     ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: development
-      PORT: 3000
-      DB_HOST: 172.31.79.193
-      DB_PORT: 27017
-      DB_NAME: auth_db
-      MONGO_URI: mongodb://172.31.79.193:27017/auth_db
-      JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: redis://172.31.79.193:6379
-    networks:
-      - vpc-network
+      - "27017:27017"
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+    networks:
+      - core-net
 
   micro-estudiantes:
-    container_name: micro-estudiantes
-    image: proyecto-acompanamiento:micro-estudiantes
     build:
       context: ./micro-estudiantes
-      dockerfile: Dockerfile
-    ports:
-      - "3001:3001"
-    environment:
-      NODE_ENV: production
-      PORT: 3001
-      DB_HOST: 172.31.79.193
-      DB_PORT: 27017
-      DB_NAME: estudiantes
-      AUTH_SERVICE: http://172.31.78.183:3000
-      REDIS_URL: redis://172.31.79.193:6379
-    networks:
-      - vpc-network
+    env_file:
+      - ./micro-estudiantes/.env
     depends_on:
-      - micro-auth
+      - mongo
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+    networks:
+      - core-net
 
   micro-maestros:
-    container_name: micro-maestros
-    image: proyecto-acompanamiento:micro-maestros
     build:
-      context: ./micro-maestros
-      dockerfile: Dockerfile
-    ports:
-      - "3002:3002"
-    environment:
-      NODE_ENV: production
-      PORT: 3002
-      DB_HOST: 172.31.79.193
-      DB_PORT: 27017
-      DB_NAME: maestros
-      AUTH_SERVICE: http://172.31.78.183:3000
-      REDIS_URL: redis://172.31.79.193:6379
-    networks:
-      - vpc-network
+      context: .
+      dockerfile: micro-maestros/Dockerfile
+    env_file:
+      - ./micro-maestros/.env
     depends_on:
-      - micro-auth
+      - mongo
+    ports:
+      - "5001:5001"
+      - "3002:3002"
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+    networks:
+      - core-net
 
+  micro-reportes-estudiantes:
+    build:
+      context: .
+      dockerfile: micro-reportes-estudiantes/Dockerfile
+    env_file:
+      - ./micro-reportes-estudiantes/.env
+    depends_on:
+      - mongo
+      - postgres
+    ports:
+      - "5003:5003"
+    restart: unless-stopped
+    networks:
+      - core-net
+
+  micro-reportes-maestros:
+    build:
+      context: .
+      dockerfile: micro-reportes-maestros/Dockerfile
+    env_file:
+      - ./micro-reportes-maestros/.env
+    depends_on:
+      - mongo
+      - postgres
+    ports:
+      - "5004:5004"
+    restart: unless-stopped
+    networks:
+      - core-net
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: acompanamiento
+    ports:
+      - "5432:5432"
+    networks:
+      - core-net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    env_file:
+      - ./api-gateway/.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - micro-estudiantes
+    restart: unless-stopped
+    networks:
+      - core-net
+# Redes compartidas
+
+# Redes compartidas
 networks:
-  vpc-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.18.0.0/16
+  core-net:
+    external: true
+
+volumes:
+  postgres_data:

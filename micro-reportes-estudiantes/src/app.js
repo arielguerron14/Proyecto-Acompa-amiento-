@@ -21,7 +21,7 @@ connectDB()
     process.exit(1);
   });
 
-app.use('/', reportesRoutes);
+app.use('/reportes', reportesRoutes);
 app.get('/health', (req, res) => res.json({ service: 'micro-reportes-estudiantes', status: 'ok' }));
 
 // Health endpoint for Postgres (optional)

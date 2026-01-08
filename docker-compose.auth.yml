@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  micro-auth:
+    build:
+      context: .
+      dockerfile: ./micro-auth/Dockerfile
+    env_file:
+      - ./micro-auth/.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    restart: unless-stopped
+    networks:
+      - core-net
+  mongo:
+    image: mongo:6
+    ports:
+      - "27018:27017"
+    restart: unless-stopped
+    networks:
+      - core-net
+# Redes compartidas
+networks:
+  core-net:
+    external: true

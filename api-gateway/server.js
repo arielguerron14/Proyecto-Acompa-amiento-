@@ -60,53 +60,40 @@ app.use((req, res, next) => {
   // Log if the client connection closes before response finished
   res.on('close', () => {
     const elapsed = Date.now() - req._startTime;
-    console.log(`⚠️  Client connection closed early: ${req.method} ${req.url} after ${elapsed}ms`);
+    // If response already finished, this is a normal close; otherwise it's an early abort
+    if (res.writableEnded || res.headersSent && res.finished) {
+      console.log(`ℹ️  Client connection closed (normal): ${req.method} ${req.url} after ${elapsed}ms`);
+    } else {
+      console.log(`⚠️  Client connection closed early: ${req.method} ${req.url} after ${elapsed}ms`);
+    }
   });
 
   next();
 });
 
-// For /horarios we MUST treat the body as raw bytes and forward exactly as received.
-// Use express.raw() on that path so we don't attempt JSON parsing here.
-const rawBodyForHorarios = express.raw({ type: '*/*', limit: '1mb' });
-app.use('/horarios', rawBodyForHorarios, (req, res, next) => {
-  try {
-    // req.body will be a Buffer when express.raw() is used
-    req.rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
-    if (req.rawBody && req.rawBody.length > 0) {
-      const sample = req.rawBody.length > 200 ? req.rawBody.slice(0, 200) + '... (truncated)' : req.rawBody;
-      console.log(`🔎 Captured raw body for ${req.method} ${req.url}:`, sample);
-      // Detect double-encoded JSON string ("{...}") and unwrap it for forwarding
-      if (req.rawBody.startsWith('"') || req.rawBody.startsWith("'")) {
-        try {
-          const unwrapped = JSON.parse(req.rawBody);
-          if (typeof unwrapped === 'string') {
-            console.log('ℹ️ Detected double-encoded JSON string; unwrapping before forwarding');
-            req.rawBody = unwrapped;
-          }
-        } catch (e) {
-          // ignore parse errors here; we'll forward as-is and let downstream handle it
-        }
-      }
-    }
-  } catch (e) {
-    req.rawBody = '';
-  }
-  next();
-});
+// Para /horarios, usar express.raw() y reenviar el buffer tal cual, sin manipulación extra
+// Eliminar manejo manual de raw body para /horarios. Usar solo express.json() global.
 
 // CORS - Allow all origins
 app.use(cors({
-  origin: '*',
-  credentials: false,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: 'http://localhost:5500',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
-// NOTE: Apply JSON body parser globally so all routes get parsed bodies,
-// EXCEPT we skip /horarios which needs raw body handling.
-// The rawBodyForHorarios middleware at the top handles /horarios separately.
-app.use(express.json());
+// Responder manualmente a OPTIONS con los headers CORS correctos
+app.options('*', cors({
+  origin: 'http://localhost:5500',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+
+// Use express.json() globally (including /horarios). This avoids complex raw handling and
+// matches typical client behavior where Content-Type: application/json is used.
+app.use(express.json({ limit: '1mb', type: 'application/json' }));
 
 // Health check endpoint (doesn't depend on microservices)
 app.get('/health', (req, res) => {
@@ -128,15 +115,17 @@ try {
 }
 
 const getReportesEstUrl = () => {
+  if (process.env.REPORTES_EST_URL) return process.env.REPORTES_EST_URL;
   if (process.env.REPORTES_EST_SERVICE) return process.env.REPORTES_EST_SERVICE;
-  if (infraConfig && infraConfig.PUBLIC.REPORTES_ESTUDIANTES_URL) return infraConfig.PUBLIC.REPORTES_ESTUDIANTES_URL();
-  return 'http://100.28.217.159:5003';
+  if (infraConfig && infraConfig.PUBLIC && infraConfig.PUBLIC.REPORTES_ESTUDIANTES_URL) return infraConfig.PUBLIC.REPORTES_ESTUDIANTES_URL();
+  return 'http://micro-reportes-estudiantes:5003';
 };
 
 const getReportesMaestUrl = () => {
+  if (process.env.REPORTES_MAEST_URL) return process.env.REPORTES_MAEST_URL;
   if (process.env.REPORTES_MAEST_SERVICE) return process.env.REPORTES_MAEST_SERVICE;
-  if (infraConfig && infraConfig.PUBLIC.REPORTES_MAESTROS_URL) return infraConfig.PUBLIC.REPORTES_MAESTROS_URL();
-  return 'http://100.28.217.159:5004';
+  if (infraConfig && infraConfig.PUBLIC && infraConfig.PUBLIC.REPORTES_MAESTROS_URL) return infraConfig.PUBLIC.REPORTES_MAESTROS_URL();
+  return 'http://micro-reportes-maestros:5004';
 };
 
 const auth = AUTH_SERVICE;
@@ -202,33 +191,61 @@ try {
   }));
 }
 
-// Horarios routes proxy (to maestros service)
-// Capture raw body for /horarios so we can log it and forward exactly as received.
-// We buffer the raw body here and then write it into the proxy request in onProxyReq.
-app.use('/horarios', (req, res, next) => {
-  let data = '';
-  req.on('data', chunk => { data += chunk; });
-  req.on('end', () => { req.rawBody = data; next(); });
-  req.on('error', () => { req.rawBody = ''; next(); });
-});
+
 
 app.use('/horarios', createProxyMiddleware({
   target: maestros,
   changeOrigin: true,
   logLevel: 'info',
+  selfHandleResponse: true,
   pathRewrite: { '^/horarios': '/horarios' },
+  proxyTimeout: 20000,
   onProxyReq: (proxyReq, req, res) => {
-    // Write the previously captured raw body into the proxy request so the
-    // maestros service receives the exact bytes sent by the client.
-    if (typeof req.rawBody === 'string' && req.rawBody.length > 0) {
-      console.log('➡️ Forwarding /horarios raw body (len=' + req.rawBody.length + ')');
-      try {
-        proxyReq.setHeader('Content-Length', Buffer.byteLength(req.rawBody));
-        proxyReq.write(req.rawBody);
-      } catch (e) {
-        console.error('❌ Failed to write raw body to proxy request:', e.message);
+    console.log(`[onProxyReq /horarios] method=${req.method} url=${req.url} bodyType=${typeof req.body}`);
+    try {
+      if (["POST", "PUT", "PATCH"].includes(req.method) && req.body) {
+        let bodyBuffer;
+        if (Buffer.isBuffer(req.body)) {
+          bodyBuffer = req.body;
+        } else if (typeof req.body === 'object') {
+          const bodyStr = JSON.stringify(req.body);
+          bodyBuffer = Buffer.from(bodyStr, 'utf8');
+        }
+        if (bodyBuffer && bodyBuffer.length > 0) {
+          proxyReq.setHeader('Content-Type', 'application/json');
+          proxyReq.setHeader('Content-Length', bodyBuffer.length);
+          proxyReq.write(bodyBuffer);
+          // Ensure upstream receives EOF so it can process the request
+          try {
+            proxyReq.end();
+            console.log(`➡️ [horarios] Wrote and ended ${bodyBuffer.length} bytes to proxy request for ${req.method} ${req.url}`);
+          } catch (e) {
+            console.error('❌ Error ending proxyReq [/horarios]:', e && e.message ? e.message : e);
+          }
+        } else {
+          console.log(`➡️ [horarios] No body to forward for ${req.method} ${req.url}`);
+        }
       }
+    } catch (e) {
+      console.error('❌ Error in onProxyReq [/horarios]:', e && e.message ? e.message : e);
     }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log(`[onProxyRes /horarios] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
+    let body = '';
+    proxyRes.on('data', chunk => { body += chunk.toString(); });
+    proxyRes.on('end', () => {
+      console.log(`[onProxyRes /horarios] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
+      try {
+        if (res.headersSent) {
+          console.warn('[onProxyRes /horarios] headers already sent, skipping response send');
+          return;
+        }
+        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
+      } catch (e) {
+        console.error('❌ Error sending proxied response [/horarios]:', e && e.message ? e.message : e);
+      }
+    });
   },
   onError: (err, req, res) => {
     console.error(`❌ Horarios proxy error: ${err.message}`);
@@ -241,21 +258,66 @@ app.use('/api/horarios', createProxyMiddleware({
   target: maestros,
   changeOrigin: true,
   logLevel: 'info',
+  selfHandleResponse: true,
   pathRewrite: { '^/api/horarios': '/horarios' },
+  proxyTimeout: 20000,
   onProxyReq: (proxyReq, req, res) => {
-    if (typeof req.rawBody === 'string' && req.rawBody.length > 0) {
-      console.log('➡️ Forwarding /api/horarios raw body (len=' + req.rawBody.length + ')');
-      try {
-        proxyReq.setHeader('Content-Length', Buffer.byteLength(req.rawBody));
-        proxyReq.write(req.rawBody);
-      } catch (e) {
-        console.error('❌ Failed to write raw body to /api/horarios proxy request:', e.message);
+    console.log(`[onProxyReq /api/horarios] method=${req.method} url=${req.url} bodyType=${typeof req.body}`);
+    try {
+      if (["POST", "PUT", "PATCH"].includes(req.method) && req.body) {
+        let bodyBuffer;
+        if (Buffer.isBuffer(req.body)) {
+          bodyBuffer = req.body;
+        } else if (typeof req.body === 'object') {
+          const bodyStr = JSON.stringify(req.body);
+          bodyBuffer = Buffer.from(bodyStr, 'utf8');
+        }
+        if (bodyBuffer && bodyBuffer.length > 0) {
+          proxyReq.setHeader('Content-Type', 'application/json');
+          proxyReq.setHeader('Content-Length', bodyBuffer.length);
+            proxyReq.write(bodyBuffer);
+            try {
+              proxyReq.end();
+              console.log(`➡️ [/api/horarios] Wrote and ended ${bodyBuffer.length} bytes to proxy request for ${req.method} ${req.url}`);
+            } catch (e) {
+              console.error('❌ Error ending proxyReq [/api/horarios]:', e && e.message ? e.message : e);
+            }
+        } else {
+          console.log(`➡️ [/api/horarios] No body to forward for ${req.method} ${req.url}`);
+        }
       }
+    } catch (e) {
+      console.error('❌ Error in onProxyReq [/api/horarios]:', e && e.message ? e.message : e);
     }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log(`[onProxyRes /api/horarios] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
+    let body = '';
+    proxyRes.on('data', chunk => { body += chunk.toString(); });
+    proxyRes.on('end', () => {
+      console.log(`[onProxyRes /api/horarios] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
+      try {
+        if (res.headersSent) {
+          console.warn('[onProxyRes /api/horarios] headers already sent, skipping response send');
+          return;
+        }
+        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
+      } catch (e) {
+        console.error('❌ Error sending proxied response [/api/horarios]:', e && e.message ? e.message : e);
+      }
+    });
   },
   onError: (err, req, res) => {
     console.error(`❌ /api/horarios proxy error: ${err.message}`);
     res.status(503).json({ success: false, error: 'Horarios service unavailable' });
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    proxyRes.on('aborted', () => {
+      if (!res.headersSent) {
+        res.status(504).json({ message: 'Timeout esperando respuesta de micro-maestros' });
+      }
+    });
+    // Note: aborted will be handled above; other lifecycle logging is in the buffering onProxyRes
   }
 }));
 
@@ -278,6 +340,7 @@ app.use('/estudiantes', createProxyMiddleware({
   logLevel: 'debug',
   proxyTimeout: 30000,
   timeout: 30000,
+  selfHandleResponse: true,
   pathRewrite: { '^/estudiantes': '' },
   onProxyReq: (proxyReq, req, res) => {
     try {
@@ -288,24 +351,38 @@ app.use('/estudiantes', createProxyMiddleware({
         proxyReq.setHeader('Content-Type', 'application/json');
         proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyStr));
         proxyReq.write(bodyStr);
-        console.log(`   ✍️ Wrote ${Buffer.byteLength(bodyStr)} bytes of JSON body to proxy request`);
+        try {
+          proxyReq.end();
+          console.log(`   ✍️ Wrote and ended ${Buffer.byteLength(bodyStr)} bytes of JSON body to proxy request`);
+        } catch (e) {
+          console.error('❌ Error ending proxyReq [estudiantes]:', e && e.message ? e.message : e);
+        }
       }
     } catch (e) {
       console.error('❌ Error in onProxyReq [estudiantes]:', e && e.message ? e.message : e);
     }
   },
   onProxyRes: (proxyRes, req, res) => {
-    try {
-      console.log(`⬅️ [estudiantes] Backend responded: ${proxyRes.statusCode}`);
-      let bytes = 0;
-      proxyRes.on('data', chunk => { bytes += chunk.length; });
-      proxyRes.on('end', () => {
-        const took = Date.now() - (req._proxyStart || req._startTime);
-        console.log(`🔁 [estudiantes] Completed proxy response: ${proxyRes.statusCode} (${bytes} bytes) in ${took}ms`);
-      });
-    } catch (e) {
-      console.error('❌ Error in onProxyRes [estudiantes]:', e && e.message ? e.message : e);
-    }
+    console.log(`[onProxyRes /estudiantes] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
+    let body = '';
+    proxyRes.on('data', chunk => { body += chunk.toString(); });
+    proxyRes.on('end', () => {
+      console.log(`[onProxyRes /estudiantes] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
+      try {
+        if (res.headersSent) {
+          console.warn('[onProxyRes /estudiantes] headers already sent, skipping response send');
+          return;
+        }
+        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
+      } catch (e) {
+        console.error('❌ Error sending proxied response [/estudiantes]:', e && e.message ? e.message : e);
+      }
+    });
+    proxyRes.on('aborted', () => {
+      if (!res.headersSent) {
+        res.status(504).json({ message: 'Timeout esperando respuesta de micro-estudiantes' });
+      }
+    });
   },
   onError: (err, req, res) => {
     console.error(`❌ Estudiantes proxy error: ${err && err.message ? err.message : err}`);
@@ -324,6 +401,7 @@ app.use('/api/estudiantes', createProxyMiddleware({
   logLevel: 'debug',
   proxyTimeout: 30000,
   timeout: 30000,
+  selfHandleResponse: true,
   pathRewrite: { '^/api/estudiantes': '' },
   onProxyReq: (proxyReq, req, res) => {
     try {
@@ -334,24 +412,38 @@ app.use('/api/estudiantes', createProxyMiddleware({
         proxyReq.setHeader('Content-Type', 'application/json');
         proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyStr));
         proxyReq.write(bodyStr);
-        console.log(`   ✍️ Wrote ${Buffer.byteLength(bodyStr)} bytes of JSON body to proxy request`);
+        try {
+          proxyReq.end();
+          console.log(`   ✍️ Wrote and ended ${Buffer.byteLength(bodyStr)} bytes of JSON body to proxy request`);
+        } catch (e) {
+          console.error('❌ Error ending proxyReq [/api/estudiantes]:', e && e.message ? e.message : e);
+        }
       }
     } catch (e) {
       console.error('❌ Error in onProxyReq [/api/estudiantes]:', e && e.message ? e.message : e);
     }
   },
   onProxyRes: (proxyRes, req, res) => {
-    try {
-      console.log(`⬅️ [/api/estudiantes] Backend responded: ${proxyRes.statusCode}`);
-      let bytes = 0;
-      proxyRes.on('data', chunk => { bytes += chunk.length; });
-      proxyRes.on('end', () => {
-        const took = Date.now() - (req._proxyStart || req._startTime);
-        console.log(`🔁 [/api/estudiantes] Completed proxy response: ${proxyRes.statusCode} (${bytes} bytes) in ${took}ms`);
-      });
-    } catch (e) {
-      console.error('❌ Error in onProxyRes [/api/estudiantes]:', e && e.message ? e.message : e);
-    }
+    console.log(`[onProxyRes /api/estudiantes] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
+    let body = '';
+    proxyRes.on('data', chunk => { body += chunk.toString(); });
+    proxyRes.on('end', () => {
+      console.log(`[onProxyRes /api/estudiantes] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
+      try {
+        if (res.headersSent) {
+          console.warn('[onProxyRes /api/estudiantes] headers already sent, skipping response send');
+          return;
+        }
+        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
+      } catch (e) {
+        console.error('❌ Error sending proxied response [/api/estudiantes]:', e && e.message ? e.message : e);
+      }
+    });
+    proxyRes.on('aborted', () => {
+      if (!res.headersSent) {
+        res.status(504).json({ message: 'Timeout esperando respuesta de micro-estudiantes' });
+      }
+    });
   },
   onError: (err, req, res) => {
     console.error(`❌ API Estudiantes proxy error: ${err && err.message ? err.message : err}`);
@@ -368,10 +460,41 @@ app.use('/reportes', createProxyMiddleware({
   target: reportesEst,
   changeOrigin: true,
   logLevel: 'info',
-  pathRewrite: { '^/reportes': '' },
+  selfHandleResponse: true,
+  // No pathRewrite: preserve full path so /reportes/estudiantes/reporte/:id is forwarded as-is
   onError: (err, req, res) => {
     console.error(`❌ Reportes proxy error: ${err.message}`);
-    res.status(503).json({ success: false, error: 'Reportes service unavailable' });
+    if (!res.headersSent) {
+      res.status(503).json({ success: false, error: 'Reportes service unavailable' });
+    } else {
+      console.warn('[Reportes proxy onError] headers already sent, skipping error response');
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log(`[onProxyRes /reportes] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
+    let body = '';
+    proxyRes.on('data', chunk => { body += chunk.toString(); });
+    proxyRes.on('end', () => {
+      console.log(`[onProxyRes /reportes] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
+      try {
+        if (res.headersSent) {
+          console.warn('[onProxyRes /reportes] headers already sent, skipping response send');
+          return;
+        }
+        if (proxyRes.statusCode === 404) {
+          res.status(404).set(proxyRes.headers).send(body);
+        } else {
+          res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
+        }
+      } catch (e) {
+        console.error('❌ Error sending proxied response [/reportes]:', e && e.message ? e.message : e);
+      }
+    });
+    proxyRes.on('aborted', () => {
+      if (!res.headersSent) {
+        res.status(504).json({ message: 'Timeout esperando respuesta de reportes' });
+      }
+    });
   }
 }));
 
@@ -380,10 +503,37 @@ app.use('/api/reportes', createProxyMiddleware({
   target: reportesEst,
   changeOrigin: true,
   logLevel: 'info',
+  selfHandleResponse: true,
   pathRewrite: { '^/api/reportes': '/api/reportes' },
   onError: (err, req, res) => {
     console.error(`❌ API Reportes proxy error: ${err.message}`);
-    res.status(503).json({ success: false, error: 'Reportes service unavailable' });
+    if (!res.headersSent) {
+      res.status(503).json({ success: false, error: 'Reportes service unavailable' });
+    } else {
+      console.warn('[API Reportes proxy onError] headers already sent, skipping error response');
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log(`[onProxyRes /api/reportes] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
+    let body = '';
+    proxyRes.on('data', chunk => { body += chunk.toString(); });
+    proxyRes.on('end', () => {
+      console.log(`[onProxyRes /api/reportes] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
+      try {
+        if (res.headersSent) {
+          console.warn('[onProxyRes /api/reportes] headers already sent, skipping response send');
+          return;
+        }
+        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
+      } catch (e) {
+        console.error('❌ Error sending proxied response [/api/reportes]:', e && e.message ? e.message : e);
+      }
+    });
+    proxyRes.on('aborted', () => {
+      if (!res.headersSent) {
+        res.status(504).json({ message: 'Timeout esperando respuesta de reportes' });
+      }
+    });
   }
 }));
 

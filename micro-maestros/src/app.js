@@ -13,8 +13,13 @@ const app = express();
 // Health check endpoint (doesn't require DB)
 app.get('/health', (req, res) => res.json({ service: 'micro-maestros', status: 'ok' }));
 
-// Core middleware
-app.use(express.json());
+
+
+
+// Use express.json globally for all routes (including /horarios)
+app.use(express.json({ limit: '1mb' }));
+
+// Core middleware para el resto
 app.use(requestLogger);
 app.use(optionalAuth);
 applySecurity(app);
@@ -39,3 +44,15 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, '0.0.0.0', () => logger.info(`micro-maestros listening on 0.0.0.0:${PORT}`));
+
+// Handler global para evitar que el proceso muera por errores no controlados
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+  if (err && err.stack) {
+    console.error('STACKTRACE:', err.stack);
+  }
+  logger.error('UNCAUGHT EXCEPTION:', err.message, err.stack || '');
+});
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('UNHANDLED REJECTION:', reason && reason.message ? reason.message : reason, reason && reason.stack ? reason.stack : '');
+});

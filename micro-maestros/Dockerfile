@@ -13,8 +13,6 @@ RUN echo "[debug] listing /usr/src/shared-auth" && ls -la /usr/src/shared-auth |
 # Copiar configuración centralizada
 COPY infrastructure.config.js /usr/src/
 COPY scripts/ /usr/src/scripts/
-COPY ./docker-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # install dependencies for shared-auth first
 WORKDIR /usr/src/shared-auth
@@ -28,6 +26,12 @@ RUN echo "[debug] app node_modules" && ls -la /usr/src/app/node_modules || true
 RUN echo "[debug] app package.json" && cat /usr/src/app/package.json || true
 
 ENV NODE_ENV=production
-EXPOSE 3002
+EXPOSE 5001
 
+# Copy entrypoint at the end so it's not overwritten by later COPY steps
+COPY ../docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Use custom entrypoint for diagnostics and process management
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["npm", "start"]

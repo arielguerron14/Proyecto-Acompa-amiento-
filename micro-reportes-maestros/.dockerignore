@@ -1,7 +1,14 @@
-node_modules
 npm-debug.log
 Dockerfile
 .dockerignore
+.git
+.env
+logs
+*.log
+node_modules
+npm-debug.log
+# Dockerfile
+# .dockerignore
 .git
 .env
 logs

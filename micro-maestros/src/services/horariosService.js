@@ -2,7 +2,7 @@ const Horario = require('../models/Horario');
 const axios = require('axios');
 
 // Axios instance with a sensible timeout to avoid hanging when other services are slow/unavailable
-const axiosInstance = axios.create({ timeout: 2000 });
+const axiosInstance = axios.create({ timeout: 10000 });
 
 const REQUIRED_FIELDS = ['maestroId', 'maestroName', 'semestre', 'materia', 'paralelo', 'dia', 'inicio', 'fin'];
 
@@ -74,9 +74,14 @@ class HorariosService {
               reservasCount[key] = (reservasCount[key] || 0) + 1;
             }
           });
+        } else {
+          // Si la respuesta es vacía o no es array, simplemente dejar reservasCount vacío
+          reservasCount = {};
         }
       } catch (err) {
         console.error('Error obteniendo reservas:', err.message, err.code || '', err.stack || '');
+        // Si falla la llamada, no romper el endpoint, retornar reservasCount vacío
+        reservasCount = {};
       }
 
       const reportes = {
@@ -133,13 +138,54 @@ class HorariosService {
     };
 
     const timeoutMs = parseInt(process.env.HORARIOS_REPORT_TIMEOUT_MS || '5000', 10);
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => {
-      const err = new Error('Report generation timed out');
-      err.status = 504;
-      reject(err);
-    }, timeoutMs));
-
-    return Promise.race([doGenerate(), timeoutPromise]);
+    return new Promise((resolve) => {
+      let finished = false;
+      const timer = setTimeout(() => {
+        if (!finished) {
+          finished = true;
+          console.error('Error in getHorariosReportes: Report generation timed out');
+          resolve({
+            totalHorasSemana: 0,
+            horasPorMateria: {},
+            horariosPorDia: {},
+            horariosPorModalidad: {},
+            cuposDisponibles: 0,
+            materiasDemanda: {},
+            error: 'timeout'
+          });
+        }
+      }, timeoutMs);
+      doGenerate().then(result => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          resolve(result || {
+            totalHorasSemana: 0,
+            horasPorMateria: {},
+            horariosPorDia: {},
+            horariosPorModalidad: {},
+            cuposDisponibles: 0,
+            materiasDemanda: {},
+            error: 'empty'
+          });
+        }
+      }).catch(err => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          console.error('Error obteniendo reservas:', err.message, err);
+          resolve({
+            totalHorasSemana: 0,
+            horasPorMateria: {},
+            horariosPorDia: {},
+            horariosPorModalidad: {},
+            cuposDisponibles: 0,
+            materiasDemanda: {},
+            error: err.message
+          });
+        }
+      });
+    });
   }
 
   /**

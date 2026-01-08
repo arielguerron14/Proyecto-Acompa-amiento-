@@ -12,7 +12,7 @@ class ReservasManager {
     }
 
     // Cargar reservas del estudiante
-    async loadReservas() {
+    async loadReservas(force = false) {
         try {
             const user = await authManager.getUserData();
             console.log('User data:', user);
@@ -29,11 +29,24 @@ class ReservasManager {
             if (emptyEl) emptyEl.style.display = 'none';
             if (listEl) listEl.style.display = 'none';
 
-            const response = await fetch(`${authManager.baseURL}/estudiantes/reservas/estudiante/${user.id}`, {
-                headers: authManager.getAuthHeaders()
+            // Add cache-busting when force is true to avoid conditional 304 responses
+            let url = `${authManager.baseURL}/estudiantes/reservas/estudiante/${user.id || user.userId}`;
+            if (force) url += `?_ts=${Date.now()}`;
+
+            const response = await fetch(url, {
+                headers: Object.assign({}, authManager.getAuthHeaders()),
+                cache: 'no-store'
             });
 
             console.log('Response status:', response.status);
+            // Treat 304 (Not Modified) as "no changes" and keep current reservas (avoid wiping UI)
+            if (response.status === 304) {
+                console.log('Reservas sin cambios (304), manteniendo lista en memoria');
+                // Ensure UI is updated to reflect current in-memory reservas (avoid stale loading indicator)
+                this.renderReservas();
+                return;
+            }
+
             if (response.ok) {
                 this.reservas = await response.json();
                 console.log('Reservas loaded:', this.reservas);

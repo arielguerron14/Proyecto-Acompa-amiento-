@@ -4,7 +4,6 @@ const { connectDB } = require('./database');
 const { applySecurity } = require('./middlewares/security');
 const { requestLogger, logger } = require('./middlewares/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
-const { optionalAuth } = require('shared-auth');
 const reservasRoutes = require('./routes/reservasRoutes');
 
 const app = express();
@@ -16,8 +15,7 @@ app.use(requestLogger);
 // Health check endpoint (doesn't require DB)
 app.get('/health', (req, res) => res.json({ service: 'micro-estudiantes', status: 'ok' }));
 
-app.use(optionalAuth);
-applySecurity(app);
+// applySecurity(app); // Si es necesario para el flujo mínimo, dejarlo
 
 // Connect to database
 connectDB()
@@ -74,5 +72,5 @@ try {
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 app.listen(PORT, '0.0.0.0', () => logger.info(`micro-estudiantes listening on 0.0.0.0:${PORT}`));

@@ -106,6 +106,9 @@ const horariosPorDia = document.getElementById('horarios-por-dia') || null;
 const horariosPorModalidad = document.getElementById('horarios-por-modalidad') || null;
 const cuposDisponibles = document.getElementById('cupos-disponibles') || null;
 const materiasDemanda = document.getElementById('materias-demanda') || null;
+// Reportes controls
+const btnActualizarReportes = document.getElementById('btn-actualizar-reportes') || null;
+const reportesStatus = document.getElementById('reportes-status') || null;
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
@@ -137,6 +140,12 @@ function setupEventListeners() {
 
   if (guardarBtn) guardarBtn.addEventListener('click', guardarHorario);
   if (cancelarBtn) cancelarBtn.addEventListener('click', cancelarEdicion);
+
+  // Reportes: manual refresh button
+  if (btnActualizarReportes) btnActualizarReportes.addEventListener('click', () => {
+    if (reportesStatus) reportesStatus.textContent = 'Actualizando reportes...';
+    loadReportes(true);
+  });
 
   // Validación en tiempo real
   if (horarioForm) horarioForm.addEventListener('input', validarFormulario);
@@ -188,22 +197,40 @@ async function loadHorarios() {
 async function loadReportes() {
   try {
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!token) {
+      if (reportesStatus) reportesStatus.textContent = 'No hay sesión activa';
+      return;
+    }
 
     const payload = JSON.parse(atob(token.split('.')[1]));
     const maestroId = payload.userId;
 
     const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+    if (reportesStatus) reportesStatus.textContent = 'Cargando reportes...';
     const response = await fetch(`${apiBase}/horarios/reportes/${maestroId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
-    const data = await response.json();
-    if (data.success) {
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (e) {
+      console.error('Error parsing reportes JSON:', e);
+      if (reportesStatus) reportesStatus.textContent = 'Error: respuesta inválida del servidor';
+      return;
+    }
+
+    if (data && data.success) {
       renderReportes(data.reportes);
+      if (reportesStatus) reportesStatus.textContent = `Actualizado ${new Date().toLocaleTimeString()}`;
+      console.log('Reportes cargados:', data.reportes);
+    } else {
+      console.warn('Carga de reportes falló:', data);
+      if (reportesStatus) reportesStatus.textContent = `Error cargando reportes: ${data && data.reportes && data.reportes.error ? data.reportes.error : (data && data.error ? data.error : 'sin detalles')}`;
     }
   } catch (error) {
     console.error('Error cargando reportes:', error);
+    if (reportesStatus) reportesStatus.textContent = `Error de conexión: ${error && error.message ? error.message : error}`;
   }
 }
 
@@ -424,7 +451,7 @@ async function guardarHorario() {
     showError('Error: Materia no válida seleccionada');
     return;
   }
-  
+
   const duracion = calcularDuracion();
 
   const horarioData = {
@@ -443,13 +470,13 @@ async function guardarHorario() {
     observaciones: data.observaciones || ''
   };
 
+  let response = null;
   try {
     const token = localStorage.getItem('token');
     const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
     const url = horarioEditando ? `${apiBase}/horarios/${horarioEditando}` : `${apiBase}/horarios`;
     const method = horarioEditando ? 'PUT' : 'POST';
 
-    // Indicate loading state to user
     if (guardarBtn) {
       guardarBtn.disabled = true;
       guardarBtn.textContent = horarioEditando ? 'Actualizando...' : 'Guardando...';
@@ -459,7 +486,6 @@ async function guardarHorario() {
     console.log('Datos (object):', horarioData);
     console.log('Datos (stringified):', JSON.stringify(horarioData));
 
-    let response, result;
     try {
       response = await fetch(url, {
         method,
@@ -469,37 +495,45 @@ async function guardarHorario() {
         },
         body: JSON.stringify(horarioData)
       });
-
-      console.log('Respuesta recibida:', response.status, response.statusText);
-      // Attempt to parse JSON safely
-      try { result = await response.json(); } catch (e) { result = {}; }
-
-      if (response && response.ok && (result.success || method === 'POST')) {
-        showSuccess(horarioEditando ? 'Horario actualizado' : 'Horario creado');
-        horarioForm.reset();
-        horarioEditando = null;
-        loadHorarios();
-        loadReportes();
-      } else {
-        let errorMsg = (result && (result.message || result.error)) || 'Error al guardar horario';
-        if (response && response.status === 409) {
-          errorMsg = 'Conflicto de horario: Ya existe un horario que se solapa con el horario que intentas crear. Por favor, elige una hora diferente o un día diferente.';
-        }
-        showError(errorMsg);
-      }
     } catch (error) {
-      console.error('Error:', error);
-      showError('Error de conexión');
-    } finally {
-      // Always restore button state so UI doesn't remain bloqueada
-      if (guardarBtn) {
-        guardarBtn.disabled = false;
-        guardarBtn.textContent = horarioEditando ? 'Actualizar Horario' : 'Crear Horario';
+      // Network error (CORS, backend caído, etc)
+      console.error('NetworkError:', error);
+      showError('No se pudo conectar al servidor. Verifica tu conexión o que el backend esté activo.');
+      return;
+    }
+
+    let result = {};
+    let isJson = false;
+    if (response && response.status !== 204 && response.status !== 304) {
+      try {
+        result = await response.json();
+        isJson = true;
+      } catch (e) {
+        result = {};
       }
+    }
+
+    if (response && response.ok && (result.success || method === 'POST')) {
+      showSuccess(horarioEditando ? 'Horario actualizado' : 'Horario creado');
+      horarioForm.reset();
+      horarioEditando = null;
+      loadHorarios();
+      loadReportes();
+    } else {
+      let errorMsg = (isJson && (result.message || result.error)) || 'Error al guardar horario';
+      if (response && response.status === 409) {
+        errorMsg = 'Conflicto de horario: Ya existe un horario que se solapa con el horario que intentas crear. Por favor, elige una hora diferente o un día diferente.';
+      }
+      showError(errorMsg);
     }
   } catch (error) {
     console.error('Error:', error);
     showError('Error de conexión');
+  } finally {
+    if (guardarBtn) {
+      guardarBtn.disabled = false;
+      guardarBtn.textContent = horarioEditando ? 'Actualizar Horario' : 'Crear Horario';
+    }
   }
 }
 

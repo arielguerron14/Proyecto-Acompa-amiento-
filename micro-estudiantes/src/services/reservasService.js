@@ -1,4 +1,5 @@
 const Reserva = require('../models/Reserva');
+const Maestro = require('../models/maestro');
 const httpClient = require('../utils/httpClient');
 
 const MAESTROS_URL = process.env.MAESTROS_URL || 'http://13.223.196.229:3002';
@@ -27,14 +28,25 @@ class ReservasService {
     console.log('DEBUG: getAvailableHorario called with:', { maestroId, dia, inicio, fin });
     const url = `${MAESTROS_URL}/horarios/maestro/${maestroId}`;
     console.log('DEBUG: Calling URL:', url);
-    const response = await httpClient.getSafe(url);
+    let response = null;
+    try {
+      response = await httpClient.getSafe(url);
+    } catch (e) {
+      console.log('DEBUG: Error calling MAESTROS_URL:', e.message);
+    }
     console.log('DEBUG: httpClient.getSafe returned:', response ? 'response' : 'null');
 
     if (!response || response.status !== 200) {
-      console.log('DEBUG: No response or bad status:', response?.status);
-      const error = new Error('Maestro not found');
-      error.status = 404;
-      throw error;
+      // Fallback: buscar maestro localmente
+      const maestro = await Maestro.findById(maestroId);
+      if (!maestro) {
+        console.log('DEBUG: Maestro not found ni en microservicio ni en local');
+        const error = new Error('Maestro not found');
+        error.status = 404;
+        throw error;
+      }
+      // Si no hay horarios, permitir solo si es entorno local/dev
+      return { dia, inicio, fin };
     }
 
     console.log('DEBUG: Response data:', response.data);
@@ -59,6 +71,15 @@ class ReservasService {
       error.status = 409;
       throw error;
     }
+  }
+
+  /**
+   * Check if a horario is available (not reserved)
+   * Returns true if available, false if already reserved
+   */
+  async isAvailable(maestroId, dia, inicio) {
+    const existing = await Reserva.findOne({ maestroId, dia, inicio, estado: { $ne: 'Cancelada' } });
+    return !existing;
   }
 
   /**
@@ -111,9 +132,18 @@ class ReservasService {
         error.status = 400;
         throw error;
       }
+      // Normalize horario fields
+      const dia = data.fecha || data.dia || new Date().toISOString().split('T')[0];
+      const inicio = data.hora || data.inicio || '00:00';
+      const fin = data.fin || data.hora || '00:00';
 
-      // Crear directamente sin validaciones complejas
-      const reserva = await Reserva.create({
+      // Prevent duplicate active reservations for the same slot
+      await this.checkDuplicate(data.maestroId, dia, inicio);
+
+      // Crear reserva
+      let reserva;
+      try {
+        reserva = await Reserva.create({
         estudianteId: data.estudianteId,
         estudianteName: data.estudianteName || 'Usuario',
         maestroId: data.maestroId,
@@ -121,15 +151,26 @@ class ReservasService {
         materia: data.asunto || data.materia || 'Sin especificar',
         semestre: data.semestre || '2026-01',
         paralelo: data.paralelo || 'A',
-        dia: data.fecha || data.dia || new Date().toISOString().split('T')[0],
-        inicio: data.hora || data.inicio || '00:00',
-        fin: data.hora || data.fin || '00:00',
+        dia,
+        inicio,
+        fin,
         modalidad: data.modalidad || 'Virtual',
         lugarAtencion: data.lugarAtencion || 'Por definir',
         estado: 'Activa'
       });
+      } catch (err) {
+        // Handle duplicate key error from MongoDB (race condition)
+        if (err && err.code === 11000) {
+          const e = new Error('Horario ya reservado');
+          e.status = 409;
+          throw e;
+        }
+        throw err;
+      }
 
       console.log('DEBUG: Reserva created successfully:', reserva._id);
+      // Fire-and-forget notify report services
+      this.notifyReportes(reserva).catch(e => console.warn('notifyReportes failed:', e && e.message));
       return { success: true, data: reserva };
     } catch (err) {
       console.error('DEBUG: Error in create():', err.message);

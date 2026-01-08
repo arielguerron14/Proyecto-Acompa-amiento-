@@ -7,19 +7,22 @@ module.exports = {
       console.log('🔹 KEYS:', Object.keys(req.body));
       
       // Validar campos requeridos
-      const { estudianteId, maestroId, fecha, hora } = req.body;
-      
+      // Accept either (fecha + hora) OR (dia + inicio) to support both frontends
+      const { estudianteId, maestroId, fecha, hora, dia, inicio } = req.body;
+
       if (!estudianteId || !maestroId) {
         return res.status(400).json({ 
           success: false, 
           message: 'estudianteId y maestroId son obligatorios' 
         });
       }
-      
-      if (!fecha || !hora) {
+
+      const hasDate = !!(fecha && hora);
+      const hasHorario = !!(dia && inicio);
+      if (!hasDate && !hasHorario) {
         return res.status(400).json({ 
           success: false, 
-          message: 'fecha y hora son obligatorios' 
+          message: 'Se requiere fecha+hora o dia+inicio para crear la reserva' 
         });
       }
       
@@ -40,21 +43,39 @@ module.exports = {
       
       if (!estudianteId) {
         console.log('❌ No estudianteId provided');
-        return res.json({ success: true, data: [] });
+        // Keep API simple for clients: always return an array for list endpoints
+        return res.status(200).json([]);
       }
 
       // Validate basic format
       if (typeof estudianteId !== 'string' || estudianteId.trim() === '') {
         console.warn('getReservasByEstudiante: invalid estudianteId param');
-        return res.status(400).json({ success: false, message: 'ID de estudiante inválido' });
+        return res.status(400).json({ success: false, message: 'ID de estudiante inválido', data: [] });
       }
-      
+
       console.log('🔍 Buscando reservas para estudiante:', estudianteId);
       const list = await reservasService.getByEstudiante(estudianteId);
-      res.json({ success: true, data: list });
+      // Respond with a plain array to match frontend expectations (array or empty array)
+      res.status(200).json(Array.isArray(list) ? list : []);
     } catch (err) {
       console.error('❌ getReservasByEstudiante error:', err && err.stack ? err.stack : err);
       res.status(err.status || 500).json({ success: false, message: err.message || 'Error al obtener reservas' });
+    }
+  },
+
+  // Check availability for a given maestro+dia+inicio
+  checkAvailability: async (req, res) => {
+    try {
+      const { maestroId, dia, inicio } = req.query;
+      if (!maestroId || !dia || !inicio) {
+        return res.status(400).json({ available: false, message: 'maestroId, dia y inicio son requeridos' });
+      }
+
+      const available = await reservasService.isAvailable(maestroId, dia, inicio);
+      return res.status(200).json({ available });
+    } catch (err) {
+      console.error('checkAvailability error:', err && err.stack ? err.stack : err);
+      return res.status(err.status || 500).json({ available: false, message: err.message || 'Error verificando disponibilidad' });
     }
   },
 
@@ -62,9 +83,14 @@ module.exports = {
     try {
       const maestroId = req.params.id; // Keep as string
       const list = await reservasService.getByMaestro(maestroId);
-      res.json(list);
+      // Nunca retornar 304, solo 200 si hay datos o array vacío si error
+      if (Array.isArray(list)) {
+        res.status(200).json(list);
+      } else {
+        res.status(200).json([]);
+      }
     } catch (err) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ error: err.message || 'Error interno' });
     }
   },
 

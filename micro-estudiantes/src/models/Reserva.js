@@ -20,4 +20,11 @@ const ReservaSchema = new Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+// Ensure no active duplicate reservations for same estudiante+maestro+dia+inicio
+// Use a partial unique index so cancelled reservations can be re-created
+ReservaSchema.index(
+  { estudianteId: 1, maestroId: 1, dia: 1, inicio: 1 },
+  { unique: true, partialFilterExpression: { estado: 'Activa' } }
+);
+
 module.exports = mongoose.model('Reserva', ReservaSchema);

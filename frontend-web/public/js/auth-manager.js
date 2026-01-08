@@ -27,9 +27,12 @@ class AuthManager {
       if (!this.token) return null;
       const payload = JSON.parse(atob(this.token.split('.')[1]));
       return {
+        // Provide both `id` and `userId` to be compatible with callers that expect either
+        id: payload.userId || payload.id || null,
         userId: payload.userId || payload.id || null,
         name: payload.name || payload.nombre || 'Usuario',
-        role: payload.role || payload.roles ? payload.roles[0] : payload.role || null
+        // Normalize role: support role or roles array
+        role: (payload.roles && Array.isArray(payload.roles)) ? payload.roles[0] : (payload.role || null)
       };
     } catch (err) {
       console.error('AuthManager.getUserData decode error', err);

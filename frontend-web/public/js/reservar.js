@@ -361,10 +361,29 @@ class ReservarManager {
 
         try {
             const user = await authManager.getUserData();
-            if (!user) return;
+            if (!user) {
+                authManager.showMessage('No se encontró sesión de usuario. Inicia sesión nuevamente.', 'error');
+                return;
+            }
+            // Defensive: support both `id` and `userId` fields from token payload
+            const estudianteId = user.id || user.userId || null;
+            if (!estudianteId) {
+                authManager.showMessage('No se pudo identificar al estudiante. Intenta iniciar sesión de nuevo.', 'error');
+                return;
+            }
+
+            if (!this.selectedHorario || !this.selectedHorario.maestroId) {
+                authManager.showMessage('Horario inválido: falta información del maestro.', 'error');
+                this.isReserving = false;
+                if (confirmarBtn) {
+                    confirmarBtn.disabled = false;
+                    confirmarBtn.textContent = 'Confirmar Reserva';
+                }
+                return;
+            }
 
             const reservaData = {
-                estudianteId: user.id,
+                estudianteId: estudianteId,
                 estudianteName: user.name,
                 maestroId: this.selectedHorario.maestroId,
                 maestroName: this.selectedHorario.maestroName,
@@ -375,6 +394,31 @@ class ReservarManager {
                 semestre: this.selectedHorario.semestre,
                 paralelo: this.selectedHorario.paralelo
             };
+
+            // Debug: log the payload so we can inspect what the client will send
+            console.debug('Reservar: sending reservaData', reservaData);
+
+            // Pre-check availability to provide faster feedback and avoid server 409 when possible
+            try {
+                // Note: availability check is served under the estudiantes proxy at /estudiantes/reservas/check
+                const checkUrl = `${authManager.baseURL}/estudiantes/reservas/check?maestroId=${encodeURIComponent(reservaData.maestroId)}&dia=${encodeURIComponent(reservaData.dia)}&inicio=${encodeURIComponent(reservaData.inicio)}`;
+                const checkRes = await fetch(checkUrl, { headers: authManager.getAuthHeaders() });
+                if (checkRes.ok) {
+                    const j = await checkRes.json();
+                    if (!j.available) {
+                        authManager.showMessage('Lo siento, este horario ya fue reservado. Se actualizará la lista.', 'error');
+                        // Remove from local list and refresh
+                        if (this.selectedHorario && this.selectedHorario._id) {
+                            this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
+                            this.applyFilters();
+                        }
+                        this.closeModal();
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn('Availability check failed, proceeding to reserve (will rely on server validation):', err);
+            }
 
             const response = await fetch(`${authManager.baseURL}/estudiantes/reservar`, {
                 method: 'POST',
@@ -391,7 +435,9 @@ class ReservarManager {
                 }
                 this.closeModal();
                 // Refrescar datos relacionados
-                await reservasManager.refresh();
+                // Force refresh to avoid cached 304 responses
+                await reservasManager.loadReservas(true);
+                reservasManager.renderReservas();
                 await dashboardManager.refresh();
             } else if (response.status === 409) {
                 // Horario ya reservado, remover de la lista
@@ -401,6 +447,10 @@ class ReservarManager {
                     this.applyFilters();
                 }
                 this.closeModal();
+                // Force refresh reservas so UI reflects current state
+                await reservasManager.loadReservas(true);
+                reservasManager.renderReservas();
+                await dashboardManager.refresh();
             } else {
                 const error = await response.json();
                 authManager.showMessage(error.message || 'Error al crear la reserva', 'error');

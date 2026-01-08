@@ -46,13 +46,13 @@ const config = {
     },
     
     REPORTES_ESTUDIANTES: {
-      URL: 'http://172.31.69.133:5003',
+      URL: 'http://micro-reportes-estudiantes:5003',
       ROUTE: '/reportes/estudiantes',
       TIMEOUT: 30000
     },
     
     REPORTES_MAESTROS: {
-      URL: 'http://172.31.69.133:5004',
+      URL: 'http://micro-reportes-maestros:5004',
       ROUTE: '/reportes/maestros',
       TIMEOUT: 30000
     },
