@@ -48,6 +48,10 @@ function createFallbackConfig() {
       MESSAGING_IP: 'localhost',
       API_GATEWAY_REPLICA_IP: 'localhost',
       MONITORING_IP: 'localhost',
+      KAFKA_IP: 'localhost',
+      PROMETHEUS_PRIVATE_IP: 'localhost',
+      GRAFANA_PRIVATE_IP: 'localhost',
+      RABBITMQ_IP: 'localhost',
       AUTH_PORT: 3000,
       ESTUDIANTES_PORT: 3001,
       MAESTROS_PORT: 3002,
@@ -55,6 +59,12 @@ function createFallbackConfig() {
       MONGO_PORT: 27017,
       POSTGRES_PORT: 5432,
       REDIS_PORT: 6379,
+      KAFKA_PORT: 9092,
+      KAFKA_ZOOKEEPER_PORT: 2181,
+      PROMETHEUS_PRIVATE_PORT: 9090,
+      GRAFANA_PRIVATE_PORT: 3000,
+      RABBITMQ_PORT: 5672,
+      RABBITMQ_MANAGEMENT_PORT: 15672,
       MONGO_URL: () => 'mongodb://localhost:27017',
       POSTGRES_URL: () => 'postgresql://localhost:5432',
       AUTH_URL: () => 'http://localhost:3000',
@@ -134,6 +144,11 @@ module.exports = {
       'reportes-maest': privateConfig.REPORTES_MAEST_URL,
       'notificaciones': privateConfig.NOTIFICACIONES_URL,
       'messaging': privateConfig.MESSAGING_URL,
+      'kafka': privateConfig.KAFKA_URL,
+      'prometheus': privateConfig.PROMETHEUS_PRIVATE_URL,
+      'grafana': privateConfig.GRAFANA_PRIVATE_URL,
+      'rabbitmq': privateConfig.RABBITMQ_URL,
+      'rabbitmq-management': privateConfig.RABBITMQ_MANAGEMENT_URL,
     };
 
     if (!serviceMap[serviceName]) {
@@ -158,6 +173,10 @@ module.exports = {
       'api-gateway-replica': config.PRIVATE.API_GATEWAY_REPLICA_IP,
       'frontend': config.PRIVATE.FRONTEND_PRIVATE_IP,
       'monitoring': config.PRIVATE.MONITORING_IP,
+      'kafka': config.PRIVATE.KAFKA_IP,
+      'prometheus': config.PRIVATE.PROMETHEUS_PRIVATE_IP,
+      'grafana': config.PRIVATE.GRAFANA_PRIVATE_IP,
+      'rabbitmq': config.PRIVATE.RABBITMQ_IP,
     };
 
     return ipMap[instanceName] || null;
@@ -177,6 +196,10 @@ module.exports = {
       'messaging': config.PUBLIC.MESSAGING_IP,
       'reportes': config.PUBLIC.REPORTES_IP,
       'monitoring': config.PUBLIC.MONITORING_IP,
+      'kafka': config.PUBLIC.KAFKA_IP,
+      'prometheus': config.PUBLIC.PROMETHEUS_PUBLIC_IP,
+      'grafana': config.PUBLIC.GRAFANA_PUBLIC_IP,
+      'rabbitmq': config.PUBLIC.RABBITMQ_IP,
     };
 
     return ipMap[instanceName] || null;
@@ -204,6 +227,10 @@ module.exports = {
       'messaging': privateConfig.MESSAGING_PORT,
       'prometheus': publicConfig.PROMETHEUS_PORT,
       'grafana': publicConfig.GRAFANA_PORT,
+      'kafka': privateConfig.KAFKA_PORT,
+      'kafka-zookeeper': privateConfig.KAFKA_ZOOKEEPER_PORT,
+      'rabbitmq': privateConfig.RABBITMQ_PORT,
+      'rabbitmq-management': privateConfig.RABBITMQ_MANAGEMENT_PORT,
     };
 
     return portMap[serviceName] || null;
@@ -215,6 +242,78 @@ module.exports = {
   getConfig() {
     return loadInfraConfig();
   },
+
+  // ======================================
+  // NUEVAS INSTANCIAS: Kafka, Prometheus, Grafana, RabbitMQ
+  // ======================================
+
+  /**
+   * Obtener URL de Kafka (Message Broker)
+   */
+  getKafkaUrl() {
+    const config = loadInfraConfig();
+    return config.PRIVATE.KAFKA_URL();
+  },
+
+  /**
+   * Obtener URL de Zookeeper (Kafka coordinator)
+   */
+  getKafkaZookeeperUrl() {
+    const config = loadInfraConfig();
+    return config.PRIVATE.KAFKA_ZOOKEEPER_URL();
+  },
+
+  /**
+   * Obtener URL de Prometheus (Metrics)
+   */
+  getPrometheusUrl() {
+    const config = loadInfraConfig();
+    return config.PRIVATE.PROMETHEUS_PRIVATE_URL();
+  },
+
+  /**
+   * Obtener URL pública de Prometheus
+   */
+  getPrometheusPublicUrl() {
+    const config = loadInfraConfig();
+    return config.PUBLIC.PROMETHEUS_PUBLIC_URL();
+  },
+
+  /**
+   * Obtener URL de Grafana (Dashboards)
+   */
+  getGrafanaUrl() {
+    const config = loadInfraConfig();
+    return config.PRIVATE.GRAFANA_PRIVATE_URL();
+  },
+
+  /**
+   * Obtener URL pública de Grafana
+   */
+  getGrafanaPublicUrl() {
+    const config = loadInfraConfig();
+    return config.PUBLIC.GRAFANA_PUBLIC_URL();
+  },
+
+  /**
+   * Obtener URL de RabbitMQ (Message Queue)
+   */
+  getRabbitMqUrl() {
+    const config = loadInfraConfig();
+    return config.PRIVATE.RABBITMQ_URL();
+  },
+
+  /**
+   * Obtener URL de Management Panel de RabbitMQ
+   */
+  getRabbitMqManagementUrl() {
+    const config = loadInfraConfig();
+    return config.PRIVATE.RABBITMQ_MANAGEMENT_URL();
+  },
+
+  /**
+   * Obtener objeto de configuración completo
+   */
 
   /**
    * Obtener todas las variables de entorno como objeto

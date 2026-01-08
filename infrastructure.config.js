@@ -66,6 +66,38 @@ module.exports = {
     MONITORING_IP: process.env.MONITORING_IP || '54.198.235.28',
     PROMETHEUS_PORT: process.env.PROMETHEUS_PORT || 9090,
     GRAFANA_PORT: process.env.GRAFANA_PORT || 3000,
+
+    // Kafka - IP pública
+    KAFKA_IP: process.env.KAFKA_IP || '52.86.104.42',
+    KAFKA_PORT: process.env.KAFKA_PORT || 9092,
+    KAFKA_URL: function() {
+      return `kafka://${this.KAFKA_IP}:${this.KAFKA_PORT}`;
+    },
+
+    // Prometheus - IP pública
+    PROMETHEUS_PUBLIC_IP: process.env.PROMETHEUS_PUBLIC_IP || '54.198.235.28',
+    PROMETHEUS_PUBLIC_PORT: process.env.PROMETHEUS_PORT || 9090,
+    PROMETHEUS_PUBLIC_URL: function() {
+      return `http://${this.PROMETHEUS_PUBLIC_IP}:${this.PROMETHEUS_PUBLIC_PORT}`;
+    },
+
+    // Grafana - IP pública
+    GRAFANA_PUBLIC_IP: process.env.GRAFANA_PUBLIC_IP || '54.198.235.28',
+    GRAFANA_PUBLIC_PORT: process.env.GRAFANA_PORT || 3000,
+    GRAFANA_PUBLIC_URL: function() {
+      return `http://${this.GRAFANA_PUBLIC_IP}:${this.GRAFANA_PUBLIC_PORT}`;
+    },
+
+    // RabbitMQ - IP pública
+    RABBITMQ_IP: process.env.RABBITMQ_IP || '44.202.235.19',
+    RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
+    RABBITMQ_MANAGEMENT_PORT: process.env.RABBITMQ_MANAGEMENT_PORT || 15672,
+    RABBITMQ_URL: function() {
+      return `amqp://${this.RABBITMQ_IP}:${this.RABBITMQ_PORT}`;
+    },
+    RABBITMQ_MANAGEMENT_URL: function() {
+      return `http://${this.RABBITMQ_IP}:${this.RABBITMQ_MANAGEMENT_PORT}`;
+    },
   },
 
   // ============================================
@@ -163,6 +195,42 @@ module.exports = {
     GRAFANA_URL: function() {
       return `http://${this.MONITORING_IP}:${this.GRAFANA_PORT}`;
     },
+
+    // EC2-Kafka - IP privada dentro de VPC
+    KAFKA_IP: process.env.KAFKA_PRIVATE_IP || '172.31.80.45',
+    KAFKA_PORT: process.env.KAFKA_PORT || 9092,
+    KAFKA_ZOOKEEPER_PORT: process.env.KAFKA_ZOOKEEPER_PORT || 2181,
+    KAFKA_URL: function() {
+      return `kafka://${this.KAFKA_IP}:${this.KAFKA_PORT}`;
+    },
+    KAFKA_ZOOKEEPER_URL: function() {
+      return `${this.KAFKA_IP}:${this.KAFKA_ZOOKEEPER_PORT}`;
+    },
+
+    // EC2-Prometheus - IP privada dentro de VPC (puede estar en MONITORING)
+    PROMETHEUS_PRIVATE_IP: process.env.PROMETHEUS_PRIVATE_IP || '172.31.71.151',
+    PROMETHEUS_PRIVATE_PORT: process.env.PROMETHEUS_PORT || 9090,
+    PROMETHEUS_PRIVATE_URL: function() {
+      return `http://${this.PROMETHEUS_PRIVATE_IP}:${this.PROMETHEUS_PRIVATE_PORT}`;
+    },
+
+    // EC2-Grafana - IP privada dentro de VPC (puede estar en MONITORING)
+    GRAFANA_PRIVATE_IP: process.env.GRAFANA_PRIVATE_IP || '172.31.71.151',
+    GRAFANA_PRIVATE_PORT: process.env.GRAFANA_PORT || 3000,
+    GRAFANA_PRIVATE_URL: function() {
+      return `http://${this.GRAFANA_PRIVATE_IP}:${this.GRAFANA_PRIVATE_PORT}`;
+    },
+
+    // EC2-RabbitMQ - IP privada dentro de VPC
+    RABBITMQ_IP: process.env.RABBITMQ_PRIVATE_IP || '172.31.72.88',
+    RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
+    RABBITMQ_MANAGEMENT_PORT: process.env.RABBITMQ_MANAGEMENT_PORT || 15672,
+    RABBITMQ_URL: function() {
+      return `amqp://${this.RABBITMQ_IP}:${this.RABBITMQ_PORT}`;
+    },
+    RABBITMQ_MANAGEMENT_URL: function() {
+      return `http://${this.RABBITMQ_IP}:${this.RABBITMQ_MANAGEMENT_PORT}`;
+    },
   },
 
   // ============================================
@@ -210,6 +278,13 @@ module.exports = {
       MONITORING_IP: this.PUBLIC.MONITORING_IP,
       PROMETHEUS_PORT: this.PUBLIC.PROMETHEUS_PORT,
       GRAFANA_PORT: this.PUBLIC.GRAFANA_PORT,
+      KAFKA_IP: this.PUBLIC.KAFKA_IP,
+      KAFKA_PORT: this.PUBLIC.KAFKA_PORT,
+      PROMETHEUS_PUBLIC_IP: this.PUBLIC.PROMETHEUS_PUBLIC_IP,
+      GRAFANA_PUBLIC_IP: this.PUBLIC.GRAFANA_PUBLIC_IP,
+      RABBITMQ_IP: this.PUBLIC.RABBITMQ_IP,
+      RABBITMQ_PORT: this.PUBLIC.RABBITMQ_PORT,
+      RABBITMQ_MANAGEMENT_PORT: this.PUBLIC.RABBITMQ_MANAGEMENT_PORT,
 
       // Private IPs
       DB_PRIVATE_IP: this.PRIVATE.DB_IP,
@@ -220,6 +295,16 @@ module.exports = {
       API_GATEWAY_REPLICA_PRIVATE_IP: this.PRIVATE.API_GATEWAY_REPLICA_IP,
       FRONTEND_PRIVATE_IP: this.PRIVATE.FRONTEND_PRIVATE_IP,
       MONITORING_PRIVATE_IP: this.PRIVATE.MONITORING_IP,
+      KAFKA_PRIVATE_IP: this.PRIVATE.KAFKA_IP,
+      KAFKA_PORT: this.PRIVATE.KAFKA_PORT,
+      KAFKA_ZOOKEEPER_PORT: this.PRIVATE.KAFKA_ZOOKEEPER_PORT,
+      PROMETHEUS_PRIVATE_IP: this.PRIVATE.PROMETHEUS_PRIVATE_IP,
+      PROMETHEUS_PRIVATE_PORT: this.PRIVATE.PROMETHEUS_PRIVATE_PORT,
+      GRAFANA_PRIVATE_IP: this.PRIVATE.GRAFANA_PRIVATE_IP,
+      GRAFANA_PRIVATE_PORT: this.PRIVATE.GRAFANA_PRIVATE_PORT,
+      RABBITMQ_PRIVATE_IP: this.PRIVATE.RABBITMQ_IP,
+      RABBITMQ_PORT: this.PRIVATE.RABBITMQ_PORT,
+      RABBITMQ_MANAGEMENT_PORT: this.PRIVATE.RABBITMQ_MANAGEMENT_PORT,
 
       // Ports
       AUTH_PORT: this.PRIVATE.AUTH_PORT,
@@ -246,11 +331,22 @@ module.exports = {
       REPORTES_MAEST_URL: this.PRIVATE.REPORTES_MAEST_URL(),
       NOTIFICACIONES_URL: this.PRIVATE.NOTIFICACIONES_URL(),
       MESSAGING_URL: this.PRIVATE.MESSAGING_URL(),
+      KAFKA_URL: this.PRIVATE.KAFKA_URL(),
+      KAFKA_ZOOKEEPER_URL: this.PRIVATE.KAFKA_ZOOKEEPER_URL(),
+      PROMETHEUS_URL: this.PRIVATE.PROMETHEUS_PRIVATE_URL(),
+      GRAFANA_URL: this.PRIVATE.GRAFANA_PRIVATE_URL(),
+      RABBITMQ_URL: this.PRIVATE.RABBITMQ_URL(),
+      RABBITMQ_MANAGEMENT_URL: this.PRIVATE.RABBITMQ_MANAGEMENT_URL(),
 
       // URLs (Public - for external access)
       API_GATEWAY_PUBLIC_URL: this.PUBLIC.API_GATEWAY_URL(),
       FRONTEND_PUBLIC_URL: this.PUBLIC.FRONTEND_URL(),
       REPORTING_PUBLIC_URL: this.PUBLIC.REPORTES_ESTUDIANTES_URL(),
+      KAFKA_PUBLIC_URL: this.PUBLIC.KAFKA_URL(),
+      PROMETHEUS_PUBLIC_URL: this.PUBLIC.PROMETHEUS_PUBLIC_URL(),
+      GRAFANA_PUBLIC_URL: this.PUBLIC.GRAFANA_PUBLIC_URL(),
+      RABBITMQ_PUBLIC_URL: this.PUBLIC.RABBITMQ_URL(),
+      RABBITMQ_MANAGEMENT_PUBLIC_URL: this.PUBLIC.RABBITMQ_MANAGEMENT_URL(),
     };
   },
 
