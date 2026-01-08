@@ -94,7 +94,8 @@ class ReservasManager {
 
         try {
             await this.loadHorarios();
-            this.renderHorarios();
+            await this.loadReservas(true);  // Also refresh reservas to get latest state
+            this.applyFilters();  // Apply filters to exclude reserved horarios
             this.showRefreshMessage('Horarios actualizados correctamente', 'success');
         } catch (error) {
             console.error('Error refrescando horarios:', error);
