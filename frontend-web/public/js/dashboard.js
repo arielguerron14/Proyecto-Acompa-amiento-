@@ -42,7 +42,9 @@ class DashboardManager {
 
             if (response.ok) {
                 const reservas = await response.json();
-                this.reservasCount = Array.isArray(reservas) ? reservas.length : 0;
+                // Count only active (non-cancelled) reservations
+                const activeReservas = Array.isArray(reservas) ? reservas.filter(r => r.estado === 'Activa') : [];
+                this.reservasCount = activeReservas.length;
             } else {
                 this.reservasCount = 0;
             }

@@ -1,45 +1,40 @@
-// reservar.js - Gestión de reserva de horarios por estudiantes
+// reservas-combined.js - Gestión completa de reservas (crear, listar, cancelar)
 
-class ReservarManager {
+class ReservasManager {
     constructor() {
         this.horarios = [];
+        this.reservas = [];
         this.selectedHorario = null;
         this.materias = new Set();
         this.semestres = new Set();
-        this.isReserving = false; // Flag to prevent multiple reservations
+        this.isReserving = false;
     }
 
-    // Inicializar módulo de reservar
+    // ==================== SECCIÓN: Inicialización ====================
+    
     async init() {
         this.setupEventListeners();
         await this.loadHorarios();
+        await this.loadReservas();
         this.renderHorarios();
+        this.renderReservas();
     }
 
-    // Configurar event listeners
+    // ==================== SECCIÓN: Event Listeners ====================
+    
     setupEventListeners() {
-        // Filtros
+        // Filtros de horarios
         const filtroSemestre = document.getElementById('filtro-semestre');
         const filtroMateria = document.getElementById('filtro-materia');
         const filtroDia = document.getElementById('filtro-dia');
 
-        if (filtroSemestre) {
-            filtroSemestre.addEventListener('change', () => this.applyFilters());
-        }
+        if (filtroSemestre) filtroSemestre.addEventListener('change', () => this.applyFilters());
+        if (filtroMateria) filtroMateria.addEventListener('change', () => this.applyFilters());
+        if (filtroDia) filtroDia.addEventListener('change', () => this.applyFilters());
 
-        if (filtroMateria) {
-            filtroMateria.addEventListener('change', () => this.applyFilters());
-        }
-
-        if (filtroDia) {
-            filtroDia.addEventListener('change', () => this.applyFilters());
-        }
-
-        // Botón de refrescar
+        // Botón refrescar horarios
         const refreshBtn = document.getElementById('refresh-horarios');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => this.refreshHorarios());
-        }
+        if (refreshBtn) refreshBtn.addEventListener('click', () => this.refreshHorarios());
 
         // Modal
         const modal = document.getElementById('reserva-modal');
@@ -47,29 +42,19 @@ class ReservarManager {
         const cancelarBtn = document.getElementById('cancelar-reserva');
         const confirmarBtn = document.getElementById('confirmar-reserva');
 
-        if (modalClose) {
-            modalClose.addEventListener('click', () => this.closeModal());
-        }
+        if (modalClose) modalClose.addEventListener('click', () => this.closeModal());
+        if (cancelarBtn) cancelarBtn.addEventListener('click', () => this.closeModal());
+        if (confirmarBtn) confirmarBtn.addEventListener('click', () => this.confirmarReserva());
 
-        if (cancelarBtn) {
-            cancelarBtn.addEventListener('click', () => this.closeModal());
-        }
-
-        if (confirmarBtn) {
-            confirmarBtn.addEventListener('click', () => this.confirmarReserva());
-        }
-
-        // Cerrar modal al hacer click fuera
         if (modal) {
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    this.closeModal();
-                }
+                if (e.target === modal) this.closeModal();
             });
         }
     }
 
-    // Cargar horarios disponibles
+    // ==================== SECCIÓN: Cargar Horarios ====================
+    
     async loadHorarios() {
         try {
             const loadingEl = document.getElementById('horarios-loading');
@@ -80,21 +65,14 @@ class ReservarManager {
             if (emptyEl) emptyEl.style.display = 'none';
             if (listEl) listEl.style.display = 'none';
 
-            // Obtener todos los horarios disponibles
             const response = await fetch(`${authManager.baseURL}/horarios`, {
                 headers: authManager.getAuthHeaders()
             });
 
             if (response.ok) {
-                const allHorarios = await response.json();
-                // Filtrar solo horarios activos (ya filtrado en backend)
-                this.horarios = allHorarios;
-
-                // Extraer materias únicas para el filtro
+                this.horarios = await response.json();
                 this.materias = new Set(this.horarios.map(h => h.materia).filter(Boolean));
                 this.updateFiltroMaterias();
-
-                // Extraer semestres únicos para el filtro
                 this.semestres = new Set(this.horarios.map(h => h.semestre).filter(Boolean));
                 this.updateFiltroSemestres();
             } else {
@@ -107,7 +85,6 @@ class ReservarManager {
         }
     }
 
-    // Refrescar horarios disponibles
     async refreshHorarios() {
         const refreshBtn = document.getElementById('refresh-horarios');
         if (refreshBtn) {
@@ -118,7 +95,6 @@ class ReservarManager {
         try {
             await this.loadHorarios();
             this.renderHorarios();
-            // Mostrar mensaje de éxito temporal
             this.showRefreshMessage('Horarios actualizados correctamente', 'success');
         } catch (error) {
             console.error('Error refrescando horarios:', error);
@@ -131,9 +107,7 @@ class ReservarManager {
         }
     }
 
-    // Mostrar mensaje de refresco
     showRefreshMessage(message, type) {
-        // Crear elemento de mensaje temporal
         const messageEl = document.createElement('div');
         messageEl.className = `refresh-message ${type}`;
         messageEl.textContent = message;
@@ -148,27 +122,19 @@ class ReservarManager {
             z-index: 1000;
             animation: slideIn 0.3s ease-out;
         `;
-
-        if (type === 'success') {
-            messageEl.style.backgroundColor = '#28a745';
-        } else {
-            messageEl.style.backgroundColor = '#dc3545';
-        }
+        messageEl.style.backgroundColor = type === 'success' ? '#28a745' : '#dc3545';
 
         document.body.appendChild(messageEl);
-
-        // Remover después de 3 segundos
         setTimeout(() => {
             messageEl.style.animation = 'slideOut 0.3s ease-in';
             setTimeout(() => {
-                if (messageEl.parentNode) {
-                    messageEl.parentNode.removeChild(messageEl);
-                }
+                if (messageEl.parentNode) messageEl.parentNode.removeChild(messageEl);
             }, 300);
         }, 3000);
     }
 
-    // Actualizar opciones del filtro de materias
+    // ==================== SECCIÓN: Filtros de Horarios ====================
+    
     updateFiltroMaterias() {
         const filtroMateria = document.getElementById('filtro-materia');
         if (!filtroMateria) return;
@@ -183,13 +149,11 @@ class ReservarManager {
             filtroMateria.appendChild(option);
         });
 
-        // Restaurar valor seleccionado si existe
         if (currentValue && this.materias.has(currentValue)) {
             filtroMateria.value = currentValue;
         }
     }
 
-    // Actualizar opciones del filtro de semestres
     updateFiltroSemestres() {
         const filtroSemestre = document.getElementById('filtro-semestre');
         if (!filtroSemestre) return;
@@ -204,13 +168,11 @@ class ReservarManager {
             filtroSemestre.appendChild(option);
         });
 
-        // Restaurar valor seleccionado si existe
         if (currentValue && this.semestres.has(Number(currentValue))) {
             filtroSemestre.value = currentValue;
         }
     }
 
-    // Aplicar filtros
     applyFilters() {
         const filtroSemestre = document.getElementById('filtro-semestre')?.value || '';
         const filtroMateria = document.getElementById('filtro-materia')?.value || '';
@@ -218,7 +180,6 @@ class ReservarManager {
 
         let filteredHorarios = [...this.horarios];
 
-        // Aplicar filtros en orden: semestre, materia, día
         if (filtroSemestre) {
             filteredHorarios = filteredHorarios.filter(h => h.semestre == filtroSemestre);
         }
@@ -234,7 +195,8 @@ class ReservarManager {
         this.renderHorarios(filteredHorarios);
     }
 
-    // Renderizar horarios
+    // ==================== SECCIÓN: Renderizar Horarios ====================
+    
     renderHorarios(horariosToRender = null) {
         const loadingEl = document.getElementById('horarios-loading');
         const emptyEl = document.getElementById('horarios-empty');
@@ -243,8 +205,6 @@ class ReservarManager {
         if (loadingEl) loadingEl.style.display = 'none';
 
         const horarios = horariosToRender || this.horarios;
-
-        // Verificar si hay filtros activos
         const hasActiveFilters = (document.getElementById('filtro-semestre')?.value || '') ||
                                  (document.getElementById('filtro-materia')?.value || '') ||
                                  (document.getElementById('filtro-dia')?.value || '');
@@ -252,7 +212,6 @@ class ReservarManager {
         if (!horarios || horarios.length === 0) {
             if (emptyEl) {
                 emptyEl.style.display = 'block';
-                // Cambiar mensaje según filtros
                 const h4 = emptyEl.querySelector('h4');
                 const p = emptyEl.querySelector('p');
                 if (hasActiveFilters) {
@@ -273,7 +232,6 @@ class ReservarManager {
         listEl.innerHTML = horarios.map(horario => this.createHorarioCard(horario)).join('');
     }
 
-    // Crear HTML para un horario
     createHorarioCard(horario) {
         return `
             <div class="horario-card" data-horario-id="${horario._id}">
@@ -295,14 +253,15 @@ class ReservarManager {
                         Semestre ${horario.semestre || 'N/A'} - Paralelo ${horario.paralelo || 'N/A'}
                     </div>
                 </div>
-                <button class="btn-reservar" onclick="reservarManager.selectHorario('${horario._id}')">
+                <button class="btn-reservar" onclick="reservasManager.selectHorario('${horario._id}')">
                     Reservar Horario
                 </button>
             </div>
         `;
     }
 
-    // Seleccionar horario para reserva
+    // ==================== SECCIÓN: Modal de Reserva ====================
+    
     selectHorario(horarioId) {
         const horario = this.horarios.find(h => h._id === horarioId);
         if (!horario) return;
@@ -311,7 +270,6 @@ class ReservarManager {
         this.showModal();
     }
 
-    // Mostrar modal de confirmación
     showModal() {
         const modal = document.getElementById('reserva-modal');
         const detailsEl = document.getElementById('reserva-details');
@@ -330,17 +288,15 @@ class ReservarManager {
         modal.style.display = 'flex';
     }
 
-    // Cerrar modal
     closeModal() {
         const modal = document.getElementById('reserva-modal');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        if (modal) modal.style.display = 'none';
         this.selectedHorario = null;
-        this.isReserving = false; // Reset flag
+        this.isReserving = false;
     }
 
-    // Confirmar reserva
+    // ==================== SECCIÓN: Crear Reserva ====================
+    
     async confirmarReserva() {
         if (!this.selectedHorario || !this.selectedHorario._id) {
             console.error('No hay horario seleccionado para reservar');
@@ -365,7 +321,7 @@ class ReservarManager {
                 authManager.showMessage('No se encontró sesión de usuario. Inicia sesión nuevamente.', 'error');
                 return;
             }
-            // Defensive: support both `id` and `userId` fields from token payload
+
             const estudianteId = user.id || user.userId || null;
             if (!estudianteId) {
                 authManager.showMessage('No se pudo identificar al estudiante. Intenta iniciar sesión de nuevo.', 'error');
@@ -395,19 +351,16 @@ class ReservarManager {
                 paralelo: this.selectedHorario.paralelo
             };
 
-            // Debug: log the payload so we can inspect what the client will send
             console.debug('Reservar: sending reservaData', reservaData);
 
-            // Pre-check availability to provide faster feedback and avoid server 409 when possible
+            // Pre-check availability
             try {
-                // Note: availability check is served under the estudiantes proxy at /estudiantes/reservas/check
                 const checkUrl = `${authManager.baseURL}/estudiantes/reservas/check?maestroId=${encodeURIComponent(reservaData.maestroId)}&dia=${encodeURIComponent(reservaData.dia)}&inicio=${encodeURIComponent(reservaData.inicio)}`;
                 const checkRes = await fetch(checkUrl, { headers: authManager.getAuthHeaders() });
                 if (checkRes.ok) {
                     const j = await checkRes.json();
                     if (!j.available) {
                         authManager.showMessage('Lo siento, este horario ya fue reservado. Se actualizará la lista.', 'error');
-                        // Remove from local list and refresh
                         if (this.selectedHorario && this.selectedHorario._id) {
                             this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
                             this.applyFilters();
@@ -417,7 +370,7 @@ class ReservarManager {
                     }
                 }
             } catch (err) {
-                console.warn('Availability check failed, proceeding to reserve (will rely on server validation):', err);
+                console.warn('Availability check failed, proceeding to reserve:', err);
             }
 
             const response = await fetch(`${authManager.baseURL}/estudiantes/reservar`, {
@@ -428,28 +381,23 @@ class ReservarManager {
 
             if (response.ok) {
                 authManager.showMessage('Reserva creada exitosamente', 'success');
-                // Remover el horario reservado de la lista local antes de cerrar el modal
                 if (this.selectedHorario && this.selectedHorario._id) {
                     this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
                     this.applyFilters();
                 }
                 this.closeModal();
-                // Refrescar datos relacionados
-                // Force refresh to avoid cached 304 responses
-                await reservasManager.loadReservas(true);
-                reservasManager.renderReservas();
+                await this.loadReservas(true);
+                this.renderReservas();
                 await dashboardManager.refresh();
             } else if (response.status === 409) {
-                // Horario ya reservado, remover de la lista
                 authManager.showMessage('Este horario ya fue reservado por otro estudiante', 'error');
                 if (this.selectedHorario && this.selectedHorario._id) {
                     this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
                     this.applyFilters();
                 }
                 this.closeModal();
-                // Force refresh reservas so UI reflects current state
-                await reservasManager.loadReservas(true);
-                reservasManager.renderReservas();
+                await this.loadReservas(true);
+                this.renderReservas();
                 await dashboardManager.refresh();
             } else {
                 const error = await response.json();
@@ -467,12 +415,180 @@ class ReservarManager {
         }
     }
 
-    // Refrescar horarios
+    // ==================== SECCIÓN: Cargar Reservas ====================
+    
+    async loadReservas(force = false) {
+        try {
+            const user = await authManager.getUserData();
+            console.log('User data:', user);
+            if (!user) {
+                console.log('No user data, skipping load');
+                return;
+            }
+
+            const loadingEl = document.getElementById('reservas-loading');
+            const emptyEl = document.getElementById('reservas-empty');
+            const listEl = document.getElementById('reservas-list');
+
+            if (loadingEl) loadingEl.style.display = 'block';
+            if (emptyEl) emptyEl.style.display = 'none';
+            if (listEl) listEl.style.display = 'none';
+
+            let url = `${authManager.baseURL}/estudiantes/reservas/estudiante/${user.id || user.userId}`;
+            if (force) url += `?_ts=${Date.now()}`;
+
+            const response = await fetch(url, {
+                headers: Object.assign({}, authManager.getAuthHeaders()),
+                cache: 'no-store'
+            });
+
+            console.log('Response status:', response.status);
+            if (response.status === 304) {
+                console.log('Reservas sin cambios (304), manteniendo lista en memoria');
+                this.renderReservas();
+                return;
+            }
+
+            if (response.ok) {
+                this.reservas = await response.json();
+                console.log('Reservas loaded:', this.reservas);
+            } else {
+                this.reservas = [];
+                console.error('Error cargando reservas:', response.status);
+            }
+        } catch (error) {
+            console.error('Error cargando reservas:', error);
+            this.reservas = [];
+        }
+    }
+
+    // ==================== SECCIÓN: Renderizar Reservas ====================
+    
+    renderReservas() {
+        const loadingEl = document.getElementById('reservas-loading');
+        const emptyEl = document.getElementById('reservas-empty');
+        const listEl = document.getElementById('reservas-list');
+
+        console.log('Rendering reservas (filter active only):', this.reservas);
+        console.log('Elements found:', { loadingEl, emptyEl, listEl });
+
+        if (loadingEl) loadingEl.style.display = 'none';
+
+        // Filter to show only active reservas
+        const activeReservas = (this.reservas || []).filter(r => r.estado === 'Activa');
+
+        if (!activeReservas || activeReservas.length === 0) {
+            console.log('Showing empty message (no active reservas)');
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (listEl) listEl.style.display = 'none';
+            return;
+        }
+
+        console.log('Showing list with', activeReservas.length, 'active reservas');
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (listEl) listEl.style.display = 'grid';
+
+        try {
+            const html = activeReservas.map(reserva => this.createReservaCard(reserva)).join('');
+            listEl.innerHTML = html;
+            if (!html.trim()) {
+                if (emptyEl) emptyEl.style.display = 'block';
+                if (listEl) listEl.style.display = 'none';
+                return;
+            }
+        } catch (error) {
+            console.error('Error rendering reservas:', error);
+            listEl.innerHTML = '<p>Error al cargar las reservas. Revisa la consola para más detalles.</p>';
+        }
+    }
+
+    createReservaCard(reserva) {
+        const statusClass = this.getStatusClass(reserva.estado || 'Activa');
+        const statusText = this.getStatusText(reserva.estado || 'Activa');
+
+        return `
+            <div class="reserva-card">
+                <div class="reserva-status ${statusClass}">${statusText}</div>
+                <div class="reserva-header">
+                    <div class="reserva-materia">${reserva.materia || 'Materia no especificada'}</div>
+                    <div class="reserva-maestro">${reserva.maestroName || 'N/A'}</div>
+                </div>
+                <div class="reserva-info">
+                    <div class="reserva-info-item">
+                        <div class="reserva-info-label">Fecha</div>
+                        <div class="reserva-info-value">${reserva.dia || 'N/A'}</div>
+                    </div>
+                    <div class="reserva-info-item">
+                        <div class="reserva-info-label">Hora</div>
+                        <div class="reserva-info-value">${reserva.inicio || 'N/A'} - ${reserva.fin || 'N/A'}</div>
+                    </div>
+                    <div class="reserva-info-item">
+                        <div class="reserva-info-label">Modalidad</div>
+                        <div class="reserva-info-value">${reserva.modalidad || 'N/A'}</div>
+                    </div>
+                    <div class="reserva-info-item">
+                        <div class="reserva-info-label">Lugar de Atención</div>
+                        <div class="reserva-info-value">${reserva.lugarAtencion || 'N/A'}</div>
+                    </div>
+                    <div class="reserva-actions">
+                        <button class="btn-delete" onclick="if(confirm('¿Estás seguro de que quieres cancelar esta reserva? Esta acción no se puede deshacer.')) reservasManager.cancelarReserva('${reserva._id}')">
+                            🗑️ Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    getStatusClass(estado) {
+        const statusMap = {
+            'Activa': 'confirmada',
+            'Cancelada': 'cancelada'
+        };
+        return statusMap[estado] || 'pendiente';
+    }
+
+    getStatusText(estado) {
+        const statusMap = {
+            'Activa': 'Activa',
+            'Cancelada': 'Cancelada'
+        };
+        return statusMap[estado] || 'Activa';
+    }
+
+    // ==================== SECCIÓN: Cancelar Reserva ====================
+    
+    async cancelarReserva(id) {
+        if (!confirm('¿Está seguro de cancelar esta reserva?')) return;
+
+        try {
+            const response = await fetch(`${authManager.baseURL}/estudiantes/reservas/${id}/cancel`, {
+                method: 'PUT',
+                headers: authManager.getAuthHeaders()
+            });
+
+            if (response.ok) {
+                alert('Reserva cancelada exitosamente');
+                await this.loadReservas(true);
+                this.renderReservas();
+                await dashboardManager.refresh();
+            } else {
+                const error = await response.json();
+                alert('Error al cancelar: ' + (error.message || 'Error desconocido'));
+            }
+        } catch (error) {
+            console.error('Error cancelando reserva:', error);
+            alert('Error de conexión al cancelar la reserva');
+        }
+    }
+
+    // ==================== SECCIÓN: Refrescar ====================
+    
     async refresh() {
-        await this.loadHorarios();
-        this.applyFilters();
+        await this.loadReservas(true);
+        this.renderReservas();
     }
 }
 
 // Instancia global
-const reservarManager = new ReservarManager();
+const reservasManager = new ReservasManager();
