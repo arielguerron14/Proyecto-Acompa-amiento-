@@ -8,6 +8,7 @@ RUN apt-get update \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Copy shared modules
+COPY shared-config/ /usr/src/shared-config/
 COPY shared-auth/ /usr/src/shared-auth/
 COPY shared-monitoring/ /usr/src/shared-monitoring/
 
