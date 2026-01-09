@@ -20,13 +20,46 @@ $RED = "`e[31m"
 $BLUE = "`e[34m"
 $RESET = "`e[0m"
 
-# Configuración
-$EC2_DB_PUBLIC_IP = "44.222.119.15"
-$EC2_DB_PRIVATE_IP = "172.31.79.193"
+# ═══════════════════════════════════════════════════════════════
+# CONFIGURACIÓN: Leer desde infrastructure.config.js (FUENTE ÚNICA)
+# ═══════════════════════════════════════════════════════════════
+
+# Cargar configuración centralizada
+$configPath = Join-Path (Get-Location) "infrastructure.config.js"
+if (-not (Test-Path $configPath)) {
+    Write-Host "${RED}❌ No se encontró infrastructure.config.js${RESET}"
+    exit 1
+}
+
+# Leer IPs desde infrastructure.config.js usando Node.js
+$configScript = @"
+const config = require('./infrastructure.config.js');
+console.log(JSON.stringify({
+    publicIp: config.PUBLIC.EC2_DB_IP,
+    privateIp: config.PRIVATE.EC2_DB_PRIVATE_IP,
+    sshUser: config.SSH_USER || 'ec2-user',
+    region: config.AWS_REGION || 'us-east-1'
+}));
+"@
+
+try {
+    $configJson = node -e $configScript | ConvertFrom-Json
+    $EC2_DB_PUBLIC_IP = $configJson.publicIp
+    $EC2_DB_PRIVATE_IP = $configJson.privateIp
+    $SSH_USER = $configJson.sshUser
+    $REGION = $configJson.region
+    Write-Color "✅ Configuración cargada desde infrastructure.config.js" $GREEN
+} catch {
+    Write-Color "⚠️  Usando valores por defecto (Node.js no disponible o config inválida)" $YELLOW
+    # Valores fallback si Node.js no está disponible
+    $EC2_DB_PUBLIC_IP = "44.192.114.31"
+    $EC2_DB_PRIVATE_IP = "172.31.79.193"
+    $SSH_USER = "ec2-user"
+    $REGION = "us-east-1"
+}
+
 $SSH_SECRET_NAME = "AWS_EC2_DB_SSH_PRIVATE_KEY"
 $SSH_KEY_FILE = "/tmp/aws-key-deploy.pem"
-$SSH_USER = "ec2-user"
-$REGION = "us-east-1"
 
 # Función para escribir con colores
 function Write-Color {
@@ -304,28 +337,28 @@ if ($allValid) {
     Write-Host ""
     
     Write-Color "MongoDB:" $BLUE
-    Write-Host "  • Host: 172.31.79.193"
+    Write-Host "  • Host: $EC2_DB_PRIVATE_IP"
     Write-Host "  • Puerto: 27017"
     Write-Host "  • Usuario: admin"
     Write-Host "  • Contraseña: mongodb123"
     Write-Host "  • Database: acompanamiento_db"
-    Write-Host "  • URL: mongodb://admin:mongodb123@172.31.79.193:27017/acompanamiento_db?authSource=admin"
+    Write-Host "  • URL: mongodb://admin:mongodb123@${EC2_DB_PRIVATE_IP}:27017/acompanamiento_db?authSource=admin"
     Write-Host ""
     
     Write-Color "PostgreSQL:" $BLUE
-    Write-Host "  • Host: 172.31.79.193"
+    Write-Host "  • Host: $EC2_DB_PRIVATE_IP"
     Write-Host "  • Puerto: 5432"
     Write-Host "  • Usuario: postgres"
     Write-Host "  • Contraseña: postgres123"
     Write-Host "  • Database: acompanamiento_db"
-    Write-Host "  • URL: postgresql://postgres:postgres123@172.31.79.193:5432/acompanamiento_db"
+    Write-Host "  • URL: postgresql://postgres:postgres123@${EC2_DB_PRIVATE_IP}:5432/acompanamiento_db"
     Write-Host ""
     
     Write-Color "Redis:" $BLUE
-    Write-Host "  • Host: 172.31.79.193"
+    Write-Host "  • Host: $EC2_DB_PRIVATE_IP"
     Write-Host "  • Puerto: 6379"
     Write-Host "  • Contraseña: redis123"
-    Write-Host "  • URL: redis://:redis123@172.31.79.193:6379"
+    Write-Host "  • URL: redis://:redis123@${EC2_DB_PRIVATE_IP}:6379"
     Write-Host ""
     
     Write-Color "⚠️  IMPORTANTE:" $YELLOW
