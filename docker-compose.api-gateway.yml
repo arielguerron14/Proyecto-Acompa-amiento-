@@ -24,8 +24,6 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       RATE_LIMIT: 100
       TIMEOUT: 30000
-    ports:
-      - "8080:8080"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
