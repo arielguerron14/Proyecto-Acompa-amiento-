@@ -127,11 +127,17 @@ jobs:
             COMPOSE_FILE="./docker-compose.ec2-core.yml"
           elif [ "$INSTANCE" = "EC2_API_GATEWAY" ]; then
             COMPOSE_FILE="./docker-compose.api-gateway.yml"
+          elif [ "$INSTANCE" = "EC2_FRONTEND" ]; then
+            COMPOSE_FILE="./docker-compose.frontend.yml"
           else
             COMPOSE_FILE="./docker-compose.yml"
           fi
           
-          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$COMPOSE_FILE" ubuntu@$IP:~/app/docker-compose.yml
+          if [ -f "$COMPOSE_FILE" ]; then
+            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$COMPOSE_FILE" ubuntu@$IP:~/app/docker-compose.yml
+          else
+            echo "⚠️ Warning: $COMPOSE_FILE not found, skipping docker-compose transfer"
+          fi
       
       - name: Deploy services
         run: |
