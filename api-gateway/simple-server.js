@@ -22,6 +22,14 @@ app.post('/api/auth/register', (req, res) => {
   });
 });
 
+app.post('/api/auth/login', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Login successful',
+    token: 'test-jwt-token-12345'
+  });
+});
+
 const PORT = process.env.PORT || 8080;  // Docker port mapping
 console.log(`Attempting to listen on port ${PORT}...`);
 
