@@ -18,7 +18,7 @@ module.exports = {
   // ============================================
   PUBLIC: {
     // EC2-DB - IP pública
-    DB_IP: process.env.DB_PUBLIC_IP || '44.192.114.31',
+    DB_IP: process.env.DB_PUBLIC_IP || '44.200.180.90',
     
     // EC2-CORE - IP pública
     CORE_IP: process.env.CORE_PUBLIC_IP || '13.216.12.61',
@@ -38,14 +38,14 @@ module.exports = {
     },
 
     // Notificaciones - IP pública
-    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '44.192.74.171',
+    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '100.28.222.128',
     NOTIFICACIONES_PORT: process.env.NOTIFICACIONES_PORT || 5005,
     NOTIFICACIONES_URL: function() {
       return `http://${this.NOTIFICACIONES_IP}:${this.NOTIFICACIONES_PORT}`;
     },
 
     // Messaging - IP pública
-    MESSAGING_IP: process.env.MESSAGING_IP || '18.205.26.214',
+    MESSAGING_IP: process.env.MESSAGING_IP || '44.222.118.225',
     MESSAGING_PORT: process.env.MESSAGING_PORT || 1883,
     MESSAGING_URL: function() {
       return `mqtt://${this.MESSAGING_IP}:${this.MESSAGING_PORT}`;
@@ -371,3 +371,4 @@ module.exports = {
     return true;
   },
 };
+

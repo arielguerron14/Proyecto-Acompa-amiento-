@@ -87,7 +87,7 @@ jobs:
               IP="13.216.12.61"
               ;;
             EC2_DB)
-              IP="44.192.114.31"
+              IP="44.200.180.90"
               ;;
             EC2_API_GATEWAY)
               IP="52.71.188.181"
@@ -96,10 +96,10 @@ jobs:
               IP="107.21.124.81"
               ;;
             EC2_NOTIFICACIONES)
-              IP="44.192.74.171"
+              IP="100.28.222.128"
               ;;
             EC2_MESSAGING)
-              IP="18.205.26.214"
+              IP="44.222.118.225"
               ;;
             EC2_REPORTES)
               IP="54.175.62.79"
@@ -306,3 +306,4 @@ jobs:
           echo "Services: ${{ github.event.inputs.services }}"
           echo ""
           echo "Status: ${{ job.status }}"
+
