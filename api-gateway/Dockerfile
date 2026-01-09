@@ -31,8 +31,12 @@ RUN mkdir -p node_modules && \
 	mkdir -p node_modules/@proyecto && \
 	ln -sf /usr/src/shared-monitoring node_modules/@proyecto/shared-monitoring
 
+# Make start script executable
+COPY api-gateway/start.sh /usr/src/app/start.sh
+RUN chmod +x /usr/src/app/start.sh
+
 ENV NODE_ENV=production
 EXPOSE 8080
 
-# Start server directly
-CMD ["node", "server.js"]
+# Start server with fallback
+CMD ["/usr/src/app/start.sh"]
