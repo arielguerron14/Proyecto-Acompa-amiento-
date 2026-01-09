@@ -5,24 +5,134 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Acompañamiento Educativo</title>
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .dashboard-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .dashboard-header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .dashboard-header p {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #3498db;
+        }
+
+        .user-info p {
+            margin: 10px 0;
+            color: #34495e;
+        }
+
+        .user-info strong {
+            color: #2c3e50;
+        }
+
+        .dashboard-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .logout-btn {
+            background-color: #e74c3c;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .logout-btn:hover {
+            background-color: #c0392b;
+        }
+
+        .success-message {
+            color: #27ae60;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+    </style>
 </head>
 <body>
     <main>
-        <div class="auth-container">
-            <h1>Bienvenido al Dashboard</h1>
-            <p>Has iniciado sesión correctamente.</p>
-            <button onclick="logout()" class="submit-btn" style="margin-top: 20px;">Cerrar Sesión</button>
+        <div class="dashboard-container">
+            <div class="dashboard-header">
+                <h1>🎓 Bienvenido al Dashboard</h1>
+                <p>Has iniciado sesión correctamente</p>
+            </div>
+
+            <div class="user-info">
+                <p><strong>📧 Email:</strong> <span id="user-email">-</span></p>
+                <p><strong>👤 Rol:</strong> <span id="user-role">-</span></p>
+                <p><strong>✅ Estado:</strong> <span class="success-message">Conectado</span></p>
+            </div>
+
+            <div class="dashboard-actions">
+                <button onclick="logout()" class="logout-btn">🚪 Cerrar Sesión</button>
+            </div>
         </div>
     </main>
 
     <script>
+        // Función para hacer logout
         function logout() {
             localStorage.removeItem('token');
+            localStorage.removeItem('user');
             window.location.href = 'index.html';
         }
 
+        // Cargar información del usuario si existe
+        function loadUserInfo() {
+            try {
+                const userData = localStorage.getItem('user');
+                if (userData) {
+                    const user = JSON.parse(userData);
+                    document.getElementById('user-email').textContent = user.email || user.correo || '-';
+                    document.getElementById('user-role').textContent = user.role || user.rol || '-';
+                } else {
+                    // Si no hay info del usuario, solo mostramos datos genéricos
+                    document.getElementById('user-email').textContent = 'Usuario';
+                    document.getElementById('user-role').textContent = 'Activo';
+                }
+            } catch (error) {
+                console.error('Error cargando info del usuario:', error);
+            }
+        }
+
+        // Verificar si el usuario está autenticado
         if (!localStorage.getItem('token')) {
+            // Si no hay token, redirigir a login
             window.location.href = 'index.html';
+        } else {
+            // Cargar la información del usuario
+            loadUserInfo();
         }
     </script>
 </body>

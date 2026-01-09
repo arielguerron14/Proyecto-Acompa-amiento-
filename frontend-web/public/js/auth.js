@@ -122,17 +122,31 @@ async function handleSubmit(event) {
         if (response.ok) {
             if (isLoginMode) {
                 // Login: esperamos token
-                if (result.token) {
-                    localStorage.setItem('token', result.token);
-                    let redirectUrl = '/dashboard.html';
+                if (result.token || result.success) {
+                    // Guardar token si existe
+                    if (result.token) {
+                        localStorage.setItem('token', result.token);
+                    }
+                    
+                    // Guardar info de usuario si existe
+                    if (result.user) {
+                        localStorage.setItem('user', JSON.stringify(result.user));
+                    }
+                    
+                    // Redirigir según el rol
+                    let redirectUrl = 'dashboard.html';
                     if (result.user && result.user.role) {
                         if (result.user.role === 'estudiante') {
-                            redirectUrl = '/estudiante.html';
+                            redirectUrl = 'estudiante.html';
                         } else if (result.user.role === 'maestro') {
-                            redirectUrl = '/maestro.html';
+                            redirectUrl = 'maestro.html';
                         }
                     }
-                    window.location.href = redirectUrl;
+                    
+                    // Usar redirección relativa
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 500);
                 } else {
                     showError('Respuesta inesperada del servidor');
                 }
