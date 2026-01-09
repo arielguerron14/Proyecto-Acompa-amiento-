@@ -1,4 +1,4 @@
-name: Deploy EC2 CORE
+name: Deploy to EC2
 
 on:
   workflow_dispatch:
