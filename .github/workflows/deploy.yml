@@ -173,10 +173,10 @@ jobs:
           echo "=== Phase 4: Verify images loaded ==="
           docker images | head -10
           
-          echo "=== Phase 5: Deploy with docker-compose (no pull) ==="
+          echo "=== Phase 5: Deploy with docker-compose (pull missing images only) ==="
           cd ~/app
           docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
-          docker-compose up -d --pull=never
+          docker-compose up -d --pull=missing
           
           echo "=== Phase 6: Verify deployment ==="
           sleep 3
