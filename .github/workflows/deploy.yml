@@ -55,7 +55,10 @@ jobs:
         id: ssh-key
         run: |
           KEY="${{ secrets.SSH_PRIVATE_KEY }}"
-          echo "key=$KEY" >> $GITHUB_OUTPUT
+          # Use the multi-line GITHUB_OUTPUT format to safely export the private key
+          printf '%s\n' "key<<EOF" >> $GITHUB_OUTPUT
+          printf '%s\n' "$KEY" >> $GITHUB_OUTPUT
+          printf '%s\n' "EOF" >> $GITHUB_OUTPUT
       
       - name: Get EC2 IP
         id: get-ip
