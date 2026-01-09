@@ -170,12 +170,15 @@ jobs:
             fi
           done
           
-          echo "=== Phase 4: Deploy with docker-compose ==="
+          echo "=== Phase 4: Verify images loaded ==="
+          docker images | head -10
+          
+          echo "=== Phase 5: Deploy with docker-compose ==="
           cd ~/app
           docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
           docker-compose up -d
           
-          echo "=== Phase 5: Verify deployment ==="
+          echo "=== Phase 6: Verify deployment ==="
           sleep 3
           docker-compose ps
           echo "=== Service Logs ==="
