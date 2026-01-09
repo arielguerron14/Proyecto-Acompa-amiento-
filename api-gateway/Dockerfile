@@ -26,7 +26,7 @@ WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent
 
 # Verify required files and dependencies
-RUN if [ ! -f "simple-server.js" ]; then echo "ERROR: simple-server.js not found!"; ls -la /usr/src/app/; exit 1; fi && echo "✓ simple-server.js found"
+RUN if [ ! -f "server.js" ]; then echo "ERROR: server.js not found!"; ls -la /usr/src/app/; exit 1; fi && echo "✓ server.js found"
 RUN if [ ! -d "node_modules/express" ]; then echo "ERROR: express not found in node_modules!"; ls -la /usr/src/app/node_modules/ | head -20; exit 1; fi && echo "✓ express found"
 
 # Create symlinks for shared dependencies
@@ -39,8 +39,9 @@ ENV NODE_ENV=production
 EXPOSE 8080
 
 # Create a startup wrapper to help debug
-RUN echo '#!/bin/sh\necho "=== Container starting ==="\necho "PWD: $(pwd)"\necho "Files: $(ls -la)"\necho "node_modules: $(ls -la node_modules | head -10)"\necho "Starting: node simple-server.js"\nexec node simple-server.js\n' > /usr/src/app/start.sh && chmod +x /usr/src/app/start.sh
+# Create a startup wrapper to help debug and start the real server
+RUN echo '#!/bin/sh\necho "=== Container starting ==="\necho "PWD: $(pwd)"\necho "Files: $(ls -la)"\necho "node_modules: $(ls -la node_modules | head -10)"\necho "Starting: node server.js"\nexec node server.js\n' > /usr/src/app/start.sh && chmod +x /usr/src/app/start.sh
 
 # Use shell form CMD to ensure proper signal handling
-CMD ["sh", "-c", "cd /usr/src/app && exec node simple-server.js"]
+CMD ["sh", "-c", "cd /usr/src/app && exec node server.js"]
 
