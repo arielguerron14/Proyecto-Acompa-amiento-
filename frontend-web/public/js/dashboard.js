@@ -36,7 +36,8 @@ class DashboardManager {
             const user = await authManager.getUserData();
             if (!user) return;
 
-            const response = await fetch(`${authManager.baseURL}/estudiantes/reservas/estudiante/${user.id}`, {
+            const base = authManager.baseURL || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
+            const response = await fetch(`${base.replace(/\/$/, '')}/estudiantes/reservas/estudiante/${user.id}`, {
                 headers: authManager.getAuthHeaders()
             });
 
@@ -60,7 +61,8 @@ class DashboardManager {
             const user = await authManager.getUserData();
             if (!user) return;
 
-            const response = await fetch(`${authManager.baseURL}/estudiantes/reservas/estudiante/${user.id}`, {
+            const base2 = authManager.baseURL || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
+            const response = await fetch(`${base2.replace(/\/$/, '')}/estudiantes/reservas/estudiante/${user.id}`, {
                 headers: authManager.getAuthHeaders()
             });
 

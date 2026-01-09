@@ -4,7 +4,8 @@ class AuthManager {
     constructor() {
         this.token = localStorage.getItem('token');
         this.user = null;
-        this.baseURL = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+        // Prefer configured API base, fallback to the known public API Gateway URL
+        this.baseURL = (window.API_CONFIG && window.API_CONFIG.API_BASE) ? window.API_CONFIG.API_BASE : 'http://52.71.188.181:8080';
     }
 
     // Verificar si hay sesión activa

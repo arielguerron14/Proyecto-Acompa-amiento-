@@ -456,7 +456,8 @@ class ReservasManager {
             if (emptyEl) emptyEl.style.display = 'none';
             if (listEl) listEl.style.display = 'none';
 
-            let url = `${authManager.baseURL}/estudiantes/reservas/estudiante/${user.id || user.userId}`;
+            const base = authManager.baseURL || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
+            let url = `${base.replace(/\/$/, '')}/estudiantes/reservas/estudiante/${user.id || user.userId}`;
             if (force) url += `?_ts=${Date.now()}`;
 
             const response = await fetch(url, {
