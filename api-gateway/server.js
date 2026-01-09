@@ -94,9 +94,17 @@ app.use((req, res, next) => {
 // Para /horarios, usar express.raw() y reenviar el buffer tal cual, sin manipulación extra
 // Eliminar manejo manual de raw body para /horarios. Usar solo express.json() global.
 
-// CORS - Allow all origins
+// CORS - Allow frontend and development origins
+const corsOrigins = [
+  'http://localhost:5500',
+  'http://localhost:3000',
+  'http://localhost:8080',
+  'http://107.21.124.81',  // EC2_FRONTEND production IP
+  'https://107.21.124.81'
+];
+
 app.use(cors({
-  origin: 'http://localhost:5500',
+  origin: corsOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -104,7 +112,7 @@ app.use(cors({
 
 // Responder manualmente a OPTIONS con los headers CORS correctos
 app.options('*', cors({
-  origin: 'http://localhost:5500',
+  origin: corsOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
