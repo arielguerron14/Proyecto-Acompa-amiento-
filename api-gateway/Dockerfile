@@ -16,9 +16,6 @@ COPY api-gateway/ /usr/src/app/
 
 # Copy infrastructure config
 COPY infrastructure.config.js /usr/src/
-COPY scripts/ /usr/src/scripts/
-COPY docker-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # Install production dependencies for shared modules first
 WORKDIR /usr/src/shared-auth
@@ -36,5 +33,5 @@ RUN mkdir -p node_modules && \
 ENV NODE_ENV=production
 EXPOSE 8080
 
-# Start server
+# Start server directly
 CMD ["node", "server.js"]
