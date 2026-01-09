@@ -6,6 +6,9 @@ WORKDIR /usr/src
 COPY shared-auth/ /usr/src/shared-auth/
 COPY micro-maestros/ /usr/src/app/
 
+# Copiar configuración centralizada
+COPY shared-config/ /usr/src/shared-config/
+
 # Sanity checks so build logs reveal missing files early
 RUN echo "[debug] listing /usr/src" && ls -la /usr/src || true
 RUN echo "[debug] listing /usr/src/shared-auth" && ls -la /usr/src/shared-auth || true
