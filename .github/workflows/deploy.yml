@@ -107,6 +107,7 @@ jobs:
       - name: Transfer files to EC2
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
+          INSTANCE=${{ github.event.inputs.instance }}
           
           # Clean /tmp on EC2 to free space
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP "rm -f /tmp/*.tar && df -h /tmp"
@@ -121,8 +122,16 @@ jobs:
             fi
           done
           
-          # Transfer docker-compose.yml
-          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ./docker-compose.ec2-core.yml ubuntu@$IP:~/app/docker-compose.yml
+          # Transfer appropriate docker-compose.yml based on instance
+          if [ "$INSTANCE" = "EC2_CORE" ]; then
+            COMPOSE_FILE="./docker-compose.ec2-core.yml"
+          elif [ "$INSTANCE" = "EC2_API_GATEWAY" ]; then
+            COMPOSE_FILE="./docker-compose.api-gateway.yml"
+          else
+            COMPOSE_FILE="./docker-compose.yml"
+          fi
+          
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$COMPOSE_FILE" ubuntu@$IP:~/app/docker-compose.yml
       
       - name: Deploy services
         run: |
