@@ -38,6 +38,9 @@ RUN mkdir -p node_modules && \
 ENV NODE_ENV=production
 EXPOSE 8080
 
-# Use simple-server.js as the main entry point (no entrypoint, just cmd)
-CMD ["node", "simple-server.js"]
+# Create a startup wrapper to help debug
+RUN echo '#!/bin/sh\necho "=== Container starting ==="\necho "PWD: $(pwd)"\necho "Files: $(ls -la)"\necho "node_modules: $(ls -la node_modules | head -10)"\necho "Starting: node simple-server.js"\nexec node simple-server.js\n' > /usr/src/app/start.sh && chmod +x /usr/src/app/start.sh
+
+# Use shell form CMD to ensure proper signal handling
+CMD ["sh", "-c", "cd /usr/src/app && exec node simple-server.js"]
 

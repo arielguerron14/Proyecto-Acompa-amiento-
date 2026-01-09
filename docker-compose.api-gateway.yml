@@ -7,8 +7,7 @@ services:
     ports:
       - "8080:8080"
     entrypoint: []
-    command: ["node", "simple-server.js"]
-    working_dir: /usr/src/app
+    command: sh -c "cd /usr/src/app && exec node simple-server.js"
     environment:
       NODE_ENV: production
       PORT: 8080
