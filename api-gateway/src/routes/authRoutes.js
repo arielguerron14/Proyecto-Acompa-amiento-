@@ -50,7 +50,7 @@ router.post('/verify-token', async (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     console.log('🚪 Logout request received');
-    const { status, data } = await HttpForwarder.forward(microAuth, '/auth/logout', 'POST', req.body);
+    const { status, data } = await HttpForwarder.forward(AUTH_SERVICE, '/auth/logout', 'POST', req.body);
     console.log('🚪 Logout response:', status);
     res.status(status).json(data);
   } catch (err) {
@@ -59,15 +59,26 @@ router.post('/logout', async (req, res) => {
   }
 });
 
-// Simplified me endpoint without auth middleware
+// Get current user from JWT token or forward to auth service
 router.get('/me', async (req, res) => {
   try {
     console.log('👤 Me request received');
-    // For now, just return a mock response since we don't have auth middleware
-    res.json({ success: false, error: 'Authentication required' });
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace('Bearer ', '');
+    
+    if (!token) {
+      console.log('❌ No token provided in Authorization header');
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    
+    console.log('🔑 Token found, forwarding to auth service to validate...');
+    // Forward the request to auth service to validate token and get user data
+    const { status, data } = await HttpForwarder.forward(AUTH_SERVICE, '/auth/me', 'GET', null, { Authorization: authHeader });
+    console.log('👤 Auth service me response:', status);
+    res.status(status).json(data);
   } catch (err) {
     console.error('❌ Me error:', err.message);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    res.status(503).json({ success: false, error: 'Auth service unavailable' });
   }
 });
 
