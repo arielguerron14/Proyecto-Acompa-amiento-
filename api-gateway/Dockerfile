@@ -34,8 +34,5 @@ RUN mkdir -p node_modules && \
 ENV NODE_ENV=production
 EXPOSE 8080
 
-# Test: Simple echo to verify the Dockerfile is being used
-RUN echo "🐳 API Gateway Docker image built successfully"
-
-# Use simple-server.js as the main entry point (fallback approach)
-CMD ["node", "simple-server.js"]
+# Use simple-server.js as the main entry point
+CMD exec node simple-server.js
