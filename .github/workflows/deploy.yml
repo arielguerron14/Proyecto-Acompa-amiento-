@@ -161,7 +161,7 @@ jobs:
           docker system prune -af --volumes 2>/dev/null || true
           docker image prune -af 2>/dev/null || true
           
-          echo "=== Phase 3: Load new images ==="
+          echo "=== Phase 3: Load new images FIRST ==="
           for FILE in /tmp/*.tar; do
             if [ -f "$FILE" ]; then
               echo "Loading $FILE..."
@@ -173,10 +173,10 @@ jobs:
           echo "=== Phase 4: Verify images loaded ==="
           docker images | head -10
           
-          echo "=== Phase 5: Deploy with docker-compose ==="
+          echo "=== Phase 5: Deploy with docker-compose (no pull) ==="
           cd ~/app
           docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
-          docker-compose up -d
+          docker-compose up -d --pull=never
           
           echo "=== Phase 6: Verify deployment ==="
           sleep 3
