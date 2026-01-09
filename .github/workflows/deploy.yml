@@ -143,8 +143,9 @@ jobs:
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
           REBUILD=${{ github.event.inputs.rebuild_docker }}
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s << 'ENDSSH'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s "$REBUILD" << 'ENDSSH'
           set -e
+          REBUILD=$1
           
           echo "=== Phase 0: Install docker-compose if needed ==="
           if ! command -v docker-compose &> /dev/null; then
