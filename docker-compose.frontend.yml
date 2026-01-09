@@ -4,7 +4,9 @@ services:
   frontend-web:
     container_name: frontend-web
     image: frontend-web:latest
-    network_mode: host
+    ports:
+      - "80:80"
+      - "443:443"
     environment:
       NODE_ENV: production
       API_GATEWAY_URL: http://172.31.76.105:8080
@@ -15,3 +17,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    networks:
+      - vpc-network
+
+networks:
+  vpc-network:
+    driver: bridge
