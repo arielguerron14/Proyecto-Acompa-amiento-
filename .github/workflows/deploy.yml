@@ -186,7 +186,7 @@ jobs:
           
           # Test connection with verbose output
           echo "🧪 Testing SSH connection..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o BatchMode=yes ec2-user@$IP "echo 'SSH connection successful' && uname -a" || {
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o BatchMode=yes ubuntu@$IP "echo 'SSH connection successful' && uname -a" || {
             echo "❌ SSH connection failed"
             echo "🔍 Checking SSH key..."
             ssh-keygen -l -f ~/.ssh/id_rsa
@@ -197,7 +197,7 @@ jobs:
           for FILE in /tmp/*.tar; do
             if [ -f "$FILE" ]; then
               echo "📦 Transferring $(basename $FILE)..."
-              scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$FILE" ec2-user@$IP:/tmp/ || {
+              scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$FILE" ubuntu@$IP:/tmp/ || {
                 echo "❌ Failed to transfer $(basename $FILE)"
                 exit 1
               }
@@ -211,7 +211,7 @@ jobs:
           IP="${{ steps.get-ip.outputs.ip }}"
           INSTANCE="${{ github.event.inputs.instance }}"
           
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ec2-user@$IP << 'ENDSSH'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP << 'ENDSSH'
           set -e
           
           echo "Deploying on $INSTANCE..."
@@ -297,7 +297,7 @@ jobs:
         run: |
           IP="${{ steps.get-ip.outputs.ip }}"
           
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ec2-user@$IP << 'ENDSSH'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP << 'ENDSSH'
           echo "=== Docker Containers ==="
           docker ps -a
           
