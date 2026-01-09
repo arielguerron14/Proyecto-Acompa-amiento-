@@ -31,12 +31,8 @@ RUN mkdir -p node_modules && \
 	mkdir -p node_modules/@proyecto && \
 	ln -sf /usr/src/shared-monitoring node_modules/@proyecto/shared-monitoring
 
-# Make start script executable
-COPY api-gateway/start.sh /usr/src/app/start.sh
-RUN chmod +x /usr/src/app/start.sh
-
 ENV NODE_ENV=production
 EXPOSE 8080
 
-# Start server with fallback (shell form to properly invoke script)
-CMD /usr/src/app/start.sh
+# Use simple-server.js as the main entry point (fallback approach)
+CMD ["node", "simple-server.js"]

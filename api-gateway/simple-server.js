@@ -22,7 +22,7 @@ app.post('/api/auth/register', (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 9000;  // Changed from 8080 to 9000
+const PORT = process.env.PORT || 8080;  // Docker port mapping
 console.log(`Attempting to listen on port ${PORT}...`);
 
 const server = app.listen(PORT, '0.0.0.0', () => {
