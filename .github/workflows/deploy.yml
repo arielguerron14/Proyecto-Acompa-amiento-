@@ -95,7 +95,7 @@ jobs:
           for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros frontend-web; do
             if [ -f "./$SERVICE/Dockerfile" ]; then
               echo "Building $SERVICE..."
-              docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+              docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
               docker save $SERVICE:latest -o /tmp/$SERVICE.tar
             fi
           done
