@@ -107,14 +107,21 @@ jobs:
       - name: Transfer files to EC2
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
+          
+          # Clean /tmp on EC2 to free space
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP "rm -f /tmp/*.tar && df -h /tmp"
+          
+          # Create app directory
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP "mkdir -p ~/app"
           
+          # Transfer Docker images
           for FILE in /tmp/*.tar; do
             if [ -f "$FILE" ]; then
               scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$FILE" ubuntu@$IP:/tmp/
             fi
           done
           
+          # Transfer docker-compose.yml
           scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ./docker-compose.ec2-core.yml ubuntu@$IP:~/app/docker-compose.yml
       
       - name: Deploy services
@@ -123,6 +130,11 @@ jobs:
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s << 'ENDSSH'
           set -e
           
+          echo "Cleaning up old Docker artifacts..."
+          docker system prune -af --volumes 2>/dev/null || true
+          docker image prune -af 2>/dev/null || true
+          
+          echo "Loading new Docker images..."
           for FILE in /tmp/*.tar; do
             if [ -f "$FILE" ]; then
               docker load -i "$FILE"
@@ -131,10 +143,14 @@ jobs:
           done
           
           cd ~/app
+          echo "Stopping and removing old containers..."
           docker-compose down -v --remove-orphans 2>/dev/null || true
           sleep 2
+          
+          echo "Starting services with force recreation..."
           docker-compose up -d --force-recreate
           sleep 5
           docker-compose ps
-          docker-compose logs --tail=20
+          echo "=== Service Logs ==="
+          docker-compose logs --tail=30
           ENDSSH
