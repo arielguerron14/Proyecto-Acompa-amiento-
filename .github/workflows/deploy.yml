@@ -68,13 +68,13 @@ jobs:
               echo "ip=13.216.12.61" >> $GITHUB_OUTPUT
               ;;
             EC2_DB)
-              echo "ip=54.252.175.217" >> $GITHUB_OUTPUT
+              echo "ip=44.200.180.90" >> $GITHUB_OUTPUT
               ;;
             EC2_API_GATEWAY)
-              echo "ip=13.211.111.226" >> $GITHUB_OUTPUT
+              echo "ip=52.71.188.181" >> $GITHUB_OUTPUT
               ;;
             EC2_FRONTEND)
-              echo "ip=3.106.109.75" >> $GITHUB_OUTPUT
+              echo "ip=107.21.124.81" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "ip=0.0.0.0" >> $GITHUB_OUTPUT
