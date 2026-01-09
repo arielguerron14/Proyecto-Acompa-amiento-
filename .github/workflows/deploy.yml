@@ -146,7 +146,6 @@ jobs:
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s "$REBUILD" << 'ENDSSH'
           set -e
           REBUILD=$1
-          echo "DEBUG: REBUILD parameter received as: '$REBUILD'"
           
           echo "=== Phase 0: Install docker-compose if needed ==="
           if ! command -v docker-compose &> /dev/null; then
