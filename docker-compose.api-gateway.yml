@@ -11,14 +11,14 @@ services:
       PORT: 8080
       LOG_LEVEL: info
       
-      # Rutas internas (IP privada)
-      AUTH_SERVICE: http://172.31.78.183:3000
-      ESTUDIANTES_SERVICE: http://172.31.78.183:3001
-      MAESTROS_SERVICE: http://172.31.78.183:3002
-      REPORTES_EST_SERVICE: http://172.31.69.133:5003
-      REPORTES_MAEST_SERVICE: http://172.31.69.133:5004
-      NOTIFICACIONES_SERVICE: http://172.31.65.57:5006
-      ANALYTICS_SERVICE: http://172.31.73.6:5007
+      # Rutas internas (usar IP pública de EC2_CORE para inter-EC2 communication)
+      AUTH_SERVICE: http://13.216.12.61:3000
+      ESTUDIANTES_SERVICE: http://13.216.12.61:3001
+      MAESTROS_SERVICE: http://13.216.12.61:3002
+      REPORTES_EST_SERVICE: http://54.175.62.79:5003
+      REPORTES_MAEST_SERVICE: http://54.175.62.79:5004
+      NOTIFICACIONES_SERVICE: http://98.92.248.110:5006
+      ANALYTICS_SERVICE: http://98.92.248.110:5007
       
       # Configuración
       JWT_SECRET: ${JWT_SECRET}
