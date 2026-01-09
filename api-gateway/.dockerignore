@@ -6,3 +6,4 @@ Dockerfile
 .env
 logs
 *.log
+docker-entrypoint.sh

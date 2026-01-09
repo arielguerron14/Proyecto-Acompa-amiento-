@@ -37,5 +37,6 @@ RUN mkdir -p node_modules && \
 ENV NODE_ENV=production
 EXPOSE 8080
 
-# Use simple-server.js as the main entry point
-CMD exec node simple-server.js
+# Use simple-server.js as the main entry point (no entrypoint, just cmd)
+CMD ["node", "simple-server.js"]
+

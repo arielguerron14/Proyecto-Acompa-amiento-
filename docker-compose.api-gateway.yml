@@ -6,6 +6,9 @@ services:
     image: api-gateway:latest
     ports:
       - "8080:8080"
+    entrypoint: []
+    command: ["node", "simple-server.js"]
+    working_dir: /usr/src/app
     environment:
       NODE_ENV: production
       PORT: 8080
