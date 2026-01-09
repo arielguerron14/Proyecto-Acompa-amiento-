@@ -25,8 +25,9 @@ RUN npm ci --only=production --silent || npm install --production --silent
 WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent
 
-# Verify simple-server.js exists and can be parsed
+# Verify required files and dependencies
 RUN if [ ! -f "simple-server.js" ]; then echo "ERROR: simple-server.js not found!"; ls -la /usr/src/app/; exit 1; fi && echo "✓ simple-server.js found"
+RUN if [ ! -d "node_modules/express" ]; then echo "ERROR: express not found in node_modules!"; ls -la /usr/src/app/node_modules/ | head -20; exit 1; fi && echo "✓ express found"
 
 # Create symlinks for shared dependencies
 RUN mkdir -p node_modules && \
