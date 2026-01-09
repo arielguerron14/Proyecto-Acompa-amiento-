@@ -10,6 +10,11 @@ class ReservasManager {
         this.isReserving = false;
     }
 
+    // Obtener base URL segura para las peticiones
+    getApiBase() {
+        return (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
+    }
+
     // ==================== SECCIÓN: Inicialización ====================
     
     async init() {
@@ -65,7 +70,8 @@ class ReservasManager {
             if (emptyEl) emptyEl.style.display = 'none';
             if (listEl) listEl.style.display = 'none';
 
-            const response = await fetch(`${authManager.baseURL}/horarios`, {
+            const base = this.getApiBase().replace(/\/$/, '');
+            const response = await fetch(`${base}/horarios`, {
                 headers: authManager.getAuthHeaders()
             });
 
@@ -365,7 +371,8 @@ class ReservasManager {
 
             // Pre-check availability
             try {
-                const checkUrl = `${authManager.baseURL}/estudiantes/reservas/check?maestroId=${encodeURIComponent(reservaData.maestroId)}&dia=${encodeURIComponent(reservaData.dia)}&inicio=${encodeURIComponent(reservaData.inicio)}`;
+                const checkBase = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
+                const checkUrl = `${checkBase.replace(/\/$/, '')}/estudiantes/reservas/check?maestroId=${encodeURIComponent(reservaData.maestroId)}&dia=${encodeURIComponent(reservaData.dia)}&inicio=${encodeURIComponent(reservaData.inicio)}`;
                 const checkRes = await fetch(checkUrl, { headers: authManager.getAuthHeaders() });
                 if (checkRes.ok) {
                     const j = await checkRes.json();
@@ -383,9 +390,10 @@ class ReservasManager {
                 console.warn('Availability check failed, proceeding to reserve:', err);
             }
 
-            const response = await fetch(`${authManager.baseURL}/estudiantes/reservar`, {
+            const reservarBase = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
+            const response = await fetch(`${reservarBase.replace(/\/$/, '')}/estudiantes/reservar`, {
                 method: 'POST',
-                headers: authManager.getAuthHeaders(),
+                headers: Object.assign({}, authManager.getAuthHeaders(), { 'Content-Type': 'application/json' }),
                 body: JSON.stringify(reservaData)
             });
 
@@ -585,7 +593,8 @@ class ReservasManager {
         if (!confirm('¿Está seguro de cancelar esta reserva?')) return;
 
         try {
-            const response = await fetch(`${authManager.baseURL}/estudiantes/reservas/${id}/cancel`, {
+            const cancelBase = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
+            const response = await fetch(`${cancelBase.replace(/\/$/, '')}/estudiantes/reservas/${id}/cancel`, {
                 method: 'PUT',
                 headers: authManager.getAuthHeaders()
             });
