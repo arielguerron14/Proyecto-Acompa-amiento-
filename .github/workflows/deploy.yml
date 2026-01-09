@@ -142,6 +142,7 @@ jobs:
       - name: Deploy services
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
+          REBUILD=${{ github.event.inputs.rebuild_docker }}
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s << 'ENDSSH'
           set -e
           
@@ -161,19 +162,23 @@ jobs:
           docker system prune -af --volumes 2>/dev/null || true
           docker image prune -af 2>/dev/null || true
           
-          echo "=== Phase 3: Load new images FIRST ==="
-          for FILE in /tmp/*.tar; do
-            if [ -f "$FILE" ]; then
-              echo "Loading $FILE..."
-              docker load -i "$FILE"
-              rm "$FILE"
-            fi
-          done
+          echo "=== Phase 3: Load new images (if rebuild_docker=true) ==="
+          if [ "$REBUILD" = "true" ]; then
+            for FILE in /tmp/*.tar; do
+              if [ -f "$FILE" ]; then
+                echo "Loading $FILE..."
+                docker load -i "$FILE"
+                rm "$FILE"
+              fi
+            done
+          else
+            echo "Skipping image load (rebuild_docker=false), will use docker pull"
+          fi
           
           echo "=== Phase 4: Verify images loaded ==="
           docker images | head -10
           
-          echo "=== Phase 5: Deploy with docker-compose (pull missing images only) ==="
+          echo "=== Phase 5: Deploy with docker-compose (pull missing images) ==="
           cd ~/app
           docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
           docker-compose up -d --pull=missing
