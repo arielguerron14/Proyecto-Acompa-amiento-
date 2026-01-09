@@ -29,7 +29,7 @@ ENV NODE_ENV=production
 EXPOSE 5001
 
 # Copy entrypoint at the end so it's not overwritten by later COPY steps
-COPY ../docker-entrypoint.sh /entrypoint.sh
+COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Use custom entrypoint for diagnostics and process management

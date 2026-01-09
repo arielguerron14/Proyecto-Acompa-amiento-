@@ -5,8 +5,8 @@ WORKDIR /usr/src
 COPY shared-auth/ /usr/src/shared-auth/
 # copy app files except entrypoint
 COPY micro-reportes-maestros/ /usr/src/app/
-# overwrite entrypoint last
-COPY micro-reportes-maestros/docker-entrypoint.sh /usr/src/app/entrypoint.sh
+# overwrite entrypoint last (from repo root)
+COPY docker-entrypoint.sh /usr/src/app/entrypoint.sh
 
 # install dependencies for shared-auth first
 WORKDIR /usr/src/shared-auth
