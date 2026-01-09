@@ -131,8 +131,9 @@ jobs:
           done
           
           cd ~/app
-          docker-compose down 2>/dev/null || true
-          docker-compose up -d
+          docker-compose down -v --remove-orphans 2>/dev/null || true
+          sleep 2
+          docker-compose up -d --force-recreate
           sleep 5
           docker-compose ps
           docker-compose logs --tail=20
