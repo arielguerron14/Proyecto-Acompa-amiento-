@@ -92,7 +92,7 @@ jobs:
       - name: Build Docker Images
         if: github.event.inputs.rebuild_docker == 'true'
         run: |
-          for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros; do
+          for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros frontend-web; do
             if [ -f "./$SERVICE/Dockerfile" ]; then
               echo "Building $SERVICE..."
               docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
