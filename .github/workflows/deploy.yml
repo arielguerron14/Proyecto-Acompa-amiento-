@@ -193,6 +193,10 @@ jobs:
             exit 1
           }
           
+          # Create app directory on remote
+          echo "📁 Creating app directory on remote..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP "mkdir -p ~/app && ls -la ~/"
+          
           # Transfer Docker images if they exist
           for FILE in /tmp/*.tar; do
             if [ -f "$FILE" ]; then
@@ -203,6 +207,13 @@ jobs:
               }
             fi
           done
+          
+          # Transfer docker-compose file
+          if [ -f "docker-compose.core.yml" ]; then
+            echo "📝 Transferring docker-compose.core.yml..."
+            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 docker-compose.core.yml ubuntu@$IP:~/app/docker-compose.yml
+          fi
+          
           echo "✓ All files transferred successfully"
       
       # 8. Deploy Services
@@ -225,25 +236,21 @@ jobs:
             fi
           done
           
-          # Go to app directory
-          if [ -d ~/app ]; then
-            cd ~/app
-          elif [ -d ~/proyecto ]; then
-            cd ~/proyecto
-          else
-            echo "App directory not found"
-            exit 1
-          fi
+          # Go to app directory (must exist after transfer)
+          cd ~/app || { echo "❌ App directory not found"; exit 1; }
+          ls -la
           
           # Start services with docker-compose
           if [ -f docker-compose.yml ]; then
-            echo "Starting services..."
+            echo "✅ Starting services..."
             docker-compose down 2>/dev/null || true
             docker-compose up -d
             sleep 5
             docker-compose ps
+            echo "✅ Services started successfully"
           else
-            echo "docker-compose.yml not found"
+            echo "❌ docker-compose.yml not found in ~/app"
+            ls -la ~/app
             exit 1
           fi
           
