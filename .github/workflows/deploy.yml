@@ -156,8 +156,19 @@ jobs:
           
           echo "=== Phase 1: Remove old containers ==="
           docker-compose -f ~/app/docker-compose.yml down 2>/dev/null || true
-          
-          echo "=== Phase 2: Load new images (if rebuild_docker=true) ==="
+
+          echo "=== Phase 2: Remove old images (if rebuild_docker=true) ==="
+          if [ "$REBUILD" = "true" ]; then
+            echo "Removing old images to prevent caching issues..."
+            docker rmi api-gateway:latest 2>/dev/null || true
+            docker rmi micro-auth:latest 2>/dev/null || true
+            docker rmi micro-estudiantes:latest 2>/dev/null || true
+            docker rmi micro-maestros:latest 2>/dev/null || true
+            docker rmi frontend-web:latest 2>/dev/null || true
+            docker image prune -f
+          fi
+
+          echo "=== Phase 3: Load new images (if rebuild_docker=true) ==="
           if [ "$REBUILD" = "true" ]; then
             for FILE in /tmp/*.tar; do
               if [ -f "$FILE" ]; then
@@ -168,14 +179,12 @@ jobs:
             done
           else
             echo "Skipping image load (rebuild_docker=false)"
-          fi
-          
-          echo "=== Phase 3: Deploy with docker-compose ==="
+          fi          echo "=== Phase 4: Deploy with docker-compose ==="
           cd ~/app
           docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
           docker-compose up -d --pull=missing
           
-          echo "=== Phase 4: Verify deployment ==="
+          echo "=== Phase 5: Verify deployment ==="
           sleep 5
           docker-compose ps
           docker-compose logs --tail=30
