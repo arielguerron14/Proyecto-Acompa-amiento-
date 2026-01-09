@@ -25,7 +25,7 @@ module.exports = {
 
     // API Gateway - IP pública para acceso desde frontend
     API_GATEWAY_IP: process.env.API_GATEWAY_IP || '52.71.188.181',
-    API_GATEWAY_PORT: process.env.API_GATEWAY_PORT || 8080,
+    API_GATEWAY_PORT: process.env.API_GATEWAY_PORT || 3000,
     API_GATEWAY_URL: function() {
       return `http://${this.API_GATEWAY_IP}:${this.API_GATEWAY_PORT}`;
     },
@@ -67,7 +67,7 @@ module.exports = {
     PROMETHEUS_PORT: process.env.PROMETHEUS_PORT || 9090,
     GRAFANA_PORT: process.env.GRAFANA_PORT || 3000,
 
-    // Kafka - IP pública
+    // Kafka - IP pública (no disponible en lista)
     KAFKA_IP: process.env.KAFKA_IP || '52.86.104.42',
     KAFKA_PORT: process.env.KAFKA_PORT || 9092,
     KAFKA_URL: function() {
@@ -88,7 +88,7 @@ module.exports = {
       return `http://${this.GRAFANA_PUBLIC_IP}:${this.GRAFANA_PUBLIC_PORT}`;
     },
 
-    // RabbitMQ - IP pública
+    // RabbitMQ - IP pública (no disponible en lista)
     RABBITMQ_IP: process.env.RABBITMQ_IP || '44.202.235.19',
     RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
     RABBITMQ_MANAGEMENT_PORT: process.env.RABBITMQ_MANAGEMENT_PORT || 15672,
