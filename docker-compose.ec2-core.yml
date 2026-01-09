@@ -10,9 +10,10 @@ services:
       - mongo_data:/data/db
     networks:
       - core-net
-  api-gateway:
-    image: api-gateway:latest
-    container_name: api-gateway
+
+  micro-auth:
+    image: micro-auth:latest
+    container_name: micro-auth
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -23,9 +24,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-  micro-auth:
-    image: micro-auth:latest
-    container_name: micro-auth
+
+  micro-estudiantes:
+    image: micro-estudiantes:latest
+    container_name: micro-estudiantes
     restart: unless-stopped
     ports:
       - "3001:3001"
@@ -36,19 +38,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-  micro-estudiantes:
-    image: micro-estudiantes:latest
-    container_name: micro-estudiantes
-    restart: unless-stopped
-    ports:
-      - "3003:3003"
-    depends_on:
-      - mongo
-    networks:
-      - core-net
-    environment:
-      NODE_ENV: production
-      PORT: 3003
+
   micro-maestros:
     image: micro-maestros:latest
     container_name: micro-maestros
@@ -62,8 +52,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3002
+
 networks:
   core-net:
     driver: bridge
+
 volumes:
   mongo_data:

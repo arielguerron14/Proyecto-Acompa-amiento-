@@ -3,10 +3,7 @@ version: '3.8'
 services:
   api-gateway:
     container_name: api-gateway
-    image: proyecto-acompanamiento:api-gateway
-    build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
+    image: api-gateway:latest
     ports:
       - "8080:8080"
     environment:
