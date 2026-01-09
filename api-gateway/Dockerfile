@@ -1,29 +1,40 @@
 FROM node:18-slim
 
-WORKDIR /usr/src/app
+WORKDIR /usr/src
 
 # Install curl for container healthcheck
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends curl ca-certificates \
 	&& rm -rf /var/lib/apt/lists/*
 
-# Copy package manifests from the api-gateway directory
-COPY api-gateway/package*.json ./
+# Copy shared modules
+COPY shared-auth/ /usr/src/shared-auth/
+COPY shared-monitoring/ /usr/src/shared-monitoring/
 
-# Install production dependencies
-RUN npm install --production
+# Copy api-gateway code
+COPY api-gateway/ /usr/src/app/
 
-# Copy api-gateway source files
-COPY api-gateway/server.js ./
-COPY api-gateway/src ./src
-COPY api-gateway/.env* ./
+# Copy infrastructure config
+COPY infrastructure.config.js /usr/src/
+COPY scripts/ /usr/src/scripts/
+COPY docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Copy shared dependencies
-COPY shared-config ./shared-config
+# Install production dependencies for shared modules first
+WORKDIR /usr/src/shared-auth
+RUN npm ci --only=production --silent || npm install --production --silent
 
-# Expose and use port 8080 to match docker-compose configuration
-ENV PORT=8080
+WORKDIR /usr/src/app
+RUN npm ci --only=production --silent || npm install --production --silent
+
+# Create symlinks for shared dependencies
+RUN mkdir -p node_modules && \
+	ln -sf /usr/src/shared-auth node_modules/shared-auth && \
+	mkdir -p node_modules/@proyecto && \
+	ln -sf /usr/src/shared-monitoring node_modules/@proyecto/shared-monitoring
+
+ENV NODE_ENV=production
 EXPOSE 8080
 
-# Start server directly
+# Start server
 CMD ["node", "server.js"]
