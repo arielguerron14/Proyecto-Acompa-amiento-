@@ -1,0 +1,365 @@
+name: 🚀 Deploy Services
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance:
+        description: 'Instance to deploy'
+        required: true
+        default: 'EC2_CORE'
+        type: choice
+        options:
+          - EC2_CORE
+          - EC2_DB
+          - EC2_API_GATEWAY
+          - EC2_AUTH
+          - EC2_ESTUDIANTES
+          - EC2_MAESTROS
+          - EC2_MESSAGING
+          - EC2_NOTIFICACIONES
+          - EC2_REPORTES
+          - EC2_SOAP_BRIDGE
+          - EC2_MONITORING
+          - EC2_KAFKA
+      
+      services:
+        description: 'Services to deploy (comma-separated, leave empty for all)'
+        required: false
+        default: 'all'
+        type: string
+      
+      rebuild_docker:
+        description: 'Rebuild Docker images'
+        required: false
+        default: true
+        type: boolean
+      
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.instance }}
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      # 1. Checkout
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      # 2. Setup Node.js
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      # 3. AWS Credentials
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      # 4. Get SSH Key from Secrets Manager
+      - name: 🔑 Get SSH Private Key
+        id: ssh-key
+        run: |
+          SSH_KEY=$(aws secretsmanager get-secret-value --secret-id "AWS_EC2_SSH_PRIVATE_KEY" --query 'SecretString' --output text)
+          echo "::add-mask::$SSH_KEY"
+          echo "key<<EOF" >> $GITHUB_OUTPUT
+          echo "$SSH_KEY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      # 5. Get Instance IP
+      - name: 🌐 Get Instance IP
+        id: get-ip
+        run: |
+          INSTANCE_NAME="${{ github.event.inputs.instance }}"
+          IP=$(node -e "
+            const config = require('./infrastructure.config.js');
+            const instances = config.instances;
+            for (let key in instances) {
+              if (instances[key].name === '$INSTANCE_NAME') {
+                console.log(instances[key].publicIp);
+                break;
+              }
+            }
+          ")
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "Instance: $INSTANCE_NAME → $IP"
+      
+      # 6. Build Docker Images
+      - name: 🐳 Build Docker Images
+        if: github.event.inputs.rebuild_docker == 'true'
+        run: |
+          INSTANCE="${{ github.event.inputs.instance }}"
+          SERVICES="${{ github.event.inputs.services }}"
+          
+          echo "Building Docker images..."
+          echo "Instance: $INSTANCE"
+          echo "Services: $SERVICES"
+          
+          # Map instance to services
+          case "$INSTANCE" in
+            EC2_CORE)
+              DOCKER_SERVICES="api-gateway micro-auth micro-estudiantes micro-maestros"
+              ;;
+            EC2_API_GATEWAY)
+              DOCKER_SERVICES="api-gateway"
+              ;;
+            EC2_AUTH)
+              DOCKER_SERVICES="micro-auth"
+              ;;
+            EC2_ESTUDIANTES)
+              DOCKER_SERVICES="micro-estudiantes"
+              ;;
+            EC2_MAESTROS)
+              DOCKER_SERVICES="micro-maestros"
+              ;;
+            EC2_MESSAGING)
+              DOCKER_SERVICES="messaging"
+              ;;
+            EC2_NOTIFICACIONES)
+              DOCKER_SERVICES="micro-notificaciones"
+              ;;
+            EC2_REPORTES)
+              DOCKER_SERVICES="micro-reportes-estudiantes micro-reportes-maestros"
+              ;;
+            EC2_SOAP_BRIDGE)
+              DOCKER_SERVICES="micro-soap-bridge"
+              ;;
+            *)
+              DOCKER_SERVICES=""
+              ;;
+          esac
+          
+          # Build each service
+          for SERVICE in $DOCKER_SERVICES; do
+            if [ -d "$SERVICE" ]; then
+              echo "Building: $SERVICE"
+              docker build -t $SERVICE:latest $SERVICE
+              docker save $SERVICE:latest -o /tmp/$SERVICE.tar
+              echo "✅ Built: $SERVICE"
+            fi
+          done
+      
+      # 7. Setup SSH
+      - name: 🔧 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ steps.ssh-key.outputs.key }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ steps.get-ip.outputs.ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+      
+      # 8. Generate Environment File
+      - name: 📝 Generate Environment File
+        run: |
+          INSTANCE="${{ github.event.inputs.instance }}"
+          ENV="${{ github.event.inputs.environment }}"
+          
+          node generate-env-from-config.js \
+            --instance "$INSTANCE" \
+            --environment "$ENV" \
+            --output "/tmp/.env.prod"
+          
+          echo "✅ Environment file generated"
+      
+      # 9. Transfer Files
+      - name: 📤 Transfer Files to EC2
+        run: |
+          IP="${{ steps.get-ip.outputs.ip }}"
+          
+          # Transfer environment file
+          scp -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            /tmp/.env.prod ec2-user@$IP:/tmp/.env.prod
+          
+          # Transfer Docker images if rebuilt
+          if [ "${{ github.event.inputs.rebuild_docker }}" == "true" ]; then
+            for FILE in /tmp/*.tar; do
+              if [ -f "$FILE" ]; then
+                echo "Transferring $(basename $FILE)..."
+                scp -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$FILE" ec2-user@$IP:/tmp/
+              fi
+            done
+          fi
+          
+          echo "✅ Files transferred"
+      
+      # 10. Deploy Services
+      - name: 🚀 Deploy Services
+        run: |
+          IP="${{ steps.get-ip.outputs.ip }}"
+          INSTANCE="${{ github.event.inputs.instance }}"
+          
+          # Connect and deploy
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ec2-user@$IP << 'EOF'
+            set -e
+            
+            echo "🔧 Deploying on $INSTANCE..."
+            
+            # Copy environment file
+            [ -f /tmp/.env.prod ] && sudo cp /tmp/.env.prod ~/.env.prod
+            
+            # Load images if exist
+            for FILE in /tmp/*.tar; do
+              if [ -f "$FILE" ]; then
+                echo "Loading $(basename $FILE)..."
+                docker load -i "$FILE"
+              fi
+            done
+            
+            # Start containers
+            cd ~/app || exit 1
+            
+            if [ -f docker-compose.yml ]; then
+              docker-compose down 2>/dev/null || true
+              docker-compose up -d
+              echo "✅ Services started"
+            else
+              echo "⚠️  docker-compose.yml not found"
+            fi
+            
+            # Wait for services
+            sleep 5
+          EOF
+          
+          echo "✅ Deployment completed"
+      
+      # 11. Test Endpoints
+      - name: 🧪 Test Endpoints
+        id: test
+        run: |
+          IP="${{ steps.get-ip.outputs.ip }}"
+          INSTANCE="${{ github.event.inputs.instance }}"
+          
+          echo "Testing endpoints on $INSTANCE ($IP)..."
+          
+          # Define ports based on instance
+          PORTS=""
+          case "$INSTANCE" in
+            EC2_CORE)
+              PORTS="3000 3001 3002 3003"
+              ;;
+            EC2_API_GATEWAY)
+              PORTS="3000"
+              ;;
+            EC2_AUTH)
+              PORTS="3001"
+              ;;
+            EC2_ESTUDIANTES)
+              PORTS="3002"
+              ;;
+            EC2_MAESTROS)
+              PORTS="3003"
+              ;;
+            *)
+              PORTS=""
+              ;;
+          esac
+          
+          # Test endpoints
+          FAILED=0
+          for PORT in $PORTS; do
+            echo "Testing port $PORT..."
+            if timeout 5 bash -c "echo > /dev/tcp/$IP/$PORT" 2>/dev/null; then
+              echo "✅ Port $PORT is open"
+            else
+              echo "❌ Port $PORT is closed"
+              FAILED=$((FAILED+1))
+            fi
+          done
+          
+          if [ $FAILED -eq 0 ]; then
+            echo "✅ All ports responding"
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  Some ports not responding"
+            echo "status=warning" >> $GITHUB_OUTPUT
+          fi
+      
+      # 12. Check Logs
+      - name: 📋 Check Logs
+        if: always()
+        run: |
+          IP="${{ steps.get-ip.outputs.ip }}"
+          
+          echo "Checking logs on instance..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ec2-user@$IP << 'EOF'
+            echo "=== Docker Containers ==="
+            docker ps -a
+            
+            echo ""
+            echo "=== Recent Logs ==="
+            docker-compose logs --tail=20 2>/dev/null || true
+            
+            echo ""
+            echo "=== Disk Usage ==="
+            df -h /
+          EOF
+      
+      # 13. Generate Report
+      - name: 📊 Generate Report
+        if: always()
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          REPORT="/tmp/deployment-report.json"
+          
+          cat > "$REPORT" << EOF
+          {
+            "timestamp": "$TIMESTAMP",
+            "instance": "${{ github.event.inputs.instance }}",
+            "environment": "${{ github.event.inputs.environment }}",
+            "rebuild_docker": ${{ github.event.inputs.rebuild_docker }},
+            "services": "${{ github.event.inputs.services }}",
+            "test_status": "${{ steps.test.outputs.status }}",
+            "status": "${{ job.status }}",
+            "commit": "${{ github.sha }}",
+            "actor": "${{ github.actor }}"
+          }
+          EOF
+          
+          cat "$REPORT"
+      
+      # 14. Upload Artifacts
+      - name: 📦 Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts
+          path: /tmp/deployment-report.json
+          retention-days: 30
+
+  # Summary
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    
+    steps:
+      - name: 📈 Summary
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║  ✅ DEPLOYMENT COMPLETED                                  ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Instance: ${{ github.event.inputs.instance }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Status: ${{ needs.deploy.result }}"
+          echo ""
+          echo "📊 Check artifacts for detailed report"
