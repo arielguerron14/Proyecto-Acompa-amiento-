@@ -130,27 +130,31 @@ jobs:
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s << 'ENDSSH'
           set -e
           
-          echo "Cleaning up old Docker artifacts..."
+          echo "=== Phase 1: Force remove all containers ==="
+          docker stop $(docker ps -aq) 2>/dev/null || true
+          docker rm $(docker ps -aq) -f 2>/dev/null || true
+          
+          echo "=== Phase 2: System cleanup ==="
           docker system prune -af --volumes 2>/dev/null || true
           docker image prune -af 2>/dev/null || true
           
-          echo "Loading new Docker images..."
+          echo "=== Phase 3: Load new images ==="
           for FILE in /tmp/*.tar; do
             if [ -f "$FILE" ]; then
+              echo "Loading $FILE..."
               docker load -i "$FILE"
               rm "$FILE"
             fi
           done
           
+          echo "=== Phase 4: Deploy with docker-compose ==="
           cd ~/app
-          echo "Stopping and removing old containers..."
-          docker-compose down -v --remove-orphans 2>/dev/null || true
-          sleep 2
+          docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
+          docker-compose up -d
           
-          echo "Starting services with force recreation..."
-          docker-compose up -d --force-recreate
-          sleep 5
+          echo "=== Phase 5: Verify deployment ==="
+          sleep 3
           docker-compose ps
           echo "=== Service Logs ==="
-          docker-compose logs --tail=30
+          docker-compose logs --tail=50
           ENDSSH
