@@ -1,0 +1,93 @@
+name: Force Deploy Frontend on Push
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-1
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  deploy-frontend:
+    name: Deploy Frontend on Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Get SSH key
+        id: ssh-key
+        run: |
+          KEY="${{ secrets.SSH_PRIVATE_KEY }}"
+          printf '%s\n' "key<<EOF" >> $GITHUB_OUTPUT
+          printf '%s\n' "$KEY" >> $GITHUB_OUTPUT
+          printf '%s\n' "EOF" >> $GITHUB_OUTPUT
+
+      - name: Set frontend IP
+        id: get-ip
+        run: |
+          echo "ip=107.21.124.81" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ steps.ssh-key.outputs.key }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub 2>&1 || exit 1
+          ssh-keyscan -H ${{ steps.get-ip.outputs.ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Build Frontend Image
+        run: |
+          echo "Building frontend-web..."
+          if [ -f "./frontend-web/Dockerfile" ]; then
+            docker build --no-cache -t frontend-web:latest -f ./frontend-web/Dockerfile ./frontend-web
+            docker save frontend-web:latest -o /tmp/frontend-web.tar
+          else
+            echo "⚠️ frontend Dockerfile not found, skipping build"
+          fi
+
+      - name: Transfer files to EC2 frontend
+        run: |
+          IP=${{ steps.get-ip.outputs.ip }}
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP "mkdir -p ~/app"
+          if [ -f /tmp/frontend-web.tar ]; then
+            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 /tmp/frontend-web.tar ubuntu@$IP:/tmp/
+          fi
+          if [ -f ./docker-compose.frontend.yml ]; then
+            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ./docker-compose.frontend.yml ubuntu@$IP:~/app/docker-compose.yml
+          else
+            echo "⚠️ docker-compose.frontend.yml not found"
+          fi
+
+      - name: Deploy frontend on EC2
+        run: |
+          IP=${{ steps.get-ip.outputs.ip }}
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s << 'ENDSSH'
+          set -e
+          if ! command -v docker-compose &> /dev/null; then
+            echo "Installing docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
+          docker-compose -f ~/app/docker-compose.yml down 2>/dev/null || true
+          if [ -f /tmp/frontend-web.tar ]; then
+            docker load -i /tmp/frontend-web.tar || true
+            rm -f /tmp/frontend-web.tar || true
+          fi
+          cd ~/app
+          docker-compose up -d --pull=missing
+          sleep 5
+          docker-compose ps
+          docker-compose logs --tail=30
+          ENDSSH
