@@ -133,16 +133,60 @@ async function handleSubmit(event) {
                         localStorage.setItem('user', JSON.stringify(result.user));
                     }
                     
-                    // Redirigir según el rol
+                    // Intentar determinar el usuario/rol. Si el backend no devuelve
+                    // `result.user`, intentamos consultar `/auth/me` usando el token
+                    // y / o leerlo de localStorage.
+                    let user = result.user || null;
+
+                    // Si no tenemos user y hay token, intentar recuperar perfil
+                    if (!user && localStorage.getItem('token')) {
+                        try {
+                            const profileRes = await fetch(window.API_CONFIG.buildUrl('/auth/me'), {
+                                method: 'GET',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer ' + localStorage.getItem('token')
+                                }
+                            });
+
+                            if (profileRes.ok) {
+                                const profileJson = await profileRes.json();
+                                // Acomodar distintos shapes: { user: {...} } o directamente { role: '...' }
+                                if (profileJson.user) {
+                                    user = profileJson.user;
+                                } else if (profileJson.role || profileJson.email) {
+                                    user = profileJson;
+                                }
+
+                                if (user) {
+                                    localStorage.setItem('user', JSON.stringify(user));
+                                }
+                            }
+                        } catch (err) {
+                            // No bloquear el flujo si falla la consulta del perfil
+                            console.warn('No se pudo recuperar perfil tras login:', err);
+                        }
+                    }
+
+                    // También permitir que el user venga de localStorage previo
+                    if (!user && localStorage.getItem('user')) {
+                        try {
+                            user = JSON.parse(localStorage.getItem('user'));
+                        } catch (e) {
+                            user = null;
+                        }
+                    }
+
+                    // Redirigir según rol (fallback: dashboard.html)
                     let redirectUrl = 'dashboard.html';
-                    if (result.user && result.user.role) {
-                        if (result.user.role === 'estudiante') {
+                    if (user && user.role) {
+                        if (user.role === 'estudiante') {
                             redirectUrl = 'estudiante.html';
-                        } else if (result.user.role === 'maestro') {
+                        } else if (user.role === 'maestro') {
                             redirectUrl = 'maestro.html';
                         }
                     }
-                    
+
                     // Usar redirección relativa
                     setTimeout(() => {
                         window.location.href = redirectUrl;

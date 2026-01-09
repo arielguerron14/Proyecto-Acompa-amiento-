@@ -131,8 +131,28 @@
             // Si no hay token, redirigir a login
             window.location.href = 'index.html';
         } else {
-            // Cargar la información del usuario
-            loadUserInfo();
+            // Intentar obtener info del usuario desde localStorage
+            let user = null;
+            try {
+                const raw = localStorage.getItem('user');
+                if (raw) user = JSON.parse(raw);
+            } catch (e) {
+                user = null;
+            }
+
+            // Si conocemos el rol, redirigir al dashboard específico
+            if (user && user.role) {
+                if (user.role === 'estudiante') {
+                    window.location.href = 'estudiante.html';
+                } else if (user.role === 'maestro') {
+                    window.location.href = 'maestro.html';
+                } else {
+                    loadUserInfo();
+                }
+            } else {
+                // Si no hay rol conocido, cargar info genérica
+                loadUserInfo();
+            }
         }
     </script>
 </body>
