@@ -208,11 +208,89 @@ jobs:
             fi
           done
           
-          # Transfer docker-compose file
-          if [ -f "docker-compose.core.yml" ]; then
-            echo "📝 Transferring docker-compose.core.yml..."
-            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 docker-compose.core.yml ubuntu@$IP:~/app/docker-compose.yml
-          fi
+          # Generate and transfer docker-compose file for the instance
+          echo "📝 Generating docker-compose.yml for $INSTANCE..."
+          cat > /tmp/docker-compose.yml << 'COMPOSE_EOF'
+version: '3.8'
+services:
+  mongo:
+    image: mongo:6
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - core-net
+    environment:
+      MONGO_INITDB_DATABASE: proyecto
+
+  api-gateway:
+    image: api-gateway:latest
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+
+  micro-auth:
+    image: micro-auth:latest
+    container_name: micro-auth
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongo
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+
+  micro-estudiantes:
+    image: micro-estudiantes:latest
+    container_name: micro-estudiantes
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    depends_on:
+      - mongo
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+
+  micro-maestros:
+    image: micro-maestros:latest
+    container_name: micro-maestros
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    depends_on:
+      - mongo
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+
+networks:
+  core-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+COMPOSE_EOF
+          
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 /tmp/docker-compose.yml ubuntu@$IP:~/app/docker-compose.yml
           
           echo "✓ All files transferred successfully"
       
