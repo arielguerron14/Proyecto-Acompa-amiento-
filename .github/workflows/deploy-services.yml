@@ -181,7 +181,7 @@ jobs:
       - name: 📝 Generate docker-compose.yml
         run: |
           mkdir -p /tmp/app
-          cat > /tmp/app/docker-compose.yml << 'EOF'
+          cat > /tmp/app/docker-compose.yml << 'COMPOSE_END'
 version: '3.8'
 services:
   mongo:
@@ -196,7 +196,6 @@ services:
       - core-net
     environment:
       MONGO_INITDB_DATABASE: proyecto
-
   api-gateway:
     image: api-gateway:latest
     container_name: api-gateway
@@ -210,7 +209,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-
   micro-auth:
     image: micro-auth:latest
     container_name: micro-auth
@@ -224,7 +222,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-
   micro-estudiantes:
     image: micro-estudiantes:latest
     container_name: micro-estudiantes
@@ -238,7 +235,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3003
-
   micro-maestros:
     image: micro-maestros:latest
     container_name: micro-maestros
@@ -252,14 +248,12 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3002
-
 networks:
   core-net:
     driver: bridge
-
 volumes:
   mongo_data:
-EOF
+COMPOSE_END
 
       # 8. Transfer SSH Key and Files
       - name: 📤 Transfer to EC2
