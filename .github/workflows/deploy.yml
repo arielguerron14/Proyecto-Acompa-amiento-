@@ -179,7 +179,9 @@ jobs:
             done
           else
             echo "Skipping image load (rebuild_docker=false)"
-          fi          echo "=== Phase 4: Deploy with docker-compose ==="
+          fi
+          
+          echo "=== Phase 4: Deploy with docker-compose ==="
           cd ~/app
           docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
           docker-compose up -d --pull=missing
