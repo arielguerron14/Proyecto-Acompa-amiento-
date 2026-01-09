@@ -3,30 +3,22 @@ version: '3.8'
 services:
   frontend-web:
     container_name: frontend-web
-    image: proyecto-acompanamiento:frontend-web
-    build:
-      context: ./frontend-web
-      dockerfile: Dockerfile
+    image: frontend-web:latest
     ports:
       - "80:80"
       - "443:443"
     environment:
       NODE_ENV: production
-      API_ENDPOINT: http://52.71.188.181:8080
-      API_ENDPOINT_PRIVATE: http://172.31.76.105:8080
       API_GATEWAY_URL: http://52.71.188.181:8080
       API_GATEWAY_HOST: 52.71.188.181
-    volumes:
-      - ./frontend-web:/app
-      - /app/node_modules
-    networks:
-      - vpc-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 10s
       timeout: 5s
       retries: 3
+    networks:
+      - vpc-network
 
 networks:
   vpc-network:
