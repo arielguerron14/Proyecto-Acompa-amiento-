@@ -159,13 +159,14 @@ jobs:
           echo "Services to build: $DOCKER_SERVICES"
           
           for SERVICE in $DOCKER_SERVICES; do
-            if [ -d "$SERVICE" ] && [ -f "$SERVICE/Dockerfile" ]; then
-              echo "✓ Building: $SERVICE"
-              docker build -t $SERVICE:latest $SERVICE
-              docker save $SERVICE:latest -o /tmp/$SERVICE.tar
-              ls -lh /tmp/$SERVICE.tar
+            # Use repository root as build context and the service's Dockerfile
+            if [ -f "./$SERVICE/Dockerfile" ]; then
+              echo "✓ Building: $SERVICE using root context"
+              docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+              docker save $SERVICE:latest -o /tmp/$SERVICE.tar || true
+              ls -lh /tmp/$SERVICE.tar || true
             else
-              echo "⚠ Skipping $SERVICE (not found or no Dockerfile)"
+              echo "⚠ Skipping $SERVICE (Dockerfile not found at ./$SERVICE/Dockerfile)"
             fi
           done
       
