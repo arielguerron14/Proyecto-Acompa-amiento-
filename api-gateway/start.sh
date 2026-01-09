@@ -3,6 +3,8 @@
 
 echo "🚀 Starting API Gateway..."
 echo "Current working directory: $(pwd)"
+cd /usr/src/app
+echo "Changed to: $(pwd)"
 echo "Files in current directory:"
 ls -la
 
