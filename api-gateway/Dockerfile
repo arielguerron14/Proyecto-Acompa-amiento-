@@ -38,5 +38,5 @@ RUN chmod +x /usr/src/app/start.sh
 ENV NODE_ENV=production
 EXPOSE 8080
 
-# Start server with fallback
-CMD ["/usr/src/app/start.sh"]
+# Start server with fallback (shell form to properly invoke script)
+CMD /usr/src/app/start.sh
