@@ -1,0 +1,97 @@
+name: Deploy Instance Suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_name:
+        description: 'Select instance to deploy'
+        required: true
+        type: choice
+        options:
+          - EC2_CORE
+          - EC2_DB
+          - EC2_API_GATEWAY
+          - EC2_AUTH
+          - EC2_ESTUDIANTES
+          - EC2_MAESTROS
+          - EC2_MESSAGING
+          - EC2_NOTIFICACIONES
+          - EC2_REPORTES
+          - EC2_SOAP_BRIDGE
+          - EC2_MONITORING
+          - EC2_KAFKA
+      
+      skip_build:
+        description: 'Skip Docker rebuild'
+        required: false
+        type: boolean
+        default: false
+      
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.instance_name }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔑 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          aws secretsmanager get-secret-value \
+            --secret-id "AWS_EC2_SSH_PRIVATE_KEY" \
+            --query 'SecretString' \
+            --output text > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: 🚀 Deploy with Suite
+        run: |
+          pwsh -Command @"
+          Write-Host "╔════════════════════════════════════════════════════════════╗"
+          Write-Host "║  🚀 DEPLOY & VALIDATE SUITE - GitHub Actions             ║"
+          Write-Host "╚════════════════════════════════════════════════════════════╝"
+          Write-Host ""
+          
+          `$params = @{
+              InstanceName = '${{ inputs.instance_name }}'
+              Environment = '${{ inputs.environment }}'
+              AutoContinue = `$true
+          }
+          
+          if ('${{ inputs.skip_build }}' -eq 'true') {
+              `$params['SkipImageBuild'] = `$true
+              Write-Host "⏭️  Skipping Docker rebuild"
+          }
+          
+          & '.\deploy-and-validate.ps1' @params
+          "@
+
+      - name: 📤 Upload Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-${{ inputs.instance_name }}-report
+          path: deploy-validation-*.json
+          retention-days: 30
