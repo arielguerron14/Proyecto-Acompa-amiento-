@@ -6,6 +6,9 @@ console.log('Environment PORT:', process.env.PORT);
 
 const app = express();
 
+// Middleware to parse JSON
+app.use(express.json());
+
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
 });
@@ -23,10 +26,27 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 app.post('/api/auth/login', (req, res) => {
+  // Extract email from request body
+  const email = req.body?.email || 'user@test.com';
+  
+  // Determine role based on email (for test purposes)
+  // If email contains 'maestro' or 'teacher', assign maestro role, otherwise estudiante
+  let role = 'estudiante'; // default
+  if (email.toLowerCase().includes('maestro') || 
+      email.toLowerCase().includes('teacher') ||
+      email.toLowerCase().includes('profesor')) {
+    role = 'maestro';
+  }
+  
   res.json({ 
     success: true, 
     message: 'Login successful',
-    token: 'test-jwt-token-12345'
+    token: 'test-jwt-token-12345',
+    user: {
+      email: email,
+      role: role,
+      name: 'Test User'
+    }
   });
 });
 
