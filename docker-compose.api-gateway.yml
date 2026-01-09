@@ -4,8 +4,7 @@ services:
   api-gateway:
     container_name: api-gateway
     image: api-gateway:latest
-    ports:
-      - "8080:8080"
+    network_mode: host
     environment:
       NODE_ENV: production
       PORT: 8080
@@ -24,18 +23,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       RATE_LIMIT: 100
       TIMEOUT: 30000
-    networks:
-      - vpc-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 3
-
-networks:
-  vpc-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.18.0.0/16
