@@ -7,14 +7,19 @@ RUN apt-get update \
 	&& apt-get install -y --no-install-recommends curl ca-certificates \
 	&& rm -rf /var/lib/apt/lists/*
 
-# Copy package manifests from the build context (api-gateway/ when built by compose)
-COPY package*.json ./
+# Copy package manifests from the api-gateway directory
+COPY api-gateway/package*.json ./
 
 # Install production dependencies
 RUN npm install --production
 
-# Copy source files from the build context
-COPY . .
+# Copy api-gateway source files
+COPY api-gateway/server.js ./
+COPY api-gateway/src ./src
+COPY api-gateway/.env* ./
+
+# Copy shared dependencies
+COPY shared-config ./shared-config
 
 # Expose and use port 8080 to match docker-compose configuration
 ENV PORT=8080
