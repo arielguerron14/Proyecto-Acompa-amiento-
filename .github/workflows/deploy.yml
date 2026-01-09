@@ -1,0 +1,207 @@
+name: Deploy EC2 CORE
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance:
+        description: 'Instance to deploy'
+        required: true
+        default: 'EC2_CORE'
+        type: choice
+        options:
+          - EC2_CORE
+          - EC2_DB
+          - EC2_API_GATEWAY
+          - EC2_FRONTEND
+      rebuild_docker:
+        description: 'Rebuild Docker images'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  deploy-ec2:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      
+      - name: Get SSH key
+        id: ssh-key
+        run: |
+          KEY="${{ secrets.SSH_PRIVATE_KEY }}"
+          echo "key=$KEY" >> $GITHUB_OUTPUT
+      
+      - name: Get EC2 IP
+        id: get-ip
+        run: |
+          case "${{ github.event.inputs.instance }}" in
+            EC2_CORE)
+              echo "ip=13.216.12.61" >> $GITHUB_OUTPUT
+              ;;
+            EC2_DB)
+              echo "ip=54.252.175.217" >> $GITHUB_OUTPUT
+              ;;
+            EC2_API_GATEWAY)
+              echo "ip=13.211.111.226" >> $GITHUB_OUTPUT
+              ;;
+            EC2_FRONTEND)
+              echo "ip=3.106.109.75" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "ip=0.0.0.0" >> $GITHUB_OUTPUT
+              ;;
+          esac
+      
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ steps.ssh-key.outputs.key }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub 2>&1 || exit 1
+          ssh-keyscan -H ${{ steps.get-ip.outputs.ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+      
+      - name: Build Docker Images
+        if: github.event.inputs.rebuild_docker == 'true'
+        run: |
+          for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros; do
+            if [ -f "./$SERVICE/Dockerfile" ]; then
+              echo "Building $SERVICE..."
+              docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+              docker save $SERVICE:latest -o /tmp/$SERVICE.tar
+            fi
+          done
+      
+      - name: Generate docker-compose
+        run: |
+          mkdir -p /tmp/app
+          cat > /tmp/app/docker-compose.yml << ENDFILE
+version: '3.8'
+services:
+  mongo:
+    image: mongo:6
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - core-net
+  api-gateway:
+    image: api-gateway:latest
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+  micro-auth:
+    image: micro-auth:latest
+    container_name: micro-auth
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongo
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+  micro-estudiantes:
+    image: micro-estudiantes:latest
+    container_name: micro-estudiantes
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    depends_on:
+      - mongo
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+  micro-maestros:
+    image: micro-maestros:latest
+    container_name: micro-maestros
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    depends_on:
+      - mongo
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+networks:
+  core-net:
+    driver: bridge
+volumes:
+  mongo_data:
+ENDFILE
+      
+      - name: Transfer files to EC2
+        run: |
+          IP=${{ steps.get-ip.outputs.ip }}
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP "mkdir -p ~/app"
+          
+          for FILE in /tmp/*.tar; do
+            if [ -f "$FILE" ]; then
+              scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$FILE" ubuntu@$IP:/tmp/
+            fi
+          done
+          
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 /tmp/app/docker-compose.yml ubuntu@$IP:~/app/docker-compose.yml
+      
+      - name: Deploy services
+        run: |
+          IP=${{ steps.get-ip.outputs.ip }}
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s << 'ENDSSH'
+          set -e
+          
+          for FILE in /tmp/*.tar; do
+            if [ -f "$FILE" ]; then
+              docker load -i "$FILE"
+              rm "$FILE"
+            fi
+          done
+          
+          cd ~/app
+          docker-compose down 2>/dev/null || true
+          docker-compose up -d
+          sleep 5
+          docker-compose ps
+          docker-compose logs --tail=20
+          ENDSSH
