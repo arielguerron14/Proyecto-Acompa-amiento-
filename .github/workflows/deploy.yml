@@ -150,16 +150,33 @@ jobs:
           IP=${{ steps.get-ip.outputs.ip }}
           INSTANCE=${{ github.event.inputs.instance }}
           
-          # Clean /tmp on EC2 to free space
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP "rm -f /tmp/*.tar && df -h /tmp"
+          # Aggressively clean space on EC2
+          echo "Cleaning EC2 instance..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP << 'CLEANUP'
+          set -e
+          echo "=== Cleaning old docker resources ==="
+          docker system prune -af --volumes 2>/dev/null || true
           
-          # Create app directory
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP "mkdir -p ~/app"
+          echo "=== Cleaning old .tar files ==="
+          rm -f /tmp/*.tar /tmp/*.tar.gz 2>/dev/null || true
+          rm -f ~/docker-images/*.tar 2>/dev/null || true
           
-          # Transfer Docker images
+          echo "=== Disk usage before cleanup ==="
+          df -h / | tail -1
+          
+          echo "=== Creating app directory ==="
+          mkdir -p ~/docker-images ~/app
+          
+          echo "=== Disk usage after cleanup ==="
+          df -h / | tail -1
+          CLEANUP
+          
+          # Transfer Docker images to EC2 home directory
+          echo "Transferring Docker images..."
           for FILE in /tmp/*.tar; do
             if [ -f "$FILE" ]; then
-              scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$FILE" ubuntu@$IP:/tmp/
+              echo "  Transferring $(basename $FILE)..."
+              scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 -C "$FILE" ubuntu@$IP:~/docker-images/ || true
             fi
           done
           
@@ -223,13 +240,26 @@ jobs:
 
           echo "=== Phase 3: Load new images (if rebuild_docker=true) ==="
           if [ "$REBUILD" = "true" ]; then
-            for FILE in /tmp/*.tar; do
+            echo "Loading images from ~/docker-images..."
+            for FILE in ~/docker-images/*.tar; do
               if [ -f "$FILE" ]; then
-                echo "Loading $FILE..."
-                docker load -i "$FILE"
-                rm "$FILE"
+                echo "Loading $(basename $FILE)..."
+                docker load -i "$FILE" || echo "Warning: Failed to load $FILE"
+                rm -f "$FILE"
               fi
             done
+            
+            echo "Loading images from /tmp..."
+            for FILE in /tmp/*.tar; do
+              if [ -f "$FILE" ]; then
+                echo "Loading $(basename $FILE)..."
+                docker load -i "$FILE" || echo "Warning: Failed to load $FILE"
+                rm -f "$FILE"
+              fi
+            done
+            
+            echo "Images loaded successfully"
+            docker images | grep -E 'proyecto|api-gateway|micro|frontend' || echo "No images found"
           else
             echo "Skipping image load (rebuild_docker=false)"
           fi
