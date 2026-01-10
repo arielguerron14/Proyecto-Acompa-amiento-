@@ -50,8 +50,20 @@ const mockUsers = {
   }
 };
 
-function generateMockToken(email) {
-  return Buffer.from(`${email}:${Date.now()}`).toString('base64');
+// Generate proper JWT-like token for testing
+function generateMockJWT(user) {
+  const header = Buffer.from(JSON.stringify({ typ: 'JWT', alg: 'HS256' })).toString('base64');
+  const payload = Buffer.from(JSON.stringify({
+    id: user.id,
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
+  })).toString('base64');
+  const signature = Buffer.from('mock-signature').toString('base64');
+  return `${header}.${payload}.${signature}`;
 }
 
 // Simplified routes without complex middleware
@@ -80,7 +92,7 @@ router.post('/register', async (req, res) => {
         password
       };
 
-      const token = generateMockToken(email);
+      const token = generateMockJWT(mockUsers[email]);
       
       return res.json({
         success: true,
@@ -128,7 +140,7 @@ router.post('/login', async (req, res) => {
         return res.status(401).json({ success: false, error: 'Invalid credentials' });
       }
 
-      const token = generateMockToken(email);
+      const token = generateMockJWT(user);
       
       return res.json({
         success: true,
@@ -167,9 +179,12 @@ router.post('/verify-token', async (req, res) => {
       }
 
       try {
-        const decoded = Buffer.from(token, 'base64').toString();
-        const email = decoded.split(':')[0];
-        const user = mockUsers[email];
+        const parts = token.split('.');
+        if (parts.length !== 3) {
+          return res.json({ success: true, valid: false });
+        }
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        const user = mockUsers[payload.email];
         
         if (!user) {
           return res.json({ success: true, valid: false });
@@ -237,9 +252,12 @@ router.get('/me', async (req, res) => {
     if (shouldUseMock) {
       console.log('🎭 Using MOCK auth for /me');
       try {
-        const decoded = Buffer.from(token, 'base64').toString();
-        const email = decoded.split(':')[0];
-        const user = mockUsers[email];
+        const parts = token.split('.');
+        if (parts.length !== 3) {
+          return res.status(401).json({ success: false, error: 'Invalid token format' });
+        }
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        const user = mockUsers[payload.email];
         
         if (!user) {
           return res.status(401).json({ success: false, error: 'User not found' });
