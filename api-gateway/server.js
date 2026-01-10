@@ -175,6 +175,53 @@ console.log(`  Estudiantes: ${estudiantes}`);
 console.log(`  Reportes Est: ${reportesEst}`);
 console.log(`  Reportes Maest: ${reportesMaest}`);
 
+// Lightweight fallback for reportes endpoint: if upstream is unreachable,
+// return a small mock so the frontend can continue functioning while the
+// reportes service is being recovered. This handler runs BEFORE the generic
+// `/reportes` proxy and only handles the student report endpoint.
+app.get('/reportes/estudiantes/reporte/:id', async (req, res) => {
+  const id = req.params.id;
+  const upstreamBase = (typeof reportesEst === 'function') ? reportesEst() : reportesEst;
+  const upstreamUrl = `${upstreamBase.replace(/\/$/, '')}/reportes/estudiantes/reporte/${id}`;
+  console.log(`➡️ [reportes-fallback] forwarding to upstream ${upstreamUrl}`);
+  try {
+    // Use global fetch (Node 18+) to call upstream
+    const fetchRes = await fetch(upstreamUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': req.headers.authorization || '',
+        'Accept': 'application/json'
+      },
+      // small timeout via AbortController if desired could be added
+    });
+
+    const contentType = fetchRes.headers.get('content-type') || 'application/json';
+    const bodyText = await fetchRes.text();
+
+    // Forward upstream status, content-type and body
+    res.status(fetchRes.status).type(contentType).send(bodyText);
+    console.log(`⬅️ [reportes-fallback] upstream responded ${fetchRes.status} for id=${id}`);
+    return;
+  } catch (err) {
+    console.warn('⚠️ [reportes-fallback] upstream call failed:', err && err.message ? err.message : err);
+    // Return a safe mock payload for the frontend to render while service is down
+    const mock = {
+      success: true,
+      report: {
+        id: id,
+        studentId: id,
+        title: 'Reporte temporal (mock)',
+        resumen: 'Este es un reporte de prueba generado por el API Gateway porque el servicio de reportes no está disponible.',
+        notas: [],
+        createdAt: new Date().toISOString(),
+        mock: true
+      }
+    };
+    res.status(200).json(mock);
+    return;
+  }
+});
+
 // Auth routes: mount internal router which forwards requests with axios and explicit timeouts
 // This avoids problematic proxy behavior for streaming/bodies and gives better logging
 try {
