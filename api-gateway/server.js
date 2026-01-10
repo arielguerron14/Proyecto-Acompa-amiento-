@@ -252,6 +252,16 @@ app.use('/horarios', createProxyMiddleware({
   proxyTimeout: 20000,
   onProxyReq: (proxyReq, req, res) => {
     console.log(`[onProxyReq /horarios] method=${req.method} url=${req.url} bodyType=${typeof req.body}`);
+    // Remove Origin header so upstream microservices (which have their own CORS
+    // enforcement) don't reject requests. API Gateway handles CORS centrally.
+    try {
+      if (proxyReq.removeHeader) {
+        proxyReq.removeHeader('origin');
+        proxyReq.removeHeader('Origin');
+      }
+    } catch (e) {
+      // ignore
+    }
     try {
       if (["POST", "PUT", "PATCH"].includes(req.method) && req.body) {
         let bodyBuffer;
@@ -313,6 +323,13 @@ app.use('/api/horarios', createProxyMiddleware({
   proxyTimeout: 20000,
   onProxyReq: (proxyReq, req, res) => {
     console.log(`[onProxyReq /api/horarios] method=${req.method} url=${req.url} bodyType=${typeof req.body}`);
+    // Strip Origin header before forwarding to upstream microservice
+    try {
+      if (proxyReq.removeHeader) {
+        proxyReq.removeHeader('origin');
+        proxyReq.removeHeader('Origin');
+      }
+    } catch (e) {}
     try {
       if (["POST", "PUT", "PATCH"].includes(req.method) && req.body) {
         let bodyBuffer;
@@ -394,6 +411,9 @@ app.use('/estudiantes', createProxyMiddleware({
   pathRewrite: { '^/estudiantes': '' },
   onProxyReq: (proxyReq, req, res) => {
     try {
+      // Remove Origin header so microservices will treat this as server-to-server
+      // call (API Gateway already applied CORS to the client).
+      try { proxyReq.removeHeader && proxyReq.removeHeader('origin'); proxyReq.removeHeader && proxyReq.removeHeader('Origin'); } catch (e) {}
       req._proxyStart = Date.now();
       console.log(`➡️ [estudiantes] Proxying request to ${proxyReq.getHeader('host')}${proxyReq.path} ${req.method}`);
       if (req.body && Object.keys(req.body).length > 0 && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
@@ -455,6 +475,8 @@ app.use('/api/estudiantes', createProxyMiddleware({
   pathRewrite: { '^/api/estudiantes': '' },
   onProxyReq: (proxyReq, req, res) => {
     try {
+      // Remove Origin header to avoid upstream CORS rejection
+      try { proxyReq.removeHeader && proxyReq.removeHeader('origin'); proxyReq.removeHeader && proxyReq.removeHeader('Origin'); } catch (e) {}
       req._proxyStart = Date.now();
       console.log(`➡️ [/api/estudiantes] Proxying request to ${proxyReq.getHeader('host')}${proxyReq.path} ${req.method}`);
       if (req.body && Object.keys(req.body).length > 0 && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
