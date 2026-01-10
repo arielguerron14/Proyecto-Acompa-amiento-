@@ -11,52 +11,18 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'api-gateway'
-    static_configs:
-      - targets: ['172.31.65.190:8080']
-    metrics_path: '/metrics'
+  # Microservices targets to be updated with correct IPs
+  # For now, these are commented out to allow Prometheus to start
+  # - job_name: 'api-gateway'
+  #   static_configs:
+  #     - targets: ['api-gateway-ip:8080']
+  #   metrics_path: '/metrics'
 
-  - job_name: 'micro-auth'
+  # Message broker targets
+  - job_name: 'rabbitmq'
     static_configs:
-      - targets: ['172.31.77.203:5005']
-    metrics_path: '/metrics'
+      - targets: ['rabbitmq:5672']
 
-  - job_name: 'micro-maestros'
+  - job_name: 'kafka'
     static_configs:
-      - targets: ['172.31.77.203:5001']
-    metrics_path: '/metrics'
-
-  - job_name: 'micro-estudiantes'
-    static_configs:
-      - targets: ['172.31.77.203:5002']
-    metrics_path: '/metrics'
-
-  - job_name: 'micro-reportes-estudiantes'
-    static_configs:
-      - targets: ['172.31.74.228:5003']
-    metrics_path: '/metrics'
-
-  - job_name: 'micro-reportes-maestros'
-    static_configs:
-      - targets: ['172.31.74.228:5004']
-    metrics_path: '/metrics'
-
-  - job_name: 'micro-notificaciones'
-    static_configs:
-      - targets: ['172.31.72.141:5006']
-    metrics_path: '/metrics'
-
-  - job_name: 'micro-analytics'
-    static_configs:
-      - targets: ['172.31.74.228:5007']
-    metrics_path: '/metrics'
-
-  - job_name: 'micro-soap-bridge'
-    static_configs:
-      - targets: ['172.31.72.141:5008']
-    metrics_path: '/metrics'
-
-  - job_name: 'message-broker'
-    static_configs:
-      - targets: ['172.31.72.111:5008']
-    metrics_path: '/metrics'
+      - targets: ['kafka:9092']
