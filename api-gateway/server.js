@@ -192,37 +192,53 @@ try {
   console.log('📍 Available auth endpoints: /auth/register, /auth/login, /auth/logout, /auth/verify-token, /auth/me');
   console.log('📍 Also available with /api prefix: /api/auth/register, /api/auth/login, etc.');
 } catch (err) {
-  console.error('❌ Failed to mount auth routes, falling back to proxy:', err.message);
-  console.error('❌ Error details:', err.stack);
-  // Fallback proxy
-  app.use('/auth', createProxyMiddleware({
-    target: auth,
-    changeOrigin: true,
-    logLevel: 'info',
-    proxyTimeout: 20000,
-    onError: (err2, req, res) => {
-      console.error(`❌ Auth proxy error: ${err2.message}`);
-      res.status(503).json({ success: false, error: 'Auth service unavailable' });
-    }
-  }));
-  // Also add /api/auth proxy fallback
-  app.use('/api/auth', createProxyMiddleware({
-    target: auth,
-    changeOrigin: true,
-    logLevel: 'info',
-    proxyTimeout: 20000,
-    onError: (err2, req, res) => {
-      console.error(`❌ Auth proxy error: ${err2.message}`);
-      res.status(503).json({ success: false, error: 'Auth service unavailable' });
-    }
-  }));
+  console.error('❌ Failed to mount auth routes:', err.message);
+  console.error('❌ Attempting to use MOCK auth routes for testing...');
+  
+  try {
+    // Try to use mock auth routes for development/testing
+    const mockAuthRoutes = require('./src/routes/mockAuthRoutes');
+    const authJson = express.json({
+      verify: (req, res, buf, encoding) => {
+        try { req.rawBody = buf && buf.length ? buf.toString(encoding || 'utf8') : ''; } catch (e) { req.rawBody = ''; }
+      }
+    });
+    app.use('/auth', authJson, mockAuthRoutes);
+    app.use('/api/auth', authJson, mockAuthRoutes);
+    console.warn('⚠️  USING MOCK AUTH SERVICE FOR DEVELOPMENT/TESTING');
+    console.warn('⚠️  This is temporary until remote auth service is reachable');
+  } catch (mockErr) {
+    console.error('❌ Failed to mount mock auth routes, using proxy fallback:', mockErr.message);
+    // Fallback proxy
+    app.use('/auth', createProxyMiddleware({
+      target: auth,
+      changeOrigin: true,
+      logLevel: 'info',
+      proxyTimeout: 20000,
+      onError: (err2, req, res) => {
+        console.error(`❌ Auth proxy error: ${err2.message}`);
+        res.status(503).json({ success: false, error: 'Auth service unavailable' });
+      }
+    }));
+    // Also add /api/auth proxy fallback
+    app.use('/api/auth', createProxyMiddleware({
+      target: auth,
+      changeOrigin: true,
+      logLevel: 'info',
+      proxyTimeout: 20000,
+      onError: (err2, req, res) => {
+        console.error(`❌ Auth proxy error: ${err2.message}`);
+        res.status(503).json({ success: false, error: 'Auth service unavailable' });
+      }
+    }));
 
-  // Debug endpoint for MongoDB status
-  app.use('/debug/mongo-status', createProxyMiddleware({
-    target: auth,
-    changeOrigin: true,
-    logLevel: 'info'
-  }));
+    // Debug endpoint for MongoDB status
+    app.use('/debug/mongo-status', createProxyMiddleware({
+      target: auth,
+      changeOrigin: true,
+      logLevel: 'info'
+    }));
+  }
 }
 
 
