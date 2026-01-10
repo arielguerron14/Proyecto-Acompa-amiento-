@@ -30,18 +30,24 @@ try {
   // Intentar cargar config centralizada primero
   config = sharedConfig.getConfig();
   console.log('✅ Configuración centralizada cargada');
-  console.log('AUTH_SERVICE:', sharedConfig.getServiceUrl('auth'));
-  console.log('ESTUDIANTES_SERVICE:', sharedConfig.getServiceUrl('estudiantes'));
-  console.log('MAESTROS_SERVICE:', sharedConfig.getServiceUrl('maestros'));
+  console.log('AUTH_SERVICE (from sharedConfig):', sharedConfig.getServiceUrl('auth'));
+  console.log('ESTUDIANTES_SERVICE (from sharedConfig):', sharedConfig.getServiceUrl('estudiantes'));
+  console.log('MAESTROS_SERVICE (from sharedConfig):', sharedConfig.getServiceUrl('maestros'));
   
-  // Mapear a variables conocidas
-  config.AUTH_SERVICE = sharedConfig.getServiceUrl('auth');
-  config.ESTUDIANTES_SERVICE = sharedConfig.getServiceUrl('estudiantes');
-  config.MAESTROS_SERVICE = sharedConfig.getServiceUrl('maestros');
-  config.REPORTES_EST_SERVICE = sharedConfig.getServiceUrl('reportes-est');
-  config.REPORTES_MAEST_SERVICE = sharedConfig.getServiceUrl('reportes-maest');
-  config.NOTIFICACIONES_SERVICE = sharedConfig.getServiceUrl('notificaciones');
+  // Mapear a variables conocidas, BUT prioritize environment variables for inter-EC2 communication
+  // Environment variables have public IPs for EC2 communication, infrastructure.config has private IPs
+  config.AUTH_SERVICE = process.env.AUTH_SERVICE || sharedConfig.getServiceUrl('auth');
+  config.ESTUDIANTES_SERVICE = process.env.ESTUDIANTES_SERVICE || sharedConfig.getServiceUrl('estudiantes');
+  config.MAESTROS_SERVICE = process.env.MAESTROS_SERVICE || sharedConfig.getServiceUrl('maestros');
+  config.REPORTES_EST_SERVICE = process.env.REPORTES_EST_SERVICE || sharedConfig.getServiceUrl('reportes-est');
+  config.REPORTES_MAEST_SERVICE = process.env.REPORTES_MAEST_SERVICE || sharedConfig.getServiceUrl('reportes-maest');
+  config.NOTIFICACIONES_SERVICE = process.env.NOTIFICACIONES_SERVICE || sharedConfig.getServiceUrl('notificaciones');
   config.PORT = process.env.PORT || sharedConfig.getPort('gateway') || 8080;
+  
+  console.log('🔧 Final CONFIG:');
+  console.log('  AUTH_SERVICE:', config.AUTH_SERVICE);
+  console.log('  ESTUDIANTES_SERVICE:', config.ESTUDIANTES_SERVICE);
+  console.log('  MAESTROS_SERVICE:', config.MAESTROS_SERVICE);
 } catch (e) {
   console.warn('⚠️  Error cargando config centralizada:', e.message);
   // Fallback a config local
