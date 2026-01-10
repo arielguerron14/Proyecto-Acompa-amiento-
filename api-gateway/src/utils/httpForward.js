@@ -33,17 +33,24 @@ class HttpForwarder {
         config.data = body;
       }
 
+      console.log(`🔄 [HttpForwarder] Forwarding to: ${config.url} (method: ${method})`);
       const response = await axios(config);
+      console.log(`✅ [HttpForwarder] Response received: ${response.status} from ${config.url}`);
       return { status: response.status, data: response.data };
     } catch (err) {
+      console.error(`❌ [HttpForwarder] Failed to forward to ${path}:`, err.message);
+      console.error(`❌ [HttpForwarder] Target URL was: ${baseUrl}${path}`);
       logger.error(`[HttpForwarder] Failed to forward to ${path}:`, err.message);
 
       // Handle axios errors
       if (err.response) {
         // Server responded with error status
+        console.error(`⚠️ [HttpForwarder] Server responded with error: ${err.response.status}`);
         return { status: err.response.status, data: err.response.data };
       } else if (err.request) {
         // Request was made but no response received
+        console.error(`⚠️ [HttpForwarder] No response received from ${baseUrl}${path}`);
+        console.error(`⚠️ [HttpForwarder] Error details:`, err.message);
         throw new Error(`Service unavailable: ${baseUrl}${path}`);
       } else {
         // Something else happened
