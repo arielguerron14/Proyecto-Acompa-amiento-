@@ -100,16 +100,30 @@ jobs:
       - name: Build Docker Images
         if: github.event.inputs.rebuild_docker == 'true'
         run: |
+          # Build microservices
           for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros frontend-web; do
             if [ -f "./$SERVICE/Dockerfile" ]; then
               echo "Building $SERVICE..."
               if [ "$SERVICE" = "frontend-web" ]; then
-                # frontend has its own build context in ./frontend-web
                 docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile ./$SERVICE
               else
                 docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
               fi
               docker save $SERVICE:latest -o /tmp/$SERVICE.tar
+            fi
+          done
+          
+          # Build infrastructure services
+          for SERVICE in messaging/zookeeper messaging/kafka messaging/rabbitmq monitoring/prometheus monitoring/grafana; do
+            CONTEXT_DIR=$(dirname "$SERVICE")
+            SERVICE_NAME=$(echo "$SERVICE" | cut -d'/' -f2)
+            
+            if [ -f "./$SERVICE/Dockerfile" ]; then
+              echo "Building $SERVICE..."
+              cd "$CONTEXT_DIR"
+              docker build --no-cache -t "proyecto-$SERVICE_NAME:1.0" -f "./$SERVICE_NAME/Dockerfile" .
+              docker save "proyecto-$SERVICE_NAME:1.0" -o "/tmp/proyecto-$SERVICE_NAME.tar"
+              cd -
             fi
           done
       
@@ -142,6 +156,12 @@ jobs:
             COMPOSE_FILE="./docker-compose.api-gateway.yml"
           elif [ "$INSTANCE" = "EC2_FRONTEND" ]; then
             COMPOSE_FILE="./docker-compose.frontend.yml"
+          elif [ "$INSTANCE" = "EC2_MESSAGING" ]; then
+            COMPOSE_FILE="./messaging/docker-compose.yml"
+          elif [ "$INSTANCE" = "EC2_MONITORING" ]; then
+            COMPOSE_FILE="./monitoring/docker-compose.yml"
+          elif [ "$INSTANCE" = "EC2_DB" ]; then
+            COMPOSE_FILE="./databases/docker-compose.yml"
           else
             COMPOSE_FILE="./docker-compose.yml"
           fi
@@ -179,6 +199,11 @@ jobs:
             docker rmi micro-estudiantes:latest 2>/dev/null || true
             docker rmi micro-maestros:latest 2>/dev/null || true
             docker rmi frontend-web:latest 2>/dev/null || true
+            docker rmi proyecto-kafka:1.0 2>/dev/null || true
+            docker rmi proyecto-zookeeper:1.0 2>/dev/null || true
+            docker rmi proyecto-rabbitmq:1.0 2>/dev/null || true
+            docker rmi proyecto-prometheus:1.0 2>/dev/null || true
+            docker rmi proyecto-grafana:1.0 2>/dev/null || true
             docker image prune -f
           fi
 
