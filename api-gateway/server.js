@@ -282,12 +282,6 @@ app.use('/horarios', createProxyMiddleware({
   },
   onProxyRes: (proxyRes, req, res) => {
     console.log(`[onProxyRes /horarios] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
-    // Add CORS headers to the proxied response
-    res.set('Access-Control-Allow-Origin', '107.21.124.81');
-    res.set('Access-Control-Allow-Credentials', 'true');
-    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
     let body = '';
     proxyRes.on('data', chunk => { body += chunk.toString(); });
     proxyRes.on('end', () => {
@@ -348,12 +342,6 @@ app.use('/api/horarios', createProxyMiddleware({
   },
   onProxyRes: (proxyRes, req, res) => {
     console.log(`[onProxyRes /api/horarios] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
-    // Add CORS headers to the proxied response
-    res.set('Access-Control-Allow-Origin', '107.21.124.81');
-    res.set('Access-Control-Allow-Credentials', 'true');
-    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
     let body = '';
     proxyRes.on('data', chunk => { body += chunk.toString(); });
     proxyRes.on('end', () => {
