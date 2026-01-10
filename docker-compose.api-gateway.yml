@@ -4,8 +4,7 @@ services:
   api-gateway:
     container_name: api-gateway
     image: api-gateway:latest
-    ports:
-      - "8080:8080"
+    network_mode: host
     entrypoint: []
     command: sh -c "cd /usr/src/app && exec node server.js"
     environment:
@@ -32,9 +31,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    networks:
-      - vpc-network
-
-networks:
-  vpc-network:
-    driver: bridge
