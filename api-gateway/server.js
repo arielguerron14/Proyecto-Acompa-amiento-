@@ -192,7 +192,7 @@ app.get('/reportes/estudiantes/reporte/:id', async (req, res) => {
         'Authorization': req.headers.authorization || '',
         'Accept': 'application/json'
       },
-      // small timeout via AbortController if desired could be added
+      timeout: 5000  // 5 second timeout
     });
 
     const contentType = fetchRes.headers.get('content-type') || 'application/json';
@@ -204,20 +204,25 @@ app.get('/reportes/estudiantes/reporte/:id', async (req, res) => {
     return;
   } catch (err) {
     console.warn('⚠️ [reportes-fallback] upstream call failed:', err && err.message ? err.message : err);
-    // Return a safe mock payload for the frontend to render while service is down
-    const mock = {
-      success: true,
-      report: {
-        id: id,
-        studentId: id,
-        title: 'Reporte temporal (mock)',
-        resumen: 'Este es un reporte de prueba generado por el API Gateway porque el servicio de reportes no está disponible.',
-        notas: [],
-        createdAt: new Date().toISOString(),
-        mock: true
-      }
+    // Return a safe mock payload for the frontend to render while service is down.
+    // The frontend expects { items: [...] } structure per reportes.js
+    const mockReporte = {
+      _id: id,
+      estudianteId: id,
+      materia: 'Materia temporal (mock)',
+      semestre: 1,
+      paralelo: 'A',
+      maestroName: 'Maestro temporal',
+      dia: 'Lunes',
+      inicio: '09:00',
+      fin: '10:00',
+      estado: 'Completada',
+      observaciones: 'Este es un reporte temporal generado por el API Gateway porque el servicio de reportes no está disponible.',
+      mock: true
     };
-    res.status(200).json(mock);
+    res.status(200).json({
+      items: [mockReporte]
+    });
     return;
   }
 });

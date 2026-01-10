@@ -450,9 +450,9 @@ class ReservasManager {
     async loadReservas(force = false) {
         try {
             const user = await authManager.getUserData();
-            console.log('User data:', user);
+            console.log('[reservas-combined] User data:', user);
             if (!user) {
-                console.log('No user data, skipping load');
+                console.log('[reservas-combined] No user data, skipping load');
                 return;
             }
 
@@ -465,30 +465,41 @@ class ReservasManager {
             if (listEl) listEl.style.display = 'none';
 
             const base = authManager.baseURL || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
-            let url = `${base.replace(/\/$/, '')}/estudiantes/reservas/estudiante/${user.id || user.userId}`;
+            const userId = user.id || user.userId;
+            console.log('[reservas-combined] userId:', userId);
+            let url = `${base.replace(/\/$/, '')}/estudiantes/reservas/estudiante/${userId}`;
             if (force) url += `?_ts=${Date.now()}`;
+            console.log('[reservas-combined] Fetching from URL:', url);
 
             const response = await fetch(url, {
                 headers: Object.assign({}, authManager.getAuthHeaders()),
                 cache: 'no-store'
             });
 
-            console.log('Response status:', response.status);
+            console.log('[reservas-combined] Response status:', response.status);
             if (response.status === 304) {
-                console.log('Reservas sin cambios (304), manteniendo lista en memoria');
+                console.log('[reservas-combined] Reservas sin cambios (304), manteniendo lista en memoria');
                 this.renderReservas();
                 return;
             }
 
             if (response.ok) {
                 this.reservas = await response.json();
-                console.log('Reservas loaded:', this.reservas);
+                console.log('[reservas-combined] Reservas loaded (raw):', this.reservas);
+                console.log('[reservas-combined] Reservas is array?', Array.isArray(this.reservas));
+                console.log('[reservas-combined] Reservas length:', Array.isArray(this.reservas) ? this.reservas.length : 'N/A');
+                if (Array.isArray(this.reservas)) {
+                    this.reservas.forEach((r, i) => {
+                        console.log(`  [${i}] estado='${r.estado}' materia='${r.materia}' dia='${r.dia}'`);
+                    });
+                }
             } else {
                 this.reservas = [];
-                console.error('Error cargando reservas:', response.status);
+                const errorText = await response.text();
+                console.error('[reservas-combined] Error cargando reservas:', response.status, errorText);
             }
         } catch (error) {
-            console.error('Error cargando reservas:', error);
+            console.error('[reservas-combined] Error cargando reservas:', error);
             this.reservas = [];
         }
     }
@@ -500,35 +511,39 @@ class ReservasManager {
         const emptyEl = document.getElementById('reservas-empty');
         const listEl = document.getElementById('reservas-list');
 
-        console.log('Rendering reservas (filter active only):', this.reservas);
-        console.log('Elements found:', { loadingEl, emptyEl, listEl });
+        console.log('[reservas-combined] renderReservas() called');
+        console.log('[reservas-combined] Rendering reservas (all):', this.reservas);
+        console.log('[reservas-combined] Elements found:', { loadingEl: !!loadingEl, emptyEl: !!emptyEl, listEl: !!listEl });
 
         if (loadingEl) loadingEl.style.display = 'none';
 
         // Filter to show only active reservas
         const activeReservas = (this.reservas || []).filter(r => r.estado === 'Activa');
+        console.log('[reservas-combined] Active reservas after filter:', activeReservas);
 
         if (!activeReservas || activeReservas.length === 0) {
-            console.log('Showing empty message (no active reservas)');
+            console.log('[reservas-combined] Showing empty message (no active reservas)');
             if (emptyEl) emptyEl.style.display = 'block';
             if (listEl) listEl.style.display = 'none';
             return;
         }
 
-        console.log('Showing list with', activeReservas.length, 'active reservas');
+        console.log('[reservas-combined] Showing list with', activeReservas.length, 'active reservas');
         if (emptyEl) emptyEl.style.display = 'none';
         if (listEl) listEl.style.display = 'grid';
 
         try {
             const html = activeReservas.map(reserva => this.createReservaCard(reserva)).join('');
+            console.log('[reservas-combined] Generated HTML length:', html.length);
             listEl.innerHTML = html;
             if (!html.trim()) {
+                console.log('[reservas-combined] Generated HTML is empty, showing empty message');
                 if (emptyEl) emptyEl.style.display = 'block';
                 if (listEl) listEl.style.display = 'none';
                 return;
             }
         } catch (error) {
-            console.error('Error rendering reservas:', error);
+            console.error('[reservas-combined] Error rendering reservas:', error);
             listEl.innerHTML = '<p>Error al cargar las reservas. Revisa la consola para más detalles.</p>';
         }
     }
