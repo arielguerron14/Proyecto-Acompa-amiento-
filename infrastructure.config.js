@@ -18,7 +18,7 @@ module.exports = {
   // ============================================
   PUBLIC: {
     // EC2-DB - IP pública
-    DB_IP: process.env.DB_PUBLIC_IP || '44.200.180.90',
+    DB_IP: process.env.DB_PUBLIC_IP || '3.238.204.241',
     
     // EC2-CORE - IP pública
     CORE_IP: process.env.CORE_PUBLIC_IP || '13.216.12.61',
@@ -38,14 +38,14 @@ module.exports = {
     },
 
     // Notificaciones - IP pública
-    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '100.28.222.128',
+    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '35.175.180.215',
     NOTIFICACIONES_PORT: process.env.NOTIFICACIONES_PORT || 5005,
     NOTIFICACIONES_URL: function() {
       return `http://${this.NOTIFICACIONES_IP}:${this.NOTIFICACIONES_PORT}`;
     },
 
     // Messaging - IP pública
-    MESSAGING_IP: process.env.MESSAGING_IP || '44.222.118.225',
+    MESSAGING_IP: process.env.MESSAGING_IP || '44.221.50.177',
     MESSAGING_PORT: process.env.MESSAGING_PORT || 1883,
     MESSAGING_URL: function() {
       return `mqtt://${this.MESSAGING_IP}:${this.MESSAGING_PORT}`;
@@ -67,8 +67,8 @@ module.exports = {
     PROMETHEUS_PORT: process.env.PROMETHEUS_PORT || 9090,
     GRAFANA_PORT: process.env.GRAFANA_PORT || 3000,
 
-    // Kafka - IP pública (no disponible en lista)
-    KAFKA_IP: process.env.KAFKA_IP || '52.86.104.42',
+    // Kafka - IP pública
+    KAFKA_IP: process.env.KAFKA_IP || '44.221.50.177',
     KAFKA_PORT: process.env.KAFKA_PORT || 9092,
     KAFKA_URL: function() {
       return `kafka://${this.KAFKA_IP}:${this.KAFKA_PORT}`;
@@ -88,8 +88,8 @@ module.exports = {
       return `http://${this.GRAFANA_PUBLIC_IP}:${this.GRAFANA_PUBLIC_PORT}`;
     },
 
-    // RabbitMQ - IP pública (no disponible en lista)
-    RABBITMQ_IP: process.env.RABBITMQ_IP || '44.202.235.19',
+    // RabbitMQ - IP pública
+    RABBITMQ_IP: process.env.RABBITMQ_IP || '44.221.50.177',
     RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
     RABBITMQ_MANAGEMENT_PORT: process.env.RABBITMQ_MANAGEMENT_PORT || 15672,
     RABBITMQ_URL: function() {
