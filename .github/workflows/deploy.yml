@@ -53,15 +53,6 @@ jobs:
         with:
           node-version: 18
       
-      - name: Get SSH key
-        id: ssh-key
-        run: |
-          KEY="${{ secrets.SSH_PRIVATE_KEY }}"
-          # Use the multi-line GITHUB_OUTPUT format to safely export the private key
-          printf '%s\n' "key<<EOF" >> $GITHUB_OUTPUT
-          printf '%s\n' "$KEY" >> $GITHUB_OUTPUT
-          printf '%s\n' "EOF" >> $GITHUB_OUTPUT
-      
       - name: Get EC2 IP
         id: get-ip
         run: |
@@ -92,10 +83,10 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ steps.ssh-key.outputs.key }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub 2>&1 || exit 1
           ssh-keyscan -H ${{ steps.get-ip.outputs.ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "SSH setup complete"
       
       - name: Build Docker Images
         if: github.event.inputs.rebuild_docker == 'true'
