@@ -23,6 +23,14 @@ on:
         options:
           - 'true'
           - 'false'
+      build_location:
+        description: 'Where to build images'
+        required: false
+        default: 'ec2'
+        type: choice
+        options:
+          - 'ec2'
+          - 'github'
       environment:
         description: 'Environment'
         required: true
@@ -88,8 +96,8 @@ jobs:
           ssh-keyscan -H ${{ steps.get-ip.outputs.ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
           echo "SSH setup complete"
       
-      - name: Build Docker Images
-        if: github.event.inputs.rebuild_docker == 'true'
+      - name: Build Docker Images on GitHub
+        if: github.event.inputs.rebuild_docker == 'true' && github.event.inputs.build_location == 'github'
         run: |
           mkdir -p /tmp
           
@@ -274,3 +282,84 @@ jobs:
           docker-compose ps
           docker-compose logs --tail=30
           ENDSSH
+      
+      - name: Build Docker Images on EC2
+        if: github.event.inputs.rebuild_docker == 'true' && github.event.inputs.build_location == 'ec2'
+        run: |
+          IP=${{ steps.get-ip.outputs.ip }}
+          INSTANCE=${{ github.event.inputs.instance }}
+          GITHUB_REPO="${{ github.repository }}"
+          GITHUB_REF="${{ github.ref }}"
+          
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s "$INSTANCE" "$GITHUB_REPO" "$GITHUB_REF" << 'BUILDSSH'
+          set -e
+          INSTANCE=$1
+          GITHUB_REPO=$2
+          GITHUB_REF=$3
+          
+          echo "=== EC2 Build: Cloning repository ==="
+          cd ~
+          rm -rf app-build
+          git clone --depth 1 https://github.com/${GITHUB_REPO}.git app-build
+          cd app-build
+          git checkout ${GITHUB_REF#refs/heads/}
+          
+          echo "=== EC2 Build: Building images for $INSTANCE ==="
+          mkdir -p ~/docker-images
+          
+          case "$INSTANCE" in
+            EC2_MESSAGING)
+              echo "Building infrastructure images for messaging..."
+              # Build Zookeeper
+              if [ -f "./messaging/zookeeper/Dockerfile" ]; then
+                echo "Building zookeeper..."
+                docker build --no-cache -t proyecto-zookeeper:1.0 -f ./messaging/zookeeper/Dockerfile ./messaging
+              fi
+              # Build Kafka
+              if [ -f "./messaging/kafka/Dockerfile" ]; then
+                echo "Building kafka..."
+                docker build --no-cache -t proyecto-kafka:1.0 -f ./messaging/kafka/Dockerfile ./messaging
+              fi
+              # Build RabbitMQ
+              if [ -f "./messaging/rabbitmq/Dockerfile" ]; then
+                echo "Building rabbitmq..."
+                docker build --no-cache -t proyecto-rabbitmq:1.0 -f ./messaging/rabbitmq/Dockerfile ./messaging
+              fi
+              ;;
+            EC2_MONITORING)
+              echo "Building infrastructure images for monitoring..."
+              # Build Prometheus
+              if [ -f "./monitoring/prometheus/Dockerfile" ]; then
+                echo "Building prometheus..."
+                docker build --no-cache -t proyecto-prometheus:1.0 -f ./monitoring/prometheus/Dockerfile ./monitoring
+              fi
+              # Build Grafana
+              if [ -f "./monitoring/grafana/Dockerfile" ]; then
+                echo "Building grafana..."
+                docker build --no-cache -t proyecto-grafana:1.0 -f ./monitoring/grafana/Dockerfile ./monitoring
+              fi
+              ;;
+            *)
+              echo "Building microservices..."
+              for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros frontend-web; do
+                if [ -f "./$SERVICE/Dockerfile" ]; then
+                  echo "Building $SERVICE..."
+                  if [ "$SERVICE" = "frontend-web" ]; then
+                    docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile ./$SERVICE
+                  else
+                    docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+                  fi
+                fi
+              done
+              ;;
+          esac
+          
+          echo "=== EC2 Build: Images built successfully ==="
+          docker images | grep -E 'proyecto|api-gateway|micro|frontend' || echo "No custom images found"
+          
+          echo "=== EC2 Build: Starting services ==="
+          cd ~/app
+          docker-compose up -d --pull=missing
+          sleep 5
+          docker-compose ps
+          BUILDSSH
