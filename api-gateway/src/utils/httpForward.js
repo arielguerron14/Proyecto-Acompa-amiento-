@@ -26,20 +26,24 @@ class HttpForwarder {
           'Content-Type': 'application/json',
           ...headers
         },
-        timeout: 30000 // 30 second timeout
+        timeout: 30000, // 30 second timeout
+        validateStatus: () => true // Accept any status code, handle errors manually
       };
 
       if (body) {
         config.data = body;
       }
 
-      console.log(`🔄 [HttpForwarder] Forwarding to: ${config.url} (method: ${method})`);
+      console.log(`🔄 [HttpForwarder] Forwarding ${method} to: ${config.url}`);
+      console.log(`🔄 [HttpForwarder] baseUrl="${baseUrl}", path="${path}"`);
       const response = await axios(config);
       console.log(`✅ [HttpForwarder] Response received: ${response.status} from ${config.url}`);
       return { status: response.status, data: response.data };
     } catch (err) {
-      console.error(`❌ [HttpForwarder] Failed to forward to ${path}:`, err.message);
+      console.error(`❌ [HttpForwarder] Exception during forward to ${path}:`, err.message);
       console.error(`❌ [HttpForwarder] Target URL was: ${baseUrl}${path}`);
+      console.error(`❌ [HttpForwarder] Error code:`, err.code);
+      console.error(`❌ [HttpForwarder] Error message:`, err.message);
       logger.error(`[HttpForwarder] Failed to forward to ${path}:`, err.message);
 
       // Handle axios errors
@@ -50,10 +54,17 @@ class HttpForwarder {
       } else if (err.request) {
         // Request was made but no response received
         console.error(`⚠️ [HttpForwarder] No response received from ${baseUrl}${path}`);
-        console.error(`⚠️ [HttpForwarder] Error details:`, err.message);
-        throw new Error(`Service unavailable: ${baseUrl}${path}`);
+        console.error(`⚠️ [HttpForwarder] Request error:`, err.request);
+        throw new Error(`Service unavailable: ${baseUrl}${path} - ${err.message}`);
+      } else if (err.code === 'ECONNREFUSED') {
+        console.error(`🚨 [HttpForwarder] Connection refused - Service not listening at ${baseUrl}${path}`);
+        throw new Error(`Service not listening: ${baseUrl}${path}`);
+      } else if (err.code === 'ETIMEDOUT' || err.code === 'EHOSTUNREACH') {
+        console.error(`🚨 [HttpForwarder] Network error (${err.code}) - Cannot reach ${baseUrl}${path}`);
+        throw new Error(`Network unreachable: ${baseUrl}${path}`);
       } else {
         // Something else happened
+        console.error(`🚨 [HttpForwarder] Unexpected error:`, err);
         throw err;
       }
     }

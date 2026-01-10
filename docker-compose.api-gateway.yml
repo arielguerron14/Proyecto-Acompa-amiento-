@@ -13,10 +13,10 @@ services:
       PORT: 8080
       LOG_LEVEL: info
       
-      # Use PRIVATE IPs for inter-EC2 communication within VPC (more reliable than public IPs)
-      AUTH_SERVICE: http://172.31.78.183:3000
-      ESTUDIANTES_SERVICE: http://172.31.78.183:3001
-      MAESTROS_SERVICE: http://172.31.78.183:3002
+      # Public IPs for inter-EC2 communication
+      AUTH_SERVICE: http://13.216.12.61:3000
+      ESTUDIANTES_SERVICE: http://13.216.12.61:3001
+      MAESTROS_SERVICE: http://13.216.12.61:3002
       REPORTES_EST_SERVICE: http://54.175.62.79:5003
       REPORTES_MAEST_SERVICE: http://54.175.62.79:5004
       NOTIFICACIONES_SERVICE: http://98.92.248.110:5006
