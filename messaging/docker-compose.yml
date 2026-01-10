@@ -3,9 +3,6 @@ version: '3.8'
 services:
   # Zookeeper - Coordinator for Kafka
   zookeeper:
-    build:
-      context: ./zookeeper
-      dockerfile: Dockerfile
     image: proyecto-zookeeper:1.0
     container_name: proyecto-zookeeper
     ports:
@@ -30,9 +27,6 @@ services:
 
   # Apache Kafka - Event streaming platform
   kafka:
-    build:
-      context: ./kafka
-      dockerfile: Dockerfile
     image: proyecto-kafka:1.0
     container_name: proyecto-kafka
     ports:

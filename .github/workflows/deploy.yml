@@ -246,7 +246,7 @@ jobs:
             docker image prune -f
           fi
 
-          echo "=== Phase 3: Load new images (if rebuild_docker=true) ==="
+          echo "=== Phase 3: Load pre-built docker images (if rebuild_docker=true) ==="
           if [ "$REBUILD" = "true" ]; then
             echo "Loading images from ~/docker-images..."
             for FILE in ~/docker-images/*.tar; do
@@ -272,10 +272,10 @@ jobs:
             echo "Skipping image load (rebuild_docker=false)"
           fi
           
-          echo "=== Phase 4: Deploy with docker-compose ==="
+          echo "=== Phase 4: Deploy with docker-compose (using pre-built images, not building) ==="
           cd ~/app
           docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
-          docker-compose up -d --pull=missing
+          docker-compose up -d --no-build
           
           echo "=== Phase 5: Verify deployment ==="
           sleep 5
