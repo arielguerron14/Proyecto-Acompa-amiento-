@@ -59,9 +59,15 @@ jobs:
       - name: Set defaults for missing inputs
         id: defaults
         run: |
-          echo "rebuild_docker=${{ github.event.inputs.rebuild_docker || 'true' }}" >> $GITHUB_OUTPUT
-          echo "build_location=${{ github.event.inputs.build_location || 'ec2' }}" >> $GITHUB_OUTPUT
-          echo "environment=${{ github.event.inputs.environment || 'prod' }}" >> $GITHUB_OUTPUT
+          REBUILD_DOCKER="${{ github.event.inputs.rebuild_docker || 'true' }}"
+          BUILD_LOCATION="${{ github.event.inputs.build_location || 'ec2' }}"
+          ENVIRONMENT="${{ github.event.inputs.environment || 'prod' }}"
+          echo "rebuild_docker=${REBUILD_DOCKER}" >> $GITHUB_OUTPUT
+          echo "build_location=${BUILD_LOCATION}" >> $GITHUB_OUTPUT
+          echo "environment=${ENVIRONMENT}" >> $GITHUB_OUTPUT
+          echo "REBUILD_DOCKER=${REBUILD_DOCKER}" >> $GITHUB_ENV
+          echo "BUILD_LOCATION=${BUILD_LOCATION}" >> $GITHUB_ENV
+          echo "ENVIRONMENT=${ENVIRONMENT}" >> $GITHUB_ENV
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -105,7 +111,7 @@ jobs:
           echo "SSH setup complete"
       
       - name: Build Docker Images on GitHub
-        if: steps.defaults.outputs.rebuild_docker == 'true' && steps.defaults.outputs.build_location == 'github'
+        if: env.REBUILD_DOCKER == 'true' && env.BUILD_LOCATION == 'github'
         run: |
           mkdir -p /tmp
           
@@ -222,7 +228,7 @@ jobs:
       - name: Deploy services
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
-          REBUILD=${{ steps.defaults.outputs.rebuild_docker }}
+          REBUILD=${{ env.REBUILD_DOCKER }}
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s "$REBUILD" << 'ENDSSH'
           set -e
           REBUILD=$1
@@ -292,7 +298,7 @@ jobs:
           ENDSSH
       
       - name: Build Docker Images on EC2
-        if: steps.defaults.outputs.rebuild_docker == 'true' && steps.defaults.outputs.build_location == 'ec2'
+        if: env.REBUILD_DOCKER == 'true' && env.BUILD_LOCATION == 'ec2'
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
           INSTANCE=${{ github.event.inputs.instance }}
