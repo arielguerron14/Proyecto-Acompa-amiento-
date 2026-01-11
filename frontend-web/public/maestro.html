@@ -214,6 +214,42 @@
             <section id="reportes" class="module" data-module="reportes">
                 <h2>Reportes y Estadísticas</h2>
 
+                <!-- SUBSECCIÓN: MIS RESERVAS -->
+                <div class="reservas-section" style="margin-bottom: 30px;">
+                    <h3 style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                        <span>📅</span> Mis Reservas
+                    </h3>
+                    <div class="table-container">
+                        <table id="reservas-table" class="reservas-table" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background-color: #f3f4f6;">
+                                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Profesor</th>
+                                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Materia</th>
+                                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Fecha</th>
+                                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Hora</th>
+                                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Modalidad</th>
+                                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Lugar de Atención</th>
+                                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reservas-tbody">
+                                <tr>
+                                    <td colspan="7" style="padding: 20px; text-align: center; color: #9ca3af;">
+                                        <span>📭</span> No hay reservas registradas aún
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+
+                <!-- SUBSECCIÓN: ESTADÍSTICAS -->
+                <h3 style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                    <span>📊</span> Estadísticas
+                </h3>
+
                 <div class="reportes-grid">
                     <div class="reporte-card">
                         <div class="reporte-icon">⏰</div>
@@ -299,6 +335,33 @@
                 alert('Acceso denegado. Solo maestros pueden acceder a esta página.');
                 window.location.href = '/';
                 return;
+            }
+
+            // Cargar datos iniciales del maestro
+            await loadHorarios();
+            await loadReportes();
+            await loadMisReservas();
+
+            // Configurar eventos de navegación de tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+              tab.addEventListener('click', (e) => {
+                const moduleName = e.currentTarget.dataset.module;
+                switchTab(moduleName);
+                // Recargar datos cuando se abre la sección de reportes
+                if (moduleName === 'reportes') {
+                  loadReportes();
+                  loadMisReservas();
+                }
+              });
+            });
+
+            // Botón para actualizar reportes
+            const btnActualizarReportes = document.getElementById('btn-actualizar-reportes');
+            if (btnActualizarReportes) {
+              btnActualizarReportes.addEventListener('click', () => {
+                loadReportes();
+                loadMisReservas();
+              });
             }
         });
 

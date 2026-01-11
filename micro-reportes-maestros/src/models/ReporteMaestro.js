@@ -5,6 +5,11 @@ const HoraSchema = new Schema({
   dia: String,
   inicio: String,
   fin: String,
+  materia: String,
+  semestre: String,
+  paralelo: String,
+  modalidad: String,
+  lugarAtencion: String,
   alumnosAtendidos: { type: Number, default: 0 },
   alumnos: [{ estudianteId: String, estudianteName: String }]
 });

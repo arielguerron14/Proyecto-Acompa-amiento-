@@ -108,9 +108,14 @@ class ReservasService {
     const maestPayload = {
       maestroId: reserva.maestroId,
       maestroName: reserva.maestroName,
+      materia: reserva.materia,
+      semestre: reserva.semestre,
+      paralelo: reserva.paralelo,
       dia: reserva.dia,
       inicio: reserva.inicio,
       fin: reserva.fin,
+      modalidad: reserva.modalidad,
+      lugarAtencion: reserva.lugarAtencion,
       estudianteId: reserva.estudianteId,
       estudianteName: reserva.estudianteName,
     };

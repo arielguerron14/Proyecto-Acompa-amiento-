@@ -313,6 +313,98 @@ function renderReportes(reportes) {
   }
 }
 
+// Cargar y mostrar mis reservas como maestro
+async function loadMisReservas() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.warn('No token, skipping loadMisReservas');
+      return;
+    }
+
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const maestroId = payload.userId;
+
+    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+    
+    // Obtener reporte del maestro (que contiene sus reservas)
+    const response = await fetch(`${apiBase}/reportes-maestros/${maestroId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (e) {
+      console.error('Error parsing mis reservas JSON:', e);
+      return;
+    }
+
+    if (data && data.horas) {
+      renderMisReservas(data.horas, data.maestroName);
+      console.log('Mis reservas cargadas:', data.horas);
+    } else {
+      console.warn('No horas found in reporte:', data);
+    }
+  } catch (error) {
+    console.error('Error cargando mis reservas:', error);
+  }
+}
+
+// Renderizar mis reservas en tabla
+function renderMisReservas(horas, maestroName) {
+  const tbody = document.getElementById('reservas-tbody');
+  if (!tbody) return; // nothing to render on this page
+
+  tbody.innerHTML = '';
+
+  if (!horas || horas.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="padding: 20px; text-align: center; color: #9ca3af;">📭 No hay reservas registradas aún</td></tr>';
+    return;
+  }
+
+  horas.forEach(hora => {
+    if (!hora.alumnos || hora.alumnos.length === 0) return; // Skip horas sin estudiantes
+
+    hora.alumnos.forEach(alumno => {
+      const row = document.createElement('tr');
+      row.style.borderBottom = '1px solid #e5e7eb';
+      
+      const estado = 'Activa'; // TODO: agregar campo estado a ReporteMaestro si es necesario
+      
+      row.innerHTML = `
+        <td style="padding: 12px;">${maestroName || 'N/A'}</td>
+        <td style="padding: 12px;">${hora.materia || 'N/A'}</td>
+        <td style="padding: 12px;">${hora.dia || 'N/A'}</td>
+        <td style="padding: 12px;">${hora.inicio || 'N/A'} - ${hora.fin || 'N/A'}</td>
+        <td style="padding: 12px;">
+          <span style="background-color: ${getModalidadColor(hora.modalidad)}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">
+            ${hora.modalidad || 'N/A'}
+          </span>
+        </td>
+        <td style="padding: 12px;">${hora.lugarAtencion || 'N/A'}</td>
+        <td style="padding: 12px;">
+          <span style="background-color: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">
+            ${estado}
+          </span>
+        </td>
+      `;
+
+      tbody.appendChild(row);
+    });
+  });
+}
+
+// Helper para obtener color de modalidad
+function getModalidadColor(modalidad) {
+  switch(modalidad) {
+    case 'Presencial': return '#3b82f6'; // blue
+    case 'Virtual': return '#8b5cf6'; // purple
+    case 'Híbrido': return '#f59e0b'; // amber
+    default: return '#6b7280'; // gray
+  }
+}
+
 // Actualizar opciones de materia según semestre
 function updateMateriaOptions() {
   // Defensive: if the select elements are not present on the page, do nothing

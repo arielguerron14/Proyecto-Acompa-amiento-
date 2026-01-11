@@ -3,7 +3,11 @@ const Reporte = require('../models/ReporteMaestro');
 module.exports = {
   registrarAtencion: async (req, res) => {
     try {
-      const { maestroId, maestroName, dia, inicio, estudianteId, estudianteName, fin } = req.body;
+      const { 
+        maestroId, maestroName, dia, inicio, fin, 
+        estudianteId, estudianteName,
+        materia, semestre, paralelo, modalidad, lugarAtencion
+      } = req.body;
       if (!maestroId || !dia || !inicio || !estudianteId) return res.status(400).json({ message: 'Missing fields' });
 
       let reporte = await Reporte.findOne({ maestroId });
@@ -11,7 +15,12 @@ module.exports = {
         reporte = await Reporte.create({
           maestroId,
           maestroName,
-          horas: [{ dia, inicio, fin, alumnosAtendidos: 1, alumnos: [{ estudianteId, estudianteName }] }]
+          horas: [{ 
+            dia, inicio, fin, 
+            materia, semestre, paralelo, modalidad, lugarAtencion,
+            alumnosAtendidos: 1, 
+            alumnos: [{ estudianteId, estudianteName }] 
+          }]
         });
         return res.status(201).json(reporte);
       }
@@ -19,7 +28,12 @@ module.exports = {
       // buscar la hora
       const horaIdx = reporte.horas.findIndex(h => h.dia === dia && h.inicio === inicio);
       if (horaIdx === -1) {
-        reporte.horas.push({ dia, inicio, fin, alumnosAtendidos: 1, alumnos: [{ estudianteId, estudianteName }] });
+        reporte.horas.push({ 
+          dia, inicio, fin, 
+          materia, semestre, paralelo, modalidad, lugarAtencion,
+          alumnosAtendidos: 1, 
+          alumnos: [{ estudianteId, estudianteName }] 
+        });
       } else {
         const hora = reporte.horas[horaIdx];
         // prevenir duplicados
@@ -27,6 +41,12 @@ module.exports = {
           hora.alumnos.push({ estudianteId, estudianteName });
           hora.alumnosAtendidos = hora.alumnos.length;
         }
+        // Actualizar campos adicionales si cambieron
+        if (materia) hora.materia = materia;
+        if (semestre) hora.semestre = semestre;
+        if (paralelo) hora.paralelo = paralelo;
+        if (modalidad) hora.modalidad = modalidad;
+        if (lugarAtencion) hora.lugarAtencion = lugarAtencion;
       }
       reporte.updatedAt = new Date();
       await reporte.save();
