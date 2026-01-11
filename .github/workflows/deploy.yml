@@ -111,7 +111,7 @@ jobs:
           echo "SSH setup complete"
       
       - name: Build Docker Images on GitHub
-        if: env.REBUILD_DOCKER == 'true' && env.BUILD_LOCATION == 'github'
+        if: steps.defaults.outputs.rebuild_docker == 'true' && steps.defaults.outputs.build_location == 'github'
         run: |
           mkdir -p /tmp
           
@@ -298,7 +298,7 @@ jobs:
           ENDSSH
       
       - name: Build Docker Images on EC2
-        if: env.REBUILD_DOCKER == 'true' && env.BUILD_LOCATION == 'ec2'
+        if: steps.defaults.outputs.rebuild_docker == 'true' && steps.defaults.outputs.build_location == 'ec2'
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
           INSTANCE=${{ github.event.inputs.instance }}
