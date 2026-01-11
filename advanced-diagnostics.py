@@ -31,12 +31,12 @@ def test_http(host, port, timeout=5):
         return None
 
 services = [
-    ("ZOOKEEPER", "44.221.50.177", 2181, "tcp"),
-    ("KAFKA", "44.221.50.177", 9092, "tcp"),
-    ("RABBITMQ_AMQP", "44.221.50.177", 5672, "tcp"),
-    ("RABBITMQ_MGMT", "44.221.50.177", 15672, "http"),
-    ("PROMETHEUS", "54.198.235.28", 9090, "http"),
-    ("GRAFANA", "54.198.235.28", 3000, "http"),
+    ("ZOOKEEPER", "54.82.124.96", 2181, "tcp"),
+    ("KAFKA", "54.82.124.96", 9092, "tcp"),
+    ("RABBITMQ_AMQP", "54.82.124.96", 5672, "tcp"),
+    ("RABBITMQ_MGMT", "54.82.124.96", 15672, "http"),
+    ("PROMETHEUS", "34.203.175.72", 9090, "http"),
+    ("GRAFANA", "34.203.175.72", 3000, "http"),
 ]
 
 print("\n" + "="*60)

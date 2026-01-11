@@ -31,12 +31,12 @@ def check_http(host, port, path="/", timeout=3):
 
 # Services to check
 services = [
-    {"name": "ZOOKEEPER", "ip": "44.221.50.177", "port": 2181, "type": "tcp"},
-    {"name": "KAFKA", "ip": "44.221.50.177", "port": 9092, "type": "tcp"},
-    {"name": "RABBITMQ_AMQP", "ip": "44.221.50.177", "port": 5672, "type": "tcp"},
-    {"name": "RABBITMQ_MGMT", "ip": "44.221.50.177", "port": 15672, "type": "http", "path": "/api/queues"},
-    {"name": "PROMETHEUS", "ip": "54.198.235.28", "port": 9090, "type": "http", "path": "/api/v1/targets"},
-    {"name": "GRAFANA", "ip": "54.198.235.28", "port": 3000, "type": "http", "path": "/api/health"},
+    {"name": "ZOOKEEPER", "ip": "54.82.124.96", "port": 2181, "type": "tcp"},
+    {"name": "KAFKA", "ip": "54.82.124.96", "port": 9092, "type": "tcp"},
+    {"name": "RABBITMQ_AMQP", "ip": "54.82.124.96", "port": 5672, "type": "tcp"},
+    {"name": "RABBITMQ_MGMT", "ip": "54.82.124.96", "port": 15672, "type": "http", "path": "/api/queues"},
+    {"name": "PROMETHEUS", "ip": "34.203.175.72", "port": 9090, "type": "http", "path": "/api/v1/targets"},
+    {"name": "GRAFANA", "ip": "34.203.175.72", "port": 3000, "type": "http", "path": "/api/health"},
 ]
 
 print("=" * 50)

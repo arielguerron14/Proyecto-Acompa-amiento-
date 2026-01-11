@@ -69,19 +69,19 @@ jobs:
               echo "ip=13.216.12.61" >> $GITHUB_OUTPUT
               ;;
             EC2_DB)
-              echo "ip=3.238.204.241" >> $GITHUB_OUTPUT
+              echo "ip=13.221.197.119" >> $GITHUB_OUTPUT
               ;;
             EC2_API_GATEWAY)
-              echo "ip=52.71.188.181" >> $GITHUB_OUTPUT
+              echo "ip=3.214.212.205" >> $GITHUB_OUTPUT
               ;;
             EC2_FRONTEND)
-              echo "ip=107.21.124.81" >> $GITHUB_OUTPUT
+              echo "ip=54.85.92.175" >> $GITHUB_OUTPUT
               ;;
             EC2_MESSAGING)
-              echo "ip=44.221.50.177" >> $GITHUB_OUTPUT
+              echo "ip=54.82.124.96" >> $GITHUB_OUTPUT
               ;;
             EC2_MONITORING)
-              echo "ip=54.198.235.28" >> $GITHUB_OUTPUT
+              echo "ip=34.203.175.72" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "ip=0.0.0.0" >> $GITHUB_OUTPUT

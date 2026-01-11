@@ -18,41 +18,41 @@ module.exports = {
   // ============================================
   PUBLIC: {
     // EC2-DB - IP pública
-    DB_IP: process.env.DB_PUBLIC_IP || '3.238.204.241',
+    DB_IP: process.env.DB_PUBLIC_IP || '13.221.197.119',
     
     // EC2-CORE - IP pública
-    CORE_IP: process.env.CORE_PUBLIC_IP || '13.216.12.61',
+    CORE_IP: process.env.CORE_PUBLIC_IP || '3.234.198.34',
 
     // API Gateway - IP pública para acceso desde frontend
-    API_GATEWAY_IP: process.env.API_GATEWAY_IP || '52.71.188.181',
+    API_GATEWAY_IP: process.env.API_GATEWAY_IP || '3.214.212.205',
     API_GATEWAY_PORT: process.env.API_GATEWAY_PORT || 3000,
     API_GATEWAY_URL: function() {
       return `http://${this.API_GATEWAY_IP}:${this.API_GATEWAY_PORT}`;
     },
 
     // Frontend - IP pública para acceso desde navegador
-    FRONTEND_IP: process.env.FRONTEND_IP || '107.21.124.81',
+    FRONTEND_IP: process.env.FRONTEND_IP || '54.85.92.175',
     FRONTEND_PORT: process.env.FRONTEND_PORT || 5500,
     FRONTEND_URL: function() {
       return `http://${this.FRONTEND_IP}:${this.FRONTEND_PORT}`;
     },
 
     // Notificaciones - IP pública
-    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '35.175.180.215',
+    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '100.31.92.71',
     NOTIFICACIONES_PORT: process.env.NOTIFICACIONES_PORT || 5005,
     NOTIFICACIONES_URL: function() {
       return `http://${this.NOTIFICACIONES_IP}:${this.NOTIFICACIONES_PORT}`;
     },
 
     // Messaging - IP pública
-    MESSAGING_IP: process.env.MESSAGING_IP || '44.221.50.177',
+    MESSAGING_IP: process.env.MESSAGING_IP || '54.82.124.96',
     MESSAGING_PORT: process.env.MESSAGING_PORT || 1883,
     MESSAGING_URL: function() {
       return `mqtt://${this.MESSAGING_IP}:${this.MESSAGING_PORT}`;
     },
 
     // Reportes - IP pública
-    REPORTES_IP: process.env.REPORTES_IP || '54.175.62.79',
+    REPORTES_IP: process.env.REPORTES_IP || '3.94.74.223',
     REPORTES_ESTUDIANTES_PORT: process.env.REPORTES_ESTUDIANTES_PORT || 5003,
     REPORTES_MAESTROS_PORT: process.env.REPORTES_MAESTROS_PORT || 5004,
     REPORTES_ESTUDIANTES_URL: function() {
@@ -63,33 +63,33 @@ module.exports = {
     },
 
     // Monitoring - IP pública
-    MONITORING_IP: process.env.MONITORING_IP || '54.198.235.28',
+    MONITORING_IP: process.env.MONITORING_IP || '34.203.175.72',
     PROMETHEUS_PORT: process.env.PROMETHEUS_PORT || 9090,
     GRAFANA_PORT: process.env.GRAFANA_PORT || 3000,
 
     // Kafka - IP pública
-    KAFKA_IP: process.env.KAFKA_IP || '44.221.50.177',
+    KAFKA_IP: process.env.KAFKA_IP || '54.82.124.96',
     KAFKA_PORT: process.env.KAFKA_PORT || 9092,
     KAFKA_URL: function() {
       return `kafka://${this.KAFKA_IP}:${this.KAFKA_PORT}`;
     },
 
     // Prometheus - IP pública
-    PROMETHEUS_PUBLIC_IP: process.env.PROMETHEUS_PUBLIC_IP || '54.198.235.28',
+    PROMETHEUS_PUBLIC_IP: process.env.PROMETHEUS_PUBLIC_IP || '34.203.175.72',
     PROMETHEUS_PUBLIC_PORT: process.env.PROMETHEUS_PORT || 9090,
     PROMETHEUS_PUBLIC_URL: function() {
       return `http://${this.PROMETHEUS_PUBLIC_IP}:${this.PROMETHEUS_PUBLIC_PORT}`;
     },
 
     // Grafana - IP pública
-    GRAFANA_PUBLIC_IP: process.env.GRAFANA_PUBLIC_IP || '54.198.235.28',
+    GRAFANA_PUBLIC_IP: process.env.GRAFANA_PUBLIC_IP || '34.203.175.72',
     GRAFANA_PUBLIC_PORT: process.env.GRAFANA_PORT || 3000,
     GRAFANA_PUBLIC_URL: function() {
       return `http://${this.GRAFANA_PUBLIC_IP}:${this.GRAFANA_PUBLIC_PORT}`;
     },
 
     // RabbitMQ - IP pública
-    RABBITMQ_IP: process.env.RABBITMQ_IP || '44.221.50.177',
+    RABBITMQ_IP: process.env.RABBITMQ_IP || '54.82.124.96',
     RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
     RABBITMQ_MANAGEMENT_PORT: process.env.RABBITMQ_MANAGEMENT_PORT || 15672,
     RABBITMQ_URL: function() {
@@ -105,7 +105,7 @@ module.exports = {
   // ============================================
   PRIVATE: {
     // EC2-DB - IP privada dentro de VPC
-    DB_IP: process.env.DB_PRIVATE_IP || '172.31.79.193',
+    DB_IP: process.env.DB_PRIVATE_IP || '172.31.78.151',
     MONGO_PORT: process.env.MONGO_PORT || 27017,
     POSTGRES_PORT: process.env.POSTGRES_PORT || 5432,
     REDIS_PORT: process.env.REDIS_PORT || 6379,
@@ -127,7 +127,7 @@ module.exports = {
     },
 
     // EC2-CORE - IP privada dentro de VPC
-    CORE_IP: process.env.CORE_PRIVATE_IP || '172.31.78.183',
+    CORE_IP: process.env.CORE_PRIVATE_IP || '172.31.66.255',
     AUTH_PORT: process.env.AUTH_PORT || 3000,
     ESTUDIANTES_PORT: process.env.ESTUDIANTES_PORT || 3001,
     MAESTROS_PORT: process.env.MAESTROS_PORT || 3002,
@@ -147,7 +147,7 @@ module.exports = {
     },
 
     // EC2-Reportes - IP privada dentro de VPC
-    REPORTES_IP: process.env.REPORTES_PRIVATE_IP || '172.31.69.133',
+    REPORTES_IP: process.env.REPORTES_PRIVATE_IP || '172.31.76.191',
     REPORTES_ESTUDIANTES_PORT: process.env.REPORTES_ESTUDIANTES_PORT || 5003,
     REPORTES_MAESTROS_PORT: process.env.REPORTES_MAESTROS_PORT || 5004,
     REPORTES_EST_URL: function() {
@@ -158,35 +158,35 @@ module.exports = {
     },
 
     // EC2-Notificaciones - IP privada dentro de VPC
-    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_PRIVATE_IP || '172.31.65.57',
+    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_PRIVATE_IP || '172.31.79.1',
     NOTIFICACIONES_PORT: process.env.NOTIFICACIONES_PORT || 5005,
     NOTIFICACIONES_URL: function() {
       return `http://${this.NOTIFICACIONES_IP}:${this.NOTIFICACIONES_PORT}`;
     },
 
     // EC2-Messaging - IP privada dentro de VPC
-    MESSAGING_IP: process.env.MESSAGING_PRIVATE_IP || '172.31.73.6',
+    MESSAGING_IP: process.env.MESSAGING_PRIVATE_IP || '172.31.30.229',
     MESSAGING_PORT: process.env.MESSAGING_PORT || 1883,
     MESSAGING_URL: function() {
       return `mqtt://${this.MESSAGING_IP}:${this.MESSAGING_PORT}`;
     },
 
     // EC2-API-Gateway Replica - IP privada dentro de VPC
-    API_GATEWAY_REPLICA_IP: process.env.API_GATEWAY_REPLICA_PRIVATE_IP || '172.31.76.105',
+    API_GATEWAY_REPLICA_IP: process.env.API_GATEWAY_REPLICA_PRIVATE_IP || '172.31.73.68',
     API_GATEWAY_REPLICA_PORT: process.env.API_GATEWAY_REPLICA_PORT || 8080,
     API_GATEWAY_REPLICA_URL: function() {
       return `http://${this.API_GATEWAY_REPLICA_IP}:${this.API_GATEWAY_REPLICA_PORT}`;
     },
 
     // EC2-Frontend - IP privada dentro de VPC
-    FRONTEND_PRIVATE_IP: process.env.FRONTEND_PRIVATE_IP || '172.31.69.203',
+    FRONTEND_PRIVATE_IP: process.env.FRONTEND_PRIVATE_IP || '172.31.75.56',
     FRONTEND_PRIVATE_PORT: process.env.FRONTEND_PRIVATE_PORT || 5500,
     FRONTEND_PRIVATE_URL: function() {
       return `http://${this.FRONTEND_PRIVATE_IP}:${this.FRONTEND_PRIVATE_PORT}`;
     },
 
     // EC2-Monitoring - IP privada dentro de VPC
-    MONITORING_IP: process.env.MONITORING_PRIVATE_IP || '172.31.71.151',
+    MONITORING_IP: process.env.MONITORING_PRIVATE_IP || '172.31.73.163',
     PROMETHEUS_PORT: process.env.PROMETHEUS_PORT || 9090,
     GRAFANA_PORT: process.env.GRAFANA_PORT || 3000,
     PROMETHEUS_URL: function() {
@@ -197,7 +197,7 @@ module.exports = {
     },
 
     // EC2-Kafka - IP privada dentro de VPC
-    KAFKA_IP: process.env.KAFKA_PRIVATE_IP || '172.31.80.45',
+    KAFKA_IP: process.env.KAFKA_PRIVATE_IP || '172.31.30.229',
     KAFKA_PORT: process.env.KAFKA_PORT || 9092,
     KAFKA_ZOOKEEPER_PORT: process.env.KAFKA_ZOOKEEPER_PORT || 2181,
     KAFKA_URL: function() {
@@ -208,21 +208,21 @@ module.exports = {
     },
 
     // EC2-Prometheus - IP privada dentro de VPC (puede estar en MONITORING)
-    PROMETHEUS_PRIVATE_IP: process.env.PROMETHEUS_PRIVATE_IP || '172.31.71.151',
+    PROMETHEUS_PRIVATE_IP: process.env.PROMETHEUS_PRIVATE_IP || '172.31.73.163',
     PROMETHEUS_PRIVATE_PORT: process.env.PROMETHEUS_PORT || 9090,
     PROMETHEUS_PRIVATE_URL: function() {
       return `http://${this.PROMETHEUS_PRIVATE_IP}:${this.PROMETHEUS_PRIVATE_PORT}`;
     },
 
     // EC2-Grafana - IP privada dentro de VPC (puede estar en MONITORING)
-    GRAFANA_PRIVATE_IP: process.env.GRAFANA_PRIVATE_IP || '172.31.71.151',
+    GRAFANA_PRIVATE_IP: process.env.GRAFANA_PRIVATE_IP || '172.31.73.163',
     GRAFANA_PRIVATE_PORT: process.env.GRAFANA_PORT || 3000,
     GRAFANA_PRIVATE_URL: function() {
       return `http://${this.GRAFANA_PRIVATE_IP}:${this.GRAFANA_PRIVATE_PORT}`;
     },
 
     // EC2-RabbitMQ - IP privada dentro de VPC
-    RABBITMQ_IP: process.env.RABBITMQ_PRIVATE_IP || '172.31.72.88',
+    RABBITMQ_IP: process.env.RABBITMQ_PRIVATE_IP || '172.31.30.229',
     RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
     RABBITMQ_MANAGEMENT_PORT: process.env.RABBITMQ_MANAGEMENT_PORT || 15672,
     RABBITMQ_URL: function() {
