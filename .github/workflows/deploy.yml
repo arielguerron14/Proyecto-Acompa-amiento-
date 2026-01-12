@@ -225,80 +225,8 @@ jobs:
             echo "⚠️ Warning: $COMPOSE_FILE not found, skipping docker-compose transfer"
           fi
       
-      - name: Deploy services
-        run: |
-          IP=${{ steps.get-ip.outputs.ip }}
-          REBUILD=${{ env.REBUILD_DOCKER }}
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s "$REBUILD" << 'ENDSSH'
-          set -e
-          REBUILD=$1
-          
-          echo "=== Phase 0: Install docker-compose if needed ==="
-          if ! command -v docker-compose &> /dev/null; then
-            echo "Installing docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-            docker-compose --version
-          fi
-          
-          echo "=== Phase 1: Remove old containers ==="
-          docker-compose -f ~/app/docker-compose.yml down 2>/dev/null || true
-
-          echo "=== Phase 2: Remove old images (if rebuild_docker=true) ==="
-          if [ "$REBUILD" = "true" ]; then
-            echo "Removing old images to prevent caching issues..."
-            docker rmi api-gateway:latest 2>/dev/null || true
-            docker rmi micro-auth:latest 2>/dev/null || true
-            docker rmi micro-estudiantes:latest 2>/dev/null || true
-            docker rmi micro-maestros:latest 2>/dev/null || true
-            docker rmi frontend-web:latest 2>/dev/null || true
-            docker rmi proyecto-kafka:1.0 2>/dev/null || true
-            docker rmi proyecto-zookeeper:1.0 2>/dev/null || true
-            docker rmi proyecto-rabbitmq:1.0 2>/dev/null || true
-            docker rmi proyecto-prometheus:1.0 2>/dev/null || true
-            docker rmi proyecto-grafana:1.0 2>/dev/null || true
-            docker image prune -f
-          fi
-
-          echo "=== Phase 3: Load pre-built docker images (if rebuild_docker=true) ==="
-          if [ "$REBUILD" = "true" ]; then
-            echo "Loading images from ~/docker-images..."
-            for FILE in ~/docker-images/*.tar; do
-              if [ -f "$FILE" ]; then
-                echo "Loading $(basename $FILE)..."
-                docker load -i "$FILE" || echo "Warning: Failed to load $FILE"
-                rm -f "$FILE"
-              fi
-            done
-            
-            echo "Loading images from /tmp..."
-            for FILE in /tmp/*.tar; do
-              if [ -f "$FILE" ]; then
-                echo "Loading $(basename $FILE)..."
-                docker load -i "$FILE" || echo "Warning: Failed to load $FILE"
-                rm -f "$FILE"
-              fi
-            done
-            
-            echo "Images loaded successfully"
-            docker images | grep -E 'proyecto|api-gateway|micro|frontend' || echo "No images found"
-          else
-            echo "Skipping image load (rebuild_docker=false)"
-          fi
-          
-          echo "=== Phase 4: Deploy with docker-compose (using pre-built images, not building) ==="
-          cd ~/app
-          docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
-          docker-compose up -d --no-build
-          
-          echo "=== Phase 5: Verify deployment ==="
-          sleep 5
-          docker-compose ps
-          docker-compose logs --tail=30
-          ENDSSH
-      
       - name: Build Docker Images on EC2
-        if: steps.defaults.outputs.rebuild_docker == 'true' && steps.defaults.outputs.build_location == 'ec2'
+        if: env.REBUILD_DOCKER == 'true' && env.BUILD_LOCATION == 'ec2'
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
           INSTANCE=${{ github.event.inputs.instance }}
@@ -370,10 +298,34 @@ jobs:
           
           echo "=== EC2 Build: Images built successfully ==="
           docker images | grep -E 'proyecto|api-gateway|micro|frontend' || echo "No custom images found"
+          BUILDSSH
+      
+      - name: Deploy services
+        run: |
+          IP=${{ steps.get-ip.outputs.ip }}
+          REBUILD=${{ env.REBUILD_DOCKER }}
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s "$REBUILD" << 'ENDSSH'
+          set -e
+          REBUILD=$1
           
-          echo "=== EC2 Build: Starting services ==="
+          echo "=== Phase 0: Install docker-compose if needed ==="
+          if ! command -v docker-compose &> /dev/null; then
+            echo "Installing docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
+          
+          echo "=== Phase 1: Remove old containers ==="
+          docker-compose -f ~/app/docker-compose.yml down 2>/dev/null || true
+          
+          echo "=== Phase 2: Deploy with docker-compose ==="
           cd ~/app
+          docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
           docker-compose up -d
+          
+          echo "=== Phase 3: Verify deployment ==="
           sleep 5
           docker-compose ps
-          BUILDSSH
+          docker-compose logs --tail=30
+          ENDSSH
