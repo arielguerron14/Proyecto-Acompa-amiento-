@@ -69,13 +69,13 @@ jobs:
           
           ssh-keyscan -H $IP >> ~/.ssh/known_hosts 2>/dev/null || true
           
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash << 'EOFSCRIPT'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash << EOFSCRIPT
           set -e
           
-          INSTANCE="'"$INSTANCE"'"
-          REBUILD="'"$REBUILD"'"
-          GITHUB_REPO="'"$GITHUB_REPO"'"
-          GITHUB_REF="'"$GITHUB_REF"'"
+          INSTANCE="$INSTANCE"
+          REBUILD="$REBUILD"
+          GITHUB_REPO="$GITHUB_REPO"
+          GITHUB_REF="$GITHUB_REF"
           
           echo "=========================================="
           echo "EC2 Deployment Script"
