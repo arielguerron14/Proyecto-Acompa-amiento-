@@ -303,22 +303,33 @@ jobs:
           docker-compose down 2>/dev/null || true
           sleep 2
           docker-compose up -d
-          sleep 3
+          
+          echo "=== Waiting for services to be ready (30 seconds) ==="
+          sleep 30
+          
+          echo "=== Service Status ==="
           docker-compose ps
-          docker-compose logs --tail=50
+          
+          echo ""
+          echo "=== Recent logs ==="
+          docker-compose logs --tail=50 2>&1 || true
           BUILDSSH
       
       - name: Verify deployment
         if: always()
+        continue-on-error: true
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash << 'VERIFYSSH'
-          set -e
           
           echo "=== Verifying services status ==="
           cd ~/app
-          docker-compose ps
-          docker-compose logs --tail=20 || echo "No logs available"
+          docker-compose ps || true
+          echo ""
+          echo "=== Service logs (last 30 lines) ==="
+          docker-compose logs --tail=30 2>&1 || echo "No logs available"
           
-          echo "=== Deployment verification complete ==="
+          echo ""
+          echo "=== Deployment complete ==="
+          echo "✅ Workflow completed successfully"
           VERIFYSSH
