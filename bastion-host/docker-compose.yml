@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  bastion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bastion-host
+    hostname: bastion-host
+    restart: always
+    
+    # Configuración de red
+    networks:
+      - proyecto-network
+    
+    ports:
+      - "22:22"
+    
+    # Volúmenes para persistencia de datos
+    volumes:
+      # SSH keys (cambiar ruta según tu setup)
+      - ./ssh-keys:/root/.ssh:ro
+      - ./authorized_keys:/home/ec2-user/.ssh/authorized_keys:ro
+      
+      # Logs de auditoría y monitoreo
+      - bastion-logs:/var/log/bastion
+      - bastion-auth:/var/log
+      
+      # Configuración SSH (persistente)
+      - bastion-ssh-config:/etc/ssh
+      
+      # Scripts personalizados (opcional)
+      - ./scripts:/opt/bastion/scripts:ro
+    
+    # Limites de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Environment variables
+    environment:
+      TZ: UTC
+      BASTION_PORT: 22
+      LOG_LEVEL: INFO
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "/opt/bastion/scripts/health-check.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Opciones de seguridad
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    
+    cap_drop:
+      - ALL
+    
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+      - /var/run
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+        labels: "service=bastion-host"
+
+# Volúmenes persistentes
+volumes:
+  bastion-logs:
+    driver: local
+  bastion-auth:
+    driver: local
+  bastion-ssh-config:
+    driver: local
+
+# Red del proyecto
+networks:
+  proyecto-network:
+    name: proyecto-network
+    driver: bridge

@@ -1,0 +1,44 @@
+# Bastion Host - Git Ignore
+
+# Claves SSH (NUNCA commitar)
+ssh-keys/*
+!ssh-keys/authorized_keys
+!ssh-keys/.gitkeep
+
+# Archivos de configuración locales
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Temporales
+tmp/
+temp/
+*.tmp

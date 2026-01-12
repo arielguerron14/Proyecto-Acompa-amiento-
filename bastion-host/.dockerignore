@@ -1,0 +1,16 @@
+# Docker ignore for Bastion Host
+.git
+.gitignore
+.dockerignore
+.env
+.env.local
+*.md
+README.md
+*.log
+logs/
+.DS_Store
+__pycache__
+*.pyc
+node_modules/
+.venv/
+venv/

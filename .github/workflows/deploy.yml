@@ -9,6 +9,7 @@ on:
         default: 'EC2_CORE'
         type: choice
         options:
+          - EC2_BASTION
           - EC2_CORE
           - EC2_DB
           - EC2_API_GATEWAY
@@ -68,6 +69,7 @@ jobs:
           echo "REBUILD_DOCKER=${REBUILD_DOCKER}" >> $GITHUB_ENV
           echo "BUILD_LOCATION=${BUILD_LOCATION}" >> $GITHUB_ENV
           echo "ENVIRONMENT=${ENVIRONMENT}" >> $GITHUB_ENV
+          echo "INSTANCE=${{ github.event.inputs.instance }}" >> $GITHUB_ENV
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -78,6 +80,9 @@ jobs:
         id: get-ip
         run: |
           case "${{ github.event.inputs.instance }}" in
+            EC2_BASTION)
+              echo "ip=54.172.74.210" >> $GITHUB_OUTPUT
+              ;;
             EC2_CORE)
               echo "ip=3.234.198.34" >> $GITHUB_OUTPUT
               ;;
@@ -193,17 +198,13 @@ jobs:
           df -h / | tail -1
           CLEANUP
           
-          # Transfer Docker images to EC2 home directory
-          echo "Transferring Docker images..."
-          for FILE in /tmp/*.tar; do
-            if [ -f "$FILE" ]; then
-              echo "  Transferring $(basename $FILE)..."
-              scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 -C "$FILE" ubuntu@$IP:~/docker-images/ || true
-            fi
-          done
-          
-          # Transfer appropriate docker-compose.yml based on instance
-          if [ "$INSTANCE" = "EC2_CORE" ]; then
+          # Determine docker-compose.yml based on instance
+          if [ "$INSTANCE" = "EC2_BASTION" ]; then
+            # Para Bastion, transferir toda la carpeta bastion-host
+            echo "Transferring Bastion Host files..."
+            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 -r ./bastion-host ubuntu@$IP:~/app/bastion-host || true
+            COMPOSE_FILE="./bastion-host/docker-compose.yml"
+          elif [ "$INSTANCE" = "EC2_CORE" ]; then
             COMPOSE_FILE="./docker-compose.ec2-core.yml"
           elif [ "$INSTANCE" = "EC2_API_GATEWAY" ]; then
             COMPOSE_FILE="./docker-compose.api-gateway.yml"
@@ -250,6 +251,11 @@ jobs:
           mkdir -p ~/docker-images
           
           case "$INSTANCE" in
+            EC2_BASTION)
+              echo "Building Bastion Host Docker image..."
+              cd ~/app/bastion-host
+              docker build --no-cache -t bastion-host:latest .
+              ;;
             EC2_MESSAGING)
               echo "Building infrastructure images for messaging..."
               # Build Zookeeper

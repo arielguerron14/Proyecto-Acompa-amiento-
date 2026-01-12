@@ -1,0 +1,20 @@
+# Bastion Host - Authorized Keys Configuration
+# 
+# Este archivo debe contener las claves públicas SSH autorizadas para acceder al Bastion
+# 
+# Uso:
+# 1. Agregar tu clave pública aquí (generalmente ~/.ssh/id_rsa.pub)
+# 2. Configurar los permisos: chmod 600 authorized_keys
+# 3. Reconstruir la imagen Docker o reiniciar el contenedor
+#
+# Ejemplo:
+# ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... usuario@localhost
+#
+# IMPORTANTE:
+# - Una clave por línea
+# - No incluir espacios al inicio o final
+# - Mantener este archivo seguro (chmod 600)
+# - No commitar al repositorio si contiene claves sensibles
+
+# Agregar tus claves públicas aquí:
+

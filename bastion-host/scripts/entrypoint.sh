@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# Bastion Host - Entrypoint Script
+# Este script se ejecuta cuando inicia el contenedor
+
+set -e
+
+echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Iniciando Bastion Host..."
+
+# Crear directorio de logs
+mkdir -p /var/log/bastion
+chmod 755 /var/log/bastion
+
+# Generar claves SSH si no existen
+if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
+    echo "[BASTION] Generando claves SSH..."
+    ssh-keygen -A
+fi
+
+# Configurar permisos SSH
+chmod 600 /etc/ssh/ssh_host_*
+chmod 644 /etc/ssh/ssh_host_*.pub
+
+# Crear usuario ec2-user si no existe
+if ! id "ec2-user" &>/dev/null; then
+    echo "[BASTION] Creando usuario ec2-user..."
+    useradd -m -s /bin/bash ec2-user
+    mkdir -p /home/ec2-user/.ssh
+    chmod 700 /home/ec2-user/.ssh
+    chown -R ec2-user:ec2-user /home/ec2-user/.ssh
+fi
+
+# Si existe una clave pública en /root/.ssh/authorized_keys, copiarla al usuario
+if [ -f /root/.ssh/authorized_keys ]; then
+    echo "[BASTION] Configurando authorized_keys para ec2-user..."
+    cp /root/.ssh/authorized_keys /home/ec2-user/.ssh/authorized_keys
+    chmod 600 /home/ec2-user/.ssh/authorized_keys
+    chown ec2-user:ec2-user /home/ec2-user/.ssh/authorized_keys
+fi
+
+# Configurar sudoers para ec2-user (permitir sudo sin contraseña)
+echo "ec2-user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ec2-user
+chmod 440 /etc/sudoers.d/ec2-user
+
+# Iniciar auditoría
+echo "[BASTION] Configurando auditoría de conexiones..."
+cat > /etc/ssh/sshd_config.d/99-audit.conf << 'EOF'
+# Bastion SSH Audit Configuration
+LogLevel VERBOSE
+SyslogFacility AUTH
+AuthorizedKeysFile .ssh/authorized_keys
+StrictModes yes
+IgnoreRhosts yes
+HostbasedAuthentication no
+PubkeyAuthentication yes
+PermitRootLogin prohibit-password
+PasswordAuthentication no
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+UsePAM yes
+X11Forwarding no
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib64/openssh/sftp-server
+EOF
+
+# Crear archivo de motivo (MOTD)
+cat > /etc/motd << 'EOF'
+╔════════════════════════════════════════════════════════════════╗
+║                    BASTION HOST - AWS                          ║
+║                                                                ║
+║  Este es un Bastion Host (Jump Host) para acceso seguro a      ║
+║  instancias EC2 privadas. Todas las conexiones son auditadas.  ║
+║                                                                ║
+║  IP: 54.172.74.210                                             ║
+║  Usuario: ec2-user                                             ║
+║  Puerto: 22                                                    ║
+║                                                                ║
+║  ⚠️  Acceso solo autorizado. Violaciones serán registradas.    ║
+╚════════════════════════════════════════════════════════════════╝
+EOF
+
+# Crear archivo de bienvenida
+cat > /etc/ssh/banner.txt << 'EOF'
+╔════════════════════════════════════════════════════════════════╗
+║                    BASTION HOST - AWS                          ║
+║                                                                ║
+║  Acceso auditado y monitorizado                               ║
+║  Instancias accesibles a través de este host                  ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+EOF
+
+# Agregar banner a SSH config
+if ! grep -q "Banner" /etc/ssh/sshd_config.d/99-bastion.conf; then
+    echo "Banner /etc/ssh/banner.txt" >> /etc/ssh/sshd_config.d/99-bastion.conf
+fi
+
+# Iniciar servicio SSH
+echo "[BASTION] Iniciando SSH daemon..."
+mkdir -p /var/run/sshd
+
+# Validar configuración SSH
+echo "[BASTION] Validando configuración SSH..."
+/usr/sbin/sshd -t && echo "[BASTION] ✅ Configuración SSH válida" || {
+    echo "[BASTION] ❌ Error en configuración SSH"
+    exit 1
+}
+
+# Registrar inicio en log
+echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Bastion Host iniciado correctamente" >> /var/log/bastion/startup.log
+
+# Log inicial en CloudWatch
+echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Bastion Host iniciado" 
+
+# Ejecutar comando pasado como argumento (normalmente sshd -D)
+echo "[BASTION] Ejecutando: $@"
+exec "$@"
