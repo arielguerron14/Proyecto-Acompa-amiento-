@@ -3,8 +3,8 @@ version: '3.8'
 services:
   prometheus:
     build:
-      context: .
-      dockerfile: prometheus/Dockerfile
+      context: ..
+      dockerfile: monitoring/prometheus/Dockerfile
     image: proyecto-prometheus:1.0
     container_name: proyecto-prometheus
     ports:
@@ -26,8 +26,8 @@ services:
 
   grafana:
     build:
-      context: .
-      dockerfile: grafana/Dockerfile
+      context: ..
+      dockerfile: monitoring/grafana/Dockerfile
     image: proyecto-grafana:1.0
     container_name: proyecto-grafana
     ports:
