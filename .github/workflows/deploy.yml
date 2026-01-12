@@ -1,4 +1,4 @@
-name: Deploy to EC2 - v2
+name: Deploy to EC2
 
 on:
   workflow_dispatch:
@@ -227,6 +227,7 @@ jobs:
       
       - name: Build Docker Images on EC2
         run: |
+          echo "🚀 EXECUTING NEW BUILD STEP VERSION (2026-01-12)"
           IP=${{ steps.get-ip.outputs.ip }}
           INSTANCE=${{ github.event.inputs.instance }}
           GITHUB_REPO="${{ github.repository }}"
