@@ -9,8 +9,8 @@ services:
       - "443:443"
     environment:
       NODE_ENV: production
-      API_GATEWAY_URL: http://52.71.188.181:8080
-      API_GATEWAY_HOST: 52.71.188.181
+      API_GATEWAY_URL: http://3.214.212.205:8080
+      API_GATEWAY_HOST: 3.214.212.205
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]

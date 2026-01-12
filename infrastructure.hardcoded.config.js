@@ -33,7 +33,7 @@ const EC2_INSTANCES = {
   
   // EC2-API-GATEWAY: API Gateway (router/load balancer)
   API_GATEWAY: {
-    PUBLIC_IP: '52.71.188.181',
+    PUBLIC_IP: '3.214.212.205',
     PRIVATE_IP: '172.31.76.105',
     REGION: 'us-east-1',
     SERVICES: ['api-gateway']

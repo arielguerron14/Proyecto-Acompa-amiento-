@@ -95,7 +95,7 @@ const config = {
     ORIGIN: [
       'http://107.21.124.81',           // EC2-Frontend public
       'http://172.31.69.203',            // EC2-Frontend private
-      'http://52.71.188.181:8080',       // EC2-API-Gateway public
+      'http://3.214.212.205:8080',       // EC2-API-Gateway public
       'http://172.31.76.105:8080',       // EC2-API-Gateway private
       'http://localhost',
       'http://localhost:80',
