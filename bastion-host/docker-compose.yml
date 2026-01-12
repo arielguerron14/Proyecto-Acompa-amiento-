@@ -14,22 +14,18 @@ services:
       - proyecto-network
     
     ports:
-      - "22:22"
+      - "2222:22"
     
     # Volúmenes para persistencia de datos
     volumes:
-      # SSH keys (cambiar ruta según tu setup)
-      - ./ssh-keys:/root/.ssh:ro
-      - ./authorized_keys:/home/ec2-user/.ssh/authorized_keys:ro
-      
       # Logs de auditoría y monitoreo
       - bastion-logs:/var/log/bastion
       - bastion-auth:/var/log
       
-      # Configuración SSH (persistente)
+      # Configuración SSH (persistente - read-write)
       - bastion-ssh-config:/etc/ssh
       
-      # Scripts personalizados (opcional)
+      # Scripts personalizados (readonly)
       - ./scripts:/opt/bastion/scripts:ro
     
     # Limites de recursos
@@ -64,7 +60,6 @@ services:
     cap_drop:
       - ALL
     
-    read_only: true
     tmpfs:
       - /run
       - /tmp
@@ -85,6 +80,8 @@ volumes:
   bastion-auth:
     driver: local
   bastion-ssh-config:
+    driver: local
+  bastion-ssh-auth:
     driver: local
 
 # Red del proyecto
