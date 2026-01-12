@@ -67,12 +67,28 @@ const server = http.createServer((req, res) => {
                     res.end(JSON.stringify({ error: 'File not found' }));
                 } else {
                     res.writeHead(200, { 'Content-Type': contentType });
-                    res.end(altData);
+                    let content = altData.toString();
+                    // Inject API_GATEWAY_URL for HTML files
+                    if (ext === '.html' && content.includes('</head>')) {
+                        content = content.replace(
+                            '</head>',
+                            `<script>window.__API_GATEWAY_URL__ = '${API_GATEWAY_URL}';</script></head>`
+                        );
+                    }
+                    res.end(content);
                 }
             });
         } else {
             res.writeHead(200, { 'Content-Type': contentType });
-            res.end(data);
+            let content = data.toString();
+            // Inject API_GATEWAY_URL for HTML files
+            if (ext === '.html' && content.includes('</head>')) {
+                content = content.replace(
+                    '</head>',
+                    `<script>window.__API_GATEWAY_URL__ = '${API_GATEWAY_URL}';</script></head>`
+                );
+            }
+            res.end(content);
         }
     });
 });
