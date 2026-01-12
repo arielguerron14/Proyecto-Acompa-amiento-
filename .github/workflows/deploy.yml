@@ -226,7 +226,6 @@ jobs:
           fi
       
       - name: Build Docker Images on EC2
-        if: env.REBUILD_DOCKER == 'true' && env.BUILD_LOCATION == 'ec2'
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
           INSTANCE=${{ github.event.inputs.instance }}
@@ -298,34 +297,28 @@ jobs:
           
           echo "=== EC2 Build: Images built successfully ==="
           docker images | grep -E 'proyecto|api-gateway|micro|frontend' || echo "No custom images found"
+          
+          echo "=== EC2 Build: Starting services with docker-compose ==="
+          cd ~/app
+          docker-compose down 2>/dev/null || true
+          sleep 2
+          docker-compose up -d
+          sleep 3
+          docker-compose ps
+          docker-compose logs --tail=50
           BUILDSSH
       
-      - name: Deploy services
+      - name: Verify deployment
+        if: always()
         run: |
           IP=${{ steps.get-ip.outputs.ip }}
-          REBUILD=${{ env.REBUILD_DOCKER }}
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s "$REBUILD" << 'ENDSSH'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash << 'VERIFYSSH'
           set -e
-          REBUILD=$1
           
-          echo "=== Phase 0: Install docker-compose if needed ==="
-          if ! command -v docker-compose &> /dev/null; then
-            echo "Installing docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-            docker-compose --version
-          fi
-          
-          echo "=== Phase 1: Remove old containers ==="
-          docker-compose -f ~/app/docker-compose.yml down 2>/dev/null || true
-          
-          echo "=== Phase 2: Deploy with docker-compose ==="
+          echo "=== Verifying services status ==="
           cd ~/app
-          docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
-          docker-compose up -d
-          
-          echo "=== Phase 3: Verify deployment ==="
-          sleep 5
           docker-compose ps
-          docker-compose logs --tail=30
-          ENDSSH
+          docker-compose logs --tail=20 || echo "No logs available"
+          
+          echo "=== Deployment verification complete ==="
+          VERIFYSSH
