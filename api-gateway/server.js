@@ -105,7 +105,9 @@ const corsOrigins = [
   'http://localhost:5500',
   'http://localhost:3000',
   'http://localhost:8080',
-  'http://107.21.124.81',  // EC2_FRONTEND production IP
+  'http://54.85.92.175',  // EC2_FRONTEND production IP
+  'https://54.85.92.175',
+  'http://107.21.124.81',  // Old EC2_FRONTEND IP (keep for backwards compatibility)
   'https://107.21.124.81'
 ];
 
