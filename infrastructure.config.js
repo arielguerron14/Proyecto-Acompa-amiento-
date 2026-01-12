@@ -17,6 +17,15 @@ module.exports = {
   // IPs PÚBLICAS (para acceso externo)
   // ============================================
   PUBLIC: {
+    // BASTION HOST - Punto de acceso seguro a todas las instancias
+    BASTION_IP: process.env.BASTION_IP || '54.172.74.210',
+    BASTION_PORT: process.env.BASTION_PORT || 22,
+    BASTION_USER: process.env.BASTION_USER || 'ec2-user',
+    BASTION_KEY_PATH: process.env.BASTION_KEY_PATH || './ssh-key-bastion.pem',
+    BASTION_URL: function() {
+      return `ssh://${this.BASTION_USER}@${this.BASTION_IP}:${this.BASTION_PORT}`;
+    },
+
     // EC2-DB - IP pública
     DB_IP: process.env.DB_PUBLIC_IP || '3.237.32.106',
     
