@@ -81,7 +81,7 @@ jobs:
         run: |
           case "${{ github.event.inputs.instance }}" in
             EC2_BASTION)
-              echo "ip=54.172.74.210" >> $GITHUB_OUTPUT
+              echo "ip=13.217.194.108" >> $GITHUB_OUTPUT
               ;;
             EC2_CORE)
               echo "ip=3.234.198.34" >> $GITHUB_OUTPUT

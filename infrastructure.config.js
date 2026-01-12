@@ -18,7 +18,7 @@ module.exports = {
   // ============================================
   PUBLIC: {
     // BASTION HOST - Punto de acceso seguro a todas las instancias
-    BASTION_IP: process.env.BASTION_IP || '54.172.74.210',
+    BASTION_IP: process.env.BASTION_IP || '13.217.194.108',
     BASTION_PORT: process.env.BASTION_PORT || 22,
     BASTION_USER: process.env.BASTION_USER || 'ec2-user',
     BASTION_KEY_PATH: process.env.BASTION_KEY_PATH || './ssh-key-bastion.pem',
