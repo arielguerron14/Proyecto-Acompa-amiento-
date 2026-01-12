@@ -373,7 +373,7 @@ jobs:
           
           echo "=== EC2 Build: Starting services ==="
           cd ~/app
-          docker-compose up -d --no-build
+          docker-compose up -d
           sleep 5
           docker-compose ps
           BUILDSSH
