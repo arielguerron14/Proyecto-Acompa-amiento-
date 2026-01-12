@@ -79,10 +79,10 @@ jobs:
         run: |
           case "${{ github.event.inputs.instance }}" in
             EC2_CORE)
-              echo "ip=13.216.12.61" >> $GITHUB_OUTPUT
+              echo "ip=3.234.198.34" >> $GITHUB_OUTPUT
               ;;
             EC2_DB)
-              echo "ip=13.221.197.119" >> $GITHUB_OUTPUT
+              echo "ip=3.237.32.106" >> $GITHUB_OUTPUT
               ;;
             EC2_API_GATEWAY)
               echo "ip=3.214.212.205" >> $GITHUB_OUTPUT
@@ -91,7 +91,7 @@ jobs:
               echo "ip=54.85.92.175" >> $GITHUB_OUTPUT
               ;;
             EC2_MESSAGING)
-              echo "ip=54.82.124.96" >> $GITHUB_OUTPUT
+              echo "ip=34.207.206.13" >> $GITHUB_OUTPUT
               ;;
             EC2_MONITORING)
               echo "ip=34.203.175.72" >> $GITHUB_OUTPUT

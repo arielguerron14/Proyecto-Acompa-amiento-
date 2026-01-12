@@ -13,9 +13,9 @@ services:
       LOG_LEVEL: info
       
       # Public IPs for inter-EC2 communication
-      AUTH_SERVICE: http://13.216.12.61:3000
-      ESTUDIANTES_SERVICE: http://13.216.12.61:3001
-      MAESTROS_SERVICE: http://13.216.12.61:3002
+      AUTH_SERVICE: http://3.234.198.34:3000
+      ESTUDIANTES_SERVICE: http://3.234.198.34:3001
+      MAESTROS_SERVICE: http://3.234.198.34:3002
       REPORTES_EST_SERVICE: http://54.175.62.79:5003
       REPORTES_MAEST_SERVICE: http://54.175.62.79:5004
       NOTIFICACIONES_SERVICE: http://98.92.248.110:5006

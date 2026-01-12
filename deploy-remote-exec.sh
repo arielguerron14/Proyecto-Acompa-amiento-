@@ -3,7 +3,7 @@
 # Usage: ./deploy-remote-exec.sh <ssh-key-path> [user@]<ip-address>
 
 SSH_KEY="$1"
-REMOTE_HOST="${2:-ubuntu@13.216.12.61}"
+REMOTE_HOST="${2:-ubuntu@3.234.198.34}"
 
 if [ -z "$SSH_KEY" ] || [ ! -f "$SSH_KEY" ]; then
   echo "❌ SSH key not found: $SSH_KEY"

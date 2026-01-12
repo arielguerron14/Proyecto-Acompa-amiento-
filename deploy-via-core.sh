@@ -4,7 +4,7 @@
 
 set -e
 
-CORE_IP="13.216.12.61"  # EC2-CORE public IP
+CORE_IP="3.234.198.34"  # EC2-CORE public IP
 API_GW_PRIVATE="172.31.76.105"  # EC2-API-Gateway private IP
 FRONTEND_PRIVATE="172.31.76.106"  # EC2-Frontend private IP (placeholder)
 NOTIF_PRIVATE="172.31.76.107"  # EC2-Notificaciones private IP (placeholder)

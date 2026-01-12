@@ -12,14 +12,14 @@
 
 module.exports = {
   // ==========================================
-  // 1️⃣ EC2-CORE (13.216.12.61)
+  // 1️⃣ EC2-CORE (3.234.198.34)
   // Microservicios: auth, estudiantes, maestros
   // ==========================================
   EC2_CORE: {
     name: 'EC2-CORE',
     public: {
-      ip: '13.216.12.61',
-      elastic: '13.216.12.61',
+      ip: '3.234.198.34',
+      elastic: '3.234.198.34',
       accessible: true,
       description: 'IP pública fija (Elastic IP)'
     },
@@ -31,19 +31,19 @@ module.exports = {
     services: {
       'micro-auth': {
         port: 3000,
-        url_public: 'http://13.216.12.61:3000',
+        url_public: 'http://3.234.198.34:3000',
         url_private: 'http://172.31.78.183:3000',
         description: 'Autenticación y gestión de usuarios'
       },
       'micro-estudiantes': {
         port: 3001,
-        url_public: 'http://13.216.12.61:3001',
+        url_public: 'http://3.234.198.34:3001',
         url_private: 'http://172.31.78.183:3001',
         description: 'Gestión de estudiantes'
       },
       'micro-maestros': {
         port: 3002,
-        url_public: 'http://13.216.12.61:3002',
+        url_public: 'http://3.234.198.34:3002',
         url_private: 'http://172.31.78.183:3002',
         description: 'Gestión de maestros y disponibilidad'
       }

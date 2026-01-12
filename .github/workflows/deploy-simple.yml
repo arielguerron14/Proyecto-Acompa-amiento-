@@ -51,13 +51,13 @@ jobs:
       - name: Get EC2 IP and Deploy
         run: |
           case "${{ github.event.inputs.instance }}" in
-            EC2_CORE) IP="13.216.12.61" ;;
-            EC2_DB) IP="13.221.197.119" ;;
+            EC2_CORE) IP="3.234.198.34" ;;
+            EC2_DB) IP="3.237.32.106" ;;
             EC2_API_GATEWAY) IP="3.214.212.205" ;;
             EC2_FRONTEND) IP="54.85.92.175" ;;
-            EC2_MESSAGING) IP="54.82.124.96" ;;
+            EC2_MESSAGING) IP="34.207.206.13" ;;
             EC2_MONITORING) IP="34.203.175.72" ;;
-            EC2_NOTIFICACIONES) IP="100.31.92.71" ;;
+            EC2_NOTIFICACIONES) IP="35.175.200.15" ;;
             EC2_REPORTES) IP="3.94.74.223" ;;
             *) IP="0.0.0.0" ;;
           esac

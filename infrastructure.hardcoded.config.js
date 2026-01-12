@@ -25,7 +25,7 @@
 const EC2_INSTANCES = {
   // EC2-CORE: Auth + Estudiantes + Maestros microservices
   CORE: {
-    PUBLIC_IP: '13.216.12.61',
+    PUBLIC_IP: '3.234.198.34',
     PRIVATE_IP: '172.31.78.183',
     REGION: 'ap-southeast-1',
     SERVICES: ['auth', 'estudiantes', 'maestros']

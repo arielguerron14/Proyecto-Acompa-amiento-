@@ -18,7 +18,7 @@ module.exports = {
   // ============================================
   PUBLIC: {
     // EC2-DB - IP pública
-    DB_IP: process.env.DB_PUBLIC_IP || '13.221.197.119',
+    DB_IP: process.env.DB_PUBLIC_IP || '3.237.32.106',
     
     // EC2-CORE - IP pública
     CORE_IP: process.env.CORE_PUBLIC_IP || '3.234.198.34',
@@ -38,14 +38,14 @@ module.exports = {
     },
 
     // Notificaciones - IP pública
-    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '100.31.92.71',
+    NOTIFICACIONES_IP: process.env.NOTIFICACIONES_IP || '35.175.200.15',
     NOTIFICACIONES_PORT: process.env.NOTIFICACIONES_PORT || 5005,
     NOTIFICACIONES_URL: function() {
       return `http://${this.NOTIFICACIONES_IP}:${this.NOTIFICACIONES_PORT}`;
     },
 
     // Messaging - IP pública
-    MESSAGING_IP: process.env.MESSAGING_IP || '54.82.124.96',
+    MESSAGING_IP: process.env.MESSAGING_IP || '34.207.206.13',
     MESSAGING_PORT: process.env.MESSAGING_PORT || 1883,
     MESSAGING_URL: function() {
       return `mqtt://${this.MESSAGING_IP}:${this.MESSAGING_PORT}`;
@@ -68,7 +68,7 @@ module.exports = {
     GRAFANA_PORT: process.env.GRAFANA_PORT || 3000,
 
     // Kafka - IP pública
-    KAFKA_IP: process.env.KAFKA_IP || '54.82.124.96',
+    KAFKA_IP: process.env.KAFKA_IP || '34.207.206.13',
     KAFKA_PORT: process.env.KAFKA_PORT || 9092,
     KAFKA_URL: function() {
       return `kafka://${this.KAFKA_IP}:${this.KAFKA_PORT}`;
@@ -89,7 +89,7 @@ module.exports = {
     },
 
     // RabbitMQ - IP pública
-    RABBITMQ_IP: process.env.RABBITMQ_IP || '54.82.124.96',
+    RABBITMQ_IP: process.env.RABBITMQ_IP || '34.207.206.13',
     RABBITMQ_PORT: process.env.RABBITMQ_PORT || 5672,
     RABBITMQ_MANAGEMENT_PORT: process.env.RABBITMQ_MANAGEMENT_PORT || 15672,
     RABBITMQ_URL: function() {
