@@ -126,24 +126,28 @@ jobs:
         run: |
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "=== ALB TARGET GROUP HEALTH ===" >> $GITHUB_STEP_SUMMARY
-          
+          TG_ARN=$(jq -r '.app_tg_arn.value // .["app_tg_arn"].value // empty' terraform/outputs.json)
+          if [ -z "$TG_ARN" ] || [ "$TG_ARN" = "null" ]; then
+            TG_ARN=$(jq -r '.app_tg_arn // .["app_tg_arn"] // empty' terraform/outputs.json)
+          fi
+          if [ -z "$TG_ARN" ] || [ "$TG_ARN" = "null" ]; then
+            echo "❌ Target group ARN not found in outputs" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
           HEALTHY=$(aws elbv2 describe-target-health \
-            --target-group-arn arn:aws:elasticloadbalancing:us-east-1:497189141139:targetgroup/tg-acompanamiento/7af5bd278b554659 \
-            --region us-east-1 \
+            --target-group-arn "$TG_ARN" \
+            --region $AWS_REGION \
             --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" \
             --output text)
-          
           TOTAL=$(aws elbv2 describe-target-health \
-            --target-group-arn arn:aws:elasticloadbalancing:us-east-1:497189141139:targetgroup/tg-acompanamiento/7af5bd278b554659 \
-            --region us-east-1 \
+            --target-group-arn "$TG_ARN" \
+            --region $AWS_REGION \
             --query "length(TargetHealthDescriptions[*])" \
             --output text)
-          
           echo "Targets healthy: $HEALTHY/$TOTAL" >> $GITHUB_STEP_SUMMARY
-          
           aws elbv2 describe-target-health \
-            --target-group-arn arn:aws:elasticloadbalancing:us-east-1:497189141139:targetgroup/tg-acompanamiento/7af5bd278b554659 \
-            --region us-east-1 \
+            --target-group-arn "$TG_ARN" \
+            --region $AWS_REGION \
             --query "TargetHealthDescriptions[*].[Target.Id, TargetHealth.State, TargetHealth.Reason]" \
             --output table >> $GITHUB_STEP_SUMMARY
 
