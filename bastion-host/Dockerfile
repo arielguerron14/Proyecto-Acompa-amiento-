@@ -69,11 +69,43 @@ RUN mkdir -p /opt/bastion/scripts
 COPY scripts/health-check.sh /opt/bastion/scripts/health-check.sh
 COPY scripts/bastion-monitor.sh /opt/bastion/scripts/bastion-monitor.sh
 COPY scripts/audit-log.sh /opt/bastion/scripts/audit-log.sh
-COPY scripts/entrypoint.sh /opt/bastion/scripts/entrypoint.sh
 
-# Hacer ejecutables los scripts - ANTES de cambiar permisos
-RUN chmod 755 /opt/bastion/scripts/*.sh && \
-    ls -la /opt/bastion/scripts/
+# Entrypoint generado inline
+RUN cat > /opt/bastion/scripts/entrypoint.sh << 'ENTRYPOINT_EOF'
+#!/bin/bash
+echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Iniciando Bastion Host..."
+mkdir -p /var/log/bastion
+chmod 755 /var/log/bastion
+cat > /etc/ssh/sshd_config.d/99-audit.conf << 'EOF'
+# Bastion SSH Audit Configuration
+LogLevel VERBOSE
+SyslogFacility AUTH
+AuthorizedKeysFile .ssh/authorized_keys
+StrictModes yes
+IgnoreRhosts yes
+HostbasedAuthentication no
+PubkeyAuthentication yes
+PasswordAuthentication no
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+UsePAM yes
+X11Forwarding no
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+EOF
+echo "[BASTION] Iniciando SSH daemon..."
+mkdir -p /var/run/sshd
+echo "[BASTION] Validando configuración SSH..."
+/usr/sbin/sshd -t && echo "[BASTION] ✅ Configuración SSH válida" || { echo "[BASTION] ❌ Error en configuración SSH"; exit 1; }
+echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Bastion Host iniciado correctamente" >> /var/log/bastion/startup.log
+echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Bastion Host iniciado"
+exec /usr/sbin/sshd -D
+ENTRYPOINT_EOF
+chmod 755 /opt/bastion/scripts/entrypoint.sh
+
+# Hacer ejecutables los scripts restantes
+RUN chmod 755 /opt/bastion/scripts/*.sh
 
 # Crear usuario para auditoría y logging
 RUN mkdir -p /var/log/bastion && \
