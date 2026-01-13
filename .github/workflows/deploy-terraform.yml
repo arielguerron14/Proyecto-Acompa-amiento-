@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload Terraform Outputs
         if: github.event.inputs.action != 'destroy'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-outputs
           path: terraform/outputs.json
