@@ -41,28 +41,32 @@ RUN yum update -y && \
 # Crear directorio SSH
 RUN mkdir -p /root/.ssh && \
     mkdir -p /var/run/sshd && \
-    chmod 700 /root/.ssh
+    chmod 700 /root/.ssh && \
+    echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC60SOhcAV4q637KCupB3JTFHJifqqz1b4lmQriNI841pzBgs+z+YQCJAiX3gubq/1TXIv7q7jELA9EY8/+76MNnVLh/iI0azmcqpfqIv73cpF8WMMMsoRRW2KFZm1tUi6ctzZ/ZfW8HaDkntC2pQ6Pr5w9dWhaKuIJX2azht2uwWjKgql3qTcsT8Um8llA3BhWXRxlqRCKcC+8YOVs6gcL/oREL7VfiliKRapbvod2vMaruKmqUKLvQnfu+fTngwGx5cBsrZpfGMN6F3O7RFchMfXjgInrge6TjlfNXvMhmwd9ilTKEuMoq1Fvlo3SweodoXAPuR58nx2+IyWj+tZf' > /root/.ssh/authorized_keys && \
+    chmod 600 /root/.ssh/authorized_keys
 
 # Configuración de SSH para máxima seguridad
-RUN echo "
-# Bastion SSH Configuration
-PermitRootLogin prohibit-password
-PubkeyAuthentication yes
-PasswordAuthentication no
-PermitEmptyPasswords no
-X11Forwarding no
-X11UseLocalhost yes
-MaxAuthTries 3
-MaxSessions 10
-AllowAgentForwarding yes
-AllowTcpForwarding yes
-GatewayPorts no
-PermitTTY yes
-Compression delayed
-ClientAliveInterval 300
-ClientAliveCountMax 2
-UsePAM yes
-" > /etc/ssh/sshd_config.d/99-bastion.conf && \
+RUN mkdir -p /etc/ssh/sshd_config.d && \
+    printf '%s\n' \
+    '# Bastion SSH Configuration' \
+    'PermitRootLogin yes' \
+    'PubkeyAuthentication yes' \
+    'PasswordAuthentication no' \
+    'PermitEmptyPasswords no' \
+    'X11Forwarding no' \
+    'X11UseLocalhost yes' \
+    'MaxAuthTries 3' \
+    'MaxSessions 10' \
+    'AllowAgentForwarding yes' \
+    'AllowTcpForwarding yes' \
+    'GatewayPorts no' \
+    'PermitTTY yes' \
+    'Compression delayed' \
+    'ClientAliveInterval 300' \
+    'ClientAliveCountMax 2' \
+    'UsePAM yes' \
+    'LogLevel VERBOSE' \
+    > /etc/ssh/sshd_config.d/99-bastion.conf && \
     chmod 600 /etc/ssh/sshd_config.d/99-bastion.conf
 
 # Agregar scripts de monitoreo y utilidades
@@ -78,7 +82,14 @@ RUN chmod +x /opt/bastion/scripts/*.sh
 
 # Crear usuario para auditoría y logging
 RUN mkdir -p /var/log/bastion && \
-    chmod 755 /var/log/bastion
+    chmod 755 /var/log/bastion && \
+    mkdir -p /etc/sudoers.d && \
+    useradd -m -s /bin/bash ec2-user || true && \
+    mkdir -p /home/ec2-user/.ssh && \
+    chmod 700 /home/ec2-user/.ssh && \
+    chown -R ec2-user:ec2-user /home/ec2-user/.ssh && \
+    echo "ec2-user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ec2-user && \
+    chmod 440 /etc/sudoers.d/ec2-user
 
 # Configurar AWS CLI para logging en CloudWatch
 RUN mkdir -p /etc/amazon/amazon-cloudwatch-agent && \

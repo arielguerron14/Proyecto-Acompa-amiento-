@@ -3,8 +3,6 @@
 # Bastion Host - Entrypoint Script
 # Este script se ejecuta cuando inicia el contenedor
 
-set -e
-
 echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Iniciando Bastion Host..."
 
 # Crear directorio de logs
@@ -21,26 +19,13 @@ fi
 chmod 600 /etc/ssh/ssh_host_*
 chmod 644 /etc/ssh/ssh_host_*.pub
 
-# Crear usuario ec2-user si no existe
-if ! id "ec2-user" &>/dev/null; then
-    echo "[BASTION] Creando usuario ec2-user..."
-    useradd -m -s /bin/bash ec2-user
-    mkdir -p /home/ec2-user/.ssh
-    chmod 700 /home/ec2-user/.ssh
-    chown -R ec2-user:ec2-user /home/ec2-user/.ssh
-fi
-
-# Si existe una clave pública en /root/.ssh/authorized_keys, copiarla al usuario
+# Configurar authorized_keys si existe
 if [ -f /root/.ssh/authorized_keys ]; then
-    echo "[BASTION] Configurando authorized_keys para ec2-user..."
-    cp /root/.ssh/authorized_keys /home/ec2-user/.ssh/authorized_keys
-    chmod 600 /home/ec2-user/.ssh/authorized_keys
-    chown ec2-user:ec2-user /home/ec2-user/.ssh/authorized_keys
+    echo "[BASTION] Configurando SSH keys..."
+    cp /root/.ssh/authorized_keys /home/ec2-user/.ssh/authorized_keys 2>/dev/null || true
+    chmod 600 /home/ec2-user/.ssh/authorized_keys 2>/dev/null || true
+    chown ec2-user:ec2-user /home/ec2-user/.ssh/authorized_keys 2>/dev/null || true
 fi
-
-# Configurar sudoers para ec2-user (permitir sudo sin contraseña)
-echo "ec2-user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ec2-user
-chmod 440 /etc/sudoers.d/ec2-user
 
 # Iniciar auditoría
 echo "[BASTION] Configurando auditoría de conexiones..."
@@ -81,6 +66,7 @@ cat > /etc/motd << 'EOF'
 EOF
 
 # Crear archivo de bienvenida
+mkdir -p /etc/ssh
 cat > /etc/ssh/banner.txt << 'EOF'
 ╔════════════════════════════════════════════════════════════════╗
 ║                    BASTION HOST - AWS                          ║
@@ -91,10 +77,10 @@ cat > /etc/ssh/banner.txt << 'EOF'
 ╚════════════════════════════════════════════════════════════════╝
 EOF
 
-# Agregar banner a SSH config
-if ! grep -q "Banner" /etc/ssh/sshd_config.d/99-bastion.conf; then
-    echo "Banner /etc/ssh/banner.txt" >> /etc/ssh/sshd_config.d/99-bastion.conf
-fi
+# Quitar conflictos - no añadir banner si ya existe en config
+# if ! grep -q "Banner" /etc/ssh/sshd_config.d/99-bastion.conf; then
+#     echo "Banner /etc/ssh/banner.txt" >> /etc/ssh/sshd_config.d/99-bastion.conf
+# fi
 
 # Iniciar servicio SSH
 echo "[BASTION] Iniciando SSH daemon..."
