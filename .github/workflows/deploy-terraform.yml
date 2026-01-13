@@ -1,4 +1,4 @@
-name: 'Deploy Infrastructure'
+name: Deploy Infrastructure
 
 on:
   workflow_dispatch:
@@ -13,24 +13,15 @@ on:
           - apply
           - destroy
 
-concurrency:
-  group: terraform-deployment
-  cancel-in-progress: false
-
 env:
   AWS_REGION: us-east-1
   TF_VERSION: 1.6.0
-  TF_IN_AUTOMATION: true
 
 jobs:
   terraform:
-    name: 'Terraform ${{ github.event.inputs.action || 'apply' }}'
+    name: 'Terraform ${{ github.event.inputs.action || "apply" }}'
     runs-on: ubuntu-latest
     
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -93,17 +84,12 @@ jobs:
           
           terraform output -json > outputs.json 2>/dev/null || echo "{}" > outputs.json
           
-          # Extract and display outputs
           if [ -s outputs.json ] && [ "$(cat outputs.json)" != "{}" ]; then
-            echo "**Load Balancer DNS:** $(jq -r '.load_balancer_dns_name.value // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
-            echo "**Load Balancer ARN:** $(jq -r '.load_balancer_arn.value // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### EC2 Instances" >> $GITHUB_STEP_SUMMARY
-            echo "**Instance IDs:** $(jq -r '.ec2_instance_ids.value | join(", ") // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
-            echo "**Private IPs:** $(jq -r '.ec2_private_ips.value | join(", ") // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
-            echo "**Public IPs:** $(jq -r '.ec2_public_ips.value | join(", ") // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
-          else
             echo "✅ Infrastructure provisioned successfully" >> $GITHUB_STEP_SUMMARY
+            echo "**Outputs:**" >> $GITHUB_STEP_SUMMARY
+            jq '.' outputs.json >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ Terraform execution completed" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Upload Terraform Outputs
