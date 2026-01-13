@@ -27,7 +27,6 @@ RUN apt-get update && \
     dnsutils \
     iputils-ping \
     jq \
-    awscli \
     ca-certificates \
     && \
     apt-get clean && \
