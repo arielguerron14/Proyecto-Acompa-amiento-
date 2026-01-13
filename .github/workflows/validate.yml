@@ -8,6 +8,7 @@ on:
       - 'terraform/**'
       - 'docker-compose*.yml'
       - '.github/workflows/validate.yml'
+  workflow_dispatch:
 
 jobs:
   validate:
