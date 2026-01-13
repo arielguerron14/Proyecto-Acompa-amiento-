@@ -1,3 +1,56 @@
+# ============================================================================
+# SECURITY GROUPS
+# ============================================================================
+
+resource "aws_security_group" "alb_sg" {
+  name        = "alb-sg"
+  description = "Allow HTTP from anywhere"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name    = "alb-sg"
+    Project = "proyecto-acompanamiento"
+  }
+}
+
+resource "aws_security_group" "ec2_sg" {
+  name        = "ec2-sg"
+  description = "Allow HTTP from ALB"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress {
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name    = "ec2-sg"
+    Project = "proyecto-acompanamiento"
+  }
+}
 # DATA SOURCE - Default Security Groups
 data "aws_security_groups" "default" {
   filter {
@@ -13,7 +66,7 @@ resource "aws_lb" "app_alb" {
   name                       = "acompanamiento-alb"
   internal                   = false
   load_balancer_type         = "application"
-  security_groups            = [data.aws_security_groups.default.ids[0]]
+  security_groups            = [aws_security_group.alb_sg.id]
   subnets                    = data.aws_subnets.default.ids
   enable_deletion_protection = false
   tags = {
@@ -134,7 +187,8 @@ locals {
 # ============================================================================
 
 resource "aws_instance" "app" {
-  for_each = local.instances_to_create
+  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+  for_each               = local.instances_to_create
 
   ami           = var.ami
   instance_type = var.instance_type
