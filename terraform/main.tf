@@ -47,24 +47,32 @@ variable "security_group_id" {
   default = "sg-04f3d554d6dc9e304"
 }
 
-# Get existing instances by name
-data "aws_instances" "existing" {
-  filter {
-    name   = "tag:Name"
-    values = var.instance_names
-  }
-
+# Get all EC2 instances to check which ones exist
+data "aws_instances" "all" {
   filter {
     name   = "instance-state-name"
     values = ["running", "pending", "stopped"]
   }
+  
+  filter {
+    name   = "tag:Project"
+    values = ["proyecto-acompanamiento"]
+  }
+}
+
+# Get details of existing instances
+data "aws_instance" "existing" {
+  for_each = toset(data.aws_instances.all.ids)
+  
+  instance_id = each.value
 }
 
 # Create a map of existing instances by name
 locals {
   existing_instances = {
-    for instance in data.aws_instances.existing.instances : 
+    for id, instance in data.aws_instance.existing :
     instance.tags["Name"] => instance.id
+    if can(instance.tags["Name"])
   }
   
   # Determine which instances need to be created
