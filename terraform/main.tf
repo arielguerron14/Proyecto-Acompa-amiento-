@@ -65,7 +65,7 @@ locals {
 # ============================================================================
 
 resource "aws_instance" "app" {
-  for_each      = local.instances_to_create
+  for_each = local.instances_to_create
 
   ami           = var.ami
   instance_type = var.instance_type
@@ -98,10 +98,10 @@ output "instance_details" {
   value = {
     for name, instance in aws_instance.app :
     name => {
-      id           = instance.id
-      private_ip   = instance.private_ip
-      public_ip    = instance.public_ip != null ? instance.public_ip : "No public IP assigned"
-      subnet_id    = instance.subnet_id
+      id         = instance.id
+      private_ip = instance.private_ip
+      public_ip  = instance.public_ip != null ? instance.public_ip : "No public IP assigned"
+      subnet_id  = instance.subnet_id
     }
   }
 }
@@ -109,20 +109,20 @@ output "instance_details" {
 output "deployment_summary" {
   description = "Summary of the deployment"
   value = {
-    status              = "✓ Infrastructure deployed successfully"
-    instances_deployed  = length(aws_instance.app)
-    total_instances     = length(var.instance_names)
-    deployment_time     = timestamp()
+    status             = "✓ Infrastructure deployed successfully"
+    instances_deployed = length(aws_instance.app)
+    total_instances    = length(var.instance_names)
+    deployment_time    = timestamp()
   }
 }
 
 output "test_results" {
   description = "Infrastructure validation tests"
   value = {
-    overall_status = "✓ ALL TESTS PASSED - Infrastructure is ready"
+    overall_status           = "✓ ALL TESTS PASSED - Infrastructure is ready"
     test_1_instances_created = "✓ PASS: ${length(aws_instance.app)} instances created"
-    test_2_subnets_assigned = "✓ PASS: Instances distributed across subnets"
+    test_2_subnets_assigned  = "✓ PASS: Instances distributed across subnets"
     test_3_vpc_configuration = "✓ PASS: VPC ${var.vpc_id} configured"
-    test_4_idempotency = "✓ PASS: Configuration is idempotent with lifecycle rules"
+    test_4_idempotency       = "✓ PASS: Configuration is idempotent with lifecycle rules"
   }
 }

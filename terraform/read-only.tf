@@ -1,16 +1,4 @@
-terraform {
-  required_version = ">= 1.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
 
-provider "aws" {
-  region = "us-east-1"
-}
 
 # ============================================================================
 # ESTA CONFIGURACIÓN SOLO CONSULTA RECURSOS EXISTENTES
@@ -66,9 +54,9 @@ data "aws_ami" "ubuntu" {
 output "vpc_info" {
   description = "Información del VPC"
   value = {
-    id              = data.aws_vpc.main.id
-    cidr_block      = data.aws_vpc.main.cidr_block
-    enable_dns      = data.aws_vpc.main.enable_dns_hostnames
+    id               = data.aws_vpc.main.id
+    cidr_block       = data.aws_vpc.main.cidr_block
+    enable_dns       = data.aws_vpc.main.enable_dns_hostnames
     main_route_table = data.aws_vpc.main.main_route_table_id
   }
 }
@@ -92,8 +80,8 @@ output "security_groups_info" {
 output "ami_info" {
   description = "AMI Ubuntu disponible"
   value = {
-    id            = data.aws_ami.ubuntu.id
-    name          = data.aws_ami.ubuntu.name
+    id             = data.aws_ami.ubuntu.id
+    name           = data.aws_ami.ubuntu.name
     virtualization = data.aws_ami.ubuntu.virtualization_type
   }
 }
