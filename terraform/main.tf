@@ -110,7 +110,64 @@ resource "aws_instance" "app" {
   }
 }
 
-# Combine newly created and existing instances
+# Create or get security group for ALB
+data "aws_security_group" "alb" {
+  name   = "alb-sg"
+  vpc_id = var.vpc_id
+}
+
+# Create ALB
+resource "aws_lb" "alb" {
+  name               = "proyecto-acompanamiento-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [data.aws_security_group.alb.id]
+  subnets            = var.subnets
+
+  enable_deletion_protection = false
+
+  tags = {
+    Name    = "proyecto-acompanamiento-alb"
+    Project = "proyecto-acompanamiento"
+  }
+}
+
+# Create Target Group
+resource "aws_lb_target_group" "tg" {
+  name        = "tg-acompanamiento"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "instance"
+
+  health_check {
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 3
+    interval            = 30
+    path                = "/"
+    matcher             = "200"
+  }
+
+  tags = {
+    Name    = "tg-acompanamiento"
+    Project = "proyecto-acompanamiento"
+  }
+}
+
+# Create ALB Listener
+resource "aws_lb_listener" "app" {
+  load_balancer_arn = aws_lb.alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg.arn
+  }
+}
+
+# Merge existing instances with newly created ones
 locals {
   all_instance_ids = merge(
     { for name, instance in aws_instance.app : name => instance.id },
@@ -118,20 +175,10 @@ locals {
   )
 }
 
-# Get ALB
-data "aws_lb" "alb" {
-  name = "proyecto-acompanamiento-alb"
-}
-
-# Get target group
-data "aws_lb_target_group" "tg" {
-  name = "tg-acompanamiento"
-}
-
 # Register ALL instances (existing and new) to target group
 resource "aws_lb_target_group_attachment" "app" {
   for_each         = local.all_instance_ids
-  target_group_arn = data.aws_lb_target_group.tg.arn
+  target_group_arn = aws_lb_target_group.tg.arn
   target_id        = each.value
   port             = 80
 }
@@ -168,9 +215,9 @@ output "instance_details" {
 
 output "alb_information" {
   value = {
-    dns_name = data.aws_lb.alb.dns_name
-    url = "http://${data.aws_lb.alb.dns_name}"
-    target_group_arn = data.aws_lb_target_group.tg.arn
+    dns_name = aws_lb.alb.dns_name
+    url = "http://${aws_lb.alb.dns_name}"
+    target_group_arn = aws_lb_target_group.tg.arn
     registered_targets = length(aws_lb_target_group_attachment.app)
   }
   description = "ALB and target group information"
