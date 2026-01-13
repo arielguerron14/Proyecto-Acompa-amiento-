@@ -97,8 +97,5 @@ EXPOSE 22
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD /opt/bastion/scripts/health-check.sh || exit 1
 
-# Entrypoint - ejecutar bash para iniciar el script
-ENTRYPOINT ["bash", "-c", "/opt/bastion/scripts/entrypoint.sh && exec \"$@\"", "--"]
-
-# Por defecto, iniciar SSH daemon
-CMD ["/usr/sbin/sshd", "-D"]
+# Entrypoint - ejecutar script directamente
+CMD ["/bin/bash", "/opt/bastion/scripts/entrypoint.sh"]
