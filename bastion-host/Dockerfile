@@ -77,10 +77,12 @@ set -e
 echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Iniciando Bastion Host..."
 mkdir -p /var/log/bastion /var/run/sshd
 chmod 755 /var/log/bastion
+
 echo "[BASTION] Validando configuración SSH..."
 /usr/sbin/sshd -t && echo "[BASTION] ✅ Configuración SSH válida" || { echo "[BASTION] ❌ Error en SSH config"; exit 1; }
-echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Bastion Host iniciado"
-exec /usr/sbin/sshd -D
+
+echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Iniciando daemon SSH..."
+/usr/sbin/sshd -D 2>&1 || { echo "[BASTION] ❌ Error iniciando SSHD"; exit 1; }
 ENTRYPOINT_SCRIPT
 chmod 755 /opt/bastion/scripts/entrypoint.sh
 
