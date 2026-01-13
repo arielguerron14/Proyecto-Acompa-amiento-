@@ -45,7 +45,7 @@ UsePAM yes
 X11Forwarding no
 PrintMotd no
 AcceptEnv LANG LC_*
-Subsystem sftp /usr/lib64/openssh/sftp-server
+Subsystem sftp /usr/lib/openssh/sftp-server
 EOF
 
 # Crear archivo de motivo (MOTD)

@@ -1,5 +1,5 @@
 # Bastion Host - Jump Host para acceso seguro a todas las instancias
-FROM amazonlinux:2
+FROM ubuntu:24.04
 
 # Metadata
 LABEL maintainer="Infrastructure Team"
@@ -11,11 +11,10 @@ ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Actualizar sistema y instalar dependencias
-RUN yum update -y && \
-    yum install -y \
+RUN apt-get update && \
+    apt-get install -y \
     openssh-server \
-    openssh-clients \
-    openssh-askpass \
+    openssh-client \
     curl \
     wget \
     git \
@@ -25,18 +24,14 @@ RUN yum update -y && \
     net-tools \
     telnet \
     traceroute \
-    nslookup \
-    bind-utils \
-    iputils \
+    dnsutils \
+    iputils-ping \
     jq \
-    aws-cli \
-    awslogs \
-    amazon-cloudwatch-agent \
-    security-update-check \
-    yum-cron \
+    awscli \
+    ca-certificates \
     && \
-    yum clean all && \
-    rm -rf /var/cache/yum/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Crear directorio SSH
 RUN mkdir -p /root/.ssh && \
