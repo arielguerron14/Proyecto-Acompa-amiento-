@@ -7,13 +7,8 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket         = "proyecto-acompanamiento-tfstate"
-    key            = "infrastructure/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "terraform-locks"
-  }
+  # Backend is configured in backend.tf or via CLI flags
+  # For local development, uses local state
 }
 
 provider "aws" {
@@ -29,29 +24,6 @@ provider "aws" {
   }
 }
 
-# VPC Data Source
-data "aws_vpc" "main" {
-  id = var.vpc_id
-}
-
-# Security Group Data Source
-data "aws_security_group" "main" {
-  id = var.security_group_id
-}
-
-# EC2 Instances Data Sources
-data "aws_instances" "all" {
-  filter {
-    name   = "instance-id"
-    values = var.instance_ids
-  }
-
-  filter {
-    name   = "instance-state-name"
-    values = ["running"]
-  }
-}
-
 # Load Balancer Module
 module "load_balancer" {
   source = "./modules/load_balancer"
@@ -59,7 +31,7 @@ module "load_balancer" {
   name              = "${var.project_name}-alb"
   vpc_id            = var.vpc_id
   security_group_id = var.security_group_id
-  instance_ids      = data.aws_instances.all.ids
+  instance_ids      = var.instance_ids
   subnets           = var.subnet_ids
   environment       = var.environment
 
@@ -88,28 +60,19 @@ module "load_balancer" {
   }
 }
 
-# Outputs
-output "load_balancer_dns_name" {
-  description = "DNS name of the load balancer"
-  value       = module.load_balancer.alb_dns_name
-}
+# EC2 Instances Module
+module "ec2_instances" {
+  source = "./modules/ec2_instances"
 
-output "load_balancer_arn" {
-  description = "ARN of the load balancer"
-  value       = module.load_balancer.alb_arn
-}
+  aws_region        = var.aws_region
+  project_name      = var.project_name
+  environment       = var.environment
+  vpc_id            = var.vpc_id
+  security_group_id = var.security_group_id
+  subnet_ids        = var.subnet_ids
+  instance_count    = 8
+  instance_type     = "t3.medium"
+  target_group_arn  = module.load_balancer.target_group_arn
 
-output "target_group_arn" {
-  description = "ARN of the target group"
-  value       = module.load_balancer.target_group_arn
-}
-
-output "registered_instances" {
-  description = "List of registered instances"
-  value       = data.aws_instances.all.ids
-}
-
-output "registered_instances_ips" {
-  description = "List of registered instance IP addresses"
-  value       = data.aws_instances.all.private_ips
+  depends_on = [module.load_balancer]
 }

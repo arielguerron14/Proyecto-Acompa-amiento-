@@ -70,17 +70,21 @@ resource "aws_lb" "main" {
   security_groups    = [var.security_group_id]
   subnets            = var.subnets
 
-  enable_deletion_protection = false
-  enable_http2               = true
+  enable_deletion_protection       = false
+  enable_http2                     = true
   enable_cross_zone_load_balancing = true
 
-  tags = merge(
-    var.tags,
-    {
-      Name        = var.name
-      Environment = var.environment
-    }
-  )
+  tags = {
+    Name        = var.name
+    Environment = var.environment
+    CreatedAt   = ""
+    ManagedBy   = ""
+    Project     = ""
+  }
+
+  lifecycle {
+    ignore_changes = [tags_all, tags["CreatedAt"], tags["ManagedBy"], tags["Project"]]
+  }
 }
 
 # Create Target Group
@@ -107,13 +111,17 @@ resource "aws_lb_target_group" "main" {
     cookie_duration = 86400
   }
 
-  tags = merge(
-    var.tags,
-    {
-      Name        = var.target_group_config.name
-      Environment = var.environment
-    }
-  )
+  tags = {
+    Name        = var.target_group_config.name
+    Environment = var.environment
+    CreatedAt   = ""
+    ManagedBy   = ""
+    Project     = ""
+  }
+
+  lifecycle {
+    ignore_changes = [tags_all, tags["CreatedAt"], tags["ManagedBy"], tags["Project"]]
+  }
 }
 
 # Register instances to target group

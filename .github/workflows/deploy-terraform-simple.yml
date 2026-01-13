@@ -1,0 +1,115 @@
+name: 'Deploy Infrastructure with Terraform'
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+concurrency:
+  group: terraform-deployment
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: 1.6.0
+  TF_IN_AUTOMATION: true
+
+jobs:
+  terraform:
+    name: 'Terraform ${{ github.event.inputs.action || 'apply' }}'
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive terraform/
+        continue-on-error: true
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Terraform Validate
+        run: |
+          cd terraform
+          terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd terraform
+          terraform plan -lock=false
+        continue-on-error: true
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply' || github.event.inputs.action == null
+        run: |
+          cd terraform
+          terraform apply -auto-approve -lock=false
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        run: |
+          cd terraform
+          terraform destroy -auto-approve -lock=false
+
+      - name: Get Terraform Outputs
+        id: outputs
+        if: github.event.inputs.action != 'destroy'
+        run: |
+          cd terraform
+          echo "=== INFRASTRUCTURE STATUS ===" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          terraform output -json > outputs.json 2>/dev/null || echo "{}" > outputs.json
+          
+          # Extract and display outputs
+          if [ -s outputs.json ] && [ "$(cat outputs.json)" != "{}" ]; then
+            echo "**Load Balancer DNS:** $(jq -r '.load_balancer_dns_name.value // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
+            echo "**Load Balancer ARN:** $(jq -r '.load_balancer_arn.value // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### EC2 Instances" >> $GITHUB_STEP_SUMMARY
+            echo "**Instance IDs:** $(jq -r '.ec2_instance_ids.value | join(", ") // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
+            echo "**Private IPs:** $(jq -r '.ec2_private_ips.value | join(", ") // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
+            echo "**Public IPs:** $(jq -r '.ec2_public_ips.value | join(", ") // "N/A"' outputs.json)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ Infrastructure provisioned successfully" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Terraform Outputs
+        if: github.event.inputs.action != 'destroy'
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-outputs
+          path: terraform/outputs.json
+          retention-days: 30

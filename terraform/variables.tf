@@ -19,13 +19,13 @@ variable "environment" {
 variable "vpc_id" {
   description = "VPC ID where instances are located"
   type        = string
-  default     = "vpc-083e8d854f2c9fbfd"
+  default     = "vpc-0f8670efa9e394cf3"
 }
 
 variable "security_group_id" {
   description = "Security group ID for instances"
   type        = string
-  default     = "sg-03af810d8f419b171"
+  default     = "sg-04f3d554d6dc9e304"
 }
 
 variable "instance_ids" {
@@ -48,8 +48,8 @@ variable "subnet_ids" {
   description = "List of subnet IDs for ALB"
   type        = list(string)
   default = [
-    "subnet-0a2c1b8f9e3d4c5a6",   # us-east-1b
-    "subnet-0b3d4c5a6e7f8g9h0"    # us-east-1f
+    "subnet-003fd1f4046a6b641",   # us-east-1a
+    "subnet-00865aa51057ed7b4"    # us-east-1b
   ]
 }
 
