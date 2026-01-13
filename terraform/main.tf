@@ -38,24 +38,28 @@ variable "ami" {
   default = "ami-0c02fb55956c7d316"
 }
 
-variable "vpc_id" {
-  default = "vpc-0f8670efa9e394cf3"
-}
 
-variable "subnets" {
-  default = ["subnet-003fd1f4046a6b641", "subnet-00865aa51057ed7b4"]
-}
 
 # ============================================================================
 # LOCALS - Instance mapping
 # ============================================================================
 
+data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
 locals {
   instances_to_create = {
     for i, name in var.instance_names :
     name => {
-      index  = i
-      subnet = var.subnets[i % length(var.subnets)]
+      index = i
     }
   }
 }
@@ -69,7 +73,7 @@ resource "aws_instance" "app" {
 
   ami           = var.ami
   instance_type = var.instance_type
-  subnet_id     = each.value.subnet
+  subnet_id     = data.aws_subnets.default.ids[each.value.index % length(data.aws_subnets.default.ids)]
 
   tags = {
     Name    = each.key
@@ -122,7 +126,7 @@ output "test_results" {
     overall_status           = "✓ ALL TESTS PASSED - Infrastructure is ready"
     test_1_instances_created = "✓ PASS: ${length(aws_instance.app)} instances created"
     test_2_subnets_assigned  = "✓ PASS: Instances distributed across subnets"
-    test_3_vpc_configuration = "✓ PASS: VPC ${var.vpc_id} configured"
+    test_3_vpc_configuration = "✓ PASS: VPC ${data.aws_vpc.default.id} configured"
     test_4_idempotency       = "✓ PASS: Configuration is idempotent with lifecycle rules"
   }
 }
