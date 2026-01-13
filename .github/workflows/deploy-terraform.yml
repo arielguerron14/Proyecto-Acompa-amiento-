@@ -95,13 +95,11 @@ jobs:
           cd terraform
           echo "=== INFRASTRUCTURE STATUS ===" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
           terraform output -json > outputs.json 2>/dev/null || echo "{}" > outputs.json
-          
           if [ -s outputs.json ] && [ "$(cat outputs.json)" != "{}" ]; then
             echo "✅ Infrastructure provisioned successfully" >> $GITHUB_STEP_SUMMARY
             echo "**Outputs:**" >> $GITHUB_STEP_SUMMARY
-            jq '.' outputs.json >> $GITHUB_STEP_SUMMARY
+            (jq '.' outputs.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "⚠️ Outputs could not be parsed" >> $GITHUB_STEP_SUMMARY) || true
           else
             echo "✅ Terraform execution completed" >> $GITHUB_STEP_SUMMARY
           fi
