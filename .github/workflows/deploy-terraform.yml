@@ -19,7 +19,7 @@ env:
 
 jobs:
   terraform:
-    name: 'Terraform ${{ github.event.inputs.action || "apply" }}'
+    name: 'Terraform'
     runs-on: ubuntu-latest
     
     steps:
@@ -63,7 +63,7 @@ jobs:
         continue-on-error: true
 
       - name: Terraform Apply
-        if: github.event.inputs.action == 'apply' || github.event.inputs.action == null
+        if: github.event.inputs.action == 'apply'
         run: |
           cd terraform
           terraform apply -auto-approve -lock=false
