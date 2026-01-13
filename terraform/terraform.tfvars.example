@@ -1,0 +1,39 @@
+# Terraform Development/Testing Variables
+# Copy this to terraform.tfvars for local development
+
+aws_region         = "us-east-1"
+project_name       = "proyecto-acompanamiento"
+environment        = "production"
+vpc_id             = "vpc-083e8d854f2c9fbfd"
+security_group_id  = "sg-03af810d8f419b171"
+
+# EC2 Instances
+instance_ids = [
+  "i-0413c190dbf686769",   # EC2-Messaging
+  "i-0bd13b8e83e8679bb",   # EC2-Bastion
+  "i-00a121b00e2e8aa55",   # EC2-Frontend
+  "i-01fb14943445a6820",   # EC2-API-Gateway
+  "i-0cbed7ea84129a7ca",   # EC2-Reportes
+  "i-0cb7fc180ec736b7a",   # EC2-CORE
+  "i-0e4141c9befb46701",   # EC2-Notificaciones
+  "i-02bd21ddcacaae221",   # EC2-Monitoring
+  "i-091730b9034fc8b71"    # EC2-DB
+]
+
+# Subnets for Load Balancer (across multiple AZs)
+subnet_ids = [
+  "subnet-0a2c1b8f9e3d4c5a6",   # us-east-1b
+  "subnet-0b3d4c5a6e7f8g9h0"    # us-east-1f
+]
+
+# Load Balancer Settings
+create_load_balancer      = true
+enable_deletion_protection = false
+enable_http2              = true
+
+# Additional Tags
+tags = {
+  Team        = "DevOps"
+  CostCenter  = "Engineering"
+  Terraform   = "true"
+}
