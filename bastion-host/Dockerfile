@@ -71,7 +71,7 @@ COPY scripts/bastion-monitor.sh /opt/bastion/scripts/bastion-monitor.sh
 COPY scripts/audit-log.sh /opt/bastion/scripts/audit-log.sh
 
 # Entrypoint generado inline
-RUN cat > /opt/bastion/scripts/entrypoint.sh << 'ENTRYPOINT_EOF'
+RUN cat > /opt/bastion/scripts/entrypoint.sh << 'ENTRYPOINT_EOF' && chmod 755 /opt/bastion/scripts/entrypoint.sh
 #!/bin/bash
 echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Iniciando Bastion Host..."
 mkdir -p /var/log/bastion
@@ -102,7 +102,6 @@ echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Bastion Host iniciado correctamen
 echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Bastion Host iniciado"
 exec /usr/sbin/sshd -D
 ENTRYPOINT_EOF
-chmod 755 /opt/bastion/scripts/entrypoint.sh
 
 # Hacer ejecutables los scripts restantes
 RUN chmod 755 /opt/bastion/scripts/*.sh
