@@ -59,14 +59,23 @@ jobs:
         id: plan
         run: |
           cd terraform
-          terraform plan -lock=false
-        continue-on-error: true
+          terraform plan -lock=false -out=tfplan
+
+      - name: Check if changes are needed
+        id: changes
+        run: |
+          cd terraform
+          if terraform show tfplan | grep -q "No changes"; then
+            echo "status=no-changes" >> $GITHUB_OUTPUT
+          else
+            echo "status=has-changes" >> $GITHUB_OUTPUT
+          fi
 
       - name: Terraform Apply
         if: github.event.inputs.action == 'apply'
         run: |
           cd terraform
-          terraform apply -auto-approve -lock=false
+          terraform apply -auto-approve -lock=false tfplan
         continue-on-error: true
 
       - name: Terraform Destroy
@@ -100,21 +109,44 @@ jobs:
       - name: Verify EC2 Instances
         if: github.event.inputs.action == 'apply'
         run: |
-          echo "=== EC2 INSTANCES ===" >> $GITHUB_STEP_SUMMARY
-          aws ec2 describe-instances \
+          echo "=== INSTANCIAS EC2 ===" >> $GITHUB_STEP_SUMMARY
+          INSTANCE_COUNT=$(aws ec2 describe-instances \
             --region us-east-1 \
             --filters "Name=instance-state-name,Values=running" "Name=tag:Project,Values=proyecto-acompanamiento" \
+            --query "length(Reservations[*].Instances[*])" \
+            --output text)
+          echo "Instancias corriendo: $INSTANCE_COUNT/8" >> $GITHUB_STEP_SUMMARY
+          
+          aws ec2 describe-instances \
+            --region us-east-1 \
+            --filters "Name=instance-state-name,Values=running,pending" "Name=tag:Project,Values=proyecto-acompanamiento" \
             --query "Reservations[*].Instances[*].[InstanceId,Tags[?Key=='Name'].Value|[0],State.Name]" \
             --output table >> $GITHUB_STEP_SUMMARY
 
       - name: Check Target Group Health
         if: github.event.inputs.action == 'apply'
         run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "=== ALB TARGET GROUP HEALTH ===" >> $GITHUB_STEP_SUMMARY
+          
+          HEALTHY=$(aws elbv2 describe-target-health \
+            --target-group-arn arn:aws:elasticloadbalancing:us-east-1:497189141139:targetgroup/tg-acompanamiento/7af5bd278b554659 \
+            --region us-east-1 \
+            --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" \
+            --output text)
+          
+          TOTAL=$(aws elbv2 describe-target-health \
+            --target-group-arn arn:aws:elasticloadbalancing:us-east-1:497189141139:targetgroup/tg-acompanamiento/7af5bd278b554659 \
+            --region us-east-1 \
+            --query "length(TargetHealthDescriptions[*])" \
+            --output text)
+          
+          echo "Targets healthy: $HEALTHY/$TOTAL" >> $GITHUB_STEP_SUMMARY
+          
           aws elbv2 describe-target-health \
             --target-group-arn arn:aws:elasticloadbalancing:us-east-1:497189141139:targetgroup/tg-acompanamiento/7af5bd278b554659 \
             --region us-east-1 \
-            --query "TargetHealthDescriptions[*].[Target.Id, TargetHealth.State]" \
+            --query "TargetHealthDescriptions[*].[Target.Id, TargetHealth.State, TargetHealth.Reason]" \
             --output table >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Terraform Outputs
