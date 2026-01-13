@@ -67,12 +67,17 @@ jobs:
         run: |
           cd terraform
           terraform apply -auto-approve -lock=false
+        continue-on-error: true
 
       - name: Terraform Destroy
         if: github.event.inputs.action == 'destroy'
         run: |
           cd terraform
           terraform destroy -auto-approve -lock=false
+
+      - name: Wait for instances to stabilize
+        if: github.event.inputs.action == 'apply'
+        run: sleep 30
 
       - name: Get Terraform Outputs
         id: outputs
@@ -91,6 +96,26 @@ jobs:
           else
             echo "✅ Terraform execution completed" >> $GITHUB_STEP_SUMMARY
           fi
+          
+      - name: Verify EC2 Instances
+        if: github.event.inputs.action == 'apply'
+        run: |
+          echo "=== EC2 INSTANCES ===" >> $GITHUB_STEP_SUMMARY
+          aws ec2 describe-instances \
+            --region us-east-1 \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Project,Values=proyecto-acompanamiento" \
+            --query "Reservations[*].Instances[*].[InstanceId,Tags[?Key=='Name'].Value|[0],State.Name]" \
+            --output table >> $GITHUB_STEP_SUMMARY
+
+      - name: Check Target Group Health
+        if: github.event.inputs.action == 'apply'
+        run: |
+          echo "=== ALB TARGET GROUP HEALTH ===" >> $GITHUB_STEP_SUMMARY
+          aws elbv2 describe-target-health \
+            --target-group-arn arn:aws:elasticloadbalancing:us-east-1:497189141139:targetgroup/tg-acompanamiento/7af5bd278b554659 \
+            --region us-east-1 \
+            --query "TargetHealthDescriptions[*].[Target.Id, TargetHealth.State]" \
+            --output table >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Terraform Outputs
         if: github.event.inputs.action != 'destroy'

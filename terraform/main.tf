@@ -6,73 +6,101 @@ terraform {
       version = "~> 5.0"
     }
   }
-
-  # Backend is configured in backend.tf or via CLI flags
-  # For local development, uses local state
 }
 
 provider "aws" {
-  region = var.aws_region
-
-  default_tags {
-    tags = {
-      Environment = var.environment
-      Project     = var.project_name
-      ManagedBy   = "Terraform"
-      CreatedAt   = timestamp()
-    }
-  }
+  region = "us-east-1"
 }
 
-# Load Balancer Module (creates ALB + target_group + listener, NO attachments)
-module "load_balancer" {
-  source = "./modules/load_balancer"
+# Variables
+variable "instance_count" {
+  default = 8
+}
 
-  name              = "${var.project_name}-alb"
-  vpc_id            = var.vpc_id
-  security_group_id = var.security_group_id
-  instance_ids      = []  # Empty - will be created by ec2_instances module
-  subnets           = var.subnet_ids
-  environment       = var.environment
+variable "instance_type" {
+  default = "t3.medium"
+}
 
-  target_group_config = {
-    name     = "${var.project_name}-tg"
-    port     = 80
-    protocol = "HTTP"
-    health_check = {
-      path                = "/"
-      port                = "80"
-      healthy_threshold   = 2
-      unhealthy_threshold = 2
-      timeout             = 5
-      interval            = 30
-      matcher             = "200-299"
-    }
-  }
+variable "ami" {
+  default = "ami-0c02fb55956c7d316"
+}
 
-  listener_config = {
-    port     = 80
-    protocol = "HTTP"
-  }
+variable "vpc_id" {
+  default = "vpc-0f8670efa9e394cf3"
+}
+
+variable "subnets" {
+  default = ["subnet-003fd1f4046a6b641", "subnet-00865aa51057ed7b4"]
+}
+
+variable "security_group_id" {
+  default = "sg-04f3d554d6dc9e304"
+}
+
+locals {
+  instance_names = [
+    "EC2-Bastion",
+    "EC2-CORE",
+    "EC2-Monitoring",
+    "EC2-API-Gateway",
+    "EC2-Frontend",
+    "EC2-Notificaciones",
+    "EC2-Messaging",
+    "EC2-Reportes"
+  ]
+}
+
+# Create EC2 instances
+resource "aws_instance" "app" {
+  count                = var.instance_count
+  ami                  = var.ami
+  instance_type        = var.instance_type
+  subnet_id            = element(var.subnets, count.index % length(var.subnets))
+  vpc_security_group_ids = [var.security_group_id]
+  
+  user_data = base64encode(<<-EOF
+    #!/bin/bash
+    apt-get update -y
+    apt-get install -y docker.io
+    systemctl enable docker
+    systemctl start docker
+    usermod -aG docker ubuntu
+  EOF
+  )
 
   tags = {
-    Name = "${var.project_name}-alb"
+    Name    = local.instance_names[count.index]
+    Project = "proyecto-acompanamiento"
   }
 }
 
-# EC2 Instances Module (creates instances and registers them to ALB)
-module "ec2_instances" {
-  source = "./modules/ec2_instances"
+# Get ALB
+data "aws_lb" "alb" {
+  name = "proyecto-acompanamiento-alb"
+}
 
-  aws_region        = var.aws_region
-  project_name      = var.project_name
-  environment       = var.environment
-  vpc_id            = var.vpc_id
-  security_group_id = var.security_group_id
-  subnet_ids        = var.subnet_ids
-  instance_count    = 8
-  instance_type     = "t3.medium"
-  target_group_arn  = module.load_balancer.target_group_arn
+# Get target group
+data "aws_lb_target_group" "tg" {
+  name = "tg-acompanamiento"
+}
 
-  depends_on = [module.load_balancer]
+# Register targets
+resource "aws_lb_target_group_attachment" "app" {
+  count            = var.instance_count
+  target_group_arn = data.aws_lb_target_group.tg.arn
+  target_id        = aws_instance.app[count.index].id
+  port             = 80
+}
+
+# Outputs
+output "instance_ids" {
+  value = aws_instance.app[*].id
+}
+
+output "instance_ips" {
+  value = aws_instance.app[*].private_ip
+}
+
+output "alb_dns" {
+  value = data.aws_lb.alb.dns_name
 }

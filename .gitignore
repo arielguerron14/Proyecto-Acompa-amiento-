@@ -19,6 +19,29 @@ dist/
 build/
 coverage/
 
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+.terraformrc
+terraform_plan.tfplan
+.terraform.lock.hcl
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+ENV/
+
+# AWS
+.aws/
+.aws_credentials
+aws_credentials
+
 # IDE
 .vscode/
 .idea/
