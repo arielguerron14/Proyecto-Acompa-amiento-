@@ -97,7 +97,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD /opt/bastion/scripts/health-check.sh || exit 1
 
 # Entrypoint
-ENTRYPOINT ["/opt/bastion/scripts/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/opt/bastion/scripts/entrypoint.sh"]
 
 # Por defecto, iniciar SSH daemon
 CMD ["/usr/sbin/sshd", "-D"]
