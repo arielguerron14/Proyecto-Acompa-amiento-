@@ -1,3 +1,68 @@
+# DATA SOURCE - Default Security Groups
+data "aws_security_groups" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+# ============================================================================
+# LOAD BALANCER (ALB) - Default VPC
+# ============================================================================
+
+resource "aws_lb" "app_alb" {
+  name                       = "acompanamiento-alb"
+  internal                   = false
+  load_balancer_type         = "application"
+  security_groups            = [data.aws_security_groups.default.ids[0]]
+  subnets                    = data.aws_subnets.default.ids
+  enable_deletion_protection = false
+  tags = {
+    Name    = "acompanamiento-alb"
+    Project = "proyecto-acompanamiento"
+  }
+}
+
+resource "aws_lb_target_group" "app_tg" {
+  name     = "acompanamiento-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = data.aws_vpc.default.id
+  health_check {
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+  tags = {
+    Name    = "acompanamiento-tg"
+    Project = "proyecto-acompanamiento"
+  }
+}
+
+resource "aws_lb_listener" "app_http" {
+  load_balancer_arn = aws_lb.app_alb.arn
+  port              = 80
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
+  }
+}
+
+resource "aws_lb_target_group_attachment" "app" {
+  for_each         = aws_instance.app
+  target_group_arn = aws_lb_target_group.app_tg.arn
+  target_id        = each.value.id
+  port             = 80
+}
+
+output "alb_dns_name" {
+  description = "DNS name of the Application Load Balancer"
+  value       = aws_lb.app_alb.dns_name
+}
 terraform {
   required_version = ">= 1.0"
   required_providers {
