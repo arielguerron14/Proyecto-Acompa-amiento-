@@ -10,9 +10,9 @@
 # DATA SOURCES - Consultas de recursos existentes
 # ============================================================================
 
-# Get VPC
+# Get default VPC
 data "aws_vpc" "main" {
-  id = "vpc-0f8670efa9e394cf3"
+  default = true
 }
 
 # Get Subnets
