@@ -38,7 +38,6 @@ StrictModes yes
 IgnoreRhosts yes
 HostbasedAuthentication no
 PubkeyAuthentication yes
-PermitRootLogin prohibit-password
 PasswordAuthentication no
 PermitEmptyPasswords no
 ChallengeResponseAuthentication no
