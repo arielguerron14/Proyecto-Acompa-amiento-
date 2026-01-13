@@ -24,14 +24,14 @@ provider "aws" {
   }
 }
 
-# Load Balancer Module
+# Load Balancer Module (creates ALB + target_group + listener, NO attachments)
 module "load_balancer" {
   source = "./modules/load_balancer"
 
   name              = "${var.project_name}-alb"
   vpc_id            = var.vpc_id
   security_group_id = var.security_group_id
-  instance_ids      = var.instance_ids
+  instance_ids      = []  # Empty - will be created by ec2_instances module
   subnets           = var.subnet_ids
   environment       = var.environment
 
@@ -60,7 +60,7 @@ module "load_balancer" {
   }
 }
 
-# EC2 Instances Module
+# EC2 Instances Module (creates instances and registers them to ALB)
 module "ec2_instances" {
   source = "./modules/ec2_instances"
 
