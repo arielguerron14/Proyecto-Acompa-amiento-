@@ -71,8 +71,9 @@ COPY scripts/bastion-monitor.sh /opt/bastion/scripts/bastion-monitor.sh
 COPY scripts/audit-log.sh /opt/bastion/scripts/audit-log.sh
 COPY scripts/entrypoint.sh /opt/bastion/scripts/entrypoint.sh
 
-# Hacer ejecutables los scripts
-RUN chmod +x /opt/bastion/scripts/*.sh
+# Hacer ejecutables los scripts - ANTES de cambiar permisos
+RUN chmod 755 /opt/bastion/scripts/*.sh && \
+    ls -la /opt/bastion/scripts/
 
 # Crear usuario para auditoría y logging
 RUN mkdir -p /var/log/bastion && \
@@ -96,8 +97,8 @@ EXPOSE 22
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD /opt/bastion/scripts/health-check.sh || exit 1
 
-# Entrypoint
-ENTRYPOINT ["/bin/bash", "/opt/bastion/scripts/entrypoint.sh"]
+# Entrypoint - ejecutar bash para iniciar el script
+ENTRYPOINT ["bash", "-c", "/opt/bastion/scripts/entrypoint.sh && exec \"$@\"", "--"]
 
 # Por defecto, iniciar SSH daemon
 CMD ["/usr/sbin/sshd", "-D"]
