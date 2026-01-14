@@ -175,4 +175,72 @@ resource "aws_eip" "eip" {
   for_each = toset(var.eip_instances)
   instance = aws_instance.fixed[each.key].id
   depends_on = [aws_instance.fixed]
-} 
+}
+
+# Application Load Balancer
+resource "aws_lb" "main" {
+  name               = "lab-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : []
+  subnets            = local.subnet_ids
+  tags = {
+    Name = "lab-alb"
+    Project = "lab-8-ec2"
+  }
+}
+
+# Target Group for web instances (Frontend, API-Gateway, Reportes)
+resource "aws_lb_target_group" "web" {
+  name        = "lab-alb-web-tg"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = local.vpc_id
+  target_type = "instance"
+
+  health_check {
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 3
+    interval            = 30
+    path                = "/"
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "lab-alb-web-tg"
+    Project = "lab-8-ec2"
+  }
+}
+
+# Register web instances to target group
+resource "aws_lb_target_group_attachment" "web" {
+  for_each         = toset(["EC2-Frontend", "EC2-API-Gateway", "EC2-Reportes"])
+  target_group_arn = aws_lb_target_group.web.arn
+  target_id        = aws_instance.fixed[each.key].id
+  port             = 80
+}
+
+# Listener for HTTP (port 80)
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web.arn
+  }
+}
+
+# Listener for HTTPS (port 443) - forwards to HTTP for now
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = "443"
+  protocol          = "HTTP" # Note: Use HTTPS in production with SSL certificate
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web.arn
+  }
+}
