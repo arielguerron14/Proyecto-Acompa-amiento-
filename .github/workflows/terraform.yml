@@ -52,8 +52,8 @@ jobs:
 
     - name: Plan
       env:
-        TF_VAR_ami_id: ${{ secrets.AMI_ID }}
-        TF_VAR_azs: ${{ secrets.AZS_JSON }}
+        TF_VAR_ami_id: "ami-0c19292331f6e3a5c"
+        TF_VAR_azs: '["us-east-1a", "us-east-1b"]'
       run: cd terraform && terraform plan -out=tfplan
 
 

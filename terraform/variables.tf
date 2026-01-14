@@ -31,12 +31,12 @@ variable "ssh_key_name" {
 variable "ami_id" {
   description = "AMI ID to use (optional). If empty, a data lookup will be used."
   type        = string
-  default     = ""
+  default     = "ami-0c19292331f6e3a5c"
 }
 
 variable "azs" {
   description = "List of AZ names to use (optional). If empty, a data lookup will be used."
   type        = list(string)
-  default     = []
-}    
+  default     = ["us-east-1a", "us-east-1b"]
+}     
 
