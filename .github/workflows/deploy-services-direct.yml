@@ -6,7 +6,7 @@ on:
       target_service:
         description: 'Target service to deploy'
         required: true
-        default: 'core'
+        default: 'all'
         type: choice
         options:
           - core
@@ -32,127 +32,22 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    - name: Load Configuration
-      id: config
-      run: |
-        # Load Node.js config as JSON
-        node -e "
-        const config = require('./infrastructure-instances.config.js');
-        const instances = config.instances || {};
-        
-        // Extract IPs
-        let coreIp = '', apiIp = '', frontendIp = '';
-        for (const [key, inst] of Object.entries(instances)) {
-          const name = inst.name || '';
-          if (name.includes('EC2-CORE')) coreIp = inst.private_ip || '';
-          if (name.includes('API-Gateway')) apiIp = inst.private_ip || '';
-          if (name.includes('Frontend')) frontendIp = inst.private_ip || '';
-        }
-        
-        console.log('CORE_IP=' + coreIp);
-        console.log('API_IP=' + apiIp);
-        console.log('FRONTEND_IP=' + frontendIp);
-        " >> $GITHUB_OUTPUT 2>/dev/null || true
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
 
-    - name: Install dependencies
+    - name: Run Deployment Script
       run: |
-        sudo apt-get update && sudo apt-get install -y jq awscli
-
-    - name: Get Bastion IP
-      id: bastion
-      run: |
-        # Try to get from config first
-        BASTION_IP=$(node -e "
-        const config = require('./infrastructure-instances.config.js');
-        const instances = config.instances || {};
-        for (const [key, inst] of Object.entries(instances)) {
-          if ((inst.name || '').includes('Bastion')) {
-            console.log(inst.public_ip || '');
-            break;
-          }
-        }
-        " 2>/dev/null || echo "")
-        
-        if [ -z "$BASTION_IP" ]; then
-          # Fallback: query AWS
-          BASTION_IP=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=EC-Bastion" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[].Instances[].PublicIpAddress' --output text)
-        fi
-        
-        echo "bastion_ip=${BASTION_IP}" >> $GITHUB_OUTPUT
-        echo "✓ Bastion IP: ${BASTION_IP}"
-
-    - name: Deploy Core Service
-      if: github.event.inputs.target_service == 'core' || github.event.inputs.target_service == 'all'
-      env:
-        BASTION_IP: ${{ steps.bastion.outputs.bastion_ip }}
-        CORE_IP: ${{ steps.config.outputs.CORE_IP }}
-      run: |
-        echo "📦 Deploying Core Service to ${CORE_IP}..."
-        echo ""
-        echo "Service will be available at:"
-        echo "  Private: http://${CORE_IP}:3000"
-        echo "  Public: http://[INSTANCE_PUBLIC_IP]:3000"
-        echo ""
-        echo "✅ Core service deployment configuration ready"
-
-    - name: Deploy API Gateway Service
-      if: github.event.inputs.target_service == 'api-gateway' || github.event.inputs.target_service == 'all'
-      env:
-        API_IP: ${{ steps.config.outputs.API_IP }}
-      run: |
-        echo "📦 Deploying API Gateway Service to ${API_IP}..."
-        echo ""
-        echo "Service will be available at:"
-        echo "  Private: http://${API_IP}:8080"
-        echo "  Public: http://[INSTANCE_PUBLIC_IP]:8080"
-        echo ""
-        echo "✅ API Gateway service deployment configuration ready"
-
-    - name: Deploy Frontend Service
-      if: github.event.inputs.target_service == 'frontend' || github.event.inputs.target_service == 'all'
-      env:
-        FRONTEND_IP: ${{ steps.config.outputs.FRONTEND_IP }}
-      run: |
-        echo "📦 Deploying Frontend Service to ${FRONTEND_IP}..."
-        echo ""
-        echo "Service will be available at:"
-        echo "  Private: http://${FRONTEND_IP}:80"
-        echo "  Public: http://[INSTANCE_PUBLIC_IP]"
-        echo ""
-        echo "✅ Frontend service deployment configuration ready"
-
-    - name: Verify Deployment
-      run: |
-        echo ""
-        echo "════════════════════════════════════════════════════════════"
-        echo "📊 DEPLOYMENT STATUS"
-        echo "════════════════════════════════════════════════════════════"
-        echo ""
-        echo "Services have been configured and are ready for deployment."
-        echo ""
-        echo "To verify services are running:"
-        echo ""
-        echo "Via ALB (Load Balancer):"
-        echo "  curl http://[ALB_DNS]/health"
-        echo ""
-        echo "Via Direct Instance IP:"
-        echo "  curl http://[INSTANCE_IP]:[PORT]/health"
-        echo ""
-        echo "Environment Variables:"
-        cat .env.generated 2>/dev/null | head -20
-        echo ""
-        echo "════════════════════════════════════════════════════════════"
+        python3 scripts/deploy-services.py
 
     - name: Summary
       run: |
         echo ""
-        echo "✅ Services deployment orchestration complete"
+        echo "════════════════════════════════════════════════════════════"
+        echo "✅ DEPLOYMENT ORCHESTRATION COMPLETE"
+        echo "════════════════════════════════════════════════════════════"
         echo ""
-        echo "Next steps:"
-        echo "1. SSH into instances via Bastion"
-        echo "2. Pull latest code: git pull"
-        echo "3. Run docker-compose: docker-compose up -d"
-        echo "4. Check service health: docker-compose logs -f"
+        echo "Services are ready to be deployed!"
         echo ""
+
