@@ -1,0 +1,208 @@
+name: Project - Discover IPs and Update Config
+
+on:
+  workflow_dispatch:
+
+jobs:
+  discover-and-update:
+    name: Discover Instances & Update Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Discover instances
+      run: |
+        echo "🔍 Discovering EC2 instances..."
+        
+        # Get all instances
+        aws ec2 describe-instances \
+          --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
+          --region us-east-1 > instances.json
+        
+        # Get Elastic IPs
+        aws ec2 describe-addresses \
+          --region us-east-1 > eips.json
+        
+        # Process with jq
+        jq '.' instances.json > /dev/null && echo "✅ Instances fetched"
+        jq '.' eips.json > /dev/null && echo "✅ Elastic IPs fetched"
+
+    - name: Generate configuration
+      run: |
+        #!/bin/bash
+        set -e
+        
+        # Extract data
+        INSTANCES=$(jq -r '.Reservations[].Instances[] | 
+          select(.State.Name == "running") |
+          {
+            name: (.Tags[] | select(.Key == "Name") | .Value),
+            instance_id: .InstanceId,
+            private_ip: .PrivateIpAddress,
+            public_ip: .PublicIpAddress
+          }' instances.json)
+        
+        # Create instance map
+        echo "Building instance map..."
+        
+        # Create Node.js config file
+        cat > infrastructure-instances.config.js << 'EOF'
+        /**
+         * Instance Configuration - Auto-Generated
+         * Generated: $(date -u)
+         */
+        
+        const instances = {
+        EOF
+        
+        echo "$INSTANCES" | jq -r '.name' | while read NAME; do
+          PRIV=$(echo "$INSTANCES" | jq -r "select(.name == \"$NAME\") | .private_ip")
+          PUB=$(echo "$INSTANCES" | jq -r "select(.name == \"$NAME\") | .public_ip")
+          INST_ID=$(echo "$INSTANCES" | jq -r "select(.name == \"$NAME\") | .instance_id")
+          
+          # Get Elastic IP if exists
+          ELIP=$(jq -r ".Addresses[] | select(.InstanceId == \"$INST_ID\") | .PublicIp" eips.json 2>/dev/null || echo "$PUB")
+          
+          cat >> infrastructure-instances.config.js << EOF
+          "$NAME": {
+            instance_id: "$INST_ID",
+            private_ip: "$PRIV",
+            public_ip: "$PUB",
+            elastic_ip: "$ELIP"
+          },
+        EOF
+        done
+        
+        cat >> infrastructure-instances.config.js << 'EOF'
+        };
+        
+        module.exports = { instances };
+        EOF
+        
+        echo "✅ infrastructure-instances.config.js generated"
+
+    - name: Generate .env file
+      run: |
+        #!/bin/bash
+        
+        # Read from instances.json
+        FE_DATA=$(jq -r '.Reservations[].Instances[] | 
+          select(.State.Name == "running") |
+          select((.Tags[] | select(.Key == "Name") | .Value) == "EC2-Frontend") |
+          "\(.PrivateIpAddress),\(.PublicIpAddress)"' instances.json | head -1)
+        
+        API_DATA=$(jq -r '.Reservations[].Instances[] | 
+          select(.State.Name == "running") |
+          select((.Tags[] | select(.Key == "Name") | .Value) == "EC2-API-Gateway") |
+          "\(.PrivateIpAddress),\(.PublicIpAddress)"' instances.json | head -1)
+        
+        CORE_DATA=$(jq -r '.Reservations[].Instances[] | 
+          select(.State.Name == "running") |
+          select((.Tags[] | select(.Key == "Name") | .Value) == "EC2-CORE") |
+          "\(.PrivateIpAddress),\(.PublicIpAddress)"' instances.json | head -1)
+        
+        DB_DATA=$(jq -r '.Reservations[].Instances[] | 
+          select(.State.Name == "running") |
+          select((.Tags[] | select(.Key == "Name") | .Value) == "EC2-DB") |
+          "\(.PrivateIpAddress),\(.PublicIpAddress)"' instances.json | head -1)
+        
+        MSG_DATA=$(jq -r '.Reservations[].Instances[] | 
+          select(.State.Name == "running") |
+          select((.Tags[] | select(.Key == "Name") | .Value) == "EC2-Messaging") |
+          "\(.PrivateIpAddress),\(.PublicIpAddress)"' instances.json | head -1)
+        
+        BASTION_IP=$(jq -r '.Reservations[].Instances[] | 
+          select(.State.Name == "running") |
+          select((.Tags[] | select(.Key == "Name") | .Value) == "EC-Bastion") |
+          .PublicIpAddress' instances.json | head -1)
+        
+        IFS=',' read -r FE_PRIV FE_PUB <<< "$FE_DATA"
+        IFS=',' read -r API_PRIV API_PUB <<< "$API_DATA"
+        IFS=',' read -r CORE_PRIV CORE_PUB <<< "$CORE_DATA"
+        IFS=',' read -r DB_PRIV DB_PUB <<< "$DB_DATA"
+        IFS=',' read -r MSG_PRIV MSG_PUB <<< "$MSG_DATA"
+        
+        cat > .env.generated << ENVEOF
+        # Auto-Generated Environment Variables
+        # Timestamp: $(date -u)
+        
+        FRONTEND_PRIVATE=${FE_PRIV}
+        FRONTEND_PUBLIC=${FE_PUB}
+        API_PRIVATE=${API_PRIV}
+        API_PUBLIC=${API_PUB}
+        CORE_PRIVATE=${CORE_PRIV}
+        CORE_PUBLIC=${CORE_PUB}
+        DB_PRIVATE=${DB_PRIV}
+        DB_PUBLIC=${DB_PUB}
+        MESSAGING_PRIVATE=${MSG_PRIV}
+        
+        DATABASE_HOST=${DB_PRIV}
+        DATABASE_PORT=5432
+        DATABASE_URL=postgresql://user:pass@${DB_PRIV}:5432/acompanamiento
+        
+        RABBITMQ_HOST=${MSG_PRIV}
+        RABBITMQ_PORT=5672
+        
+        API_GATEWAY_HOST=${API_PRIV}
+        API_GATEWAY_PORT=8080
+        
+        CORE_SERVICE_HOST=${CORE_PRIV}
+        CORE_SERVICE_PORT=8081
+        
+        BASTION_HOST=${BASTION_IP}
+        BASTION_USER=ubuntu
+        ENVEOF
+        
+        echo "✅ .env.generated created"
+
+    - name: Show discovered instances
+      run: |
+        echo ""
+        echo "╔════════════════════════════════════════╗"
+        echo "║  DISCOVERED INSTANCES & IPS             ║"
+        echo "╚════════════════════════════════════════╝"
+        echo ""
+        
+        jq -r '.Reservations[].Instances[] | 
+          select(.State.Name == "running") |
+          (.Tags[] | select(.Key == "Name") | .Value) as $name |
+          "\($name)\n  Private: \(.PrivateIpAddress)\n  Public: \(.PublicIpAddress)"' instances.json
+
+    - name: Commit and push
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        git add infrastructure-instances.config.js .env.generated
+        
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "chore: Update instance IPs from auto-discovery"
+          git push
+          echo "✅ Configuration updated and pushed"
+        fi
+
+    - name: Summary
+      run: |
+        echo ""
+        echo "════════════════════════════════════════"
+        echo "✅ DISCOVERY & CONFIGURATION COMPLETE"
+        echo "════════════════════════════════════════"
+        echo ""
+        echo "Files generated:"
+        echo "  • infrastructure-instances.config.js"
+        echo "  • .env.generated"
+        echo ""
