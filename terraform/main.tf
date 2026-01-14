@@ -4,15 +4,15 @@ provider "aws" {
   region = var.region
 }
 
-# AMI oficial Amazon Linux 2023 (opcional: se usa si var.ami_id no está especificada)
-data "aws_ami" "al2023" {
+# AMI Ubuntu lookup (opcional: se usa si var.ami_id no está especificada)
+data "aws_ami" "ubuntu" {
   count       = var.ami_id == "" ? 1 : 0
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["099720109477"] # Canonical Ubuntu owner
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-*-amd64-server-*"]
   }
 }
 
@@ -21,11 +21,6 @@ data "aws_availability_zones" "azs" {
   count = length(var.azs) == 0 ? 1 : 0
 }
 
-# Default VPC lookup disabled to avoid ec2:DescribeVpcs in restricted lab.
-# If you want to use an existing or default VPC, set TF_VAR_existing_vpc_id to the VPC id.
-# (We avoid querying default VPC because the lab's IAM forbids ec2:DescribeVpcs.)
-# (This data lookup was removed to prevent the workflow failing under restricted creds.)
-
 # Subnet ids for an existing VPC (opcional)
 data "aws_subnets" "existing" {
   count = var.existing_vpc_id != "" ? 1 : 0
@@ -33,6 +28,11 @@ data "aws_subnets" "existing" {
   filter {
     name   = "vpc-id"
     values = [ var.existing_vpc_id ]
+  }
+
+  filter {
+    name = "availability-zone"
+    values = [ length(var.azs) > 0 ? var.azs[0] : data.aws_availability_zones.azs[0].names[0] ]
   }
 }
 
@@ -50,11 +50,11 @@ locals {
   vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : (length(aws_vpc.main) > 0 ? aws_vpc.main[0].id : "")
 }
 
-# Subnet id selection: prefer subnets created by this module, otherwise use existing subnets in the VPC
+# Subnet id selection: prefer explicit var.subnet_id, then subnets created by this module, otherwise use existing subnets in the VPC
 locals {
   created_subnet_ids = length(aws_subnet.public) > 0 ? [for s in aws_subnet.public : s.id] : []
   existing_subnet_ids = length(data.aws_subnets.existing) > 0 ? data.aws_subnets.existing[0].ids : []
-  subnet_ids = length(local.created_subnet_ids) > 0 ? local.created_subnet_ids : local.existing_subnet_ids
+  subnet_ids = var.subnet_id != "" ? [var.subnet_id] : (length(local.created_subnet_ids) > 0 ? local.created_subnet_ids : local.existing_subnet_ids)
 }
 
 # Subnets
@@ -112,6 +112,13 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -120,38 +127,40 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# User Data simple
+# User Data (Ubuntu + docker)
 locals {
   user_data = <<EOF
 #!/bin/bash
-yum update -y
-yum install -y httpd
-systemctl enable httpd
-systemctl start httpd
-echo "<h1>Hola desde EC2 $(hostname)</h1>" > /var/www/html/index.html
+apt update -y
+apt install -y docker.io
+systemctl enable docker
+systemctl start docker
+usermod -aG docker ubuntu
 EOF
 }
 
 
-# 10 instancias EC2 fijas
+# Instances required by the user
 locals {
   instance_names = [
-    "EC2-API",
-    "EC2-Bastion",
+    "EC2-Frontend",
+    "EC2-API-Gateway",
+    "EC2-Reportes",
     "EC2-CORE",
-    "EC2-frontend",
+    "EC2-Monitoring",
     "EC2-Messaging",
-    "EC2-Auth",
-    "EC2-Admin",
+    "EC-Bastion",
+    "EC2-Notificaciones",
     "EC2-DB"
   ]
 }
 
 resource "aws_instance" "fixed" {
   for_each = var.create_instances ? toset(local.instance_names) : toset([])
-  ami           = var.ami_id != "" ? var.ami_id : data.aws_ami.al2023[0].id
+  ami           = var.ami_id != "" ? var.ami_id : data.aws_ami.ubuntu[0].id
   instance_type = var.instance_type
   subnet_id     = length(local.subnet_ids) > 0 ? local.subnet_ids[0] : ""
+  key_name      = var.ssh_key_name != "" ? var.ssh_key_name : null
   vpc_security_group_ids = var.existing_security_group_id != "" ? [var.existing_security_group_id] : (length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : [])
   associate_public_ip_address = true
   user_data = local.user_data
@@ -160,3 +169,11 @@ resource "aws_instance" "fixed" {
     Project = "lab-8-ec2"
   }
 }
+
+# Elastic IPs for selected instances
+resource "aws_eip" "eip" {
+  for_each = toset(var.eip_instances)
+  instance = aws_instance.fixed[each.key].id
+  vpc = true
+  depends_on = [aws_instance.fixed]
+} 

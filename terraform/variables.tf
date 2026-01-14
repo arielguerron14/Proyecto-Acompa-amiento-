@@ -19,7 +19,7 @@ variable "public_subnets" {
 variable "instance_type" {
 	description = "EC2 instance type"
 	type        = string
-	default     = "t3.micro"
+	default     = "t3.small"
 }
 
 variable "ssh_key_name" {
@@ -27,6 +27,18 @@ variable "ssh_key_name" {
 	type        = string
 	default     = ""
 }
+
+variable "subnet_id" {
+  description = "(Optional) Specific subnet id to use (e.g., a subnet in us-east-1f)"
+  type        = string
+  default     = ""
+}
+
+variable "eip_instances" {
+  description = "List of instance names to assign Elastic IPs"
+  type        = list(string)
+  default     = []
+} 
 
 variable "ami_id" {
   description = "AMI ID to use (optional). If empty, a data lookup will be used."

@@ -157,6 +157,32 @@ jobs:
         echo "\nTerraform directory content:"
         ls -l terraform || echo "No terraform directory found!"
 
+    - name: Detect VPC, Subnet (us-east-1f) and keypair
+      run: |
+        # Try to read inventory artifact if present
+        if [ -f artifact/vpcs.json ]; then
+          VPC_ID=$(jq -r '.Vpcs[] | select(.IsDefault==true) | .VpcId' artifact/vpcs.json || true)
+        fi
+        if [ -z "$VPC_ID" ] || [ "$VPC_ID" = "null" ]; then
+          VPC_ID=$(aws ec2 describe-vpcs --filters Name=is-default,Values=true --query 'Vpcs[0].VpcId' --output text || true)
+        fi
+        echo "Found VPC: $VPC_ID"
+        SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=availability-zone,Values=us-east-1f --query 'Subnets[0].SubnetId' --output text || true)
+        if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" = "None" ]; then
+          SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[0].SubnetId' --output text || true)
+        fi
+        echo "Found Subnet: $SUBNET_ID"
+        KEY_NAME=$(aws ec2 describe-key-pairs --query 'KeyPairs[0].KeyName' --output text || true)
+        echo "Found KeyPair: $KEY_NAME"
+        echo "TF_VAR_existing_vpc_id=$VPC_ID" >> $GITHUB_ENV
+        echo "TF_VAR_subnet_id=$SUBNET_ID" >> $GITHUB_ENV
+        echo "TF_VAR_ssh_key_name=$KEY_NAME" >> $GITHUB_ENV
+        echo "TF_VAR_azs=[\"us-east-1f\"]" >> $GITHUB_ENV
+        echo "TF_VAR_instance_type=t3.small" >> $GITHUB_ENV
+        echo "TF_VAR_create_instances=true" >> $GITHUB_ENV
+        echo "TF_VAR_create_security_group=true" >> $GITHUB_ENV
+        echo "TF_VAR_eip_instances=[\"EC-Bastion\",\"EC2-Frontend\",\"EC2-API-Gateway\",\"EC2-Reportes\",\"EC2-Monitoring\"]" >> $GITHUB_ENV
+
     - name: Init
       run: cd terraform && terraform init
 
@@ -236,6 +262,32 @@ jobs:
         echo "Current directory: $(pwd)"
         echo "Terraform directory content:" 
         ls -l terraform || echo "No terraform directory found!"
+
+    - name: Detect VPC, Subnet (us-east-1f) and keypair
+      run: |
+        # Try to read inventory artifact if present
+        if [ -f artifact/vpcs.json ]; then
+          VPC_ID=$(jq -r '.Vpcs[] | select(.IsDefault==true) | .VpcId' artifact/vpcs.json || true)
+        fi
+        if [ -z "$VPC_ID" ] || [ "$VPC_ID" = "null" ]; then
+          VPC_ID=$(aws ec2 describe-vpcs --filters Name=is-default,Values=true --query 'Vpcs[0].VpcId' --output text || true)
+        fi
+        echo "Found VPC: $VPC_ID"
+        SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=availability-zone,Values=us-east-1f --query 'Subnets[0].SubnetId' --output text || true)
+        if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" = "None" ]; then
+          SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[0].SubnetId' --output text || true)
+        fi
+        echo "Found Subnet: $SUBNET_ID"
+        KEY_NAME=$(aws ec2 describe-key-pairs --query 'KeyPairs[0].KeyName' --output text || true)
+        echo "Found KeyPair: $KEY_NAME"
+        echo "TF_VAR_existing_vpc_id=$VPC_ID" >> $GITHUB_ENV
+        echo "TF_VAR_subnet_id=$SUBNET_ID" >> $GITHUB_ENV
+        echo "TF_VAR_ssh_key_name=$KEY_NAME" >> $GITHUB_ENV
+        echo "TF_VAR_azs=[\"us-east-1f\"]" >> $GITHUB_ENV
+        echo "TF_VAR_instance_type=t3.small" >> $GITHUB_ENV
+        echo "TF_VAR_create_instances=true" >> $GITHUB_ENV
+        echo "TF_VAR_create_security_group=true" >> $GITHUB_ENV
+        echo "TF_VAR_eip_instances=[\"EC-Bastion\",\"EC2-Frontend\",\"EC2-API-Gateway\",\"EC2-Reportes\",\"EC2-Monitoring\"]" >> $GITHUB_ENV
 
     - name: Init
       run: cd terraform && terraform init
