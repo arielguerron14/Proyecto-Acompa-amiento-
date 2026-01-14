@@ -1,38 +1,130 @@
-name: Terraform Deploy
-
-# Trigger: actualización menor para ejecutar workflow
+name: Terraform Inventory & Deploy
 
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
+    inputs:
+      run_inventory:
+        description: 'Run inventory step (true/false)'
+        required: false
+        default: 'true'
+      run_terraform:
+        description: 'Run terraform after inventory (true/false)'
+        required: false
+        default: 'false'
+      deploy_role_arn:
+        description: 'Role ARN to assume in target account (optional)'
+        required: false
+      deploy_region:
+        description: 'Region to run Terraform in (optional)'
+        required: false
+      tf_var_ami_id:
+        description: 'AMI id to pass to Terraform (optional)'
+        required: false
+      tf_var_azs:
+        description: 'AZs to pass to Terraform (JSON array, optional)'
+        required: false
+      apply:
+        description: 'Perform terraform apply (true/false)'
+        required: false
+        default: 'false'
 
 jobs:
-  deploy:
+  inventory:
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.run_inventory == 'true' }}
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Debug - show repo content after checkout
-      run: |
-        echo "Directorio actual: $(pwd)"
-        echo "Contenido del directorio actual:"
-        ls -l
-        echo "Contenido del padre:"
-        ls -l ..
-        echo "Contenido de ./terraform si existe:"
-        ls -l terraform || echo "No existe carpeta terraform"
-
-    - uses: hashicorp/setup-terraform@v3
-
-    - name: Configure AWS
+    - name: Configure AWS credentials for inventory
       uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
+
+    - name: Create output dir
+      run: mkdir -p artifact
+
+    - name: Caller identity
+      run: aws sts get-caller-identity --output json > artifact/caller_identity.json
+
+    - name: Describe EC2 instances
+      run: aws ec2 describe-instances --region us-east-1 --output json > artifact/ec2_instances.json || true
+
+    - name: Describe VPCs
+      run: aws ec2 describe-vpcs --region us-east-1 --output json > artifact/vpcs.json || true
+
+    - name: List S3 buckets (optional)
+      run: aws s3api list-buckets --output json > artifact/s3_buckets.json || true
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: aws-inventory
+        path: artifact
+
+  assume_role:
+    runs-on: ubuntu-latest
+    needs: inventory
+    if: ${{ github.event.inputs.run_terraform == 'true' && github.event.inputs.deploy_role_arn != '' }}
+    outputs:
+      aws_access_key_id: ${{ steps.assume.outputs.aws_access_key_id }}
+      aws_secret_access_key: ${{ steps.assume.outputs.aws_secret_access_key }}
+      aws_session_token: ${{ steps.assume.outputs.aws_session_token }}
+
+    steps:
+    - name: Configure AWS (caller creds)
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Assume role
+      id: assume
+      run: |
+        ROLE_ARN="${{ github.event.inputs.deploy_role_arn }}"
+        echo "Assuming role $ROLE_ARN"
+        CREDS=$(aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "gh-workflow" --duration-seconds 3600 --output json)
+        AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.Credentials.AccessKeyId')
+        AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.Credentials.SecretAccessKey')
+        AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.Credentials.SessionToken')
+        echo "aws_access_key_id=$AWS_ACCESS_KEY_ID" >> $GITHUB_OUTPUT
+        echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_OUTPUT
+        echo "aws_session_token=$AWS_SESSION_TOKEN" >> $GITHUB_OUTPUT
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: assume_role
+    if: ${{ github.event.inputs.run_terraform == 'true' }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set AWS creds (assumed or repo secrets)
+      run: |
+        echo "AWS_ACCESS_KEY_ID=${{ needs.assume_role.outputs.aws_access_key_id || secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+        echo "AWS_SECRET_ACCESS_KEY=${{ needs.assume_role.outputs.aws_secret_access_key || secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+        echo "AWS_SESSION_TOKEN=${{ needs.assume_role.outputs.aws_session_token || secrets.AWS_SESSION_TOKEN }}" >> $GITHUB_ENV
+        echo "AWS_REGION=${{ github.event.inputs.deploy_region || 'us-east-1' }}" >> $GITHUB_ENV
+
+    - uses: hashicorp/setup-terraform@v3
+
+    - name: Configure AWS (for terraform)
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
 
     - name: Debug - show runner paths and terraform folder
       run: |
@@ -43,19 +135,16 @@ jobs:
         ls -l ..
         echo "\nTerraform directory content:"
         ls -l terraform || echo "No terraform directory found!"
-        echo "\nFull path to terraform directory: $(realpath terraform || echo 'not found')"
-
 
     - name: Init
       run: cd terraform && terraform init
 
-
     - name: Plan
       env:
-        TF_VAR_ami_id: "ami-0c19292331f6e3a5c"
-        TF_VAR_azs: '["us-east-1a", "us-east-1b"]'
+        TF_VAR_ami_id: ${{ github.event.inputs.tf_var_ami_id || 'ami-0c19292331f6e3a5c' }}
+        TF_VAR_azs: ${{ github.event.inputs.tf_var_azs || '["us-east-1a","us-east-1b"]' }}
       run: cd terraform && terraform plan -out=tfplan
 
-
     - name: Apply
+      if: ${{ github.event.inputs.apply == 'true' }}
       run: cd terraform && terraform apply -auto-approve tfplan
