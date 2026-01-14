@@ -170,7 +170,7 @@ jobs:
         if [ ! -z "$INSTANCE_IDS" ]; then
           echo "Found instances to terminate: $INSTANCE_IDS"
           aws ec2 terminate-instances --instance-ids $INSTANCE_IDS 2>/dev/null && echo "Terminated instances" || echo "Could not terminate instances"
-          sleep 5  # Wait for instance termination
+          sleep 15  # Wait for instances to fully terminate and release resources
         fi
         
         # Delete Elastic IPs if they exist
@@ -190,8 +190,11 @@ jobs:
           aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true
           aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 80 --cidr 0.0.0.0/0 2>/dev/null || true
           aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 0.0.0.0/0 2>/dev/null || true
-          # Try to delete
-          aws ec2 delete-security-group --group-id $SG_ID 2>/dev/null && echo "Deleted existing security group" || echo "Could not delete security group (may still be in use)"
+          # Try to delete with retries
+          for attempt in 1 2 3; do
+            aws ec2 delete-security-group --group-id $SG_ID 2>/dev/null && echo "Deleted existing security group" && break || echo "Attempt $attempt: Could not delete security group yet..."
+            if [ $attempt -lt 3 ]; then sleep 5; fi
+          done
         fi
 
     - name: Debug - show runner paths and terraform folder
