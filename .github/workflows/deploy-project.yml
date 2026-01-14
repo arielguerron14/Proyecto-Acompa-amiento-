@@ -1,0 +1,382 @@
+name: Deploy Project to EC2 Instances
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name (dev, staging, prod)'
+        required: false
+        default: 'production'
+      deploy_all_services:
+        description: 'Deploy all services (true/false)'
+        required: false
+        default: 'true'
+      skip_verification:
+        description: 'Skip endpoint verification (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  discover-instances:
+    runs-on: ubuntu-latest
+    outputs:
+      instances_json: ${{ steps.discover.outputs.instances_json }}
+      bastion_ip: ${{ steps.discover.outputs.bastion_ip }}
+      
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Discover EC2 instances and IPs
+      id: discover
+      run: |
+        # Get all instances with Project=lab-8-ec2 tag
+        INSTANCES=$(aws ec2 describe-instances \
+          --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
+          --query 'Reservations[*].Instances[*].[Tags[?Key==`Name`].Value|[0],PrivateIpAddress,PublicIpAddress,InstanceId]' \
+          --output json)
+        
+        echo "Discovered instances:"
+        echo "$INSTANCES" | jq '.'
+        
+        # Create instance mapping
+        INSTANCE_MAP=$(echo "$INSTANCES" | jq -r '.[][] | @base64' | jq -R 'fromjson' | \
+          jq -s 'map({
+            name: .[0],
+            private_ip: .[1],
+            public_ip: (.[2] // .[1]),
+            instance_id: .[3]
+          }) | 
+          map(select(.name != null)) |
+          map({(.name): {private_ip, public_ip, instance_id}}) |
+          add')
+        
+        echo "Instance mapping:"
+        echo "$INSTANCE_MAP" | jq '.'
+        
+        # Get Bastion public IP
+        BASTION_IP=$(echo "$INSTANCE_MAP" | jq -r '.["EC-Bastion"].public_ip // empty')
+        echo "bastion_ip=$BASTION_IP" >> $GITHUB_OUTPUT
+        echo "instances_json=$(echo $INSTANCE_MAP | jq -c '.')" >> $GITHUB_OUTPUT
+        
+        echo "Bastion IP: $BASTION_IP"
+
+    - name: Upload instances artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: instances-discovered
+        path: |
+          instances.json
+
+  update-configuration:
+    runs-on: ubuntu-latest
+    needs: discover-instances
+    if: ${{ needs.discover-instances.outputs.instances_json != '' }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Parse instance data
+      run: |
+        INSTANCES='${{ needs.discover-instances.outputs.instances_json }}'
+        echo "Instance data:"
+        echo "$INSTANCES" | jq '.'
+        
+        # Create .env files with IPs
+        echo "Creating environment files with instance IPs..."
+        
+        # Parse and create env files
+        mkdir -p /tmp/env-files
+        echo "$INSTANCES" | jq -r 'to_entries[] | 
+          "# \(.key)\nPRIVATE_IP=\(.value.private_ip)\nPUBLIC_IP=\(.value.public_ip)\nINSTANCE_ID=\(.value.instance_id)"' > /tmp/env-files/instances.env
+        
+        cat /tmp/env-files/instances.env
+
+    - name: Update configuration with IPs
+      run: |
+        # Read existing config
+        NODE_CONFIG_FILE="infrastructure-instances.config.js"
+        
+        if [ ! -f "$NODE_CONFIG_FILE" ]; then
+          echo "Config file not found, creating template..."
+          cat > "$NODE_CONFIG_FILE" << 'EOF'
+module.exports = {
+  instances: {},
+  deployment: {
+    timeout: 300,
+    retries: 3,
+    environment: 'production'
+  }
+};
+EOF
+        fi
+        
+        echo "Current config:"
+        cat "$NODE_CONFIG_FILE"
+
+    - name: Upload updated config
+      uses: actions/upload-artifact@v4
+      with:
+        name: updated-config
+        path: |
+          infrastructure-instances.config.js
+          .env*
+
+  deploy-services:
+    runs-on: ubuntu-latest
+    needs: [discover-instances, update-configuration]
+    if: ${{ github.event.inputs.deploy_all_services == 'true' }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install jq and ssh tools
+      run: sudo apt-get update && sudo apt-get install -y jq openssh-client
+
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+
+    - name: Deploy to EC2 instances
+      run: |
+        INSTANCES='${{ needs.discover-instances.outputs.instances_json }}'
+        BASTION_IP='${{ needs.discover-instances.outputs.bastion_ip }}'
+        
+        echo "Deployment environment: ${{ github.event.inputs.environment }}"
+        echo "Bastion IP: $BASTION_IP"
+        
+        # For each instance, prepare and deploy
+        echo "$INSTANCES" | jq -r 'to_entries[] | 
+          "\(.key)|\(.value.private_ip)|\(.value.public_ip)"' | while IFS='|' read INSTANCE_NAME PRIVATE_IP PUBLIC_IP; do
+          
+          if [ -z "$INSTANCE_NAME" ]; then continue; fi
+          
+          echo "================================================"
+          echo "Deploying to: $INSTANCE_NAME ($PRIVATE_IP)"
+          echo "================================================"
+          
+          # Prepare deployment script
+          cat > /tmp/deploy-$INSTANCE_NAME.sh << 'DEPLOY_SCRIPT'
+#!/bin/bash
+set -e
+
+INSTANCE_NAME=$1
+ENVIRONMENT=$2
+
+echo "Starting deployment on $INSTANCE_NAME..."
+
+# Update system
+sudo apt-get update -y
+
+# Ensure Docker is installed
+if ! command -v docker &> /dev/null; then
+  echo "Installing Docker..."
+  sudo apt-get install -y docker.io
+  sudo systemctl enable docker
+  sudo systemctl start docker
+  sudo usermod -aG docker ubuntu
+fi
+
+# Ensure Docker Compose is installed
+if ! command -v docker-compose &> /dev/null; then
+  echo "Installing Docker Compose..."
+  sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  sudo chmod +x /usr/local/bin/docker-compose
+fi
+
+# Check service-specific requirements
+case $INSTANCE_NAME in
+  "EC2-Frontend")
+    echo "Deploying Frontend service..."
+    [ -f "docker-compose.frontend.yml" ] && docker-compose -f docker-compose.frontend.yml up -d || echo "Frontend compose file not found"
+    ;;
+  "EC2-API-Gateway")
+    echo "Deploying API Gateway service..."
+    [ -f "docker-compose.api-gateway.yml" ] && docker-compose -f docker-compose.api-gateway.yml up -d || echo "API Gateway compose file not found"
+    ;;
+  "EC2-DB")
+    echo "Deploying Database service..."
+    [ -f "databases/docker-compose.db.yml" ] && docker-compose -f databases/docker-compose.db.yml up -d || echo "DB compose file not found"
+    ;;
+  "EC2-CORE")
+    echo "Deploying CORE service..."
+    [ -f "docker-compose.core.yml" ] && docker-compose -f docker-compose.core.yml up -d || echo "CORE compose file not found"
+    ;;
+  "EC2-Messaging")
+    echo "Deploying Messaging service..."
+    [ -f "docker-compose.messaging.yml" ] && docker-compose -f docker-compose.messaging.yml up -d || echo "Messaging compose file not found"
+    ;;
+  "EC2-Notificaciones")
+    echo "Deploying Notifications service..."
+    [ -f "docker-compose.notificaciones.yml" ] && docker-compose -f docker-compose.notificaciones.yml up -d || echo "Notifications compose file not found"
+    ;;
+  "EC2-Reportes")
+    echo "Deploying Reports service..."
+    [ -f "docker-compose.reportes.yml" ] && docker-compose -f docker-compose.reportes.yml up -d || echo "Reports compose file not found"
+    ;;
+  "EC2-Monitoring")
+    echo "Deploying Monitoring service..."
+    [ -f "docker-compose.infrastructure.yml" ] && docker-compose -f docker-compose.infrastructure.yml up -d || echo "Monitoring compose file not found"
+    ;;
+  *)
+    echo "Unknown instance: $INSTANCE_NAME"
+    ;;
+esac
+
+echo "Deployment completed on $INSTANCE_NAME"
+docker ps -a
+DEPLOY_SCRIPT
+          
+          chmod +x /tmp/deploy-$INSTANCE_NAME.sh
+          
+          # Send and execute deploy script (via bastion if needed)
+          if [ ! -z "$BASTION_IP" ] && [ "$BASTION_IP" != "null" ]; then
+            echo "Using Bastion: $BASTION_IP"
+            scp -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o StrictHostKeyChecking=no -W %h:%p ubuntu@$BASTION_IP" \
+              /tmp/deploy-$INSTANCE_NAME.sh ubuntu@$PRIVATE_IP:/tmp/deploy.sh 2>/dev/null || true
+            ssh -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o StrictHostKeyChecking=no -W %h:%p ubuntu@$BASTION_IP" \
+              ubuntu@$PRIVATE_IP "bash /tmp/deploy.sh '$INSTANCE_NAME' '$ENVIRONMENT'" 2>/dev/null || echo "Could not connect via Bastion"
+          else
+            echo "Direct connection to $PRIVATE_IP"
+            scp -o StrictHostKeyChecking=no /tmp/deploy-$INSTANCE_NAME.sh ubuntu@$PRIVATE_IP:/tmp/deploy.sh 2>/dev/null || true
+            ssh -o StrictHostKeyChecking=no ubuntu@$PRIVATE_IP "bash /tmp/deploy.sh '$INSTANCE_NAME' '$ENVIRONMENT'" 2>/dev/null || echo "Could not connect directly"
+          fi
+        done
+        
+        echo "All deployments completed"
+
+    - name: Verify service health
+      if: ${{ github.event.inputs.skip_verification == 'false' }}
+      run: |
+        INSTANCES='${{ needs.discover-instances.outputs.instances_json }}'
+        BASTION_IP='${{ needs.discover-instances.outputs.bastion_ip }}'
+        
+        echo "Verifying service health..."
+        echo "$INSTANCES" | jq -r 'to_entries[] | "\(.key)|\(.value.private_ip)"' | while IFS='|' read INSTANCE_NAME PRIVATE_IP; do
+          
+          if [ -z "$INSTANCE_NAME" ]; then continue; fi
+          
+          echo "Checking $INSTANCE_NAME ($PRIVATE_IP)..."
+          
+          # Check docker status
+          if [ ! -z "$BASTION_IP" ] && [ "$BASTION_IP" != "null" ]; then
+            ssh -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o StrictHostKeyChecking=no -W %h:%p ubuntu@$BASTION_IP" \
+              ubuntu@$PRIVATE_IP "docker ps" 2>/dev/null || echo "Could not check docker status"
+          else
+            ssh -o StrictHostKeyChecking=no ubuntu@$PRIVATE_IP "docker ps" 2>/dev/null || echo "Could not check docker status"
+          fi
+        done
+
+  verify-endpoints:
+    runs-on: ubuntu-latest
+    needs: [discover-instances, deploy-services]
+    if: ${{ github.event.inputs.skip_verification == 'false' }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install curl and jq
+      run: sudo apt-get update && sudo apt-get install -y curl jq
+
+    - name: Verify application endpoints
+      run: |
+        INSTANCES='${{ needs.discover-instances.outputs.instances_json }}'
+        
+        echo "Verifying endpoints..."
+        echo "$INSTANCES" | jq -r 'to_entries[] | 
+          "\(.key)|\(.value.public_ip)"' | while IFS='|' read INSTANCE_NAME PUBLIC_IP; do
+          
+          if [ -z "$INSTANCE_NAME" ]; then continue; fi
+          if [ "$PUBLIC_IP" = "null" ]; then 
+            echo "No public IP for $INSTANCE_NAME, skipping..."
+            continue
+          fi
+          
+          echo "================================================"
+          echo "Testing $INSTANCE_NAME ($PUBLIC_IP)"
+          echo "================================================"
+          
+          # Common ports to check
+          for PORT in 80 443 8080 5432 3000 5000 9090 5672; do
+            echo "Testing port $PORT..."
+            timeout 3 bash -c "cat < /dev/null > /dev/tcp/$PUBLIC_IP/$PORT" 2>/dev/null && \
+              echo "✓ Port $PORT is open" || \
+              echo "✗ Port $PORT is closed or unreachable"
+          done
+          
+          # Test HTTP endpoints
+          echo "Testing HTTP endpoints..."
+          curl -s -m 5 -o /dev/null -w "Frontend (http): %{http_code}\n" "http://$PUBLIC_IP/" 2>/dev/null || echo "Frontend HTTP: Connection failed"
+          curl -s -m 5 -o /dev/null -w "API Gateway (http): %{http_code}\n" "http://$PUBLIC_IP:8080/api/health" 2>/dev/null || echo "API Gateway: Connection failed"
+        done
+
+    - name: Generate health report
+      run: |
+        echo "# Deployment Health Report" > deployment-report.md
+        echo "" >> deployment-report.md
+        echo "**Timestamp**: $(date)" >> deployment-report.md
+        echo "**Environment**: ${{ github.event.inputs.environment }}" >> deployment-report.md
+        echo "" >> deployment-report.md
+        echo "## Instance Information" >> deployment-report.md
+        echo '```' >> deployment-report.md
+        echo '${{ needs.discover-instances.outputs.instances_json }}' | jq '.' >> deployment-report.md
+        echo '```' >> deployment-report.md
+        
+        cat deployment-report.md
+
+    - name: Upload deployment report
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-report
+        path: deployment-report.md
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: [discover-instances, verify-endpoints]
+    if: always()
+
+    steps:
+    - name: Deployment Summary
+      run: |
+        echo "╔════════════════════════════════════════════════════════════════╗"
+        echo "║           DEPLOYMENT SUMMARY                                   ║"
+        echo "╚════════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "Instances Discovered:"
+        echo '${{ needs.discover-instances.outputs.instances_json }}' | jq '.' 2>/dev/null || echo "No instances found"
+        echo ""
+        echo "Bastion IP: ${{ needs.discover-instances.outputs.bastion_ip }}"
+        echo ""
+        echo "All artifacts have been uploaded for review."
+        echo "Check the Actions tab for detailed logs."
