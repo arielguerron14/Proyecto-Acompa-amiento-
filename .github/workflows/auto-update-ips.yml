@@ -1,0 +1,335 @@
+name: Auto Deploy & Update IPs
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_services:
+        description: 'Deploy services?'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  discover-and-update:
+    name: Discover IPs & Update Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      instances_json: ${{ steps.discover.outputs.instances_json }}
+      bastion_ip: ${{ steps.discover.outputs.bastion_public_ip }}
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Discover EC2 instances with all IP types
+      id: discover
+      run: |
+        # Get all instances with Project=lab-8-ec2 tag
+        echo "🔍 Querying EC2 instances..."
+        INSTANCES=$(aws ec2 describe-instances \
+          --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
+          --query 'Reservations[*].Instances[*].[
+            Tags[?Key==`Name`].Value|[0],
+            InstanceId,
+            PrivateIpAddress,
+            PublicIpAddress,
+            State.Name
+          ]' \
+          --output json)
+        
+        # Get Elastic IPs
+        echo "📍 Querying Elastic IPs..."
+        ELASTIC_IPS=$(aws ec2 describe-addresses \
+          --query 'Addresses[*].[InstanceId, PublicIp, AllocationId]' \
+          --output json)
+        
+        # Create comprehensive instance map
+        INSTANCE_MAP=$(echo "$INSTANCES" | jq -c '
+          [.[][] | select(.[0] != null)] |
+          map({
+            name: .[0],
+            instance_id: .[1],
+            private_ip: .[2],
+            public_ip: (.[3] // .[2]),
+            state: .[4]
+          }) |
+          map({(.name): .}) |
+          add
+        ')
+        
+        # Enrich with Elastic IPs
+        ENRICHED=$(echo "$INSTANCE_MAP" | jq \
+          --argjson eips "$ELASTIC_IPS" '
+          . as $instances |
+          ($eips | map({(.[0]): .[1]}) | add) as $eip_map |
+          to_entries | map(
+            .value |= (. + {
+              elastic_ip: ($eip_map[.instance_id] // .public_ip)
+            })
+          ) | from_entries
+        ')
+        
+        # Output for next steps
+        ENRICHED_JSON=$(echo "$ENRICHED" | jq -c '.')
+        echo "instances_json=$ENRICHED_JSON" >> $GITHUB_OUTPUT
+        
+        # Get Bastion IPs
+        BASTION_PRIVATE=$(echo "$ENRICHED" | jq -r '.["EC-Bastion"].private_ip // "unknown"')
+        BASTION_PUBLIC=$(echo "$ENRICHED" | jq -r '.["EC-Bastion"].public_ip // "unknown"')
+        BASTION_ELASTIC=$(echo "$ENRICHED" | jq -r '.["EC-Bastion"].elastic_ip // "unknown"')
+        
+        echo "bastion_private_ip=$BASTION_PRIVATE" >> $GITHUB_OUTPUT
+        echo "bastion_public_ip=$BASTION_PUBLIC" >> $GITHUB_OUTPUT
+        echo "bastion_elastic_ip=$BASTION_ELASTIC" >> $GITHUB_OUTPUT
+        
+        echo ""
+        echo "=== BASTION GATEWAY ==="
+        echo "Private: $BASTION_PRIVATE"
+        echo "Public: $BASTION_PUBLIC"
+        echo "Elastic: $BASTION_ELASTIC"
+        
+        echo ""
+        echo "=== ALL INSTANCES ==="
+        echo "$ENRICHED" | jq 'to_entries | .[] | "\(.key): private=\(.value.private_ip) public=\(.value.public_ip) elastic=\(.value.elastic_ip)"' -r
+
+    - name: Generate project configuration
+      id: generate-config
+      run: |
+        INSTANCES='${{ steps.discover.outputs.instances_json }}'
+        
+        # Generate Node.js config file
+        cat > infrastructure-instances.config.js << 'EOF'
+/**
+ * AUTO-GENERATED: Instance Configuration with Dynamic IPs
+ * Generated at: $(date -u)
+ * Do NOT edit manually - Updated automatically by CI/CD pipeline
+ */
+
+module.exports = {
+  // Instance IP mappings - For inter-service communication
+  instances: INSTANCES_PLACEHOLDER,
+  
+  // Service routing configuration
+  services: {
+    frontend: {
+      name: 'EC2-Frontend',
+      ports: { http: 3000, https: 3001 },
+      health: '/health'
+    },
+    api_gateway: {
+      name: 'EC2-API-Gateway',
+      ports: { http: 8080, https: 8443 },
+      health: '/api/health'
+    },
+    core: {
+      name: 'EC2-CORE',
+      ports: { http: 8081, https: 8444 },
+      health: '/api/status'
+    },
+    database: {
+      name: 'EC2-DB',
+      ports: { postgres: 5432 }
+    },
+    messaging: {
+      name: 'EC2-Messaging',
+      ports: { amqp: 5672, http: 15672 }
+    },
+    notifications: {
+      name: 'EC2-Notificaciones',
+      ports: { http: 8082, https: 8445 },
+      health: '/notifications/health'
+    },
+    reports: {
+      name: 'EC2-Reportes',
+      ports: { http: 8083, https: 8446 },
+      health: '/reports/health'
+    },
+    monitoring: {
+      name: 'EC2-Monitoring',
+      ports: { prometheus: 9090, grafana: 3000 },
+      health: '/-/healthy'
+    }
+  },
+  
+  // Helper to get instance IP
+  getInstanceIP: function(instanceName, ipType = 'private') {
+    const instance = this.instances[instanceName];
+    if (!instance) return null;
+    switch(ipType.toLowerCase()) {
+      case 'public': return instance.public_ip;
+      case 'elastic': return instance.elastic_ip;
+      default: return instance.private_ip;
+    }
+  },
+  
+  // Helper to get service URL
+  getServiceURL: function(serviceName, protocol = 'http') {
+    const service = this.services[serviceName];
+    if (!service) return null;
+    const instance = this.instances[service.name];
+    if (!instance) return null;
+    const port = protocol === 'https' ? service.ports.https : service.ports.http;
+    return `${protocol}://${instance.private_ip}:${port}`;
+  }
+};
+EOF
+        
+        # Replace placeholder
+        sed -i "s|INSTANCES_PLACEHOLDER|$(echo "$INSTANCES" | sed 's/"/\\"/g')|g" infrastructure-instances.config.js
+        
+        echo "✅ infrastructure-instances.config.js generated"
+
+    - name: Generate .env file
+      run: |
+        INSTANCES='${{ steps.discover.outputs.instances_json }}'
+        
+        # Extract IPs using jq
+        FRONTEND=$(echo "$INSTANCES" | jq -r '.["EC2-Frontend"]')
+        API=$(echo "$INSTANCES" | jq -r '.["EC2-API-Gateway"]')
+        CORE=$(echo "$INSTANCES" | jq -r '.["EC2-CORE"]')
+        DB=$(echo "$INSTANCES" | jq -r '.["EC2-DB"]')
+        MESSAGING=$(echo "$INSTANCES" | jq -r '.["EC2-Messaging"]')
+        BASTION=$(echo "$INSTANCES" | jq -r '.["EC-Bastion"]')
+        
+        cat > .env.generated << 'ENVEOF'
+# Auto-generated environment variables
+# Timestamp: $(date -u)
+
+# === INSTANCE IPs ===
+# Internal Communication (Private IPs)
+FRONTEND_PRIVATE=FRONTEND_PRIVATE_PLACEHOLDER
+API_PRIVATE=API_PRIVATE_PLACEHOLDER
+CORE_PRIVATE=CORE_PRIVATE_PLACEHOLDER
+DB_PRIVATE=DB_PRIVATE_PLACEHOLDER
+MESSAGING_PRIVATE=MESSAGING_PRIVATE_PLACEHOLDER
+
+# External Access (Public/Elastic IPs)
+FRONTEND_PUBLIC=FRONTEND_PUBLIC_PLACEHOLDER
+API_PUBLIC=API_PUBLIC_PLACEHOLDER
+CORE_PUBLIC=CORE_PUBLIC_PLACEHOLDER
+DB_PUBLIC=DB_PUBLIC_PLACEHOLDER
+BASTION_PUBLIC=BASTION_PUBLIC_PLACEHOLDER
+
+# Elastic IPs (Static)
+FRONTEND_ELASTIC=FRONTEND_ELASTIC_PLACEHOLDER
+API_ELASTIC=API_ELASTIC_PLACEHOLDER
+CORE_ELASTIC=CORE_ELASTIC_PLACEHOLDER
+
+# === SERVICE CONFIGURATION ===
+DATABASE_HOST=DB_PRIVATE_PLACEHOLDER
+DATABASE_PORT=5432
+DATABASE_URL=postgresql://user:pass@DB_PRIVATE_PLACEHOLDER:5432/acompanamiento
+
+RABBITMQ_HOST=MESSAGING_PRIVATE_PLACEHOLDER
+RABBITMQ_PORT=5672
+RABBITMQ_URL=amqp://guest:guest@MESSAGING_PRIVATE_PLACEHOLDER:5672/
+
+API_GATEWAY_HOST=API_PRIVATE_PLACEHOLDER
+API_GATEWAY_PORT=8080
+
+CORE_SERVICE_HOST=CORE_PRIVATE_PLACEHOLDER
+CORE_SERVICE_PORT=8081
+
+# === BASTION GATEWAY ===
+BASTION_HOST=BASTION_PUBLIC_PLACEHOLDER
+BASTION_USER=ubuntu
+BASTION_PORT=22
+ENVEOF
+        
+        # Replace all placeholders
+        FRONTEND_PRIV=$(echo "$FRONTEND" | jq -r '.private_ip')
+        FRONTEND_PUB=$(echo "$FRONTEND" | jq -r '.public_ip')
+        FRONTEND_ELAS=$(echo "$FRONTEND" | jq -r '.elastic_ip')
+        
+        API_PRIV=$(echo "$API" | jq -r '.private_ip')
+        API_PUB=$(echo "$API" | jq -r '.public_ip')
+        API_ELAS=$(echo "$API" | jq -r '.elastic_ip')
+        
+        CORE_PRIV=$(echo "$CORE" | jq -r '.private_ip')
+        CORE_PUB=$(echo "$CORE" | jq -r '.public_ip')
+        CORE_ELAS=$(echo "$CORE" | jq -r '.elastic_ip')
+        
+        DB_PRIV=$(echo "$DB" | jq -r '.private_ip')
+        DB_PUB=$(echo "$DB" | jq -r '.public_ip')
+        
+        MESSAGING_PRIV=$(echo "$MESSAGING" | jq -r '.private_ip')
+        
+        BASTION_PUB=$(echo "$BASTION" | jq -r '.public_ip')
+        
+        sed -i "s|FRONTEND_PRIVATE_PLACEHOLDER|$FRONTEND_PRIV|g" .env.generated
+        sed -i "s|FRONTEND_PUBLIC_PLACEHOLDER|$FRONTEND_PUB|g" .env.generated
+        sed -i "s|FRONTEND_ELASTIC_PLACEHOLDER|$FRONTEND_ELAS|g" .env.generated
+        sed -i "s|API_PRIVATE_PLACEHOLDER|$API_PRIV|g" .env.generated
+        sed -i "s|API_PUBLIC_PLACEHOLDER|$API_PUB|g" .env.generated
+        sed -i "s|API_ELASTIC_PLACEHOLDER|$API_ELAS|g" .env.generated
+        sed -i "s|CORE_PRIVATE_PLACEHOLDER|$CORE_PRIV|g" .env.generated
+        sed -i "s|CORE_PUBLIC_PLACEHOLDER|$CORE_PUB|g" .env.generated
+        sed -i "s|CORE_ELASTIC_PLACEHOLDER|$CORE_ELAS|g" .env.generated
+        sed -i "s|DB_PRIVATE_PLACEHOLDER|$DB_PRIV|g" .env.generated
+        sed -i "s|DB_PUBLIC_PLACEHOLDER|$DB_PUB|g" .env.generated
+        sed -i "s|MESSAGING_PRIVATE_PLACEHOLDER|$MESSAGING_PRIV|g" .env.generated
+        sed -i "s|BASTION_PUBLIC_PLACEHOLDER|$BASTION_PUB|g" .env.generated
+        
+        echo "✅ .env.generated created"
+        
+        echo ""
+        echo "=== Environment Variables ==="
+        cat .env.generated
+
+    - name: Commit configuration updates
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        git add infrastructure-instances.config.js .env.generated
+        
+        if git diff --cached --quiet; then
+          echo "⚠️  No changes to commit"
+        else
+          git commit -m "chore: Auto-update instance configuration with current IPs
+
+- Updated with discovered EC2 instance IPs
+- Includes private, public, and elastic IPs
+- Timestamp: $(date -u)"
+          git push
+          echo "✅ Configuration committed and pushed"
+        fi
+
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: discover-and-update
+    if: always()
+    
+    steps:
+    - name: Generate summary report
+      run: |
+        cat << 'SUMMARY_EOF'
+        
+        ╔════════════════════════════════════════════════════════════╗
+        ║         DEPLOYMENT CONFIGURATION UPDATE COMPLETE          ║
+        ╚════════════════════════════════════════════════════════════╝
+        
+        📋 Generated Files:
+        • infrastructure-instances.config.js (Node.js config with dynamic IPs)
+        • .env.generated (Environment variables for Docker/services)
+        
+        🔗 Instance Mappings:
+        ${{ needs.discover-and-update.outputs.instances_json }}
+        
+        🛡️  Bastion Gateway:
+        • IP: ${{ needs.discover-and-update.outputs.bastion_ip }}
+        
+        ✅ Configuration automatically updated!
+        
+        SUMMARY_EOF
