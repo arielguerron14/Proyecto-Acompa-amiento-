@@ -21,6 +21,17 @@ data "aws_availability_zones" "azs" {
   count = length(var.azs) == 0 ? 1 : 0
 }
 
+# Default VPC (opcional) - usado si no se quiere crear una VPC nueva
+data "aws_default_vpc" "default" {
+  count = var.existing_vpc_id == "" ? 1 : 0
+}
+
+# Subnet ids for an existing/default VPC (opcional)
+data "aws_subnet_ids" "existing" {
+  count = var.existing_vpc_id != "" || length(data.aws_default_vpc.default) > 0 ? 1 : 0
+  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : data.aws_default_vpc.default[0].id
+}
+
 # VPC
 resource "aws_vpc" "main" {
   count                = var.existing_vpc_id == "" ? 1 : 0
@@ -32,12 +43,19 @@ resource "aws_vpc" "main" {
 
 # Local VPC id (uses existing_vpc_id if provided)
 locals {
-  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : (length(aws_vpc.main) > 0 ? aws_vpc.main[0].id : "")
+  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : (length(aws_vpc.main) > 0 ? aws_vpc.main[0].id : (length(data.aws_default_vpc.default) > 0 ? data.aws_default_vpc.default[0].id : ""))
+}
+
+# Subnet id selection: prefer subnets created by this module, otherwise use existing subnets in the VPC
+locals {
+  created_subnet_ids = length(aws_subnet.public) > 0 ? [for s in aws_subnet.public : s.id] : []
+  existing_subnet_ids = length(data.aws_subnet_ids.existing) > 0 ? data.aws_subnet_ids.existing[0].ids : []
+  subnet_ids = length(local.created_subnet_ids) > 0 ? local.created_subnet_ids : local.existing_subnet_ids
 }
 
 # Subnets
 resource "aws_subnet" "public" {
-  for_each = toset(var.public_subnets)
+  for_each = var.existing_vpc_id == "" && length(data.aws_default_vpc.default) == 0 ? toset(var.public_subnets) : {}
 
   vpc_id                  = local.vpc_id
   cidr_block              = each.value
@@ -128,7 +146,7 @@ resource "aws_instance" "fixed" {
   for_each = toset(local.instance_names)
   ami           = var.ami_id != "" ? var.ami_id : data.aws_ami.al2023[0].id
   instance_type = var.instance_type
-  subnet_id     = values(aws_subnet.public)[0].id
+  subnet_id     = length(local.subnet_ids) > 0 ? local.subnet_ids[0] : ""
   vpc_security_group_ids = [aws_security_group.web_sg.id]
   associate_public_ip_address = true
   user_data = local.user_data
