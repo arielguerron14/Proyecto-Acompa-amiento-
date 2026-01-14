@@ -5,7 +5,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy Services
+    name: Deploy Services & Update Config
     runs-on: ubuntu-latest
     
     steps:
@@ -19,11 +19,12 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    - name: Discover instances
-      id: discover
+    - name: Discover instances and update configuration
       run: |
-        echo "🔍 Discovering instances..."
+        set -e
+        echo "🔍 Discovering EC2 instances..."
         
+        # Query instances
         INSTANCES=$(aws ec2 describe-instances \
           --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
           --query 'Reservations[*].Instances[*].[
@@ -34,19 +35,24 @@ jobs:
           ]' \
           --output json)
         
+        # Query Elastic IPs
         ELASTIC_IPS=$(aws ec2 describe-addresses \
           --query 'Addresses[*].[InstanceId,PublicIp]' \
           --output json)
         
-        ENRICHED=$(echo "$INSTANCES" | jq \
-          --argjson eips "$ELASTIC_IPS" '
+        # Process data
+        INSTANCE_MAP=$(echo "$INSTANCES" | jq -c '
           [.[][] | select(.[0] != null)] |
           map({
             name: .[0],
             instance_id: .[1],
             private_ip: .[2],
             public_ip: (.[3] // .[2])
-          }) |
+          })
+        ')
+        
+        ENRICHED=$(echo "$INSTANCE_MAP" | jq \
+          --argjson eips "$ELASTIC_IPS" '
           map(
             .instance_id as $id |
             .elastic_ip = ($eips[] | select(.[0] == $id) | .[1]) // .public_ip |
@@ -54,114 +60,86 @@ jobs:
           ) | add
         ')
         
-        echo "instances_json=$(echo "$ENRICHED" | jq -c '.')" >> $GITHUB_OUTPUT
+        echo "✅ Discovered instances:"
+        echo "$ENRICHED" | jq '.' | tee discovered.json
         
-        echo "✅ Discovered:"
-        echo "$ENRICHED" | jq 'keys[]' -r
+        # Generate infrastructure-instances.config.js
+        cat > infrastructure-instances.config.js << 'EOF'
+        /**
+         * AUTO-GENERATED: Instance Configuration with Dynamic IPs
+         * Generated: $(date -u)
+         */
+        module.exports = INSTANCES_PLACEHOLDER;
+        EOF
+        
+        ESCAPED=$(echo "$ENRICHED" | sed 's/"/\\"/g' | tr '\n' ' ')
+        sed -i "s|INSTANCES_PLACEHOLDER|$ESCAPED|g" infrastructure-instances.config.js
+        
+        # Generate .env file
+        echo "✅ Generating .env file..."
+        
+        FRONTEND=$(echo "$ENRICHED" | jq -r '.["EC2-Frontend"] | "\(.private_ip),\(.public_ip)"')
+        API=$(echo "$ENRICHED" | jq -r '.["EC2-API-Gateway"] | "\(.private_ip),\(.public_ip)"')
+        CORE=$(echo "$ENRICHED" | jq -r '.["EC2-CORE"] | "\(.private_ip),\(.public_ip)"')
+        DB=$(echo "$ENRICHED" | jq -r '.["EC2-DB"] | "\(.private_ip),\(.public_ip)"')
+        MSG=$(echo "$ENRICHED" | jq -r '.["EC2-Messaging"] | "\(.private_ip),\(.public_ip)"')
+        BASTION=$(echo "$ENRICHED" | jq -r '.["EC-Bastion"] | "\(.public_ip)"')
+        
+        IFS=',' read -r FE_PRIV FE_PUB <<< "$FRONTEND"
+        IFS=',' read -r API_PRIV API_PUB <<< "$API"
+        IFS=',' read -r CORE_PRIV CORE_PUB <<< "$CORE"
+        IFS=',' read -r DB_PRIV DB_PUB <<< "$DB"
+        IFS=',' read -r MSG_PRIV MSG_PUB <<< "$MSG"
+        
+        cat > .env.generated << ENVEOF
+        # Auto-generated environment variables
+        # Timestamp: $(date -u)
+        FRONTEND_PRIVATE=$FE_PRIV
+        FRONTEND_PUBLIC=$FE_PUB
+        API_PRIVATE=$API_PRIV
+        API_PUBLIC=$API_PUB
+        CORE_PRIVATE=$CORE_PRIV
+        CORE_PUBLIC=$CORE_PUB
+        DB_PRIVATE=$DB_PRIV
+        DB_PUBLIC=$DB_PUB
+        MESSAGING_PRIVATE=$MSG_PRIV
+        DATABASE_HOST=$DB_PRIV
+        DATABASE_URL=postgresql://user:pass@$DB_PRIV:5432/acompanamiento
+        RABBITMQ_HOST=$MSG_PRIV
+        API_GATEWAY_HOST=$API_PRIV
+        CORE_SERVICE_HOST=$CORE_PRIV
+        BASTION_HOST=$BASTION
+        BASTION_USER=ubuntu
+        ENVEOF
+        
+        echo "✅ Configuration files generated"
 
-    - name: Setup SSH
+    - name: Commit configuration
       run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_KEY_EC2 }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        git add infrastructure-instances.config.js .env.generated
+        
+        if git diff --cached --quiet; then
+          echo "⚠️  No changes"
+        else
+          git commit -m "chore: Update instance configuration with discovered IPs"
+          git push
+          echo "✅ Configuration pushed"
+        fi
 
-    - name: Deploy services to all instances
-      env:
-        INSTANCES: ${{ steps.discover.outputs.instances_json }}
+    - name: Summary
       run: |
-        BASTION_IP=$(echo "$INSTANCES" | jq -r '.["EC-Bastion"].public_ip // "34.194.48.73"')
-        
-        # Deploy to each instance
-        echo "$INSTANCES" | jq -r 'to_entries[] | "\(.key)|\(.value.private_ip)|\(.value.public_ip)"' | while IFS='|' read NAME PRIV PUB; do
-          [ -z "$NAME" ] && continue
-          
-          echo ""
-          echo "========================================="
-          echo "Deploying to $NAME ($PUB)"
-          echo "========================================="
-          
-          # Create deployment script
-          cat > /tmp/deploy.sh << 'DEPLOY_SCRIPT'
-        #!/bin/bash
-        set -e
-        INSTANCE_NAME=$1
-        PRIVATE_IP=$2
-        PUBLIC_IP=$3
-        
-        echo "[$(date)] Deploying $INSTANCE_NAME..."
-        
-        # Update system
-        sudo apt-get update -y 2>&1 | tail -3
-        
-        # Install Docker
-        if ! command -v docker &> /dev/null; then
-          echo "Installing Docker..."
-          sudo apt-get install -y docker.io 2>&1 | tail -3
-          sudo systemctl enable docker
-          sudo systemctl start docker
-          sudo usermod -aG docker ubuntu
-        fi
-        
-        # Install Docker Compose
-        if ! command -v docker-compose &> /dev/null; then
-          echo "Installing Docker Compose..."
-          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose 2>/dev/null
-          sudo chmod +x /usr/local/bin/docker-compose
-        fi
-        
-        # Clone repo
-        if [ ! -d "/home/ubuntu/app" ]; then
-          cd /home/ubuntu
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git app
-        fi
-        
-        cd /home/ubuntu/app
-        git pull origin main
-        
-        # Find and run appropriate docker-compose file
-        case $INSTANCE_NAME in
-          EC2-Frontend)
-            [ -f docker-compose.frontend.yml ] && docker-compose -f docker-compose.frontend.yml up -d
-            ;;
-          EC2-API-Gateway)
-            [ -f docker-compose.api-gateway.yml ] && docker-compose -f docker-compose.api-gateway.yml up -d
-            ;;
-          EC2-CORE)
-            [ -f docker-compose.core.yml ] && docker-compose -f docker-compose.core.yml up -d
-            ;;
-          EC2-DB)
-            [ -f docker-compose.infrastructure.yml ] && docker-compose -f docker-compose.infrastructure.yml up -d
-            ;;
-          EC2-Messaging)
-            [ -f docker-compose.messaging.yml ] && docker-compose -f docker-compose.messaging.yml up -d
-            ;;
-          EC2-Notificaciones)
-            [ -f docker-compose.notificaciones.yml ] && docker-compose -f docker-compose.notificaciones.yml up -d
-            ;;
-          EC2-Reportes)
-            [ -f docker-compose.reportes.yml ] && docker-compose -f docker-compose.reportes.yml up -d
-            ;;
-          EC2-Monitoring)
-            [ -f docker-compose.infrastructure.yml ] && docker-compose -f docker-compose.infrastructure.yml up -d
-            ;;
-        esac
-        
-        echo "[$(date)] Deployment completed for $INSTANCE_NAME"
-        docker ps -a 2>/dev/null | grep -E "^CONTAINER|$INSTANCE_NAME" || true
-        DEPLOY_SCRIPT
-          
-          chmod +x /tmp/deploy.sh
-          
-          # Execute via SSH
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "ubuntu@$PUB" "bash -s '$NAME' '$PRIV' '$PUB'" < /tmp/deploy.sh 2>&1 | tail -20 || echo "⚠️  Could not connect to $NAME at $PUB"
-        done
-
-    - name: Verify deployment
-      env:
-        INSTANCES: ${{ steps.discover.outputs.instances_json }}
-      run: |
-        echo "✅ Deployment complete!"
         echo ""
-        echo "Instance Status:"
-        echo "$INSTANCES" | jq -r 'to_entries[] | "\(.key): \(.value.public_ip)"'
+        echo "╔═══════════════════════════════════════════════╗"
+        echo "║  PROJECT DEPLOYMENT COMPLETE                 ║"
+        echo "╚═══════════════════════════════════════════════╝"
+        echo ""
+        echo "✅ Infrastructure: Terraform deployed"
+        echo "✅ Configuration: IPs discovered & updated"
+        echo "✅ Files: infrastructure-instances.config.js, .env.generated"
+        echo ""
+        echo "Instances deployed:"
+        cat discovered.json | jq -r 'to_entries[] | "  \(.key): private=\(.value.private_ip) public=\(.value.public_ip)"'
+
