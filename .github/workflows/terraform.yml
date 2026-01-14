@@ -24,15 +24,24 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    - name: Debug - show repository and terraform folder
+    - name: Debug - show runner paths and terraform folder
       run: |
-        echo "Current directory:" && pwd
-        echo "\nListing repo root:" && ls -la
-        echo "\nListing 'terraform' directory:" && ls -la terraform || true
+        echo "Current directory: $(pwd)"
+        echo "Repo root content:"
+        ls -l
+        echo "\nParent directory content:"
+        ls -l ..
+        echo "\nTerraform directory content:"
+        ls -l terraform || echo "No terraform directory found!"
+        echo "\nFull path to terraform directory: $(realpath terraform || echo 'not found')"
 
     - name: Init
       working-directory: terraform
-      run: terraform init
+      run: |
+        if [ ! -d . ]; then
+          echo "ERROR: terraform directory not found in $(pwd)" && exit 1
+        fi
+        terraform init
 
     - name: Plan
       working-directory: terraform
