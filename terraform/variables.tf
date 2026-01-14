@@ -44,5 +44,11 @@ variable "existing_vpc_id" {
   description = "(Optional) If provided, Terraform will use this VPC instead of creating a new one."
   type        = string
   default     = ""
-}    
+}
+
+variable "create_vpc" {
+  description = "When true and existing_vpc_id is empty, Terraform will create a VPC. Default false for restricted lab environments."
+  type        = bool
+  default     = false
+}
 

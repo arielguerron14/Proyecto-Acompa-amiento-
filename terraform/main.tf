@@ -21,29 +21,24 @@ data "aws_availability_zones" "azs" {
   count = length(var.azs) == 0 ? 1 : 0
 }
 
-# Default VPC (opcional) - usado si no se quiere crear una VPC nueva
-data "aws_vpc" "default" {
-  count = var.existing_vpc_id == "" ? 1 : 0
+# Default VPC lookup disabled to avoid ec2:DescribeVpcs in restricted lab.
+# If you want to use an existing or default VPC, set TF_VAR_existing_vpc_id to the VPC id.
+# (We avoid querying default VPC because the lab's IAM forbids ec2:DescribeVpcs.)
+# (This data lookup was removed to prevent the workflow failing under restricted creds.)
 
-  filter {
-    name   = "is-default"
-    values = ["true"]
-  }
-}
-
-# Subnet ids for an existing/default VPC (opcional)
+# Subnet ids for an existing VPC (opcional)
 data "aws_subnets" "existing" {
-  count = var.existing_vpc_id != "" || length(data.aws_vpc.default) > 0 ? 1 : 0
+  count = var.existing_vpc_id != "" ? 1 : 0
 
   filter {
     name   = "vpc-id"
-    values = [ var.existing_vpc_id != "" ? var.existing_vpc_id : data.aws_vpc.default[0].id ]
+    values = [ var.existing_vpc_id ]
   }
 }
 
 # VPC
 resource "aws_vpc" "main" {
-  count                = var.existing_vpc_id == "" ? 1 : 0
+  count                = var.create_vpc && var.existing_vpc_id == "" ? 1 : 0
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
@@ -52,7 +47,7 @@ resource "aws_vpc" "main" {
 
 # Local VPC id (uses existing_vpc_id if provided)
 locals {
-  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : (length(aws_vpc.main) > 0 ? aws_vpc.main[0].id : (length(data.aws_vpc.default) > 0 ? data.aws_vpc.default[0].id : ""))
+  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : (length(aws_vpc.main) > 0 ? aws_vpc.main[0].id : "")
 }
 
 # Subnet id selection: prefer subnets created by this module, otherwise use existing subnets in the VPC
@@ -64,7 +59,7 @@ locals {
 
 # Subnets
 resource "aws_subnet" "public" {
-  for_each = var.existing_vpc_id == "" && length(data.aws_vpc.default) == 0 ? toset(var.public_subnets) : toset([])
+  for_each = var.existing_vpc_id == "" && var.create_vpc ? toset(var.public_subnets) : toset([])
 
   vpc_id                  = local.vpc_id
   cidr_block              = each.value
@@ -75,13 +70,13 @@ resource "aws_subnet" "public" {
 
 # Internet Gateway
 resource "aws_internet_gateway" "igw" {
-  count = var.existing_vpc_id == "" ? 1 : 0
+  count = var.create_vpc && var.existing_vpc_id == "" ? 1 : 0
   vpc_id = local.vpc_id
 }
 
 # Route Table
 resource "aws_route_table" "public" {
-  count  = var.existing_vpc_id == "" ? 1 : 0
+  count  = var.create_vpc && var.existing_vpc_id == "" ? 1 : 0
   vpc_id = local.vpc_id
 
   route {
