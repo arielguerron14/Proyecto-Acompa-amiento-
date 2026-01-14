@@ -14,6 +14,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Debug - show repo content after checkout
+      run: |
+        echo "Directorio actual: $(pwd)"
+        echo "Contenido del directorio actual:"
+        ls -l
+        echo "Contenido del padre:"
+        ls -l ..
+        echo "Contenido de ./terraform si existe:"
+        ls -l terraform || echo "No existe carpeta terraform"
+
     - uses: hashicorp/setup-terraform@v3
 
     - name: Configure AWS
