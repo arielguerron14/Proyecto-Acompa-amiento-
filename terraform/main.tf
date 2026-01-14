@@ -1,3 +1,4 @@
+# Trigger: cambio menor para ejecutar workflow
 provider "aws" {
   region = var.region
 }
@@ -99,8 +100,14 @@ EOF
 # 10 instancias EC2 fijas
 locals {
   instance_names = [
-    "ec2-01", "ec2-02", "ec2-03", "ec2-04", "ec2-05",
-    "ec2-06", "ec2-07", "ec2-08", "ec2-09", "ec2-10"
+    "EC2-API",
+    "EC2-Bastion",
+    "EC2-CORE",
+    "EC2-frontend",
+    "EC2-Messaging",
+    "EC2-Auth",
+    "EC2-Admin",
+    "EC2-DB"
   ]
 }
 
@@ -114,6 +121,6 @@ resource "aws_instance" "fixed" {
   user_data = local.user_data
   tags = {
     Name = each.key
-    Project = "lab-10-ec2"
+    Project = "lab-8-ec2"
   }
 }
