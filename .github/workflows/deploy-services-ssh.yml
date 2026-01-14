@@ -1,0 +1,279 @@
+name: Deploy Services via SSH
+
+on:
+  workflow_dispatch:
+    inputs:
+      instances:
+        description: 'Which instances to deploy to'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - frontend
+          - api-gateway
+          - core
+          - db
+          - messaging
+          - notificaciones
+          - reportes
+          - monitoring
+
+jobs:
+  deploy:
+    name: Deploy Docker Services
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to Frontend
+      if: ${{ inputs.instances == 'all' || inputs.instances == 'frontend' }}
+      env:
+        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        HOST: 44.220.126.89
+        USER: ubuntu
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        
+        echo "🚀 Deploying Frontend..."
+        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        set -e
+        echo "📦 Starting Frontend services..."
+        cd /home/ubuntu
+        if [ -d "Proyecto-Acompa-amiento-" ]; then
+          cd Proyecto-Acompa-amiento-
+          git pull
+        else
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+        fi
+        docker-compose -f docker-compose.frontend.yml up -d
+        docker ps
+        echo "✅ Frontend deployed"
+        EOF
+    
+    - name: Deploy to API Gateway
+      if: ${{ inputs.instances == 'all' || inputs.instances == 'api-gateway' }}
+      env:
+        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        HOST: 52.7.168.4
+        USER: ubuntu
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        
+        echo "🚀 Deploying API Gateway..."
+        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        set -e
+        echo "📦 Starting API Gateway services..."
+        cd /home/ubuntu
+        if [ -d "Proyecto-Acompa-amiento-" ]; then
+          cd Proyecto-Acompa-amiento-
+          git pull
+        else
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+        fi
+        docker-compose -f docker-compose.api-gateway.yml up -d
+        docker ps
+        echo "✅ API Gateway deployed"
+        EOF
+    
+    - name: Deploy to Core Services
+      if: ${{ inputs.instances == 'all' || inputs.instances == 'core' }}
+      env:
+        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        HOST: 13.222.63.75
+        USER: ubuntu
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        
+        echo "🚀 Deploying Core Services..."
+        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        set -e
+        echo "📦 Starting Core services..."
+        cd /home/ubuntu
+        if [ -d "Proyecto-Acompa-amiento-" ]; then
+          cd Proyecto-Acompa-amiento-
+          git pull
+        else
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+        fi
+        docker-compose -f docker-compose.core.yml up -d
+        docker ps
+        echo "✅ Core services deployed"
+        EOF
+    
+    - name: Deploy to Database
+      if: ${{ inputs.instances == 'all' || inputs.instances == 'db' }}
+      env:
+        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        HOST: 100.31.104.252
+        USER: ubuntu
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        
+        echo "🚀 Deploying Database..."
+        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        set -e
+        echo "📦 Starting Database services..."
+        cd /home/ubuntu
+        if [ -d "Proyecto-Acompa-amiento-" ]; then
+          cd Proyecto-Acompa-amiento-
+          git pull
+        else
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+        fi
+        docker-compose -f docker-compose.infrastructure.yml up -d
+        docker ps
+        echo "✅ Database deployed"
+        EOF
+    
+    - name: Deploy to Messaging
+      if: ${{ inputs.instances == 'all' || inputs.instances == 'messaging' }}
+      env:
+        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        HOST: 98.93.37.132
+        USER: ubuntu
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        
+        echo "🚀 Deploying Messaging..."
+        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        set -e
+        echo "📦 Starting Messaging services..."
+        cd /home/ubuntu
+        if [ -d "Proyecto-Acompa-amiento-" ]; then
+          cd Proyecto-Acompa-amiento-
+          git pull
+        else
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+        fi
+        docker-compose -f docker-compose.messaging.yml up -d
+        docker ps
+        echo "✅ Messaging deployed"
+        EOF
+    
+    - name: Deploy to Notificaciones
+      if: ${{ inputs.instances == 'all' || inputs.instances == 'notificaciones' }}
+      env:
+        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        HOST: 3.236.139.55
+        USER: ubuntu
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        
+        echo "🚀 Deploying Notificaciones..."
+        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        set -e
+        echo "📦 Starting Notificaciones services..."
+        cd /home/ubuntu
+        if [ -d "Proyecto-Acompa-amiento-" ]; then
+          cd Proyecto-Acompa-amiento-
+          git pull
+        else
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+        fi
+        docker-compose -f docker-compose.notificaciones.yml up -d
+        docker ps
+        echo "✅ Notificaciones deployed"
+        EOF
+    
+    - name: Deploy to Reportes
+      if: ${{ inputs.instances == 'all' || inputs.instances == 'reportes' }}
+      env:
+        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        HOST: 52.200.32.56
+        USER: ubuntu
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        
+        echo "🚀 Deploying Reportes..."
+        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        set -e
+        echo "📦 Starting Reportes services..."
+        cd /home/ubuntu
+        if [ -d "Proyecto-Acompa-amiento-" ]; then
+          cd Proyecto-Acompa-amiento-
+          git pull
+        else
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+        fi
+        docker-compose -f docker-compose.notificaciones.yml up -d
+        docker ps
+        echo "✅ Reportes deployed"
+        EOF
+    
+    - name: Deploy to Monitoring
+      if: ${{ inputs.instances == 'all' || inputs.instances == 'monitoring' }}
+      env:
+        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        HOST: 98.88.93.98
+        USER: ubuntu
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        
+        echo "🚀 Deploying Monitoring..."
+        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        set -e
+        echo "📦 Starting Monitoring services..."
+        cd /home/ubuntu
+        if [ -d "Proyecto-Acompa-amiento-" ]; then
+          cd Proyecto-Acompa-amiento-
+          git pull
+        else
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+          cd Proyecto-Acompa-amiento-
+        fi
+        docker-compose -f docker-compose.prod.yml up -d
+        docker ps
+        echo "✅ Monitoring deployed"
+        EOF
+    
+    - name: Summary
+      run: |
+        echo ""
+        echo "════════════════════════════════════════════════"
+        echo "✅ DEPLOYMENT COMPLETE"
+        echo "════════════════════════════════════════════════"
+        echo ""
+        echo "Services deployed to:"
+        echo "🌐 Frontend:        http://44.220.126.89"
+        echo "🔌 API Gateway:     http://52.7.168.4:8080"
+        echo "🔐 Core Services:   http://13.222.63.75:3000"
+        echo "💾 Database:        postgresql://100.31.104.252:5432"
+        echo "📢 Messaging:       98.93.37.132:5672"
+        echo "📧 Notificaciones:  http://3.236.139.55:5006"
+        echo "📊 Reportes:        http://52.200.32.56:5003"
+        echo "📈 Monitoring:      http://98.88.93.98:9090"
+        echo ""
+        echo "🔑 To check logs: ssh -i EC2_SSH_KEY ubuntu@<ip> 'docker logs -f <container>'"
