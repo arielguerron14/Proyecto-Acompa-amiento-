@@ -199,11 +199,27 @@ jobs:
         TF_VAR_azs: ${{ github.event.inputs.tf_var_azs || '["us-east-1a","us-east-1b"]' }}
       run: cd terraform && terraform plan -out=tfplan
 
-    - name: Clean up conflicting security group (if exists)
+    - name: Clean up conflicting resources (if exists)
       if: ${{ github.event.inputs.apply == 'true' }}
       run: |
-        # Try to delete the web-sg security group if it already exists (from failed previous runs)
         VPC_ID="${{ env.TF_VAR_existing_vpc_id }}"
+        
+        # Delete ALB if it exists
+        ALB_ARN=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?LoadBalancerName=='lab-alb'].LoadBalancerArn" --output text || true)
+        if [ ! -z "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
+          echo "Found existing ALB: $ALB_ARN"
+          aws elbv2 delete-load-balancer --load-balancer-arn "$ALB_ARN" 2>/dev/null && echo "Deleted ALB" || echo "Could not delete ALB"
+          sleep 10  # Wait for ALB deletion before deleting target group
+        fi
+        
+        # Delete target group if it exists
+        TG_ARN=$(aws elbv2 describe-target-groups --query "TargetGroups[?TargetGroupName=='lab-alb-web-tg'].TargetGroupArn" --output text || true)
+        if [ ! -z "$TG_ARN" ] && [ "$TG_ARN" != "None" ]; then
+          echo "Found existing target group: $TG_ARN"
+          aws elbv2 delete-target-group --target-group-arn "$TG_ARN" 2>/dev/null && echo "Deleted target group" || echo "Could not delete target group"
+        fi
+        
+        # Delete security group if it exists
         SG_ID=$(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID Name=group-name,Values=web-sg --query 'SecurityGroups[0].GroupId' --output text || true)
         if [ ! -z "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
           echo "Found existing security group: $SG_ID"
@@ -213,8 +229,6 @@ jobs:
           aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 0.0.0.0/0 2>/dev/null || true
           # Try to delete
           aws ec2 delete-security-group --group-id $SG_ID 2>/dev/null && echo "Deleted existing security group" || echo "Could not delete security group (may be in use)"
-        else
-          echo "No conflicting security group found"
         fi
 
     - name: Apply
