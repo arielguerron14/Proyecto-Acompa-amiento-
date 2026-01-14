@@ -165,6 +165,23 @@ jobs:
           aws elbv2 delete-target-group --target-group-arn "$TG_ARN" 2>/dev/null && echo "Deleted target group" || echo "Could not delete target group"
         fi
         
+        # Terminate EC2 instances with Project tag to free up security group
+        INSTANCE_IDS=$(aws ec2 describe-instances --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running,stopped" --query 'Reservations[*].Instances[*].InstanceId' --output text || true)
+        if [ ! -z "$INSTANCE_IDS" ]; then
+          echo "Found instances to terminate: $INSTANCE_IDS"
+          aws ec2 terminate-instances --instance-ids $INSTANCE_IDS 2>/dev/null && echo "Terminated instances" || echo "Could not terminate instances"
+          sleep 5  # Wait for instance termination
+        fi
+        
+        # Delete Elastic IPs if they exist
+        EIP_ALLOCS=$(aws ec2 describe-addresses --query 'Addresses[?Tags[?Key==`Project` && Value==`lab-8-ec2`]].AllocationId' --output text || true)
+        if [ ! -z "$EIP_ALLOCS" ]; then
+          echo "Found EIPs to delete: $EIP_ALLOCS"
+          for EIP_ID in $EIP_ALLOCS; do
+            aws ec2 release-address --allocation-id $EIP_ID 2>/dev/null && echo "Released EIP $EIP_ID" || echo "Could not release EIP $EIP_ID"
+          done
+        fi
+        
         # Delete security group by name (works across all VPCs)
         SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=web-sg --query 'SecurityGroups[0].GroupId' --output text || true)
         if [ ! -z "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
@@ -174,7 +191,7 @@ jobs:
           aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 80 --cidr 0.0.0.0/0 2>/dev/null || true
           aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 0.0.0.0/0 2>/dev/null || true
           # Try to delete
-          aws ec2 delete-security-group --group-id $SG_ID 2>/dev/null && echo "Deleted existing security group" || echo "Could not delete security group (may be in use)"
+          aws ec2 delete-security-group --group-id $SG_ID 2>/dev/null && echo "Deleted existing security group" || echo "Could not delete security group (may still be in use)"
         fi
 
     - name: Debug - show runner paths and terraform folder
