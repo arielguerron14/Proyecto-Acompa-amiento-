@@ -94,6 +94,7 @@ resource "aws_route_table_association" "public_assoc" {
 
 # Security Group
 resource "aws_security_group" "web_sg" {
+  count = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
   name   = "web-sg"
   vpc_id = local.vpc_id
 
@@ -151,7 +152,7 @@ resource "aws_instance" "fixed" {
   ami           = var.ami_id != "" ? var.ami_id : data.aws_ami.al2023[0].id
   instance_type = var.instance_type
   subnet_id     = length(local.subnet_ids) > 0 ? local.subnet_ids[0] : ""
-  vpc_security_group_ids = [aws_security_group.web_sg.id]
+  vpc_security_group_ids = var.existing_security_group_id != "" ? [var.existing_security_group_id] : (length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : [])
   associate_public_ip_address = true
   user_data = local.user_data
   tags = {

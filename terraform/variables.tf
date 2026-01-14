@@ -52,3 +52,15 @@ variable "create_vpc" {
   default     = false
 }
 
+variable "existing_security_group_id" {
+  description = "(Optional) If provided, Terraform will use this security group ID and will not attempt to create a security group."
+  type        = string
+  default     = ""
+}
+
+variable "create_security_group" {
+  description = "When true and existing_security_group_id is empty, Terraform will create a security group. Default false for restricted lab environments."
+  type        = bool
+  default     = false
+}
+
