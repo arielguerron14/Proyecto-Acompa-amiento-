@@ -246,8 +246,8 @@ jobs:
         TF_VAR_azs: ${{ matrix.target.tf_var_azs || github.event.inputs.tf_var_azs || '["us-east-1a","us-east-1b"]' }}
       run: |
         cd terraform && terraform plan -out=tfplan
-        mkdir -p artifact
-        mv terraform/tfplan artifact/tfplan-${{ matrix.target.name || matrix.target.region || env.AWS_REGION }}
+        mkdir -p ../artifact
+        mv tfplan ../artifact/tfplan-${{ matrix.target.name || matrix.target.region || env.AWS_REGION }}
 
     - name: Upload tfplan artifact
       uses: actions/upload-artifact@v4
