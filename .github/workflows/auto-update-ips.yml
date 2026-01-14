@@ -11,6 +11,10 @@ on:
         options:
           - 'true'
           - 'false'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/auto-update-ips.yml'
 
 jobs:
   discover-and-update:
