@@ -22,14 +22,19 @@ data "aws_availability_zones" "azs" {
 }
 
 # Default VPC (opcional) - usado si no se quiere crear una VPC nueva
-data "aws_default_vpc" "default" {
+data "aws_vpc" "default" {
   count = var.existing_vpc_id == "" ? 1 : 0
+
+  filter {
+    name   = "is-default"
+    values = ["true"]
+  }
 }
 
 # Subnet ids for an existing/default VPC (opcional)
 data "aws_subnet_ids" "existing" {
-  count = var.existing_vpc_id != "" || length(data.aws_default_vpc.default) > 0 ? 1 : 0
-  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : data.aws_default_vpc.default[0].id
+  count = var.existing_vpc_id != "" || length(data.aws_vpc.default) > 0 ? 1 : 0
+  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : data.aws_vpc.default[0].id
 }
 
 # VPC
@@ -43,7 +48,7 @@ resource "aws_vpc" "main" {
 
 # Local VPC id (uses existing_vpc_id if provided)
 locals {
-  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : (length(aws_vpc.main) > 0 ? aws_vpc.main[0].id : (length(data.aws_default_vpc.default) > 0 ? data.aws_default_vpc.default[0].id : ""))
+  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : (length(aws_vpc.main) > 0 ? aws_vpc.main[0].id : (length(data.aws_vpc.default) > 0 ? data.aws_vpc.default[0].id : ""))
 }
 
 # Subnet id selection: prefer subnets created by this module, otherwise use existing subnets in the VPC
@@ -55,7 +60,7 @@ locals {
 
 # Subnets
 resource "aws_subnet" "public" {
-  for_each = var.existing_vpc_id == "" && length(data.aws_default_vpc.default) == 0 ? toset(var.public_subnets) : {}
+  for_each = var.existing_vpc_id == "" && length(data.aws_vpc.default) == 0 ? toset(var.public_subnets) : {}
 
   vpc_id                  = local.vpc_id
   cidr_block              = each.value
