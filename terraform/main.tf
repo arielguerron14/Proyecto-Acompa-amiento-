@@ -174,6 +174,5 @@ resource "aws_instance" "fixed" {
 resource "aws_eip" "eip" {
   for_each = toset(var.eip_instances)
   instance = aws_instance.fixed[each.key].id
-  vpc = true
   depends_on = [aws_instance.fixed]
 } 
