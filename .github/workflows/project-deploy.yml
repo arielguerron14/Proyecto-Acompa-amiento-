@@ -37,14 +37,17 @@ jobs:
           INSTANCES=$(aws ec2 describe-instances \
             --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
             --query 'Reservations[*].Instances[*].[Tags[?Key==`Name`].Value|[0],PrivateIpAddress,PublicIpAddress]' \
-            --output json | jq -c 'flatten')
+            --output json)
+          
+          # Convert to compact object format
+          INSTANCES_MAP=$(echo "$INSTANCES" | jq -c '[.[][] | {name: .[0], private_ip: .[1], public_ip: .[2]}] | map({(.name): {private_ip, public_ip}}) | add')
           
           echo "Found instances:"
-          echo "$INSTANCES" | jq '.'
-          echo "instances=$INSTANCES" >> $GITHUB_OUTPUT
+          echo "$INSTANCES_MAP" | jq '.'
+          echo "instances=$INSTANCES_MAP" >> $GITHUB_OUTPUT
           
           # Get Bastion IP
-          BASTION=$(echo "$INSTANCES" | jq -r '.[] | select(.[0]=="EC-Bastion") | .[2]')
+          BASTION=$(echo "$INSTANCES_MAP" | jq -r '.["EC-Bastion"].public_ip // "unknown"')
           echo "bastion=$BASTION" >> $GITHUB_OUTPUT
           echo "Bastion IP: $BASTION"
 
@@ -58,9 +61,9 @@ jobs:
         run: |
           INSTANCES='${{ needs.discover.outputs.instances }}'
           echo "Verifying connectivity to instances..."
-          echo "$INSTANCES" | jq -r '.[] | "\(.[0]): \(.[2])"'
+          echo "$INSTANCES" | jq 'to_entries[] | "\(.key): \(.value.public_ip)"' -r
           
-          echo "$INSTANCES" | jq -r '.[] | .[2]' | while read IP; do
+          echo "$INSTANCES" | jq -r 'to_entries[] | .value.public_ip' | while read IP; do
             [ -z "$IP" ] && continue
             echo "Testing $IP..."
             for PORT in 22 80 443 8080; do
