@@ -27,20 +27,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Deploy to Frontend
-      if: ${{ inputs.instances == 'all' || inputs.instances == 'frontend' }}
-      env:
-        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        HOST: 44.220.126.89
-        USER: ubuntu
+    - name: Setup SSH
       run: |
         mkdir -p ~/.ssh
-        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        chmod 700 ~/.ssh
+    
+    - name: Deploy to Frontend
+      if: ${{ inputs.instances == 'all' || inputs.instances == 'frontend' }}
+      run: |
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh-keyscan -H 44.220.126.89 >> ~/.ssh/known_hosts 2>/dev/null || true
         
         echo "🚀 Deploying Frontend..."
-        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@44.220.126.89 << 'EOF'
         set -e
         echo "📦 Starting Frontend services..."
         cd /home/ubuntu
@@ -58,18 +58,13 @@ jobs:
     
     - name: Deploy to API Gateway
       if: ${{ inputs.instances == 'all' || inputs.instances == 'api-gateway' }}
-      env:
-        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        HOST: 52.7.168.4
-        USER: ubuntu
       run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh-keyscan -H 52.7.168.4 >> ~/.ssh/known_hosts 2>/dev/null || true
         
         echo "🚀 Deploying API Gateway..."
-        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@52.7.168.4 << 'EOF'
         set -e
         echo "📦 Starting API Gateway services..."
         cd /home/ubuntu
@@ -87,18 +82,13 @@ jobs:
     
     - name: Deploy to Core Services
       if: ${{ inputs.instances == 'all' || inputs.instances == 'core' }}
-      env:
-        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        HOST: 13.222.63.75
-        USER: ubuntu
       run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh-keyscan -H 13.222.63.75 >> ~/.ssh/known_hosts 2>/dev/null || true
         
         echo "🚀 Deploying Core Services..."
-        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@13.222.63.75 << 'EOF'
         set -e
         echo "📦 Starting Core services..."
         cd /home/ubuntu
@@ -116,18 +106,13 @@ jobs:
     
     - name: Deploy to Database
       if: ${{ inputs.instances == 'all' || inputs.instances == 'db' }}
-      env:
-        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        HOST: 100.31.104.252
-        USER: ubuntu
       run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh-keyscan -H 100.31.104.252 >> ~/.ssh/known_hosts 2>/dev/null || true
         
         echo "🚀 Deploying Database..."
-        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@100.31.104.252 << 'EOF'
         set -e
         echo "📦 Starting Database services..."
         cd /home/ubuntu
@@ -145,18 +130,13 @@ jobs:
     
     - name: Deploy to Messaging
       if: ${{ inputs.instances == 'all' || inputs.instances == 'messaging' }}
-      env:
-        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        HOST: 98.93.37.132
-        USER: ubuntu
       run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh-keyscan -H 98.93.37.132 >> ~/.ssh/known_hosts 2>/dev/null || true
         
         echo "🚀 Deploying Messaging..."
-        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@98.93.37.132 << 'EOF'
         set -e
         echo "📦 Starting Messaging services..."
         cd /home/ubuntu
@@ -174,18 +154,13 @@ jobs:
     
     - name: Deploy to Notificaciones
       if: ${{ inputs.instances == 'all' || inputs.instances == 'notificaciones' }}
-      env:
-        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        HOST: 3.236.139.55
-        USER: ubuntu
       run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh-keyscan -H 3.236.139.55 >> ~/.ssh/known_hosts 2>/dev/null || true
         
         echo "🚀 Deploying Notificaciones..."
-        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@3.236.139.55 << 'EOF'
         set -e
         echo "📦 Starting Notificaciones services..."
         cd /home/ubuntu
@@ -203,18 +178,13 @@ jobs:
     
     - name: Deploy to Reportes
       if: ${{ inputs.instances == 'all' || inputs.instances == 'reportes' }}
-      env:
-        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        HOST: 52.200.32.56
-        USER: ubuntu
       run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh-keyscan -H 52.200.32.56 >> ~/.ssh/known_hosts 2>/dev/null || true
         
         echo "🚀 Deploying Reportes..."
-        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@52.200.32.56 << 'EOF'
         set -e
         echo "📦 Starting Reportes services..."
         cd /home/ubuntu
@@ -232,18 +202,13 @@ jobs:
     
     - name: Deploy to Monitoring
       if: ${{ inputs.instances == 'all' || inputs.instances == 'monitoring' }}
-      env:
-        SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        HOST: 98.88.93.98
-        USER: ubuntu
       run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_KEY" > ~/.ssh/id_rsa
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh-keyscan -H 98.88.93.98 >> ~/.ssh/known_hosts 2>/dev/null || true
         
         echo "🚀 Deploying Monitoring..."
-        ssh -i ~/.ssh/id_rsa $USER@$HOST << 'EOF'
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@98.88.93.98 << 'EOF'
         set -e
         echo "📦 Starting Monitoring services..."
         cd /home/ubuntu
