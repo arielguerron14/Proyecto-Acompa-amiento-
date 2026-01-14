@@ -170,16 +170,20 @@ jobs:
         if [ ! -z "$INSTANCE_IDS" ]; then
           echo "Found instances to terminate: $INSTANCE_IDS"
           aws ec2 terminate-instances --instance-ids $INSTANCE_IDS 2>/dev/null && echo "Terminated instances" || echo "Could not terminate instances"
-          sleep 15  # Wait for instances to fully terminate and release resources
+          sleep 20  # Wait longer for instances to fully terminate and release resources
         fi
         
-        # Delete Elastic IPs if they exist
-        EIP_ALLOCS=$(aws ec2 describe-addresses --query 'Addresses[?Tags[?Key==`Project` && Value==`lab-8-ec2`]].AllocationId' --output text || true)
+        # Release ALL unassociated EIPs in the account (not associated with any instance)
+        echo "Releasing unassociated EIPs..."
+        EIP_ALLOCS=$(aws ec2 describe-addresses --query 'Addresses[?AssociationId==null].AllocationId' --output text || true)
         if [ ! -z "$EIP_ALLOCS" ]; then
-          echo "Found EIPs to delete: $EIP_ALLOCS"
+          echo "Found unassociated EIPs to release: $EIP_ALLOCS"
           for EIP_ID in $EIP_ALLOCS; do
+            echo "Releasing EIP: $EIP_ID"
             aws ec2 release-address --allocation-id $EIP_ID 2>/dev/null && echo "Released EIP $EIP_ID" || echo "Could not release EIP $EIP_ID"
           done
+        else
+          echo "No unassociated EIPs found"
         fi
         
         # Delete security group by name (works across all VPCs)
