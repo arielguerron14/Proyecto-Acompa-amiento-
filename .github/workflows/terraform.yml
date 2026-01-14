@@ -188,7 +188,6 @@ jobs:
 
     - name: Plan
       env:
-        TF_VAR_ami_id: ${{ github.event.inputs.tf_var_ami_id || 'ami-0c19292331f6e3a5c' }}
         TF_VAR_azs: ${{ github.event.inputs.tf_var_azs || '["us-east-1a","us-east-1b"]' }}
       run: cd terraform && terraform plan -out=tfplan
 
@@ -263,7 +262,7 @@ jobs:
         echo "Terraform directory content:" 
         ls -l terraform || echo "No terraform directory found!"
 
-    - name: Detect VPC, Subnet (us-east-1f) and keypair
+    - name: Detect VPC, Subnet (us-east-1f), keypair, and AMI
       run: |
         # Try to read inventory artifact if present
         if [ -f artifact/vpcs.json ]; then
@@ -280,6 +279,13 @@ jobs:
         echo "Found Subnet: $SUBNET_ID"
         KEY_NAME=$(aws ec2 describe-key-pairs --query 'KeyPairs[0].KeyName' --output text || true)
         echo "Found KeyPair: $KEY_NAME"
+        # Lookup latest Canonical Ubuntu 24.04 AMI in us-east-1
+        AMI_ID=$(aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-noble-24.04-amd64-server-*" --region us-east-1 --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text || true)
+        if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "None" ]; then
+          # Fallback: use a generic Ubuntu AMI query
+          AMI_ID=$(aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-*-amd64-server-*" --region us-east-1 --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text || true)
+        fi
+        echo "Found Ubuntu AMI: $AMI_ID"
         echo "TF_VAR_existing_vpc_id=$VPC_ID" >> $GITHUB_ENV
         echo "TF_VAR_subnet_id=$SUBNET_ID" >> $GITHUB_ENV
         echo "TF_VAR_ssh_key_name=$KEY_NAME" >> $GITHUB_ENV
@@ -287,6 +293,7 @@ jobs:
         echo "TF_VAR_instance_type=t3.small" >> $GITHUB_ENV
         echo "TF_VAR_create_instances=true" >> $GITHUB_ENV
         echo "TF_VAR_create_security_group=true" >> $GITHUB_ENV
+        echo "TF_VAR_ami_id=$AMI_ID" >> $GITHUB_ENV
         echo "TF_VAR_eip_instances=[\"EC-Bastion\",\"EC2-Frontend\",\"EC2-API-Gateway\",\"EC2-Reportes\",\"EC2-Monitoring\"]" >> $GITHUB_ENV
 
     - name: Init
@@ -294,7 +301,6 @@ jobs:
 
     - name: Plan
       env:
-        TF_VAR_ami_id: ${{ matrix.target.tf_var_ami_id || github.event.inputs.tf_var_ami_id || 'ami-0c19292331f6e3a5c' }}
         TF_VAR_azs: ${{ matrix.target.tf_var_azs || github.event.inputs.tf_var_azs || '["us-east-1a","us-east-1b"]' }}
       run: |
         cd terraform && terraform plan -out=tfplan
