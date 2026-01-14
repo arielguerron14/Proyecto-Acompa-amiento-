@@ -1,3 +1,4 @@
+# Trigger: push para ejecutar workflow tras credenciales
 # Trigger: cambio menor para ejecutar workflow
 provider "aws" {
   region = var.region
