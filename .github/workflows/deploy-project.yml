@@ -24,40 +24,33 @@ jobs:
         set -e
         echo "🔍 Discovering EC2 instances..."
         
-        # Query instances
+        # Query instances with detailed output for debugging
         INSTANCES=$(aws ec2 describe-instances \
           --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
-          --query 'Reservations[*].Instances[*].[
-            Tags[?Key==`Name`].Value|[0],
-            InstanceId,
-            PrivateIpAddress,
-            PublicIpAddress
-          ]' \
+          --query 'Reservations[*].Instances[*].{
+            name: Tags[?Key==`Name`]|[0].Value,
+            instance_id: InstanceId,
+            private_ip: PrivateIpAddress,
+            public_ip: PublicIpAddress
+          }' \
           --output json)
+        
+        echo "Raw instances data:"
+        echo "$INSTANCES"
         
         # Query Elastic IPs
         ELASTIC_IPS=$(aws ec2 describe-addresses \
           --query 'Addresses[*].[InstanceId,PublicIp]' \
           --output json)
         
-        # Process data
-        INSTANCE_MAP=$(echo "$INSTANCES" | jq -c '
-          [.[][] | select(.[0] != null)] |
-          map({
-            name: .[0],
-            instance_id: .[1],
-            private_ip: .[2],
-            public_ip: (.[3] // .[2])
-          })
-        ')
+        echo "Elastic IPs data:"
+        echo "$ELASTIC_IPS"
         
-        ENRICHED=$(echo "$INSTANCE_MAP" | jq \
-          --argjson eips "$ELASTIC_IPS" '
-          map(
-            .instance_id as $id |
-            .elastic_ip = ($eips[] | select(.[0] == $id) | .[1]) // .public_ip |
-            {(.name): .}
-          ) | add
+        # Process data - flatten array and process
+        ENRICHED=$(echo "$INSTANCES" | jq -c '
+          [.[][] // empty] |
+          map(select(.name != null)) |
+          map({(.name): .}) | add
         ')
         
         echo "✅ Discovered instances:"
@@ -72,43 +65,40 @@ jobs:
         module.exports = INSTANCES_PLACEHOLDER;
         EOF
         
-        ESCAPED=$(echo "$ENRICHED" | sed 's/"/\\"/g' | tr '\n' ' ')
+        ESCAPED=$(echo "$ENRICHED" | jq -c '.' | sed 's/"/\\"/g')
         sed -i "s|INSTANCES_PLACEHOLDER|$ESCAPED|g" infrastructure-instances.config.js
         
-        # Generate .env file
+        # Generate .env file from ENRICHED data
         echo "✅ Generating .env file..."
         
-        FRONTEND=$(echo "$ENRICHED" | jq -r '.["EC2-Frontend"] | "\(.private_ip),\(.public_ip)"')
-        API=$(echo "$ENRICHED" | jq -r '.["EC2-API-Gateway"] | "\(.private_ip),\(.public_ip)"')
-        CORE=$(echo "$ENRICHED" | jq -r '.["EC2-CORE"] | "\(.private_ip),\(.public_ip)"')
-        DB=$(echo "$ENRICHED" | jq -r '.["EC2-DB"] | "\(.private_ip),\(.public_ip)"')
-        MSG=$(echo "$ENRICHED" | jq -r '.["EC2-Messaging"] | "\(.private_ip),\(.public_ip)"')
-        BASTION=$(echo "$ENRICHED" | jq -r '.["EC-Bastion"] | "\(.public_ip)"')
-        
-        IFS=',' read -r FE_PRIV FE_PUB <<< "$FRONTEND"
-        IFS=',' read -r API_PRIV API_PUB <<< "$API"
-        IFS=',' read -r CORE_PRIV CORE_PUB <<< "$CORE"
-        IFS=',' read -r DB_PRIV DB_PUB <<< "$DB"
-        IFS=',' read -r MSG_PRIV MSG_PUB <<< "$MSG"
+        # Extract IPs safely
+        FE_PUB=$(echo "$ENRICHED" | jq -r '.["EC2-Frontend"].public_ip // "unknown"' 2>/dev/null || echo "unknown")
+        API_PUB=$(echo "$ENRICHED" | jq -r '.["EC2-API-Gateway"].public_ip // "unknown"' 2>/dev/null || echo "unknown")
+        CORE_PUB=$(echo "$ENRICHED" | jq -r '.["EC2-CORE"].public_ip // "unknown"' 2>/dev/null || echo "unknown")
+        DB_PUB=$(echo "$ENRICHED" | jq -r '.["EC2-DB"].public_ip // "unknown"' 2>/dev/null || echo "unknown")
+        MSG_PUB=$(echo "$ENRICHED" | jq -r '.["EC2-Messaging"].public_ip // "unknown"' 2>/dev/null || echo "unknown")
+        NOT_PUB=$(echo "$ENRICHED" | jq -r '.["EC2-Notificaciones"].public_ip // "unknown"' 2>/dev/null || echo "unknown")
+        REP_PUB=$(echo "$ENRICHED" | jq -r '.["EC2-Reportes"].public_ip // "unknown"' 2>/dev/null || echo "unknown")
+        MON_PUB=$(echo "$ENRICHED" | jq -r '.["EC2-Monitoring"].public_ip // "unknown"' 2>/dev/null || echo "unknown")
+        BAS_PUB=$(echo "$ENRICHED" | jq -r '.["EC-Bastion"].public_ip // "unknown"' 2>/dev/null || echo "unknown")
         
         cat > .env.generated << ENVEOF
         # Auto-generated environment variables
         # Timestamp: $(date -u)
-        FRONTEND_PRIVATE=$FE_PRIV
-        FRONTEND_PUBLIC=$FE_PUB
-        API_PRIVATE=$API_PRIV
-        API_PUBLIC=$API_PUB
-        CORE_PRIVATE=$CORE_PRIV
-        CORE_PUBLIC=$CORE_PUB
-        DB_PRIVATE=$DB_PRIV
-        DB_PUBLIC=$DB_PUB
-        MESSAGING_PRIVATE=$MSG_PRIV
-        DATABASE_HOST=$DB_PRIV
-        DATABASE_URL=postgresql://user:pass@$DB_PRIV:5432/acompanamiento
-        RABBITMQ_HOST=$MSG_PRIV
-        API_GATEWAY_HOST=$API_PRIV
-        CORE_SERVICE_HOST=$CORE_PRIV
-        BASTION_HOST=$BASTION
+        FRONTEND_IP=$FE_PUB
+        API_GATEWAY_IP=$API_PUB
+        CORE_IP=$CORE_PUB
+        DB_IP=$DB_PUB
+        MESSAGING_IP=$MSG_PUB
+        NOTIFICACIONES_IP=$NOT_PUB
+        REPORTES_IP=$REP_PUB
+        MONITORING_IP=$MON_PUB
+        BASTION_IP=$BAS_PUB
+        DATABASE_URL=postgresql://postgres:postgres@$DB_PUB:5432/acompanamiento
+        RABBITMQ_HOST=$MSG_PUB
+        API_GATEWAY_HOST=$API_PUB
+        CORE_SERVICE_HOST=$CORE_PUB
+        BASTION_HOST=$BAS_PUB
         BASTION_USER=ubuntu
         ENVEOF
         
