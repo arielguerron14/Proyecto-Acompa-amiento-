@@ -1,0 +1,167 @@
+name: Deploy Project
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Services
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Discover instances
+      id: discover
+      run: |
+        echo "🔍 Discovering instances..."
+        
+        INSTANCES=$(aws ec2 describe-instances \
+          --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
+          --query 'Reservations[*].Instances[*].[
+            Tags[?Key==`Name`].Value|[0],
+            InstanceId,
+            PrivateIpAddress,
+            PublicIpAddress
+          ]' \
+          --output json)
+        
+        ELASTIC_IPS=$(aws ec2 describe-addresses \
+          --query 'Addresses[*].[InstanceId,PublicIp]' \
+          --output json)
+        
+        ENRICHED=$(echo "$INSTANCES" | jq \
+          --argjson eips "$ELASTIC_IPS" '
+          [.[][] | select(.[0] != null)] |
+          map({
+            name: .[0],
+            instance_id: .[1],
+            private_ip: .[2],
+            public_ip: (.[3] // .[2])
+          }) |
+          map(
+            .instance_id as $id |
+            .elastic_ip = ($eips[] | select(.[0] == $id) | .[1]) // .public_ip |
+            {(.name): .}
+          ) | add
+        ')
+        
+        echo "instances_json=$(echo "$ENRICHED" | jq -c '.')" >> $GITHUB_OUTPUT
+        
+        echo "✅ Discovered:"
+        echo "$ENRICHED" | jq 'keys[]' -r
+
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KEY_EC2 }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+
+    - name: Deploy services to all instances
+      env:
+        INSTANCES: ${{ steps.discover.outputs.instances_json }}
+      run: |
+        BASTION_IP=$(echo "$INSTANCES" | jq -r '.["EC-Bastion"].public_ip // "34.194.48.73"')
+        
+        # Deploy to each instance
+        echo "$INSTANCES" | jq -r 'to_entries[] | "\(.key)|\(.value.private_ip)|\(.value.public_ip)"' | while IFS='|' read NAME PRIV PUB; do
+          [ -z "$NAME" ] && continue
+          
+          echo ""
+          echo "========================================="
+          echo "Deploying to $NAME ($PUB)"
+          echo "========================================="
+          
+          # Create deployment script
+          cat > /tmp/deploy.sh << 'DEPLOY_SCRIPT'
+        #!/bin/bash
+        set -e
+        INSTANCE_NAME=$1
+        PRIVATE_IP=$2
+        PUBLIC_IP=$3
+        
+        echo "[$(date)] Deploying $INSTANCE_NAME..."
+        
+        # Update system
+        sudo apt-get update -y 2>&1 | tail -3
+        
+        # Install Docker
+        if ! command -v docker &> /dev/null; then
+          echo "Installing Docker..."
+          sudo apt-get install -y docker.io 2>&1 | tail -3
+          sudo systemctl enable docker
+          sudo systemctl start docker
+          sudo usermod -aG docker ubuntu
+        fi
+        
+        # Install Docker Compose
+        if ! command -v docker-compose &> /dev/null; then
+          echo "Installing Docker Compose..."
+          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose 2>/dev/null
+          sudo chmod +x /usr/local/bin/docker-compose
+        fi
+        
+        # Clone repo
+        if [ ! -d "/home/ubuntu/app" ]; then
+          cd /home/ubuntu
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git app
+        fi
+        
+        cd /home/ubuntu/app
+        git pull origin main
+        
+        # Find and run appropriate docker-compose file
+        case $INSTANCE_NAME in
+          EC2-Frontend)
+            [ -f docker-compose.frontend.yml ] && docker-compose -f docker-compose.frontend.yml up -d
+            ;;
+          EC2-API-Gateway)
+            [ -f docker-compose.api-gateway.yml ] && docker-compose -f docker-compose.api-gateway.yml up -d
+            ;;
+          EC2-CORE)
+            [ -f docker-compose.core.yml ] && docker-compose -f docker-compose.core.yml up -d
+            ;;
+          EC2-DB)
+            [ -f docker-compose.infrastructure.yml ] && docker-compose -f docker-compose.infrastructure.yml up -d
+            ;;
+          EC2-Messaging)
+            [ -f docker-compose.messaging.yml ] && docker-compose -f docker-compose.messaging.yml up -d
+            ;;
+          EC2-Notificaciones)
+            [ -f docker-compose.notificaciones.yml ] && docker-compose -f docker-compose.notificaciones.yml up -d
+            ;;
+          EC2-Reportes)
+            [ -f docker-compose.reportes.yml ] && docker-compose -f docker-compose.reportes.yml up -d
+            ;;
+          EC2-Monitoring)
+            [ -f docker-compose.infrastructure.yml ] && docker-compose -f docker-compose.infrastructure.yml up -d
+            ;;
+        esac
+        
+        echo "[$(date)] Deployment completed for $INSTANCE_NAME"
+        docker ps -a 2>/dev/null | grep -E "^CONTAINER|$INSTANCE_NAME" || true
+        DEPLOY_SCRIPT
+          
+          chmod +x /tmp/deploy.sh
+          
+          # Execute via SSH
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "ubuntu@$PUB" "bash -s '$NAME' '$PRIV' '$PUB'" < /tmp/deploy.sh 2>&1 | tail -20 || echo "⚠️  Could not connect to $NAME at $PUB"
+        done
+
+    - name: Verify deployment
+      env:
+        INSTANCES: ${{ steps.discover.outputs.instances_json }}
+      run: |
+        echo "✅ Deployment complete!"
+        echo ""
+        echo "Instance Status:"
+        echo "$INSTANCES" | jq -r 'to_entries[] | "\(.key): \(.value.public_ip)"'
