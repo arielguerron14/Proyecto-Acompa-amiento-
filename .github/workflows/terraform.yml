@@ -33,6 +33,10 @@ on:
         description: 'Environment name (e.g., dev, staging, prod). Jobs using this environment will be gated by environment protection rules if configured.'
         required: false
         default: 'staging'
+      deploy_targets:
+        description: 'JSON array of deploy targets. Example: [{"name":"acct-a","role_arn":"arn:aws:iam::123456789012:role/DeployRole","region":"us-east-1","tf_var_ami_id":"ami-...","tf_var_azs":"[\"us-east-1a\"]"}]'
+        required: false
+        default: ''
 
 jobs:
   inventory:
@@ -165,3 +169,94 @@ jobs:
     - name: Apply
       if: ${{ github.event.inputs.apply == 'true' }}
       run: cd terraform && terraform apply -auto-approve tfplan
+
+  deploy-matrix:
+    runs-on: ubuntu-latest
+    needs: inventory
+    if: ${{ github.event.inputs.deploy_targets != '' && github.event.inputs.run_terraform == 'true' }}
+    environment: ${{ github.event.inputs.environment }}
+    strategy:
+      matrix:
+        target: ${{ fromJson(github.event.inputs.deploy_targets) }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Assume role (per target)
+      id: assume_matrix
+      env:
+        ROLE_ARN: ${{ matrix.target.role_arn }}
+        DEFAULT_REGION: ${{ github.event.inputs.deploy_region || 'us-east-1' }}
+      run: |
+        if [ -z "$ROLE_ARN" ] || [ "$ROLE_ARN" = "null" ]; then
+          echo "No role ARN for target - will use repo secrets"
+          echo "aws_access_key_id=" >> $GITHUB_OUTPUT
+          echo "aws_secret_access_key=" >> $GITHUB_OUTPUT
+          echo "aws_session_token=" >> $GITHUB_OUTPUT
+        else
+          echo "Assuming role $ROLE_ARN"
+          CREDS=$(aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "gh-matrix" --duration-seconds 3600 --output json)
+          AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.Credentials.AccessKeyId')
+          AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.Credentials.SecretAccessKey')
+          AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.Credentials.SessionToken')
+          echo "aws_access_key_id=$AWS_ACCESS_KEY_ID" >> $GITHUB_OUTPUT
+          echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_OUTPUT
+          echo "aws_session_token=$AWS_SESSION_TOKEN" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Set AWS creds (assumed or repo secrets)
+      run: |
+        echo "AWS_ACCESS_KEY_ID=${{ needs.deploy-matrix.outputs.aws_access_key_id || steps.assume_matrix.outputs.aws_access_key_id || secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+        echo "AWS_SECRET_ACCESS_KEY=${{ needs.deploy-matrix.outputs.aws_secret_access_key || steps.assume_matrix.outputs.aws_secret_access_key || secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+        echo "AWS_SESSION_TOKEN=${{ needs.deploy-matrix.outputs.aws_session_token || steps.assume_matrix.outputs.aws_session_token || secrets.AWS_SESSION_TOKEN }}" >> $GITHUB_ENV
+        TARGET_REGION="${{ matrix.target.region || github.event.inputs.deploy_region || 'us-east-1' }}"
+        echo "AWS_REGION=${TARGET_REGION}" >> $GITHUB_ENV
+
+    - name: Show target info
+      run: |
+        echo "Target name: ${{ matrix.target.name }}"
+        echo "Target role_arn: ${{ matrix.target.role_arn }}"
+        echo "Target region: ${{ matrix.target.region || github.event.inputs.deploy_region || 'us-east-1' }}"
+
+    - uses: hashicorp/setup-terraform@v3
+
+    - name: Configure AWS (for terraform)
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Debug - show terraform dir
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Terraform directory content:" 
+        ls -l terraform || echo "No terraform directory found!"
+
+    - name: Init
+      run: cd terraform && terraform init
+
+    - name: Plan
+      env:
+        TF_VAR_ami_id: ${{ matrix.target.tf_var_ami_id || github.event.inputs.tf_var_ami_id || 'ami-0c19292331f6e3a5c' }}
+        TF_VAR_azs: ${{ matrix.target.tf_var_azs || github.event.inputs.tf_var_azs || '["us-east-1a","us-east-1b"]' }}
+      run: |
+        cd terraform && terraform plan -out=tfplan
+        mkdir -p artifact
+        mv terraform/tfplan artifact/tfplan-${{ matrix.target.name || matrix.target.region || env.AWS_REGION }}
+
+    - name: Upload tfplan artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: tfplan-${{ matrix.target.name || matrix.target.region || env.AWS_REGION }}
+        path: artifact/tfplan-${{ matrix.target.name || matrix.target.region || env.AWS_REGION }}
+
+    - name: Apply (per target)
+      if: ${{ github.event.inputs.apply == 'true' }}
+      run: |
+        cd terraform && terraform apply -auto-approve tfplan
+
