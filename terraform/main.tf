@@ -36,7 +36,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = each.value
   map_public_ip_on_launch = true
-  availability_zone       = length(var.azs) > 0 ? var.azs[0] : data.aws_availability_zones.azs.names[0]
+  availability_zone       = length(var.azs) > 0 ? var.azs[0] : data.aws_availability_zones.azs[0].names[0]
   tags = { Name = "public-${each.value}" }
 }
 
