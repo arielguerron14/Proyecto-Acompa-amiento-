@@ -23,17 +23,23 @@ data "aws_availability_zones" "azs" {
 
 # VPC
 resource "aws_vpc" "main" {
+  count                = var.existing_vpc_id == "" ? 1 : 0
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
   tags = { Name = "lab-vpc" }
 }
 
+# Local VPC id (uses existing_vpc_id if provided)
+locals {
+  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : (length(aws_vpc.main) > 0 ? aws_vpc.main[0].id : "")
+}
+
 # Subnets
 resource "aws_subnet" "public" {
   for_each = toset(var.public_subnets)
 
-  vpc_id                  = aws_vpc.main.id
+  vpc_id                  = local.vpc_id
   cidr_block              = each.value
   map_public_ip_on_launch = true
   availability_zone       = length(var.azs) > 0 ? var.azs[0] : data.aws_availability_zones.azs[0].names[0]
@@ -42,16 +48,18 @@ resource "aws_subnet" "public" {
 
 # Internet Gateway
 resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main.id
+  count = var.existing_vpc_id == "" ? 1 : 0
+  vpc_id = local.vpc_id
 }
 
 # Route Table
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
+  count  = var.existing_vpc_id == "" ? 1 : 0
+  vpc_id = local.vpc_id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
+    gateway_id = aws_internet_gateway.igw[0].id
   }
 }
 
@@ -59,13 +67,13 @@ resource "aws_route_table" "public" {
 resource "aws_route_table_association" "public_assoc" {
   for_each       = aws_subnet.public
   subnet_id      = each.value.id
-  route_table_id = aws_route_table.public.id
+  route_table_id = aws_route_table.public[0].id
 }
 
 # Security Group
 resource "aws_security_group" "web_sg" {
   name   = "web-sg"
-  vpc_id = aws_vpc.main.id
+  vpc_id = local.vpc_id
 
   ingress {
     from_port   = 80

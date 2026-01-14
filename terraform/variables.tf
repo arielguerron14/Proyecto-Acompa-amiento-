@@ -38,5 +38,11 @@ variable "azs" {
   description = "List of AZ names to use (optional). If empty, a data lookup will be used."
   type        = list(string)
   default     = ["us-east-1a", "us-east-1b"]
-}     
+}
+
+variable "existing_vpc_id" {
+  description = "(Optional) If provided, Terraform will use this VPC instead of creating a new one."
+  type        = string
+  default     = ""
+}    
 
