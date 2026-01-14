@@ -32,9 +32,13 @@ data "aws_vpc" "default" {
 }
 
 # Subnet ids for an existing/default VPC (opcional)
-data "aws_subnet_ids" "existing" {
+data "aws_subnets" "existing" {
   count = var.existing_vpc_id != "" || length(data.aws_vpc.default) > 0 ? 1 : 0
-  vpc_id = var.existing_vpc_id != "" ? var.existing_vpc_id : data.aws_vpc.default[0].id
+
+  filter {
+    name   = "vpc-id"
+    values = [ var.existing_vpc_id != "" ? var.existing_vpc_id : data.aws_vpc.default[0].id ]
+  }
 }
 
 # VPC
@@ -54,13 +58,13 @@ locals {
 # Subnet id selection: prefer subnets created by this module, otherwise use existing subnets in the VPC
 locals {
   created_subnet_ids = length(aws_subnet.public) > 0 ? [for s in aws_subnet.public : s.id] : []
-  existing_subnet_ids = length(data.aws_subnet_ids.existing) > 0 ? data.aws_subnet_ids.existing[0].ids : []
+  existing_subnet_ids = length(data.aws_subnets.existing) > 0 ? data.aws_subnets.existing[0].ids : []
   subnet_ids = length(local.created_subnet_ids) > 0 ? local.created_subnet_ids : local.existing_subnet_ids
 }
 
 # Subnets
 resource "aws_subnet" "public" {
-  for_each = var.existing_vpc_id == "" && length(data.aws_vpc.default) == 0 ? toset(var.public_subnets) : {}
+  for_each = var.existing_vpc_id == "" && length(data.aws_vpc.default) == 0 ? toset(var.public_subnets) : toset([])
 
   vpc_id                  = local.vpc_id
   cidr_block              = each.value
