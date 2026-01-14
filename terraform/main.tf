@@ -4,8 +4,9 @@ provider "aws" {
   region = var.region
 }
 
-# AMI oficial Amazon Linux 2023 (sin IAM)
+# AMI oficial Amazon Linux 2023 (opcional: se usa si var.ami_id no está especificada)
 data "aws_ami" "al2023" {
+  count       = var.ami_id == "" ? 1 : 0
   most_recent = true
   owners      = ["amazon"]
 
@@ -15,7 +16,10 @@ data "aws_ami" "al2023" {
   }
 }
 
-data "aws_availability_zones" "azs" {}
+# AZ lookup opcional (usar var.azs si se pasa desde CI)
+data "aws_availability_zones" "azs" {
+  count = length(var.azs) == 0 ? 1 : 0
+}
 
 # VPC
 resource "aws_vpc" "main" {
@@ -32,7 +36,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = each.value
   map_public_ip_on_launch = true
-  availability_zone       = data.aws_availability_zones.azs.names[0]
+  availability_zone       = length(var.azs) > 0 ? var.azs[0] : data.aws_availability_zones.azs.names[0]
   tags = { Name = "public-${each.value}" }
 }
 
@@ -114,7 +118,7 @@ locals {
 
 resource "aws_instance" "fixed" {
   for_each = toset(local.instance_names)
-  ami           = data.aws_ami.al2023.id
+  ami           = var.ami_id != "" ? var.ami_id : data.aws_ami.al2023[0].id
   instance_type = var.instance_type
   subnet_id     = values(aws_subnet.public)[0].id
   vpc_security_group_ids = [aws_security_group.web_sg.id]

@@ -28,3 +28,15 @@ variable "ssh_key_name" {
 	default     = ""
 }
 
+variable "ami_id" {
+  description = "AMI ID to use (optional). If empty, a data lookup will be used."
+  type        = string
+  default     = ""
+}
+
+variable "azs" {
+  description = "List of AZ names to use (optional). If empty, a data lookup will be used."
+  type        = list(string)
+  default     = []
+}    
+
