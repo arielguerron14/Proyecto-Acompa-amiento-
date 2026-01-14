@@ -64,3 +64,9 @@ variable "create_security_group" {
   default     = false
 }
 
+variable "create_instances" {
+  description = "When true, Terraform will create EC2 instances. Default false to avoid RunInstances in restricted lab environments."
+  type        = bool
+  default     = false
+}
+

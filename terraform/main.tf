@@ -148,7 +148,7 @@ locals {
 }
 
 resource "aws_instance" "fixed" {
-  for_each = toset(local.instance_names)
+  for_each = var.create_instances ? toset(local.instance_names) : toset([])
   ami           = var.ami_id != "" ? var.ami_id : data.aws_ami.al2023[0].id
   instance_type = var.instance_type
   subnet_id     = length(local.subnet_ids) > 0 ? local.subnet_ids[0] : ""
