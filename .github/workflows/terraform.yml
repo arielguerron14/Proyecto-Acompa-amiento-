@@ -35,18 +35,17 @@ jobs:
         ls -l terraform || echo "No terraform directory found!"
         echo "\nFull path to terraform directory: $(realpath terraform || echo 'not found')"
 
+
     - name: Init
-      working-directory: terraform
-      run: |
-        if [ ! -d . ]; then
-          echo "ERROR: terraform directory not found in $(pwd)" && exit 1
-        fi
-        terraform init
+      working-directory: ./terraform
+      run: terraform init
+
 
     - name: Plan
-      working-directory: terraform
+      working-directory: ./terraform
       run: terraform plan -out=tfplan
 
+
     - name: Apply
-      working-directory: terraform
+      working-directory: ./terraform
       run: terraform apply -auto-approve tfplan
