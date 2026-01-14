@@ -177,13 +177,25 @@ resource "aws_eip" "eip" {
   depends_on = [aws_instance.fixed]
 }
 
+# Get all subnets in the VPC for ALB (requires 2+ in different AZs)
+data "aws_subnets" "all_for_alb" {
+  filter {
+    name   = "vpc-id"
+    values = [local.vpc_id]
+  }
+}
+
+locals {
+  alb_subnet_ids = length(data.aws_subnets.all_for_alb.ids) >= 2 ? data.aws_subnets.all_for_alb.ids : concat(local.subnet_ids, local.subnet_ids)
+}
+
 # Application Load Balancer
 resource "aws_lb" "main" {
   name               = "lab-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : []
-  subnets            = local.subnet_ids
+  subnets            = local.alb_subnet_ids
   tags = {
     Name = "lab-alb"
     Project = "lab-8-ec2"
