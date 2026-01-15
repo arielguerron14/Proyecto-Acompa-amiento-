@@ -414,43 +414,52 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "DOCKER SERVICE STATUS"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          docker-compose -f docker-compose.ec2-core.yml ps 2>/dev/null || docker-compose ps
+          docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
           
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "NETWORK CONNECTIVITY TEST"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          
-          # Test API Gateway
-          echo "Testing API Gateway on localhost:3000..."
-          docker exec $(docker ps -q -f name=api-gateway) curl -s -I http://localhost:3000/health || echo "API Gateway health check failed"
-          
-          # Test auth service
-          echo ""
-          echo "Testing Auth Service on localhost:3000..."
-          docker exec $(docker ps -q -f name=auth) curl -s -I http://localhost:3000/health || echo "Auth health check failed"
-          
-          # Test estudiantes service
-          echo ""
-          echo "Testing Estudiantes Service on localhost:3001..."
-          docker exec $(docker ps -q -f name=core) curl -s -I http://core:3001/health || echo "Estudiantes health check failed"
-          
-          # Test maestros service
-          echo ""
-          echo "Testing Maestros Service on localhost:3002..."
-          docker exec $(docker ps -q -f name=core) curl -s -I http://core:3002/horarios || echo "Maestros health check failed"
-          
-          echo ""
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "DOCKER NETWORK"
+          echo "DOCKER NETWORKS"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           docker network ls
           
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "CONTAINER LOGS (API Gateway)"
+          echo "API GATEWAY LOGS (Last 50 lines)"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          docker logs $(docker ps -q -f name=api-gateway) 2>&1 | tail -30
+          docker logs api-gateway 2>&1 | tail -50
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "MICROSERVICES LOGS"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Auth Service:"
+          docker logs micro-auth 2>&1 | tail -10
+          echo ""
+          echo "Estudiantes Service:"
+          docker logs micro-estudiantes 2>&1 | tail -10
+          echo ""
+          echo "Maestros Service:"
+          docker logs micro-maestros 2>&1 | tail -10
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "INTERNAL SERVICE CONNECTIVITY TEST"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Test from API Gateway container
+          echo "Testing from API Gateway container:"
+          docker exec api-gateway curl -s -I http://micro-maestros:3002/horarios | head -2
+          docker exec api-gateway curl -s http://micro-maestros:3002/horarios 2>&1 | head -20
+          
+          echo ""
+          echo "Testing maestros service directly:"
+          docker exec micro-maestros curl -s -I http://localhost:3002/horarios | head -2
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "ENVIRONMENT VARIABLES"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          docker exec api-gateway env | grep -i core || echo "CORE_HOST not set"
           
           DIAG
           
