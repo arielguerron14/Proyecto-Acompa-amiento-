@@ -123,7 +123,10 @@ jobs:
           aws ec2 describe-instances \
             --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
             --query 'Reservations[].Instances[].PublicIpAddress' \
-            --output text > /tmp/ips.txt
+            --output text | tr ' ' '\n' > /tmp/ips.txt
+          echo "IPs discovered:"
+          cat /tmp/ips.txt
+          echo "Total IPs: $(wc -l < /tmp/ips.txt)"
 
       - name: Deploy Frontend
         continue-on-error: true
