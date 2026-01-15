@@ -15,14 +15,14 @@ services:
       PORT: 8080
       LOG_LEVEL: info
       
-      # Public IPs for inter-EC2 communication
-      AUTH_SERVICE: http://3.234.198.34:3000
-      ESTUDIANTES_SERVICE: http://3.234.198.34:3001
-      MAESTROS_SERVICE: http://3.234.198.34:3002
-      REPORTES_EST_SERVICE: http://54.175.62.79:5003
-      REPORTES_MAEST_SERVICE: http://54.175.62.79:5004
-      NOTIFICACIONES_SERVICE: http://98.92.248.110:5006
-      ANALYTICS_SERVICE: http://98.92.248.110:5007
+      # Private IPs for inter-EC2 communication (within AWS VPC)
+      AUTH_SERVICE: http://172.31.71.182:3000
+      ESTUDIANTES_SERVICE: http://172.31.71.182:3001
+      MAESTROS_SERVICE: http://172.31.71.182:3002
+      REPORTES_EST_SERVICE: http://172.31.70.166:5003
+      REPORTES_MAEST_SERVICE: http://172.31.70.166:5004
+      NOTIFICACIONES_SERVICE: http://172.31.68.132:5006
+      ANALYTICS_SERVICE: http://172.31.68.132:5007
       
       # Configuración
       JWT_SECRET: ${JWT_SECRET}
