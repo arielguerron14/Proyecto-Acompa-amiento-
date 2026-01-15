@@ -74,30 +74,81 @@ jobs:
         with:
           node-version: 18
       
-      - name: Get EC2 IP
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get EC2 IP (Dynamic Discovery with AWS Tags)
         id: get-ip
         run: |
-          case "${{ github.event.inputs.instance }}" in
+          INSTANCE="${{ github.event.inputs.instance }}"
+          
+          # Map instance name to EXACT EC2 tag name
+          case "$INSTANCE" in
             EC2_CORE)
-              echo "ip=3.234.198.34" >> $GITHUB_OUTPUT
+              TAG_NAME="EC2-CORE"
               ;;
             EC2_DB)
-              echo "ip=3.237.32.106" >> $GITHUB_OUTPUT
+              TAG_NAME="EC2-DB"
               ;;
             EC2_API_GATEWAY)
-              echo "ip=52.7.168.4" >> $GITHUB_OUTPUT
+              TAG_NAME="EC2-API-Gateway"
               ;;
             EC2_FRONTEND)
-              echo "ip=54.85.92.175" >> $GITHUB_OUTPUT
+              TAG_NAME="EC2-Frontend"
               ;;
             EC2_MESSAGING)
-              echo "ip=34.207.206.13" >> $GITHUB_OUTPUT
+              TAG_NAME="EC2-Messaging"
               ;;
             EC2_MONITORING)
-              echo "ip=34.203.175.72" >> $GITHUB_OUTPUT
+              TAG_NAME="EC2-Monitoring"
               ;;
             *)
-              echo "ip=0.0.0.0" >> $GITHUB_OUTPUT
+              echo "❌ Unknown instance type: $INSTANCE"
+              exit 1
+              ;;
+          esac
+          
+          echo "🔍 Discovering EC2 instance with tag Name=$TAG_NAME"
+          
+          # Configure AWS credentials first
+          export AWS_REGION="${{ env.AWS_REGION }}"
+          
+          # Query EC2 for running instance with EXACT tag name match
+          INSTANCE_DATA=$(aws ec2 describe-instances \
+            --region $AWS_REGION \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=$TAG_NAME" \
+            --query 'Reservations[0].Instances[0]' \
+            --output json 2>/dev/null)
+          
+          if [ "$INSTANCE_DATA" = "null" ] || [ -z "$INSTANCE_DATA" ]; then
+            echo "❌ ERROR: Instance with tag Name=$TAG_NAME not found or not running"
+            echo "⚠️ Check AWS credentials or instance status"
+            # Fallback to direct IP (for backwards compatibility, but this should not happen)
+            case "$INSTANCE" in
+              EC2_CORE)
+                IP="3.236.51.29"
+                ;;
+              *)
+                IP="0.0.0.0"
+                ;;
+            esac
+          else
+            IP=$(echo "$INSTANCE_DATA" | jq -r '.PublicIpAddress // empty')
+            INSTANCE_NAME=$(echo "$INSTANCE_DATA" | jq -r '.Tags[] | select(.Key=="Name") | .Value' | head -1)
+            echo "✅ Found: $INSTANCE_NAME at $IP"
+          fi
+          
+          if [ -z "$IP" ] || [ "$IP" = "null" ]; then
+            echo "❌ ERROR: Could not determine IP address"
+            exit 1
+          fi
+          
+          echo "ip=$IP" >> $GITHUB_OUTPUT
               ;;
           esac
       
