@@ -368,10 +368,10 @@ jobs:
               -o StrictHostKeyChecking=no \
               ubuntu@$IP << 'SCRIPT'
           cd /home/ubuntu/project
-          echo "Building images..."
-          docker-compose -f docker-compose.ec2-core.yml build --no-cache api-gateway core auth db frontend 2>&1 | tail -20 || docker-compose build --no-cache api-gateway core auth db frontend 2>&1 | tail -20
+          echo "Building all images..."
+          docker-compose -f docker-compose.ec2-core.yml build --no-cache 2>&1 | tail -50
           docker image prune -f || true
-          echo "Build complete"
+          echo "✅ Build complete"
           SCRIPT
           
           echo "✅ Docker images rebuilt"
