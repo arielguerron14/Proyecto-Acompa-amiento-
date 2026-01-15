@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       all_reachable: ${{ steps.check.outputs.all_reachable }}
+      instances_data: ${{ steps.encode_ips.outputs.encoded_ips }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -44,32 +45,64 @@ jobs:
           REPORTES_IP: ${{ secrets.EC2_REPORTES_IP }}
           MONITORING_IP: ${{ secrets.EC2_MONITORING_IP }}
           BASTION_IP: ${{ secrets.EC2_BASTION_IP }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
-          # Usar secretos de GitHub en lugar de describe-instances (que requiere permisos IAM elevados)
-          cat > /tmp/ips.txt << EOF
-          $FRONTEND_IP
-          $API_GATEWAY_IP
-          $CORE_IP
-          $DB_IP
-          $MESSAGING_IP
-          $NOTIFICACIONES_IP
-          $REPORTES_IP
-          $MONITORING_IP
-          $BASTION_IP
-          EOF
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "$EC2_SSH_KEY" > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
           
-          # Filtrar líneas vacías
-          grep -v '^[[:space:]]*$' /tmp/ips.txt | sort -u > /tmp/ips_clean.txt
-          mv /tmp/ips_clean.txt /tmp/ips.txt
+          # IPs desde secretos (estas son las públicas)
+          INSTANCES=(
+            "frontend|$FRONTEND_IP"
+            "api-gateway|$API_GATEWAY_IP"
+            "core|$CORE_IP"
+            "db|$DB_IP"
+            "messaging|$MESSAGING_IP"
+            "notificaciones|$NOTIFICACIONES_IP"
+            "reportes|$REPORTES_IP"
+            "monitoring|$MONITORING_IP"
+            "bastion|$BASTION_IP"
+          )
           
-          echo "📋 IPs Configuradas:"
+          # Detectar IPs dinámicamente desde cada instancia
+          echo "🔍 Detectando IPs públicas y privadas de instancias..."
+          echo "" > /tmp/ips.txt
+          
+          for INSTANCE in "${INSTANCES[@]}"; do
+            NAME="${INSTANCE%%|*}"
+            PUBLIC_IP="${INSTANCE##*|}"
+            
+            if [ -z "$PUBLIC_IP" ]; then
+              echo "⏭️  $NAME: IP vacío en secretos, saltando"
+              continue
+            fi
+            
+            echo "🔗 Conectando a $NAME ($PUBLIC_IP)..."
+            
+            # Detectar IP privada de la instancia
+            PRIVATE_IP=$(ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$PUBLIC_IP "hostname -I | awk '{print \$1}'" 2>/dev/null || echo "")
+            
+            if [ -z "$PRIVATE_IP" ]; then
+              echo "⚠️  $NAME: No se pudo obtener IP privada, usando solo pública"
+              echo "$PUBLIC_IP" >> /tmp/ips.txt
+            else
+              echo "✅ $NAME: PUBLIC=$PUBLIC_IP PRIVATE=$PRIVATE_IP"
+              # Guardar en formato: name|public_ip|private_ip
+              echo "$NAME|$PUBLIC_IP|$PRIVATE_IP" >> /tmp/ips.txt
+            fi
+          done
+          
+          echo ""
+          echo "📋 IPs Detectadas:"
           cat /tmp/ips.txt
 
       - name: Test SSH Connectivity
         id: check
         continue-on-error: true
         run: |
-          INSTANCES=$(cat /tmp/ips.txt)
+          # Extraer solo IPs públicas para prueba
+          INSTANCES=$(cat /tmp/ips.txt | awk -F'|' '{print $2}' | grep -v '^$')
           REACHABLE=0
           TOTAL=0
           UNREACHABLE=""
@@ -78,7 +111,7 @@ jobs:
             TOTAL=$((TOTAL + 1))
             echo "🔍 Probando conectividad a $IP..."
             
-            if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "echo ✅ Acceso exitoso a $IP" 2>&1; then
+            if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "echo ✅ Acceso exitoso" 2>&1; then
               REACHABLE=$((REACHABLE + 1))
               echo "✅ $IP - ACCESIBLE"
             else
@@ -90,7 +123,7 @@ jobs:
           echo ""
           echo "📊 Resumen: $REACHABLE/$TOTAL instancias accesibles"
           
-          if [ $REACHABLE -eq $TOTAL ]; then
+          if [ $REACHABLE -eq $TOTAL ] && [ $TOTAL -gt 0 ]; then
             echo "all_reachable=true" >> $GITHUB_OUTPUT
           else
             echo "all_reachable=false" >> $GITHUB_OUTPUT
@@ -112,6 +145,15 @@ jobs:
             echo "⚠️ Instancias no accesibles:${{ steps.check.outputs.unreachable }}"
           fi
 
+      - name: Encode IPs for Deployment
+        id: encode_ips
+        run: |
+          # Codificar el archivo de IPs en base64 para pasar al siguiente job
+          if [ -f /tmp/ips.txt ]; then
+            ENCODED=$(cat /tmp/ips.txt | base64 -w 0)
+            echo "encoded_ips=$ENCODED" >> $GITHUB_OUTPUT
+          fi
+
   deploy:
     needs: test-connectivity
     runs-on: ubuntu-latest
@@ -130,20 +172,28 @@ jobs:
       - name: Discover & Assign Instances
         id: instances
         env:
-          FRONTEND_IP: ${{ secrets.EC2_FRONTEND_IP }}
-          API_IP: ${{ secrets.EC2_API_GATEWAY_IP }}
-          CORE_IP: ${{ secrets.EC2_CORE_IP }}
-          DB_IP: ${{ secrets.EC2_DB_IP }}
-          MESSAGING_IP: ${{ secrets.EC2_MESSAGING_IP }}
-          NOTIFICACIONES_IP: ${{ secrets.EC2_NOTIFICACIONES_IP }}
-          REPORTES_IP: ${{ secrets.EC2_REPORTES_IP }}
-          MONITORING_IP: ${{ secrets.EC2_MONITORING_IP }}
-          BASTION_IP: ${{ secrets.EC2_BASTION_IP }}
+          INSTANCES_DATA: ${{ needs.test-connectivity.outputs.instances_data }}
         run: |
-          echo "🔍 Leyendo IPs desde secretos de GitHub..."
+          echo "🔍 Leyendo IPs detectadas dinámicamente..."
+          
+          # Decodificar el archivo de IPs
+          if [ -n "$INSTANCES_DATA" ]; then
+            echo "$INSTANCES_DATA" | base64 -d > /tmp/ips.txt
+          fi
+          
+          # Asignar IPs por nombre de instancia
+          FRONTEND_IP=$(grep "^frontend|" /tmp/ips.txt 2>/dev/null | cut -d'|' -f2 || echo "")
+          API_IP=$(grep "^api-gateway|" /tmp/ips.txt 2>/dev/null | cut -d'|' -f2 || echo "")
+          CORE_IP=$(grep "^core|" /tmp/ips.txt 2>/dev/null | cut -d'|' -f2 || echo "")
+          DB_IP=$(grep "^db|" /tmp/ips.txt 2>/dev/null | cut -d'|' -f2 || echo "")
+          MESSAGING_IP=$(grep "^messaging|" /tmp/ips.txt 2>/dev/null | cut -d'|' -f2 || echo "")
+          NOTIFICACIONES_IP=$(grep "^notificaciones|" /tmp/ips.txt 2>/dev/null | cut -d'|' -f2 || echo "")
+          REPORTES_IP=$(grep "^reportes|" /tmp/ips.txt 2>/dev/null | cut -d'|' -f2 || echo "")
+          MONITORING_IP=$(grep "^monitoring|" /tmp/ips.txt 2>/dev/null | cut -d'|' -f2 || echo "")
+          BASTION_IP=$(grep "^bastion|" /tmp/ips.txt 2>/dev/null | cut -d'|' -f2 || echo "")
           
           echo ""
-          echo "✅ IPs Asignadas:"
+          echo "✅ IPs Asignadas (detectadas dinámicamente):"
           echo "  Frontend: $FRONTEND_IP"
           echo "  API Gateway: $API_IP"
           echo "  Core: $CORE_IP"
