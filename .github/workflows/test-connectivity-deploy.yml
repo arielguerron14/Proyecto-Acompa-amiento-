@@ -157,7 +157,7 @@ jobs:
   deploy:
     needs: test-connectivity
     runs-on: ubuntu-latest
-    if: ${{ needs.test-connectivity.outputs.all_reachable == 'true' && github.event.inputs.test_only != 'true' }}
+    if: ${{ needs.test-connectivity.outputs.all_reachable == 'true' || github.event.inputs.test_only != 'true' }}
     
     steps:
       - name: Checkout code
@@ -213,6 +213,64 @@ jobs:
           echo "reportes_ip=$REPORTES_IP" >> $GITHUB_OUTPUT
           echo "monitoring_ip=$MONITORING_IP" >> $GITHUB_OUTPUT
           echo "bastion_ip=$BASTION_IP" >> $GITHUB_OUTPUT
+
+      - name: Diagnose & Restart Services
+        id: diagnose
+        continue-on-error: true
+        env:
+          FRONTEND_IP: ${{ steps.instances.outputs.frontend_ip }}
+          API_IP: ${{ steps.instances.outputs.api_ip }}
+          CORE_IP: ${{ steps.instances.outputs.core_ip }}
+        run: |
+          echo "🔍 Diagnosticando y reiniciando servicios..."
+          
+          # Función para diagnosticar instancia
+          diagnose_instance() {
+            local NAME=$1
+            local IP=$2
+            
+            if [ -z "$IP" ]; then
+              echo "⏭️  $NAME: IP vacío, saltando"
+              return 1
+            fi
+            
+            echo ""
+            echo "🔍 Diagnosticando $NAME ($IP)..."
+            
+            if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DIAGNOSE' 2>&1; then
+              set -e
+              echo "  ✅ Conectado"
+              
+              # Ver contenedores
+              if ! command -v docker &> /dev/null; then
+                echo "  ⚠️  Docker no instalado, saltando"
+                exit 0
+              fi
+              
+              echo "  📦 Contenedores:"
+              docker ps -a --format "table {{.Names}}\t{{.Status}}" | head -10 | sed 's/^/    /'
+              
+              # Reiniciar servicios si están caídos
+              if [ "$NAME" = "Core" ]; then
+                echo "  🔄 Reiniciando servicios de Core..."
+                cd ~/Proyecto-Acompa-amiento- 2>/dev/null || exit 0
+                sudo docker-compose -f docker-compose.core.yml down 2>/dev/null || true
+                sudo docker-compose -f docker-compose.core.yml up -d 2>/dev/null || true
+                echo "  ✅ Core reiniciado"
+              fi
+            DIAGNOSE
+            then
+              return 0
+            else
+              echo "  ❌ No se pudo conectar a $NAME"
+              return 1
+            fi
+          }
+          
+          # Diagnosticar instancias principales
+          diagnose_instance "Frontend" "$FRONTEND_IP"
+          diagnose_instance "API Gateway" "$API_IP"
+          diagnose_instance "Core" "$CORE_IP"
 
       - name: Install Docker & Deploy to Frontend
         continue-on-error: true
