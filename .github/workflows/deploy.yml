@@ -1,4 +1,4 @@
-name: Deploy to EC2 (Latest Fixed)
+name: Deploy to EC2 (Dynamic IP Discovery)
 
 on:
   workflow_dispatch:
@@ -76,44 +76,117 @@ jobs:
         with:
           node-version: 18
       
-      - name: Get EC2 IP
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get EC2 IPs (Dynamic Discovery)
         id: get-ip
         run: |
-          case "${{ github.event.inputs.instance }}" in
+          INSTANCE="${{ github.event.inputs.instance }}"
+          
+          # Map instance name to EC2 tag or name filter
+          case "$INSTANCE" in
             EC2_BASTION)
-              echo "ip=13.217.194.108" >> $GITHUB_OUTPUT
+              INSTANCE_FILTER="bastion"
               ;;
             EC2_CORE)
-              echo "ip=3.234.198.34" >> $GITHUB_OUTPUT
+              INSTANCE_FILTER="core"
               ;;
             EC2_DB)
-              echo "ip=3.237.32.106" >> $GITHUB_OUTPUT
+              INSTANCE_FILTER="database|db"
               ;;
             EC2_API_GATEWAY)
-              echo "ip=52.7.168.4" >> $GITHUB_OUTPUT
+              INSTANCE_FILTER="api-gateway"
               ;;
             EC2_FRONTEND)
-              echo "ip=54.85.92.175" >> $GITHUB_OUTPUT
+              INSTANCE_FILTER="frontend"
               ;;
             EC2_MESSAGING)
-              echo "ip=34.207.206.13" >> $GITHUB_OUTPUT
+              INSTANCE_FILTER="messaging"
               ;;
             EC2_MONITORING)
-              echo "ip=34.203.175.72" >> $GITHUB_OUTPUT
+              INSTANCE_FILTER="monitoring"
               ;;
             *)
-              echo "ip=0.0.0.0" >> $GITHUB_OUTPUT
+              echo "Unknown instance type"
+              exit 1
               ;;
           esac
+          
+          # Query EC2 for running instances matching the filter (case-insensitive)
+          INSTANCE_DATA=$(aws ec2 describe-instances \
+            --filters "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].{Name:Tags[?Key=='Name'].Value|[0],InstanceId:InstanceId,PublicIP:PublicIpAddress,PrivateIP:PrivateIpAddress}" \
+            --output json | jq -r ".[] | select(.Name | ascii_downcase | test(\"$INSTANCE_FILTER\"))")
+          
+          if [ -z "$INSTANCE_DATA" ]; then
+            echo "❌ ERROR: No running instance found matching filter: $INSTANCE_FILTER"
+            exit 1
+          fi
+          
+          PUBLIC_IP=$(echo "$INSTANCE_DATA" | jq -r '.PublicIP')
+          PRIVATE_IP=$(echo "$INSTANCE_DATA" | jq -r '.PrivateIP')
+          INSTANCE_ID=$(echo "$INSTANCE_DATA" | jq -r '.InstanceId')
+          INSTANCE_NAME=$(echo "$INSTANCE_DATA" | jq -r '.Name')
+          
+          echo "✅ Found instance: $INSTANCE_NAME ($INSTANCE_ID)"
+          echo "   Public IP (for SSH):  $PUBLIC_IP"
+          echo "   Private IP (for routing): $PRIVATE_IP"
+          
+          echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
+          echo "private_ip=$PRIVATE_IP" >> $GITHUB_OUTPUT
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "instance_name=$INSTANCE_NAME" >> $GITHUB_OUTPUT
+          
+          # Export for use in other steps
+          echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
+          echo "PRIVATE_IP=$PRIVATE_IP" >> $GITHUB_ENV
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          echo "INSTANCE_NAME=$INSTANCE_NAME" >> $GITHUB_ENV
       
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          # Use SSH key from repository
-          cp ./ssh-key-ec2.pem ~/.ssh/id_rsa
+          # Use SSH key from repository secrets (base64 encoded)
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ steps.get-ip.outputs.ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          echo "SSH setup complete"
+          ssh-keyscan -H ${{ steps.get-ip.outputs.public_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "✅ SSH setup complete for IP: ${{ steps.get-ip.outputs.public_ip }}"
+      
+      - name: Update Configuration with IPs
+        run: |
+          INSTANCE="${{ github.event.inputs.instance }}"
+          PUBLIC_IP="${{ steps.get-ip.outputs.public_ip }}"
+          PRIVATE_IP="${{ steps.get-ip.outputs.private_ip }}"
+          
+          echo "🔧 Updating configuration files..."
+          echo "   Using PUBLIC IP ($PUBLIC_IP) for SSH"
+          echo "   Using PRIVATE IP ($PRIVATE_IP) for inter-service routing"
+          
+          # Update docker-compose.api-gateway.yml with Core private IP
+          if [ "$INSTANCE" = "EC2_API_GATEWAY" ] && [ -f "./docker-compose.api-gateway.yml" ]; then
+            echo "   Updating API Gateway config with CORE private IP..."
+            # This will be done via script on EC2
+          fi
+          
+          # For EC2_CORE: create a script that will update all .env files
+          if [ "$INSTANCE" = "EC2_CORE" ]; then
+            # Generate Python script to update .env files on EC2
+            cat > /tmp/update-core-env.py << 'EOFPY'
+import os
+import glob
+
+# .env files in microservices use localhost (internal Docker network)
+# No changes needed for internal communication within core-net
+print("✅ Core services use internal Docker network - no IP changes needed for internal services")
+EOFPY
+          fi
+
       
       - name: Build Docker Images on GitHub
         if: steps.defaults.outputs.rebuild_docker == 'true' && steps.defaults.outputs.build_location == 'github'
@@ -174,39 +247,46 @@ jobs:
       
       - name: Transfer files to EC2
         run: |
-          IP=${{ steps.get-ip.outputs.ip }}
-          INSTANCE=${{ github.event.inputs.instance }}
+          PUBLIC_IP="${{ steps.get-ip.outputs.public_ip }}"
+          PRIVATE_IP="${{ steps.get-ip.outputs.private_ip }}"
+          INSTANCE="${{ github.event.inputs.instance }}"
+          
+          echo "📦 Transferring files to EC2 instance..."
+          echo "   SSH via: $PUBLIC_IP"
+          echo "   Instance routing IP: $PRIVATE_IP"
           
           # Aggressively clean space on EC2
-          echo "Cleaning EC2 instance..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP << 'CLEANUP'
-          set -e
-          echo "=== Cleaning old docker resources ==="
-          docker system prune -af --volumes 2>/dev/null || true
-          
-          echo "=== Cleaning old .tar files ==="
-          rm -f /tmp/*.tar /tmp/*.tar.gz 2>/dev/null || true
-          rm -f ~/docker-images/*.tar 2>/dev/null || true
-          
-          echo "=== Disk usage before cleanup ==="
-          df -h / | tail -1
-          
-          echo "=== Creating app directory ==="
-          mkdir -p ~/docker-images ~/app
-          
-          echo "=== Disk usage after cleanup ==="
-          df -h / | tail -1
-          CLEANUP
+          echo "🧹 Cleaning EC2 instance..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP << CLEANUP
+set -e
+echo "=== Cleaning old docker resources ==="
+docker system prune -af --volumes 2>/dev/null || true
+
+echo "=== Cleaning old .tar files ==="
+rm -f /tmp/*.tar /tmp/*.tar.gz 2>/dev/null || true
+rm -f ~/docker-images/*.tar 2>/dev/null || true
+
+echo "=== Disk usage before cleanup ==="
+df -h / | tail -1
+
+echo "=== Creating app directory ==="
+mkdir -p ~/docker-images ~/app
+
+echo "=== Disk usage after cleanup ==="
+df -h / | tail -1
+CLEANUP
           
           # Determine docker-compose.yml based on instance
           if [ "$INSTANCE" = "EC2_BASTION" ]; then
-            # Para Bastion, transferir toda la carpeta bastion-host
-            echo "Transferring Bastion Host files..."
-            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 -r ./bastion-host ubuntu@$IP:~/app/bastion-host || true
+            echo "📤 Transferring Bastion Host files..."
+            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 -r ./bastion-host ubuntu@$PUBLIC_IP:~/app/bastion-host || true
             COMPOSE_FILE="./bastion-host/docker-compose.yml"
           elif [ "$INSTANCE" = "EC2_CORE" ]; then
             COMPOSE_FILE="./docker-compose.ec2-core.yml"
           elif [ "$INSTANCE" = "EC2_API_GATEWAY" ]; then
+            # Special handling: Update docker-compose with CORE private IP
+            echo "🔄 Preparing API Gateway configuration..."
+            # Will be done in deployment step
             COMPOSE_FILE="./docker-compose.api-gateway.yml"
           elif [ "$INSTANCE" = "EC2_FRONTEND" ]; then
             COMPOSE_FILE="./docker-compose.frontend.yml"
@@ -221,122 +301,201 @@ jobs:
           fi
           
           if [ -f "$COMPOSE_FILE" ]; then
-            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$COMPOSE_FILE" ubuntu@$IP:~/app/docker-compose.yml
+            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$COMPOSE_FILE" ubuntu@$PUBLIC_IP:~/app/docker-compose.yml
           else
             echo "⚠️ Warning: $COMPOSE_FILE not found, skipping docker-compose transfer"
           fi
+
       
-      - name: Build Docker Images on EC2
+      - name: Build Docker Images on EC2 (with Dynamic IP Configuration)
         run: |
-          echo "🚀 EXECUTING NEW BUILD STEP VERSION (2026-01-12)"
-          IP=${{ steps.get-ip.outputs.ip }}
-          INSTANCE=${{ github.event.inputs.instance }}
+          echo "🚀 EXECUTING BUILD WITH DYNAMIC IP DISCOVERY"
+          PUBLIC_IP="${{ steps.get-ip.outputs.public_ip }}"
+          PRIVATE_IP="${{ steps.get-ip.outputs.private_ip }}"
+          INSTANCE="${{ github.event.inputs.instance }}"
           GITHUB_REPO="${{ github.repository }}"
           GITHUB_REF="${{ github.ref }}"
           
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash -s "$INSTANCE" "$GITHUB_REPO" "$GITHUB_REF" << 'BUILDSSH'
-          set -e
-          INSTANCE=$1
-          GITHUB_REPO=$2
-          GITHUB_REF=$3
-          
-          echo "=== EC2 Build: Cloning repository ==="
-          cd ~
-          rm -rf app-build
-          git clone --depth 1 https://github.com/${GITHUB_REPO}.git app-build
-          cd app-build
-          git checkout ${GITHUB_REF#refs/heads/}
-          
-          echo "=== EC2 Build: Building images for $INSTANCE ==="
-          mkdir -p ~/docker-images
-          
-          case "$INSTANCE" in
-            EC2_BASTION)
-              echo "Building Bastion Host Docker image..."
-              cd ~/app/bastion-host
-              docker build --no-cache -t bastion-host:latest .
-              ;;
-            EC2_MESSAGING)
-              echo "Building infrastructure images for messaging..."
-              # Build Zookeeper
-              if [ -f "./messaging/zookeeper/Dockerfile" ]; then
-                echo "Building zookeeper..."
-                docker build --no-cache -t proyecto-zookeeper:1.0 -f ./messaging/zookeeper/Dockerfile ./messaging
-              fi
-              # Build Kafka
-              if [ -f "./messaging/kafka/Dockerfile" ]; then
-                echo "Building kafka..."
-                docker build --no-cache -t proyecto-kafka:1.0 -f ./messaging/kafka/Dockerfile ./messaging
-              fi
-              # Build RabbitMQ
-              if [ -f "./messaging/rabbitmq/Dockerfile" ]; then
-                echo "Building rabbitmq..."
-                docker build --no-cache -t proyecto-rabbitmq:1.0 -f ./messaging/rabbitmq/Dockerfile ./messaging
-              fi
-              ;;
-            EC2_MONITORING)
-              echo "Building infrastructure images for monitoring..."
-              # Build Prometheus
-              if [ -f "./monitoring/prometheus/Dockerfile" ]; then
-                echo "Building prometheus..."
-                docker build --no-cache -t proyecto-prometheus:1.0 -f ./monitoring/prometheus/Dockerfile ./monitoring
-              fi
-              # Build Grafana
-              if [ -f "./monitoring/grafana/Dockerfile" ]; then
-                echo "Building grafana..."
-                docker build --no-cache -t proyecto-grafana:1.0 -f ./monitoring/grafana/Dockerfile ./monitoring
-              fi
-              ;;
-            *)
-              echo "Building microservices..."
-              for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros frontend-web; do
-                if [ -f "./$SERVICE/Dockerfile" ]; then
-                  echo "Building $SERVICE..."
-                  if [ "$SERVICE" = "frontend-web" ]; then
-                    docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile ./$SERVICE
-                  else
-                    docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
-                  fi
-                fi
-              done
-              ;;
-          esac
-          
-          echo "=== EC2 Build: Images built successfully ==="
-          docker images | grep -E 'proyecto|api-gateway|micro|frontend' || echo "No custom images found"
-          
-          echo "=== EC2 Build: Starting services with docker-compose ==="
-          cd ~/app
-          docker-compose down 2>/dev/null || true
-          sleep 2
-          docker-compose up -d
-          
-          echo "=== Waiting for services to be ready (30 seconds) ==="
-          sleep 30
-          
-          echo "=== Service Status ==="
-          docker-compose ps
-          
-          echo ""
-          echo "=== Recent logs ==="
-          docker-compose logs --tail=50 2>&1 || true
-          BUILDSSH
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash -s "$INSTANCE" "$PRIVATE_IP" "$GITHUB_REPO" "$GITHUB_REF" << 'BUILDSSH'
+set -e
+INSTANCE=$1
+PRIVATE_IP=$2
+GITHUB_REPO=$3
+GITHUB_REF=$4
+
+echo "================================================"
+echo "🔧 EC2 DEPLOYMENT WITH DYNAMIC IP CONFIGURATION"
+echo "================================================"
+echo "Instance Type: $INSTANCE"
+echo "Private IP (for routing): $PRIVATE_IP"
+echo "Repo: $GITHUB_REPO"
+echo ""
+
+# Step 1: Clone repository
+echo "📥 Step 1: Cloning repository..."
+cd ~
+rm -rf app-build 2>/dev/null || true
+git clone --depth 1 https://github.com/${GITHUB_REPO}.git app-build
+cd app-build
+git checkout ${GITHUB_REF#refs/heads/}
+echo "✅ Repository cloned"
+
+# Step 2: Update configuration based on instance type
+echo ""
+echo "🔄 Step 2: Updating configuration with Private IP ($PRIVATE_IP)..."
+
+# For API Gateway: Update service URLs to use Core's private IP
+if [ "$INSTANCE" = "EC2_API_GATEWAY" ]; then
+  echo "   → Configuring API Gateway to use CORE private IP..."
+  
+  # Check if we can find CORE instance
+  # For now, use environment variable or manual configuration
+  if [ -z "$CORE_PRIVATE_IP" ]; then
+    echo "   ⚠️ CORE_PRIVATE_IP not set, using existing config"
+  else
+    if [ -f "./api-gateway/.env" ]; then
+      sed -i "s|http://[0-9.]*:3000|http://$CORE_PRIVATE_IP:3000|g" "./api-gateway/.env"
+      sed -i "s|http://[0-9.]*:3001|http://$CORE_PRIVATE_IP:3001|g" "./api-gateway/.env"
+      sed -i "s|http://[0-9.]*:3002|http://$CORE_PRIVATE_IP:3002|g" "./api-gateway/.env"
+      sed -i "s|http://[0-9.]*:5003|http://$CORE_PRIVATE_IP:5003|g" "./api-gateway/.env"
+      sed -i "s|http://[0-9.]*:5004|http://$CORE_PRIVATE_IP:5004|g" "./api-gateway/.env"
+      echo "   ✅ API Gateway .env updated with CORE private IP"
+    fi
+  fi
+  
+  if [ -f "./docker-compose.api-gateway.yml" ]; then
+    sed -i "s|http://[0-9.]*:3000|http://$PRIVATE_IP:3000|g" "./docker-compose.api-gateway.yml"
+    sed -i "s|http://[0-9.]*:3001|http://$PRIVATE_IP:3001|g" "./docker-compose.api-gateway.yml"
+    sed -i "s|http://[0-9.]*:3002|http://$PRIVATE_IP:3002|g" "./docker-compose.api-gateway.yml"
+    sed -i "s|http://[0-9.]*:5003|http://$PRIVATE_IP:5003|g" "./docker-compose.api-gateway.yml"
+    sed -i "s|http://[0-9.]*:5004|http://$PRIVATE_IP:5004|g" "./docker-compose.api-gateway.yml"
+    echo "   ✅ docker-compose.api-gateway.yml updated"
+  fi
+fi
+
+# For EC2_CORE: Microservices use internal Docker network (localhost)
+if [ "$INSTANCE" = "EC2_CORE" ]; then
+  echo "   → Core services use internal Docker network"
+  echo "   ✅ No IP changes needed (using localhost within core-net)"
+fi
+
+echo ""
+echo "🏗️  Step 3: Building Docker images..."
+mkdir -p ~/docker-images
+
+case "$INSTANCE" in
+  EC2_BASTION)
+    echo "   Building Bastion Host Docker image..."
+    cd ~/app-build/bastion-host
+    docker build --no-cache -t bastion-host:latest .
+    ;;
+  EC2_MESSAGING)
+    echo "   Building infrastructure images for messaging..."
+    cd ~/app-build
+    if [ -f "./messaging/zookeeper/Dockerfile" ]; then
+      echo "   → Building zookeeper..."
+      docker build --no-cache -t proyecto-zookeeper:1.0 -f ./messaging/zookeeper/Dockerfile ./messaging
+    fi
+    if [ -f "./messaging/kafka/Dockerfile" ]; then
+      echo "   → Building kafka..."
+      docker build --no-cache -t proyecto-kafka:1.0 -f ./messaging/kafka/Dockerfile ./messaging
+    fi
+    if [ -f "./messaging/rabbitmq/Dockerfile" ]; then
+      echo "   → Building rabbitmq..."
+      docker build --no-cache -t proyecto-rabbitmq:1.0 -f ./messaging/rabbitmq/Dockerfile ./messaging
+    fi
+    ;;
+  EC2_MONITORING)
+    echo "   Building infrastructure images for monitoring..."
+    cd ~/app-build
+    if [ -f "./monitoring/prometheus/Dockerfile" ]; then
+      echo "   → Building prometheus..."
+      docker build --no-cache -t proyecto-prometheus:1.0 -f ./monitoring/prometheus/Dockerfile ./monitoring
+    fi
+    if [ -f "./monitoring/grafana/Dockerfile" ]; then
+      echo "   → Building grafana..."
+      docker build --no-cache -t proyecto-grafana:1.0 -f ./monitoring/grafana/Dockerfile ./monitoring
+    fi
+    ;;
+  *)
+    echo "   Building microservices..."
+    cd ~/app-build
+    for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros frontend-web; do
+      if [ -f "./$SERVICE/Dockerfile" ]; then
+        echo "   → Building $SERVICE..."
+        if [ "$SERVICE" = "frontend-web" ]; then
+          docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile ./$SERVICE
+        else
+          docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+        fi
+      fi
+    done
+    ;;
+esac
+
+echo "✅ Docker images built successfully"
+echo ""
+echo "📊 Available images:"
+docker images | grep -E 'proyecto|api-gateway|micro|frontend' || echo "   No custom images found"
+
+echo ""
+echo "🚀 Step 4: Starting services with docker-compose..."
+cd ~/app
+docker-compose down 2>/dev/null || true
+sleep 2
+docker-compose up -d
+
+echo "⏳ Waiting for services to be ready (30 seconds)..."
+sleep 30
+
+echo ""
+echo "📋 Service Status:"
+docker-compose ps
+
+echo ""
+echo "📝 Recent logs (last 50 lines):"
+docker-compose logs --tail=50 2>&1 || true
+
+echo ""
+echo "================================================"
+echo "✅ DEPLOYMENT COMPLETE"
+echo "================================================"
+BUILDSSH
+
       
       - name: Verify deployment
         if: always()
         continue-on-error: true
         run: |
-          IP=${{ steps.get-ip.outputs.ip }}
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$IP bash << 'VERIFYSSH'
+          PUBLIC_IP="${{ steps.get-ip.outputs.public_ip }}"
+          PRIVATE_IP="${{ steps.get-ip.outputs.private_ip }}"
+          INSTANCE_NAME="${{ steps.get-ip.outputs.instance_name }}"
+          
+          echo "================================================"
+          echo "🔍 DEPLOYMENT VERIFICATION"
+          echo "================================================"
+          echo "Instance: $INSTANCE_NAME"
+          echo "Public IP: $PUBLIC_IP"
+          echo "Private IP: $PRIVATE_IP"
+          echo ""
+          
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash << 'VERIFYSSH'
           
           echo "=== Verifying services status ==="
           cd ~/app
           docker-compose ps || true
+          
           echo ""
           echo "=== Service logs (last 30 lines) ==="
           docker-compose logs --tail=30 2>&1 || echo "No logs available"
           
           echo ""
-          echo "=== Deployment complete ==="
-          echo "✅ Workflow completed successfully"
+          echo "=== Checking resource usage ==="
+          docker stats --no-stream | head -10 || true
+          
+          echo ""
+          echo "================================================"
+          echo "✅ Deployment verification complete"
+          echo "================================================"
           VERIFYSSH
+
