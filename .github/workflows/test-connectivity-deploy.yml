@@ -129,16 +129,16 @@ jobs:
           echo "📋 Todas las instancias encontradas:"
           cat /tmp/instances.txt
           
-          # Asignar IPs a variables por nombre de instancia
-          FRONTEND_IP=$(grep -i "^frontend" /tmp/instances.txt | awk '{print $2}')
-          API_IP=$(grep -i "^api" /tmp/instances.txt | awk '{print $2}')
-          CORE_IP=$(grep -i "^core" /tmp/instances.txt | awk '{print $2}')
-          DB_IP=$(grep -i "^db\|^database" /tmp/instances.txt | awk '{print $2}')
-          MESSAGING_IP=$(grep -i "^messaging" /tmp/instances.txt | awk '{print $2}')
-          NOTIFICACIONES_IP=$(grep -i "^notificaciones" /tmp/instances.txt | awk '{print $2}')
-          REPORTES_IP=$(grep -i "^reportes" /tmp/instances.txt | awk '{print $2}')
-          MONITORING_IP=$(grep -i "^monitoring\|^monitoring" /tmp/instances.txt | awk '{print $2}')
-          BASTION_IP=$(grep -i "^bastion" /tmp/instances.txt | awk '{print $2}')
+          # Asignar IPs a variables por nombre de instancia (con patrón EC2-*)
+          FRONTEND_IP=$(grep -i "EC2-Frontend" /tmp/instances.txt | awk '{print $2}')
+          API_IP=$(grep -i "EC2-API-Gateway" /tmp/instances.txt | awk '{print $2}')
+          CORE_IP=$(grep -i "EC2-CORE" /tmp/instances.txt | awk '{print $2}')
+          DB_IP=$(grep -i "EC2-DB" /tmp/instances.txt | awk '{print $2}')
+          MESSAGING_IP=$(grep -i "EC2-Messaging" /tmp/instances.txt | awk '{print $2}')
+          NOTIFICACIONES_IP=$(grep -i "EC2-Notificaciones" /tmp/instances.txt | awk '{print $2}')
+          REPORTES_IP=$(grep -i "EC2-Reportes" /tmp/instances.txt | awk '{print $2}')
+          MONITORING_IP=$(grep -i "EC2-Monitoring" /tmp/instances.txt | awk '{print $2}')
+          BASTION_IP=$(grep -i "EC-Bastion" /tmp/instances.txt | awk '{print $2}')
           
           echo ""
           echo "✅ IPs Asignadas:"
