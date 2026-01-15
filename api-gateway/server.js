@@ -105,10 +105,12 @@ const corsOrigins = [
   'http://localhost:5500',
   'http://localhost:3000',
   'http://localhost:8080',
-  'http://54.85.92.175',  // EC2_FRONTEND production IP
+  'http://54.85.92.175',  // Old EC2_FRONTEND production IP
   'https://54.85.92.175',
   'http://107.21.124.81',  // Old EC2_FRONTEND IP (keep for backwards compatibility)
-  'https://107.21.124.81'
+  'https://107.21.124.81',
+  'http://44.220.126.89',  // Current EC2_FRONTEND production IP
+  'https://44.220.126.89'
 ];
 
 app.use(cors({
