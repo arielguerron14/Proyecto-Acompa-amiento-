@@ -81,7 +81,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Get EC2 IPs (Dynamic Discovery)
@@ -121,18 +121,19 @@ jobs:
           # Query EC2 for running instances matching the filter (case-insensitive)
           INSTANCE_DATA=$(aws ec2 describe-instances \
             --filters "Name=instance-state-name,Values=running" \
-            --query "Reservations[].Instances[].{Name:Tags[?Key=='Name'].Value|[0],InstanceId:InstanceId,PublicIP:PublicIpAddress,PrivateIP:PrivateIpAddress}" \
-            --output json | jq -r ".[] | select(.Name | ascii_downcase | test(\"$INSTANCE_FILTER\"))")
+            --query "Reservations[].Instances[]" \
+            --output json | jq -r ".[] | select(.Tags[]? | select(.Key==\"Name\") | .Value | ascii_downcase | contains(\"$INSTANCE_FILTER\")) | {Name: (.Tags[]? | select(.Key==\"Name\") | .Value), InstanceId, PublicIpAddress, PrivateIpAddress} | @json" | head -1)
           
           if [ -z "$INSTANCE_DATA" ]; then
             echo "❌ ERROR: No running instance found matching filter: $INSTANCE_FILTER"
             exit 1
           fi
           
-          PUBLIC_IP=$(echo "$INSTANCE_DATA" | jq -r '.PublicIP')
-          PRIVATE_IP=$(echo "$INSTANCE_DATA" | jq -r '.PrivateIP')
-          INSTANCE_ID=$(echo "$INSTANCE_DATA" | jq -r '.InstanceId')
-          INSTANCE_NAME=$(echo "$INSTANCE_DATA" | jq -r '.Name')
+          # Parse JSON response
+          PUBLIC_IP=$(echo "$INSTANCE_DATA" | jq -r '.PublicIpAddress // empty')
+          PRIVATE_IP=$(echo "$INSTANCE_DATA" | jq -r '.PrivateIpAddress // empty')
+          INSTANCE_ID=$(echo "$INSTANCE_DATA" | jq -r '.InstanceId // empty')
+          INSTANCE_NAME=$(echo "$INSTANCE_DATA" | jq -r '.Name // empty')
           
           echo "✅ Found instance: $INSTANCE_NAME ($INSTANCE_ID)"
           echo "   Public IP (for SSH):  $PUBLIC_IP"
@@ -187,63 +188,6 @@ print("✅ Core services use internal Docker network - no IP changes needed for 
 EOFPY
           fi
 
-      
-      - name: Build Docker Images on GitHub
-        if: steps.defaults.outputs.rebuild_docker == 'true' && steps.defaults.outputs.build_location == 'github'
-        run: |
-          mkdir -p /tmp
-          
-          # Build microservices
-          for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros frontend-web; do
-            if [ -f "./$SERVICE/Dockerfile" ]; then
-              echo "Building $SERVICE..."
-              if [ "$SERVICE" = "frontend-web" ]; then
-                docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile ./$SERVICE
-              else
-                docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
-              fi
-              docker save $SERVICE:latest -o /tmp/$SERVICE.tar
-            fi
-          done
-          
-          # Build infrastructure services
-          # Zookeeper
-          if [ -f "./messaging/zookeeper/Dockerfile" ]; then
-            echo "Building zookeeper..."
-            docker build --no-cache -t proyecto-zookeeper:1.0 -f ./messaging/zookeeper/Dockerfile ./messaging
-            docker save proyecto-zookeeper:1.0 -o /tmp/proyecto-zookeeper.tar
-          fi
-          
-          # Kafka
-          if [ -f "./messaging/kafka/Dockerfile" ]; then
-            echo "Building kafka..."
-            docker build --no-cache -t proyecto-kafka:1.0 -f ./messaging/kafka/Dockerfile ./messaging
-            docker save proyecto-kafka:1.0 -o /tmp/proyecto-kafka.tar
-          fi
-          
-          # RabbitMQ
-          if [ -f "./messaging/rabbitmq/Dockerfile" ]; then
-            echo "Building rabbitmq..."
-            docker build --no-cache -t proyecto-rabbitmq:1.0 -f ./messaging/rabbitmq/Dockerfile ./messaging
-            docker save proyecto-rabbitmq:1.0 -o /tmp/proyecto-rabbitmq.tar
-          fi
-          
-          # Prometheus
-          if [ -f "./monitoring/prometheus/Dockerfile" ]; then
-            echo "Building prometheus..."
-            docker build --no-cache -t proyecto-prometheus:1.0 -f ./monitoring/prometheus/Dockerfile ./monitoring
-            docker save proyecto-prometheus:1.0 -o /tmp/proyecto-prometheus.tar
-          fi
-          
-          # Grafana
-          if [ -f "./monitoring/grafana/Dockerfile" ]; then
-            echo "Building grafana..."
-            docker build --no-cache -t proyecto-grafana:1.0 -f ./monitoring/grafana/Dockerfile ./monitoring
-            docker save proyecto-grafana:1.0 -o /tmp/proyecto-grafana.tar
-          fi
-          
-          echo "Docker images built successfully"
-          ls -lh /tmp/*.tar 2>/dev/null || echo "Warning: No tar files found"
       
       - name: Transfer files to EC2
         run: |
