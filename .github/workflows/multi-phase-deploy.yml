@@ -388,11 +388,11 @@ jobs:
               -o StrictHostKeyChecking=no \
               ubuntu@$IP << 'SCRIPT'
           cd /home/ubuntu/project
-          echo "Starting services..."
-          docker-compose -f docker-compose.ec2-core.yml up -d api-gateway core auth db frontend || docker-compose up -d api-gateway core auth db frontend
+          echo "Starting all services with docker-compose..."
+          docker-compose -f docker-compose.ec2-core.yml up -d
           sleep 5
           echo "Service status:"
-          docker-compose -f docker-compose.ec2-core.yml ps || docker-compose ps
+          docker-compose -f docker-compose.ec2-core.yml ps
           SCRIPT
           
           echo "✅ Services started"
