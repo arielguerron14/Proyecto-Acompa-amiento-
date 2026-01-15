@@ -149,8 +149,6 @@ jobs:
           fi
           
           echo "ip=$IP" >> $GITHUB_OUTPUT
-              ;;
-          esac
       
       - name: Setup SSH
         run: |
