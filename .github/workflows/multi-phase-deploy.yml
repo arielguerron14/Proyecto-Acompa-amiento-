@@ -202,13 +202,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
       
-      - name: Setup SSH Key
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: Add Host to Known Hosts
         run: |
           mkdir -p ~/.ssh
-          cat > ~/.ssh/deploy-key.pem << 'EOF'
-          ${{ secrets.SSH_PRIVATE_KEY }}
-          EOF
-          chmod 600 ~/.ssh/deploy-key.pem
           ssh-keyscan -H ${{ matrix.instance[5] }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
       - name: Display Deployment Info
@@ -227,8 +228,7 @@ jobs:
           IP="${{ matrix.instance[5] }}"
           
           echo "✓ SSH Connectivity Check:"
-          ssh -i ~/.ssh/deploy-key.pem \
-              -o ConnectTimeout=10 \
+          ssh -o ConnectTimeout=10 \
               -o StrictHostKeyChecking=no \
               ubuntu@$IP "echo 'SSH connection successful'; whoami; pwd"
       
@@ -241,7 +241,7 @@ jobs:
           echo "📤 Deploying code to $INSTANCE_NAME..."
           
           # Sync code to instance
-          rsync -avz -e "ssh -i ~/.ssh/deploy-key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no" \
+          rsync -avz -e "ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no" \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='.env' \
@@ -261,8 +261,7 @@ jobs:
           
           echo "🛑 Stopping services on $INSTANCE_NAME..."
           
-          ssh -i ~/.ssh/deploy-key.pem \
-              -o ConnectTimeout=10 \
+          ssh -o ConnectTimeout=10 \
               -o StrictHostKeyChecking=no \
               ubuntu@$IP << 'SCRIPT'
           cd /home/ubuntu/project
@@ -280,8 +279,7 @@ jobs:
           
           echo "🔨 Rebuilding Docker images on $INSTANCE_NAME..."
           
-          ssh -i ~/.ssh/deploy-key.pem \
-              -o ConnectTimeout=10 \
+          ssh -o ConnectTimeout=10 \
               -o StrictHostKeyChecking=no \
               ubuntu@$IP << 'SCRIPT'
           cd /home/ubuntu/project
@@ -300,8 +298,7 @@ jobs:
           
           echo "🚀 Starting services on $INSTANCE_NAME..."
           
-          ssh -i ~/.ssh/deploy-key.pem \
-              -o ConnectTimeout=10 \
+          ssh -o ConnectTimeout=10 \
               -o StrictHostKeyChecking=no \
               ubuntu@$IP << 'SCRIPT'
           cd /home/ubuntu/project
