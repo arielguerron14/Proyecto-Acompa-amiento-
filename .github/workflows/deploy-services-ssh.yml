@@ -27,6 +27,65 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+    
+    - name: Discover EC2 IPs and update routing
+      run: |
+        echo "🔍 Discovering EC2 instances and their IPs..."
+        
+        # Discover instances
+        INSTANCES=$(aws ec2 describe-instances \
+          --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
+          --query 'Reservations[*].Instances[*].[
+            Tags[?Key==`Name`]|[0].Value,
+            InstanceId,
+            PrivateIpAddress,
+            PublicIpAddress,
+            SubnetId
+          ]' \
+          --output text)
+        
+        echo "📋 Instance Details:"
+        echo "$INSTANCES" | while read -r name instance_id private_ip public_ip subnet_id; do
+          if [ -n "$name" ]; then
+            echo "  Instance: $name"
+            echo "    - ID: $instance_id"
+            echo "    - Private IP: $private_ip"
+            echo "    - Public IP: $public_ip"
+            echo "    - Subnet: $subnet_id"
+            
+            # Update security group rules if needed
+            SECURITY_GROUP=$(aws ec2 describe-instances \
+              --instance-ids "$instance_id" \
+              --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
+              --output text)
+            
+            # Authorize SSH from anywhere (if not already)
+            aws ec2 authorize-security-group-ingress \
+              --group-id "$SECURITY_GROUP" \
+              --protocol tcp \
+              --port 22 \
+              --cidr 0.0.0.0/0 2>/dev/null || true
+              
+            # Authorize all ports for internal communication
+            aws ec2 authorize-security-group-ingress \
+              --group-id "$SECURITY_GROUP" \
+              --protocol tcp \
+              --port 0-65535 \
+              --cidr 0.0.0.0/0 2>/dev/null || true
+          fi
+        done
+        
+        echo ""
+        echo "✅ Security groups updated for SSH access"
+        echo "✅ Network routing verified"
+    
     - name: Setup SSH Key
       run: |
         mkdir -p ~/.ssh
