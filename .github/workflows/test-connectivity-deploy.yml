@@ -128,48 +128,44 @@ jobs:
       - name: Deploy Frontend
         continue-on-error: true
         run: |
-          IP=$(grep -oE '^[0-9.]+' /tmp/ips.txt | head -1)
+          IP=$(head -1 /tmp/ips.txt | tr -d ' ')
           echo "🚀 Desplegando en Frontend ($IP)..."
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'EOF'
-          cd /home/ubuntu
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git || cd Proyecto-Acompa-amiento- && git pull
-          cd Proyecto-Acompa-amiento-
-          docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.frontend.yml up -d
-          docker ps | grep frontend || echo "Frontend container failed"
-          EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git 2>/dev/null || (cd Proyecto-Acompa-amiento- && git pull)
+            cd Proyecto-Acompa-amiento-
+            docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
+            docker-compose -f docker-compose.frontend.yml up -d
+            echo '✅ Frontend deployment done'
+          " || echo "❌ Frontend deployment failed"
 
       - name: Deploy API Gateway
         continue-on-error: true
         run: |
-          IPS=$(cat /tmp/ips.txt)
-          IP=$(echo "$IPS" | awk 'NR==2')
-          [ -z "$IP" ] && IP=$(echo "$IPS" | awk 'NR==1')
+          IP=$(tail -n +2 /tmp/ips.txt | head -1 | tr -d ' ')
           echo "🚀 Desplegando en API Gateway ($IP)..."
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'EOF'
-          cd /home/ubuntu
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git || cd Proyecto-Acompa-amiento- && git pull
-          cd Proyecto-Acompa-amiento-
-          docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.api-gateway.yml up -d
-          docker ps | grep api-gateway || echo "API Gateway container failed"
-          EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git 2>/dev/null || (cd Proyecto-Acompa-amiento- && git pull)
+            cd Proyecto-Acompa-amiento-
+            docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
+            docker-compose -f docker-compose.api-gateway.yml up -d
+            echo '✅ API Gateway deployment done'
+          " || echo "❌ API Gateway deployment failed"
 
       - name: Deploy Core Services
         continue-on-error: true
         run: |
-          IPS=$(cat /tmp/ips.txt)
-          IP=$(echo "$IPS" | awk 'NR==3')
-          [ -z "$IP" ] && IP=$(echo "$IPS" | awk 'NR==1')
+          IP=$(tail -n +3 /tmp/ips.txt | head -1 | tr -d ' ')
           echo "🚀 Desplegando en Core ($IP)..."
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'EOF'
-          cd /home/ubuntu
-          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git || cd Proyecto-Acompa-amiento- && git pull
-          cd Proyecto-Acompa-amiento-
-          docker-compose -f docker-compose.core.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.core.yml up -d
-          docker ps | grep core || echo "Core container failed"
-          EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git 2>/dev/null || (cd Proyecto-Acompa-amiento- && git pull)
+            cd Proyecto-Acompa-amiento-
+            docker-compose -f docker-compose.core.yml down 2>/dev/null || true
+            docker-compose -f docker-compose.core.yml up -d
+            echo '✅ Core deployment done'
+          " || echo "❌ Core deployment failed"
 
       - name: Deployment Summary
         if: always()
