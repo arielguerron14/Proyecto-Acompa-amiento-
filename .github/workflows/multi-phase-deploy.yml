@@ -298,7 +298,7 @@ jobs:
               -o StrictHostKeyChecking=no \
               ubuntu@$IP << 'SCRIPT'
           cd /home/ubuntu/project
-          docker-compose down 2>/dev/null || echo "Services already stopped"
+          docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || docker-compose down 2>/dev/null || echo "Services already stopped"
           SCRIPT
           
           echo "✅ Services stopped"
@@ -317,7 +317,7 @@ jobs:
               ubuntu@$IP << 'SCRIPT'
           cd /home/ubuntu/project
           echo "Building images..."
-          docker-compose build --no-cache api-gateway core auth db frontend 2>&1 | tail -20
+          docker-compose -f docker-compose.ec2-core.yml build --no-cache api-gateway core auth db frontend 2>&1 | tail -20 || docker-compose build --no-cache api-gateway core auth db frontend 2>&1 | tail -20
           docker image prune -f || true
           echo "Build complete"
           SCRIPT
@@ -336,10 +336,10 @@ jobs:
               ubuntu@$IP << 'SCRIPT'
           cd /home/ubuntu/project
           echo "Starting services..."
-          docker-compose up -d api-gateway core auth db frontend
+          docker-compose -f docker-compose.ec2-core.yml up -d api-gateway core auth db frontend || docker-compose up -d api-gateway core auth db frontend
           sleep 5
           echo "Service status:"
-          docker-compose ps
+          docker-compose -f docker-compose.ec2-core.yml ps || docker-compose ps
           SCRIPT
           
           echo "✅ Services started"
