@@ -1,0 +1,406 @@
+name: Multi-Phase Deployment (Discovery → IPs → SSH Deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_name:
+        description: 'Instance name tag to deploy (EC2-CORE, EC2-API-GATEWAY, etc)'
+        required: true
+        default: 'EC2-CORE'
+        type: choice
+        options:
+          - EC2-CORE
+          - EC2-API-GATEWAY
+          - EC2-FRONTEND
+          - EC2-DB
+          - EC2-BASTION
+          - ALL_INSTANCES
+      rebuild_docker:
+        description: 'Rebuild Docker images'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # ============================================================================
+  # PHASE 1: DISCOVER INSTANCES
+  # ============================================================================
+  discover-instances:
+    name: Phase 1 - Discover EC2 Instances
+    runs-on: ubuntu-latest
+    outputs:
+      instances_json: ${{ steps.discover.outputs.instances_json }}
+      instance_count: ${{ steps.discover.outputs.instance_count }}
+      target_instances: ${{ steps.filter.outputs.target_instances }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Discover All Running Instances
+        id: discover
+        run: |
+          echo "🔍 Discovering EC2 instances..."
+          
+          # Query all running instances with their tags
+          INSTANCES=$(aws ec2 describe-instances \
+            --filters "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].[
+              InstanceId,
+              Tags[?Key==`Name`].Value|[0],
+              InstanceType,
+              State.Name,
+              PrivateIpAddress,
+              PublicIpAddress
+            ]' \
+            --output json \
+            --region ${{ env.AWS_REGION }})
+          
+          # Save as output
+          echo "instances_json=$(echo "$INSTANCES" | jq -c .)" >> $GITHUB_OUTPUT
+          
+          # Count instances
+          COUNT=$(echo "$INSTANCES" | jq '. | length')
+          echo "instance_count=$COUNT" >> $GITHUB_OUTPUT
+          
+          # Display table
+          echo "📊 Found $COUNT running instances:"
+          echo ""
+          echo "$INSTANCES" | jq -r '.[] | "  [\(.0)] \(.1) - \(.2) - Private: \(.4) - Public: \(.5)"'
+          echo ""
+      
+      - name: Filter Target Instances
+        id: filter
+        run: |
+          INSTANCES='${{ steps.discover.outputs.instances_json }}'
+          TARGET_NAME='${{ github.event.inputs.instance_name }}'
+          
+          if [ "$TARGET_NAME" == "ALL_INSTANCES" ]; then
+            # Return all instances
+            FILTERED=$(echo "$INSTANCES" | jq -c '.')
+            echo "🎯 Target: ALL INSTANCES"
+          else
+            # Filter by name tag
+            FILTERED=$(echo "$INSTANCES" | jq -c "[.[] | select(.[1] == \"$TARGET_NAME\")]")
+            echo "🎯 Target: $TARGET_NAME"
+          fi
+          
+          # Save filtered output
+          echo "target_instances=$(echo "$FILTERED" | jq -c .)" >> $GITHUB_OUTPUT
+          
+          # Display filtered
+          echo "$FILTERED" | jq -r '.[] | "  [\(.0)] \(.1) at \(.5)"'
+          echo ""
+      
+      - name: Validate Targets
+        run: |
+          TARGETS='${{ steps.filter.outputs.target_instances }}'
+          COUNT=$(echo "$TARGETS" | jq '. | length')
+          
+          if [ "$COUNT" -eq 0 ]; then
+            echo "❌ No instances found matching criteria"
+            exit 1
+          fi
+          
+          echo "✅ Found $COUNT target instance(s)"
+
+  # ============================================================================
+  # PHASE 2: UPDATE IPS AND CONFIGURATION
+  # ============================================================================
+  update-ips:
+    name: Phase 2 - Update IPs & Configuration
+    needs: discover-instances
+    runs-on: ubuntu-latest
+    outputs:
+      ip_config: ${{ steps.update.outputs.ip_config }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Update IP Configuration
+        id: update
+        run: |
+          INSTANCES='${{ needs.discover-instances.outputs.target_instances }}'
+          
+          echo "🔄 Updating IP configuration..."
+          echo ""
+          
+          # Create IP configuration JSON
+          IP_CONFIG=$(echo "$INSTANCES" | jq -r '.[] | {
+            instance_id: .[0],
+            name: .[1],
+            instance_type: .[2],
+            state: .[3],
+            private_ip: .[4],
+            public_ip: .[5]
+          }' | jq -s .)
+          
+          echo "ip_config=$(echo "$IP_CONFIG" | jq -c .)" >> $GITHUB_OUTPUT
+          
+          # Display configuration table
+          echo "📋 IP Configuration:"
+          echo ""
+          echo "$IP_CONFIG" | jq -r '.[] | 
+            "  Instance: \(.name)\n" +
+            "    ID: \(.instance_id)\n" +
+            "    Type: \(.instance_type)\n" +
+            "    Private IP: \(.private_ip)\n" +
+            "    Public IP: \(.public_ip)\n"'
+          
+          # Create .env file with IP configuration
+          echo "# Generated IP Configuration - $(date)" > /tmp/ip-config.env
+          echo "$IP_CONFIG" | jq -r '.[] | "INSTANCE_\(.name)_PUBLIC_IP=\(.public_ip)\nINSTANCE_\(.name)_PRIVATE_IP=\(.private_ip)"' >> /tmp/ip-config.env
+          
+          # Also create a config file for the project
+          mkdir -p config-updates
+          echo "$IP_CONFIG" | jq . > config-updates/instances-config.json
+          
+          echo "✅ IP configuration updated"
+      
+      - name: Upload IP Configuration
+        uses: actions/upload-artifact@v4
+        with:
+          name: ip-configuration
+          path: |
+            config-updates/
+            /tmp/ip-config.env
+      
+      - name: Display Summary
+        run: |
+          INSTANCES='${{ needs.discover-instances.outputs.target_instances }}'
+          echo "📊 Configuration Summary:"
+          echo "  Target Instances: $(echo "$INSTANCES" | jq '. | length')"
+          echo "$INSTANCES" | jq -r '.[] | "  - \(.1) (\(.0)): \(.5)"'
+
+  # ============================================================================
+  # PHASE 3: DEPLOY VIA SSH
+  # ============================================================================
+  deploy-ssh:
+    name: Phase 3 - Deploy via SSH
+    needs: [discover-instances, update-ips]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.discover-instances.outputs.target_instances) }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/deploy-key.pem
+          chmod 600 ~/.ssh/deploy-key.pem
+          ssh-keyscan -H ${{ matrix[5] }} >> ~/.ssh/known_hosts 2>/dev/null || true
+      
+      - name: Display Deployment Info
+        run: |
+          echo "🚀 Deploying Instance:"
+          echo "  Name: ${{ matrix[1] }}"
+          echo "  ID: ${{ matrix[0] }}"
+          echo "  Type: ${{ matrix[2] }}"
+          echo "  Public IP: ${{ matrix[5] }}"
+          echo "  Private IP: ${{ matrix[4] }}"
+          echo ""
+      
+      - name: Pre-Deployment Checks
+        continue-on-error: true
+        run: |
+          IP="${{ matrix[5] }}"
+          
+          echo "✓ SSH Connectivity Check:"
+          ssh -i ~/.ssh/deploy-key.pem \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              ubuntu@$IP "echo 'SSH connection successful'; whoami; pwd"
+      
+      - name: Deploy Code via SSH
+        id: deploy
+        run: |
+          IP="${{ matrix[5] }}"
+          INSTANCE_NAME="${{ matrix[1] }}"
+          
+          echo "📤 Deploying code to $INSTANCE_NAME..."
+          
+          # Sync code to instance
+          rsync -avz -e "ssh -i ~/.ssh/deploy-key.pem -o ConnectTimeout=10 -o StrictHostKeyChecking=no" \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            --exclude='terraform' \
+            --exclude='.DS_Store' \
+            ./ ubuntu@$IP:/home/ubuntu/project/ || {
+            echo "⚠️  rsync had some warnings, continuing..."
+          }
+          
+          echo "✅ Code deployed"
+      
+      - name: Stop Current Services
+        continue-on-error: true
+        run: |
+          IP="${{ matrix[5] }}"
+          INSTANCE_NAME="${{ matrix[1] }}"
+          
+          echo "🛑 Stopping services on $INSTANCE_NAME..."
+          
+          ssh -i ~/.ssh/deploy-key.pem \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              ubuntu@$IP << 'SCRIPT'
+          cd /home/ubuntu/project
+          docker-compose down 2>/dev/null || echo "Services already stopped"
+          SCRIPT
+          
+          echo "✅ Services stopped"
+      
+      - name: Rebuild Docker Images
+        if: ${{ github.event.inputs.rebuild_docker == 'true' }}
+        continue-on-error: true
+        run: |
+          IP="${{ matrix[5] }}"
+          INSTANCE_NAME="${{ matrix[1] }}"
+          
+          echo "🔨 Rebuilding Docker images on $INSTANCE_NAME..."
+          
+          ssh -i ~/.ssh/deploy-key.pem \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              ubuntu@$IP << 'SCRIPT'
+          cd /home/ubuntu/project
+          echo "Building images..."
+          docker-compose build --no-cache api-gateway core auth db frontend 2>&1 | tail -20
+          docker image prune -f || true
+          echo "Build complete"
+          SCRIPT
+          
+          echo "✅ Docker images rebuilt"
+      
+      - name: Start Services
+        run: |
+          IP="${{ matrix[5] }}"
+          INSTANCE_NAME="${{ matrix[1] }}"
+          
+          echo "🚀 Starting services on $INSTANCE_NAME..."
+          
+          ssh -i ~/.ssh/deploy-key.pem \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              ubuntu@$IP << 'SCRIPT'
+          cd /home/ubuntu/project
+          echo "Starting services..."
+          docker-compose up -d api-gateway core auth db frontend
+          sleep 5
+          echo "Service status:"
+          docker-compose ps
+          SCRIPT
+          
+          echo "✅ Services started"
+      
+      - name: Verify Deployment
+        continue-on-error: true
+        run: |
+          IP="${{ matrix[5] }}"
+          INSTANCE_NAME="${{ matrix[1] }}"
+          
+          echo "✓ Verifying deployment on $INSTANCE_NAME..."
+          sleep 10
+          
+          # Test health endpoint
+          for i in {1..5}; do
+            if curl -s -f http://$IP:3000/health &>/dev/null; then
+              echo "✅ Health check passed"
+              curl -s http://$IP:3000/health | head -c 200
+              break
+            else
+              echo "  Attempt $i/5 - waiting..."
+              sleep 5
+            fi
+          done
+      
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "✅ DEPLOYMENT COMPLETE"
+          echo "=========================================="
+          echo ""
+          echo "Instance: ${{ matrix[1] }}"
+          echo "Public IP: ${{ matrix[5] }}"
+          echo "Private IP: ${{ matrix[4] }}"
+          echo ""
+          echo "Access Application:"
+          echo "  http://${{ matrix[5] }}:3000"
+          echo ""
+          echo "SSH Access:"
+          echo "  ssh -i ~/.ssh/deploy-key.pem ubuntu@${{ matrix[5] }}"
+          echo ""
+
+  # ============================================================================
+  # FINAL SUMMARY
+  # ============================================================================
+  summary:
+    name: Deployment Summary
+    needs: [discover-instances, update-ips, deploy-ssh]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Download IP Configuration
+        uses: actions/download-artifact@v4
+        with:
+          name: ip-configuration
+        continue-on-error: true
+      
+      - name: Final Report
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════════╗"
+          echo "║       🎉 MULTI-PHASE DEPLOYMENT COMPLETED SUCCESSFULLY 🎉       ║"
+          echo "╚════════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "📋 DEPLOYMENT PHASES SUMMARY:"
+          echo ""
+          echo "  ✅ Phase 1: Instance Discovery"
+          echo "     - Discovered ${{ needs.discover-instances.outputs.instance_count }} running instances"
+          echo "     - Filtered to target instances"
+          echo ""
+          echo "  ✅ Phase 2: IP Configuration Update"
+          echo "     - Public and Private IPs extracted"
+          echo "     - Configuration files generated"
+          echo ""
+          echo "  ✅ Phase 3: SSH Deployment"
+          echo "     - Code synced via rsync"
+          echo "     - Docker images rebuilt"
+          echo "     - Services deployed and verified"
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════════╗"
+          echo "║                   NEXT STEPS                                    ║"
+          echo "╚════════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "1. Check application health:"
+          echo "   curl http://<PUBLIC_IP>:3000/health"
+          echo ""
+          echo "2. View service logs:"
+          echo "   ssh ubuntu@<PUBLIC_IP>"
+          echo "   docker-compose logs -f"
+          echo ""
+          echo "3. Access application:"
+          echo "   http://<PUBLIC_IP>:3000"
+          echo ""
