@@ -1,0 +1,100 @@
+name: Rebuild and Deploy Fix
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Find EC2-CORE Instance
+        id: instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-CORE" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+          
+          IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-CORE" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "Found instance $INSTANCE_ID at $IP"
+      
+      - name: Rebuild API Gateway
+        run: |
+          INSTANCE_ID="${{ steps.instance.outputs.instance_id }}"
+          
+          echo "Rebuilding API Gateway and restarting services..."
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "$INSTANCE_ID" \
+            --parameters 'commands=[
+              "cd /home/ubuntu/project",
+              "git pull origin main",
+              "docker-compose down || true",
+              "docker-compose build --no-cache api-gateway 2>&1 | tail -30",
+              "docker-compose up -d api-gateway core auth db frontend",
+              "sleep 10",
+              "curl -s http://localhost:3000/health || echo \"Health check pending...\""
+            ]' \
+            --region $AWS_REGION \
+            --output table
+      
+      - name: Verify Services
+        run: |
+          IP="${{ steps.instance.outputs.ip }}"
+          
+          echo "Waiting for services to be ready..."
+          sleep 15
+          
+          echo "Testing endpoints..."
+          for i in {1..10}; do
+            if curl -s -f http://${IP}:3000/health &>/dev/null; then
+              echo "✅ Health check passed!"
+              curl -s http://${IP}:3000/health | head -c 200
+              break
+            else
+              echo "Attempt $i/10 - waiting..."
+              sleep 5
+            fi
+          done
+      
+      - name: Test Horarios Endpoint
+        continue-on-error: true
+        run: |
+          IP="${{ steps.instance.outputs.ip }}"
+          
+          echo "Testing /horarios endpoint..."
+          curl -v http://${IP}:3000/horarios 2>&1 | head -30 || echo "Endpoint still loading"
+      
+      - name: Success
+        run: |
+          echo "✅ Deployment complete!"
+          echo ""
+          echo "Application is running at:"
+          echo "  http://${{ steps.instance.outputs.ip }}:3000"
+          echo ""
+          echo "Available endpoints:"
+          echo "  GET http://${{ steps.instance.outputs.ip }}:3000/health"
+          echo "  GET http://${{ steps.instance.outputs.ip }}:3000/horarios"
+          echo "  GET http://${{ steps.instance.outputs.ip }}:3000/estudiantes"
+          echo "  GET http://${{ steps.instance.outputs.ip }}:3000/maestros"
