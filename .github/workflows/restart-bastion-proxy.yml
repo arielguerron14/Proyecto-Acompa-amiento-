@@ -10,21 +10,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup SSH Keys
+      - name: Setup SSH Key
         env:
-          BASTION_KEY: ${{ secrets.BASTION_KEY }}
-          CORE_KEY: ${{ secrets.LABSUSER_PRIVATE_KEY }}
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$BASTION_KEY" > ~/.ssh/bastion.pem
-          echo "$CORE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/*.pem
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           cat >> ~/.ssh/config << 'EOF'
           Host bastion
             HostName 34.235.224.202
             User ec2-user
-            IdentityFile ~/.ssh/bastion.pem
+            IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
           
