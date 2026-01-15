@@ -84,56 +84,72 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
           aws-region: ${{ env.AWS_REGION }}
       
-      - name: Get EC2 IPs (Dynamic Discovery)
+      - name: Get EC2 IPs (Dynamic Discovery with Exact Tag Match)
         id: get-ip
         run: |
           INSTANCE="${{ github.event.inputs.instance }}"
           
-          # Map instance name to EC2 tag or name filter
+          # Map instance name to EXACT EC2 tag name
           case "$INSTANCE" in
             EC2_BASTION)
-              INSTANCE_FILTER="bastion"
+              TAG_NAME="EC-Bastion"
               ;;
             EC2_CORE)
-              INSTANCE_FILTER="core"
+              TAG_NAME="EC2-CORE"
               ;;
             EC2_DB)
-              INSTANCE_FILTER="database|db"
+              TAG_NAME="EC2-DB"
               ;;
             EC2_API_GATEWAY)
-              INSTANCE_FILTER="api-gateway"
+              TAG_NAME="EC2-API-Gateway"
               ;;
             EC2_FRONTEND)
-              INSTANCE_FILTER="frontend"
+              TAG_NAME="EC2-Frontend"
               ;;
             EC2_MESSAGING)
-              INSTANCE_FILTER="messaging"
+              TAG_NAME="EC2-Messaging"
               ;;
             EC2_MONITORING)
-              INSTANCE_FILTER="monitoring"
+              TAG_NAME="EC2-Monitoring"
               ;;
             *)
-              echo "Unknown instance type"
+              echo "❌ Unknown instance type: $INSTANCE"
               exit 1
               ;;
           esac
           
-          # Query EC2 for running instances matching the filter (case-insensitive)
-          INSTANCE_DATA=$(aws ec2 describe-instances \
-            --filters "Name=instance-state-name,Values=running" \
-            --query "Reservations[].Instances[]" \
-            --output json | jq -r ".[] | select(.Tags[]? | select(.Key==\"Name\") | .Value | ascii_downcase | contains(\"$INSTANCE_FILTER\")) | {Name: (.Tags[]? | select(.Key==\"Name\") | .Value), InstanceId, PublicIpAddress, PrivateIpAddress} | @json" | head -1)
+          echo "🔍 Looking for instance with exact tag Name=$TAG_NAME"
           
-          if [ -z "$INSTANCE_DATA" ]; then
-            echo "❌ ERROR: No running instance found matching filter: $INSTANCE_FILTER"
+          # Query EC2 for running instance with EXACT tag name match
+          INSTANCE_DATA=$(aws ec2 describe-instances \
+            --region $AWS_REGION \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=$TAG_NAME" \
+            --query 'Reservations[0].Instances[0]' \
+            --output json)
+          
+          if [ "$INSTANCE_DATA" = "null" ] || [ -z "$INSTANCE_DATA" ]; then
+            echo "❌ ERROR: No running instance found with tag Name=$TAG_NAME"
+            echo ""
+            echo "Available running instances:"
+            aws ec2 describe-instances \
+              --region $AWS_REGION \
+              --filters "Name=instance-state-name,Values=running" \
+              --query 'Reservations[*].Instances[*].[Tags[?Key==`Name`].Value|[0],InstanceId,PublicIpAddress,State.Name]' \
+              --output table
             exit 1
           fi
           
-          # Parse JSON response
+          # Extract values using exact jq queries
           PUBLIC_IP=$(echo "$INSTANCE_DATA" | jq -r '.PublicIpAddress // empty')
           PRIVATE_IP=$(echo "$INSTANCE_DATA" | jq -r '.PrivateIpAddress // empty')
           INSTANCE_ID=$(echo "$INSTANCE_DATA" | jq -r '.InstanceId // empty')
-          INSTANCE_NAME=$(echo "$INSTANCE_DATA" | jq -r '.Name // empty')
+          INSTANCE_NAME=$(echo "$INSTANCE_DATA" | jq -r '.Tags[] | select(.Key=="Name") | .Value' | head -1)
+          
+          # Validate we got an IP
+          if [ -z "$PUBLIC_IP" ] || [ "$PUBLIC_IP" = "null" ]; then
+            echo "❌ ERROR: Could not get public IP for instance $TAG_NAME"
+            exit 1
+          fi
           
           echo "✅ Found instance: $INSTANCE_NAME ($INSTANCE_ID)"
           echo "   Public IP (for SSH):  $PUBLIC_IP"
