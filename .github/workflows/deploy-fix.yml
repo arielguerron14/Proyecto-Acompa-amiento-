@@ -13,7 +13,7 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.LABSUSER_PRIVATE_KEY }}" > ~/.ssh/labsuser.pem
+          cp ssh-key-ec2.pem ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
 
@@ -67,10 +67,8 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.LABSUSER_PRIVATE_KEY }}" > ~/.ssh/labsuser.pem
+          cp ssh-key-ec2.pem ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
-
-      - name: Restart Services on Core
         run: |
           echo "Restarting services on Core..."
           ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@172.31.71.182 << 'EOF'
