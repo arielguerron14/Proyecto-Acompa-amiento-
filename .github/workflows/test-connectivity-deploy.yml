@@ -237,29 +237,32 @@ jobs:
             echo ""
             echo "🔍 Diagnosticando $NAME ($IP)..."
             
-            if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DIAGNOSE' 2>&1; then
-              set -e
-              echo "  ✅ Conectado"
-              
-              # Ver contenedores
-              if ! command -v docker &> /dev/null; then
-                echo "  ⚠️  Docker no instalado, saltando"
-                exit 0
-              fi
-              
-              echo "  📦 Contenedores:"
-              docker ps -a --format "table {{.Names}}\t{{.Status}}" | head -10 | sed 's/^/    /'
-              
-              # Reiniciar servicios si están caídos
-              if [ "$NAME" = "Core" ]; then
-                echo "  🔄 Reiniciando servicios de Core..."
-                cd ~/Proyecto-Acompa-amiento- 2>/dev/null || exit 0
-                sudo docker-compose -f docker-compose.core.yml down 2>/dev/null || true
-                sudo docker-compose -f docker-compose.core.yml up -d 2>/dev/null || true
-                echo "  ✅ Core reiniciado"
-              fi
-            DIAGNOSE
-            then
+            # Comando remoto para diagnosticar
+            CMD=$(cat << 'REMOTE_CMD'
+          set -e
+          echo "  ✅ Conectado"
+          
+          # Ver contenedores
+          if ! command -v docker &> /dev/null; then
+            echo "  ⚠️  Docker no instalado, saltando"
+            exit 0
+          fi
+          
+          echo "  📦 Contenedores:"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}" | head -10 | sed 's/^/    /'
+          
+          # Reiniciar servicios si están caídos
+          if [ "$NAME" = "Core" ]; then
+            echo "  🔄 Reiniciando servicios de Core..."
+            cd ~/Proyecto-Acompa-amiento- 2>/dev/null || exit 0
+            sudo docker-compose -f docker-compose.core.yml down 2>/dev/null || true
+            sudo docker-compose -f docker-compose.core.yml up -d 2>/dev/null || true
+            echo "  ✅ Core reiniciado"
+          fi
+REMOTE_CMD
+            )
+            
+            if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "$CMD" 2>&1; then
               return 0
             else
               echo "  ❌ No se pudo conectar a $NAME"
