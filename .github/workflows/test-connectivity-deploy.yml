@@ -116,62 +116,122 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
-          ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Get Instance IPs
+      - name: Discover & Assign Instances
+        id: instances
         run: |
+          echo "🔍 Descubriendo instancias AWS..."
           aws ec2 describe-instances \
             --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[].Instances[].PublicIpAddress' \
-            --output text | tr ' ' '\n' > /tmp/ips.txt
-          echo "IPs discovered:"
-          cat /tmp/ips.txt
-          echo "Total IPs: $(wc -l < /tmp/ips.txt)"
+            --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value|[0],PublicIpAddress,InstanceId]' \
+            --output text | sort > /tmp/instances.txt
+          
+          echo "📋 Instancias encontradas:"
+          cat /tmp/instances.txt
+          
+          # Asignar IPs a variables por nombre de instancia
+          FRONTEND_IP=$(grep -i "frontend" /tmp/instances.txt | awk '{print $2}')
+          API_IP=$(grep -i "api" /tmp/instances.txt | awk '{print $2}')
+          CORE_IP=$(grep -i "core" /tmp/instances.txt | awk '{print $2}')
+          
+          echo ""
+          echo "✅ IPs Asignadas:"
+          echo "  Frontend: $FRONTEND_IP"
+          echo "  API Gateway: $API_IP"
+          echo "  Core: $CORE_IP"
+          
+          echo "frontend_ip=$FRONTEND_IP" >> $GITHUB_OUTPUT
+          echo "api_ip=$API_IP" >> $GITHUB_OUTPUT
+          echo "core_ip=$CORE_IP" >> $GITHUB_OUTPUT
 
-      - name: Deploy Frontend
+      - name: Deploy to Frontend
         continue-on-error: true
         run: |
-          IP=$(head -1 /tmp/ips.txt | tr -d ' ')
-          echo "🚀 Desplegando en Frontend ($IP)..."
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "
-            cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git 2>/dev/null || (cd Proyecto-Acompa-amiento- && git pull)
+          IP="${{ steps.instances.outputs.frontend_ip }}"
+          if [ -z "$IP" ]; then
+            echo "❌ Frontend IP no encontrada"
+            exit 1
+          fi
+          echo "🚀 Desplegando en FRONTEND ($IP)..."
+          ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
+          set -e
+          echo "📦 Clonando repositorio..."
+          cd /home/ubuntu
+          if [ -d "Proyecto-Acompa-amiento-" ]; then
             cd Proyecto-Acompa-amiento-
-            docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
-            docker-compose -f docker-compose.frontend.yml up -d
-            echo '✅ Frontend deployment done'
-          " || echo "❌ Frontend deployment failed"
+            git pull origin main
+          else
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          echo "🐳 Desplegando Docker Compose..."
+          docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.frontend.yml up -d
+          echo "✅ Frontend desplegado exitosamente"
+          docker ps | grep frontend
+          DEPLOY
 
-      - name: Deploy API Gateway
+      - name: Deploy to API Gateway
         continue-on-error: true
         run: |
-          IP=$(tail -n +2 /tmp/ips.txt | head -1 | tr -d ' ')
-          echo "🚀 Desplegando en API Gateway ($IP)..."
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "
-            cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git 2>/dev/null || (cd Proyecto-Acompa-amiento- && git pull)
+          IP="${{ steps.instances.outputs.api_ip }}"
+          if [ -z "$IP" ]; then
+            echo "❌ API Gateway IP no encontrada"
+            exit 1
+          fi
+          echo "🚀 Desplegando en API GATEWAY ($IP)..."
+          ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
+          set -e
+          echo "📦 Clonando repositorio..."
+          cd /home/ubuntu
+          if [ -d "Proyecto-Acompa-amiento-" ]; then
             cd Proyecto-Acompa-amiento-
-            docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
-            docker-compose -f docker-compose.api-gateway.yml up -d
-            echo '✅ API Gateway deployment done'
-          " || echo "❌ API Gateway deployment failed"
+            git pull origin main
+          else
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          echo "🐳 Desplegando Docker Compose..."
+          docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.api-gateway.yml up -d
+          echo "✅ API Gateway desplegado exitosamente"
+          docker ps | grep api
+          DEPLOY
 
-      - name: Deploy Core Services
+      - name: Deploy to Core Services
         continue-on-error: true
         run: |
-          IP=$(tail -n +3 /tmp/ips.txt | head -1 | tr -d ' ')
-          echo "🚀 Desplegando en Core ($IP)..."
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "
-            cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git 2>/dev/null || (cd Proyecto-Acompa-amiento- && git pull)
+          IP="${{ steps.instances.outputs.core_ip }}"
+          if [ -z "$IP" ]; then
+            echo "❌ Core IP no encontrada"
+            exit 1
+          fi
+          echo "🚀 Desplegando en CORE SERVICES ($IP)..."
+          ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
+          set -e
+          echo "📦 Clonando repositorio..."
+          cd /home/ubuntu
+          if [ -d "Proyecto-Acompa-amiento-" ]; then
             cd Proyecto-Acompa-amiento-
-            docker-compose -f docker-compose.core.yml down 2>/dev/null || true
-            docker-compose -f docker-compose.core.yml up -d
-            echo '✅ Core deployment done'
-          " || echo "❌ Core deployment failed"
+            git pull origin main
+          else
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          echo "🐳 Desplegando Docker Compose..."
+          docker-compose -f docker-compose.core.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.core.yml up -d
+          echo "✅ Core Services desplegado exitosamente"
+          docker ps | grep core
+          DEPLOY
 
       - name: Deployment Summary
         if: always()
         run: |
-          echo "## ✅ Despliegue completado"
-          echo "Verifica los logs en las instancias para detalles completos"
+          echo "## 🎯 Resumen de Despliegue"
+          echo ""
+          echo "✅ Frontend: ${{ steps.instances.outputs.frontend_ip }}"
+          echo "✅ API Gateway: ${{ steps.instances.outputs.api_ip }}"
+          echo "✅ Core Services: ${{ steps.instances.outputs.core_ip }}"
+          echo ""
+          echo "Verifica los logs arriba para detalles de cada despliegue"
