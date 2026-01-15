@@ -176,15 +176,81 @@ Archivos principales:
 
 Ver [REFACTORING_DESIGN_PRINCIPLES.md](./REFACTORING_DESIGN_PRINCIPLES.md) para detalles.
 
+## ☁️ Despliegue en AWS EC2
+
+Nuestro proyecto incluye un **Workflow de GitHub Actions con descubrimiento dinámico de IPs**. No requiere hardcoding de direcciones IP.
+
+### Características del Despliegue
+✅ **IPs Dinámicas** - Detecta automáticamente IPs públicas y privadas  
+✅ **Routing Inteligente** - IP pública para SSH, IP privada para inter-servicio  
+✅ **Multi-Cuenta** - Funciona en cualquier cuenta AWS  
+✅ **Automático** - Build, deploy y verificación automáticas  
+
+### Guía Rápida
+
+**1. Configura GitHub Secrets:**
+```bash
+# Usa el script interactivo
+python3 setup-github-secrets.py
+
+# O ingresa manualmente en:
+# Settings → Secrets and variables → Actions
+```
+
+Requiere:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_SESSION_TOKEN` (opcional)
+- `SSH_PRIVATE_KEY` (base64)
+
+**2. Etiqueta tus instancias EC2:**
+```
+Tag: Name = "EC2-CORE"
+Tag: Name = "EC2-API-GATEWAY"
+(etc.)
+```
+
+**3. Ejecuta el workflow:**
+```
+GitHub → Actions → Deploy to EC2 (Dynamic IP Discovery) → Run workflow
+```
+
+### Documentación Completa
+- 📖 [QUICK_START.md](./QUICK_START.md) - Checklist paso a paso
+- 📖 [WORKFLOW_SETUP.md](./WORKFLOW_SETUP.md) - Configuración detallada
+- 📖 [IP_ROUTING_STRATEGY.md](./IP_ROUTING_STRATEGY.md) - Teoría de networking
+- 📖 [SOLUTION_SUMMARY.md](./SOLUTION_SUMMARY.md) - Resumen de cambios
+
 ## 🚨 Troubleshooting
 
-### Puerto en uso
+### Despliegue en AWS
+
+**Error: "No running instance found"**
+- Verifica que la instancia esté en estado "running"
+- Confirma que tenga el tag Name configurado
+- Revisa que esté en la región correcta
+
+**Error: "SSH access denied"**
+- Verifica que SSH_PRIVATE_KEY esté en base64
+- Confirma que el archivo .pem es válido
+- Intenta SSH manualmente: `ssh -i key.pem ubuntu@PUBLIC_IP`
+
+**Servicios no inician**
+- SSH a la instancia
+- Revisa logs: `docker-compose logs [servicio]`
+- Verifica security groups permiten el tráfico
+
+Ver [WORKFLOW_SETUP.md](./WORKFLOW_SETUP.md) "Troubleshooting" para más detalles.
+
+### Desarrollo Local
+
+**Puerto en uso**
 ```bash
 netstat -ano | findstr :3000
 taskkill /PID <PID> /F
 ```
 
-### MongoDB no conecta
+**MongoDB no conecta**
 ```bash
 docker-compose ps
 docker-compose restart
