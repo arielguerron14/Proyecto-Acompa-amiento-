@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const { createProxyMiddleware } = require('http-proxy-middleware');
-const sharedConfig = require('../shared-config');
+const serviceRegistry = require('./config/service-registry');
+const { proxyMiddleware, configEndpoint, servicesEndpoint, healthEndpoint } = require('./middleware/proxy');
 
 // Global error handler for unhandled exceptions
 process.on('uncaughtException', (err) => {
@@ -22,94 +22,30 @@ try {
   console.log('⚠️  dotenv not available or .env file missing, using environment variables only');
 }
 
-console.log('🚀 Starting API Gateway server...');
-console.log('Attempting to load configuration...');
+console.log('🚀 Starting API Gateway server with Service Registry...');
 
-let config = {};
-try {
-  // Intentar cargar config centralizada primero
-  config = sharedConfig.getConfig();
-  console.log('✅ Configuración centralizada cargada');
-  console.log('AUTH_SERVICE (from sharedConfig):', sharedConfig.getServiceUrl('auth'));
-  console.log('ESTUDIANTES_SERVICE (from sharedConfig):', sharedConfig.getServiceUrl('estudiantes'));
-  console.log('MAESTROS_SERVICE (from sharedConfig):', sharedConfig.getServiceUrl('maestros'));
-  
-  // Mapear a variables conocidas, BUT prioritize environment variables for inter-EC2 communication
-  // Environment variables have public IPs for EC2 communication, infrastructure.config has private IPs
-  config.AUTH_SERVICE = process.env.AUTH_SERVICE || sharedConfig.getServiceUrl('auth');
-  config.ESTUDIANTES_SERVICE = process.env.ESTUDIANTES_SERVICE || sharedConfig.getServiceUrl('estudiantes');
-  config.MAESTROS_SERVICE = process.env.MAESTROS_SERVICE || sharedConfig.getServiceUrl('maestros');
-  config.REPORTES_EST_SERVICE = process.env.REPORTES_EST_SERVICE || sharedConfig.getServiceUrl('reportes-est');
-  config.REPORTES_MAEST_SERVICE = process.env.REPORTES_MAEST_SERVICE || sharedConfig.getServiceUrl('reportes-maest');
-  config.NOTIFICACIONES_SERVICE = process.env.NOTIFICACIONES_SERVICE || sharedConfig.getServiceUrl('notificaciones');
-  config.PORT = process.env.PORT || sharedConfig.getPort('gateway') || 8080;
-  
-  console.log('🔧 Final CONFIG:');
-  console.log('  AUTH_SERVICE:', config.AUTH_SERVICE);
-  console.log('  ESTUDIANTES_SERVICE:', config.ESTUDIANTES_SERVICE);
-  console.log('  MAESTROS_SERVICE:', config.MAESTROS_SERVICE);
-} catch (e) {
-  console.warn('⚠️  Error cargando config centralizada:', e.message);
-  // Fallback a config local
-  try {
-    const localConfig = require('./src/config');
-    config = localConfig;
-    console.log('✅ Config local cargada');
-  } catch (e2) {
-    console.error('❌ Error cargando config local:', e2.message);
-    config = {
-      AUTH_SERVICE: process.env.AUTH_SERVICE || 'http://localhost:3000',
-      ESTUDIANTES_SERVICE: process.env.ESTUDIANTES_SERVICE || 'http://localhost:3001',
-      MAESTROS_SERVICE: process.env.MAESTROS_SERVICE || 'http://localhost:3002',
-      REPORTES_EST_SERVICE: process.env.REPORTES_EST_SERVICE || 'http://localhost:5003',
-      REPORTES_MAEST_SERVICE: process.env.REPORTES_MAEST_SERVICE || 'http://localhost:5004',
-      NOTIFICACIONES_SERVICE: process.env.NOTIFICACIONES_SERVICE || 'http://localhost:5005',
-      PORT: process.env.PORT || 8080,
-    };
-    console.log('⚠️  Usando config por defecto (localhost)');
-  }
-}
+// Initialize Service Registry with environment variables
+const CORE_HOST = process.env.CORE_HOST || process.env.EC2_CORE_IP || 'http://172.31.79.241';
+const PORT = process.env.API_GATEWAY_PORT || process.env.PORT || 8080;
+
+console.log('📋 Service Registry Configuration:');
+console.log(`  CORE_HOST: ${CORE_HOST}`);
+console.log(`  PORT: ${PORT}`);
+console.log(`  All services will be routed through: ${CORE_HOST}`);
+console.log(`  🔑 KEY: Change CORE_HOST once and all routes automatically update`);
 
 const app = express();
-
-// Basic request logger + timing and client connection events
-app.use((req, res, next) => {
-  req._startTime = Date.now();
-  console.log(`📨 ${req.method} ${req.url}`);
-
-  // Log when response finishes normally
-  res.on('finish', () => {
-    const elapsed = Date.now() - req._startTime;
-    console.log(`✅ Response finished: ${req.method} ${req.url} -> ${res.statusCode} (${elapsed}ms)`);
-  });
-
-  // Log if the client connection closes before response finished
-  res.on('close', () => {
-    const elapsed = Date.now() - req._startTime;
-    // If response already finished, this is a normal close; otherwise it's an early abort
-    if (res.writableEnded || res.headersSent && res.finished) {
-      console.log(`ℹ️  Client connection closed (normal): ${req.method} ${req.url} after ${elapsed}ms`);
-    } else {
-      console.log(`⚠️  Client connection closed early: ${req.method} ${req.url} after ${elapsed}ms`);
-    }
-  });
-
-  next();
-});
-
-// Para /horarios, usar express.raw() y reenviar el buffer tal cual, sin manipulación extra
-// Eliminar manejo manual de raw body para /horarios. Usar solo express.json() global.
 
 // CORS - Allow frontend and development origins
 const corsOrigins = [
   'http://localhost:5500',
   'http://localhost:3000',
   'http://localhost:8080',
-  'http://54.85.92.175',  // Old EC2_FRONTEND production IP
+  'http://54.85.92.175',
   'https://54.85.92.175',
-  'http://107.21.124.81',  // Old EC2_FRONTEND IP (keep for backwards compatibility)
+  'http://107.21.124.81',
   'https://107.21.124.81',
-  'http://44.220.126.89',  // Current EC2_FRONTEND production IP
+  'http://44.220.126.89',
   'https://44.220.126.89'
 ];
 
@@ -120,7 +56,6 @@ app.use(cors({
   credentials: true
 }));
 
-// Responder manualmente a OPTIONS con los headers CORS correctos
 app.options('*', cors({
   origin: corsOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -128,578 +63,162 @@ app.options('*', cors({
   credentials: true
 }));
 
-
-// Use express.json() globally (including /horarios). This avoids complex raw handling and
-// matches typical client behavior where Content-Type: application/json is used.
+// Middleware
 app.use(express.json({ limit: '1mb', type: 'application/json' }));
+
+// Basic request logger
+app.use((req, res, next) => {
+  req._startTime = Date.now();
+  console.log(`📨 ${req.method} ${req.url}`);
+
+  res.on('finish', () => {
+    const elapsed = Date.now() - req._startTime;
+    console.log(`✅ Response finished: ${req.method} ${req.url} -> ${res.statusCode} (${elapsed}ms)`);
+  });
+
+  res.on('close', () => {
+    const elapsed = Date.now() - req._startTime;
+    if (res.writableEnded || res.headersSent && res.finished) {
+      console.log(`ℹ️  Client connection closed (normal): ${req.method} ${req.url} after ${elapsed}ms`);
+    } else {
+      console.log(`⚠️  Client connection closed early: ${req.method} ${req.url} after ${elapsed}ms`);
+    }
+  });
+
+  next();
+});
+
+// ============================================================================
+// DEDICATED HEALTH & CONFIG ENDPOINTS
+// ============================================================================
 
 // Health check endpoint (doesn't depend on microservices)
 app.get('/health', (req, res) => {
   console.log('✅ Health check');
-  res.json({ status: 'OK', message: 'API Gateway is running', timestamp: new Date().toISOString() });
-});
-
-// Use config already loaded
-const AUTH_SERVICE = config.AUTH_SERVICE;
-const MAESTROS_SERVICE = config.MAESTROS_SERVICE;
-const ESTUDIANTES_SERVICE = config.ESTUDIANTES_SERVICE;
-
-// Load infrastructure config for reportes services
-let infraConfig;
-try {
-  infraConfig = require('./infrastructure.config.js');
-} catch (err) {
-  infraConfig = null;
-}
-
-const getReportesEstUrl = () => {
-  if (process.env.REPORTES_EST_URL) return process.env.REPORTES_EST_URL;
-  if (process.env.REPORTES_EST_SERVICE) return process.env.REPORTES_EST_SERVICE;
-  if (infraConfig && infraConfig.PUBLIC && infraConfig.PUBLIC.REPORTES_ESTUDIANTES_URL) return infraConfig.PUBLIC.REPORTES_ESTUDIANTES_URL();
-  return 'http://micro-reportes-estudiantes:5003';
-};
-
-const getReportesMaestUrl = () => {
-  if (process.env.REPORTES_MAEST_URL) return process.env.REPORTES_MAEST_URL;
-  if (process.env.REPORTES_MAEST_SERVICE) return process.env.REPORTES_MAEST_SERVICE;
-  if (infraConfig && infraConfig.PUBLIC && infraConfig.PUBLIC.REPORTES_MAESTROS_URL) return infraConfig.PUBLIC.REPORTES_MAESTROS_URL();
-  return 'http://micro-reportes-maestros:5004';
-};
-
-const auth = AUTH_SERVICE;
-const maestros = MAESTROS_SERVICE;
-const estudiantes = ESTUDIANTES_SERVICE;
-const reportesEst = getReportesEstUrl();
-const reportesMaest = getReportesMaestUrl();
-
-console.log('🔗 Configured Services:');
-console.log(`  Auth: ${auth}`);
-console.log(`  Maestros: ${maestros}`);
-console.log(`  Estudiantes: ${estudiantes}`);
-console.log(`  Reportes Est: ${reportesEst}`);
-console.log(`  Reportes Maest: ${reportesMaest}`);
-
-// Lightweight fallback for reportes endpoint: if upstream is unreachable,
-// return a small mock so the frontend can continue functioning while the
-// reportes service is being recovered. This handler runs BEFORE the generic
-// `/reportes` proxy and only handles the student report endpoint.
-app.get('/reportes/estudiantes/reporte/:id', async (req, res) => {
-  const id = req.params.id;
-  const upstreamBase = (typeof reportesEst === 'function') ? reportesEst() : reportesEst;
-  const upstreamUrl = `${upstreamBase.replace(/\/$/, '')}/reportes/estudiantes/reporte/${id}`;
-  console.log(`➡️ [reportes-fallback] forwarding to upstream ${upstreamUrl}`);
-  try {
-    // Use global fetch (Node 18+) to call upstream
-    const fetchRes = await fetch(upstreamUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': req.headers.authorization || '',
-        'Accept': 'application/json'
-      },
-      timeout: 5000  // 5 second timeout
-    });
-
-    const contentType = fetchRes.headers.get('content-type') || 'application/json';
-    const bodyText = await fetchRes.text();
-
-    // Forward upstream status, content-type and body
-    res.status(fetchRes.status).type(contentType).send(bodyText);
-    console.log(`⬅️ [reportes-fallback] upstream responded ${fetchRes.status} for id=${id}`);
-    return;
-  } catch (err) {
-    console.warn('⚠️ [reportes-fallback] upstream call failed:', err && err.message ? err.message : err);
-    // Return a safe mock payload for the frontend to render while service is down.
-    // The frontend expects { items: [...] } structure per reportes.js
-    const mockReporte = {
-      _id: id,
-      estudianteId: id,
-      materia: 'Materia temporal (mock)',
-      semestre: 1,
-      paralelo: 'A',
-      maestroName: 'Maestro temporal',
-      dia: 'Lunes',
-      inicio: '09:00',
-      fin: '10:00',
-      estado: 'Completada',
-      observaciones: 'Este es un reporte temporal generado por el API Gateway porque el servicio de reportes no está disponible.',
-      mock: true
-    };
-    res.status(200).json({
-      items: [mockReporte]
-    });
-    return;
-  }
-});
-
-// Auth routes: mount internal router which forwards requests with axios and explicit timeouts
-// This avoids problematic proxy behavior for streaming/bodies and gives better logging
-try {
-  const authRoutes = require('./src/routes/authRoutes');
-  console.log('✅ authRoutes module loaded successfully');
-  // Parse JSON only for auth internal routes; capture raw body for debugging
-  const authJson = express.json({
-    verify: (req, res, buf, encoding) => {
-      try { req.rawBody = buf && buf.length ? buf.toString(encoding || 'utf8') : ''; } catch (e) { req.rawBody = ''; }
-    }
+  res.json({ 
+    status: 'OK', 
+    message: 'API Gateway is running', 
+    timestamp: new Date().toISOString(),
+    coreHost: CORE_HOST
   });
-  app.use('/auth', authJson, authRoutes);
-  app.use('/api/auth', authJson, authRoutes);  // Also support /api/auth prefix
-  console.log('✅ Auth routes mounted via internal forwarder (with JSON parser)');
-  console.log('📍 Available auth endpoints: /auth/register, /auth/login, /auth/logout, /auth/verify-token, /auth/me');
-  console.log('📍 Also available with /api prefix: /api/auth/register, /api/auth/login, etc.');
-} catch (err) {
-  console.error('❌ Failed to mount auth routes:', err.message);
-  console.error('❌ Attempting to use MOCK auth routes for testing...');
-  
-  try {
-    // Try to use mock auth routes for development/testing
-    const mockAuthRoutes = require('./src/routes/mockAuthRoutes');
-    const authJson = express.json({
-      verify: (req, res, buf, encoding) => {
-        try { req.rawBody = buf && buf.length ? buf.toString(encoding || 'utf8') : ''; } catch (e) { req.rawBody = ''; }
-      }
-    });
-    app.use('/auth', authJson, mockAuthRoutes);
-    app.use('/api/auth', authJson, mockAuthRoutes);
-    console.warn('⚠️  USING MOCK AUTH SERVICE FOR DEVELOPMENT/TESTING');
-    console.warn('⚠️  This is temporary until remote auth service is reachable');
-  } catch (mockErr) {
-    console.error('❌ Failed to mount mock auth routes, using proxy fallback:', mockErr.message);
-    // Fallback proxy
-    app.use('/auth', createProxyMiddleware({
-      target: auth,
-      changeOrigin: true,
-      logLevel: 'info',
-      proxyTimeout: 20000,
-      onError: (err2, req, res) => {
-        console.error(`❌ Auth proxy error: ${err2.message}`);
-        res.status(503).json({ success: false, error: 'Auth service unavailable' });
-      }
-    }));
-    // Also add /api/auth proxy fallback
-    app.use('/api/auth', createProxyMiddleware({
-      target: auth,
-      changeOrigin: true,
-      logLevel: 'info',
-      proxyTimeout: 20000,
-      onError: (err2, req, res) => {
-        console.error(`❌ Auth proxy error: ${err2.message}`);
-        res.status(503).json({ success: false, error: 'Auth service unavailable' });
-      }
-    }));
+});
 
-    // Debug endpoint for MongoDB status
-    app.use('/debug/mongo-status', createProxyMiddleware({
-      target: auth,
-      changeOrigin: true,
-      logLevel: 'info'
-    }));
-  }
-}
+// Configuration endpoint - returns all service configuration
+app.get('/config', configEndpoint);
 
+// Services endpoint - lists available services
+app.get('/services', servicesEndpoint);
 
+// Extended health endpoint with service status
+app.get('/health/extended', healthEndpoint);
 
-app.use('/horarios', createProxyMiddleware({
-  target: maestros,
-  changeOrigin: true,
-  logLevel: 'info',
-  selfHandleResponse: true,
-  pathRewrite: { '^/horarios': '/horarios' },
-  proxyTimeout: 20000,
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`[onProxyReq /horarios] method=${req.method} url=${req.url} bodyType=${typeof req.body}`);
-    // Remove Origin header so upstream microservices (which have their own CORS
-    // enforcement) don't reject requests. API Gateway handles CORS centrally.
-    try {
-      if (proxyReq.removeHeader) {
-        proxyReq.removeHeader('origin');
-        proxyReq.removeHeader('Origin');
-      }
-    } catch (e) {
-      // ignore
-    }
-    try {
-      if (["POST", "PUT", "PATCH"].includes(req.method) && req.body) {
-        let bodyBuffer;
-        if (Buffer.isBuffer(req.body)) {
-          bodyBuffer = req.body;
-        } else if (typeof req.body === 'object') {
-          const bodyStr = JSON.stringify(req.body);
-          bodyBuffer = Buffer.from(bodyStr, 'utf8');
-        }
-        if (bodyBuffer && bodyBuffer.length > 0) {
-          proxyReq.setHeader('Content-Type', 'application/json');
-          proxyReq.setHeader('Content-Length', bodyBuffer.length);
-          proxyReq.write(bodyBuffer);
-          // Ensure upstream receives EOF so it can process the request
-          try {
-            proxyReq.end();
-            console.log(`➡️ [horarios] Wrote and ended ${bodyBuffer.length} bytes to proxy request for ${req.method} ${req.url}`);
-          } catch (e) {
-            console.error('❌ Error ending proxyReq [/horarios]:', e && e.message ? e.message : e);
-          }
-        } else {
-          console.log(`➡️ [horarios] No body to forward for ${req.method} ${req.url}`);
-        }
-      }
-    } catch (e) {
-      console.error('❌ Error in onProxyReq [/horarios]:', e && e.message ? e.message : e);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    console.log(`[onProxyRes /horarios] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
-    let body = '';
-    proxyRes.on('data', chunk => { body += chunk.toString(); });
-    proxyRes.on('end', () => {
-      console.log(`[onProxyRes /horarios] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
-      try {
-        if (res.headersSent) {
-          console.warn('[onProxyRes /horarios] headers already sent, skipping response send');
-          return;
-        }
-        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
-      } catch (e) {
-        console.error('❌ Error sending proxied response [/horarios]:', e && e.message ? e.message : e);
-      }
-    });
-  },
-  onError: (err, req, res) => {
-    console.error(`❌ Horarios proxy error: ${err.message}`);
-    res.status(503).json({ success: false, error: 'Horarios service unavailable' });
-  }
-}));
+// ============================================================================
+// DYNAMIC PROXY ROUTING - SINGLE POINT OF ENTRY FOR ALL REQUESTS
+// ============================================================================
 
-// Also support /api/horarios for clients that use the /api prefix
-app.use('/api/horarios', createProxyMiddleware({
-  target: maestros,
-  changeOrigin: true,
-  logLevel: 'info',
-  selfHandleResponse: true,
-  pathRewrite: { '^/api/horarios': '/horarios' },
-  proxyTimeout: 20000,
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`[onProxyReq /api/horarios] method=${req.method} url=${req.url} bodyType=${typeof req.body}`);
-    // Strip Origin header before forwarding to upstream microservice
-    try {
-      if (proxyReq.removeHeader) {
-        proxyReq.removeHeader('origin');
-        proxyReq.removeHeader('Origin');
-      }
-    } catch (e) {}
-    try {
-      if (["POST", "PUT", "PATCH"].includes(req.method) && req.body) {
-        let bodyBuffer;
-        if (Buffer.isBuffer(req.body)) {
-          bodyBuffer = req.body;
-        } else if (typeof req.body === 'object') {
-          const bodyStr = JSON.stringify(req.body);
-          bodyBuffer = Buffer.from(bodyStr, 'utf8');
-        }
-        if (bodyBuffer && bodyBuffer.length > 0) {
-          proxyReq.setHeader('Content-Type', 'application/json');
-          proxyReq.setHeader('Content-Length', bodyBuffer.length);
-            proxyReq.write(bodyBuffer);
-            try {
-              proxyReq.end();
-              console.log(`➡️ [/api/horarios] Wrote and ended ${bodyBuffer.length} bytes to proxy request for ${req.method} ${req.url}`);
-            } catch (e) {
-              console.error('❌ Error ending proxyReq [/api/horarios]:', e && e.message ? e.message : e);
-            }
-        } else {
-          console.log(`➡️ [/api/horarios] No body to forward for ${req.method} ${req.url}`);
-        }
-      }
-    } catch (e) {
-      console.error('❌ Error in onProxyReq [/api/horarios]:', e && e.message ? e.message : e);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    console.log(`[onProxyRes /api/horarios] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
-    let body = '';
-    proxyRes.on('data', chunk => { body += chunk.toString(); });
-    proxyRes.on('end', () => {
-      console.log(`[onProxyRes /api/horarios] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
-      try {
-        if (res.headersSent) {
-          console.warn('[onProxyRes /api/horarios] headers already sent, skipping response send');
-          return;
-        }
-        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
-      } catch (e) {
-        console.error('❌ Error sending proxied response [/api/horarios]:', e && e.message ? e.message : e);
-      }
-    });
-  },
-  onError: (err, req, res) => {
-    console.error(`❌ /api/horarios proxy error: ${err.message}`);
-    res.status(503).json({ success: false, error: 'Horarios service unavailable' });
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    proxyRes.on('aborted', () => {
-      if (!res.headersSent) {
-        res.status(504).json({ message: 'Timeout esperando respuesta de micro-maestros' });
-      }
-    });
-    // Note: aborted will be handled above; other lifecycle logging is in the buffering onProxyRes
-  }
-}));
+console.log('🔗 Routing Configuration (all routes via Service Registry):');
+console.log(`  Auth service (port 3000) -> ${CORE_HOST}:3000`);
+console.log(`  Estudiantes service (port 3001) -> ${CORE_HOST}:3001`);
+console.log(`  Maestros service (port 3002) -> ${CORE_HOST}:3002`);
+console.log(`  Reportes Est service (port 5003) -> ${CORE_HOST}:5003`);
+console.log(`  Reportes Maest service (port 5004) -> ${CORE_HOST}:5004`);
 
-// Maestros routes proxy
-app.use('/maestros', createProxyMiddleware({
-  target: maestros,
-  changeOrigin: true,
-  logLevel: 'info',
-  pathRewrite: { '^/maestros': '' },
-  onError: (err, req, res) => {
-    console.error(`❌ Maestros proxy error: ${err.message}`);
-    res.status(503).json({ success: false, error: 'Maestros service unavailable' });
-  }
-}));
+// Catch-all proxy middleware for /auth, /estudiantes, /maestros, /reportes, /horarios
+app.use('/auth', proxyMiddleware);
+app.use('/api/auth', proxyMiddleware);
+app.use('/estudiantes', proxyMiddleware);
+app.use('/api/estudiantes', proxyMiddleware);
+app.use('/maestros', proxyMiddleware);
+app.use('/api/maestros', proxyMiddleware);
+app.use('/horarios', proxyMiddleware);
+app.use('/api/horarios', proxyMiddleware);
+app.use('/reportes', proxyMiddleware);
+app.use('/api/reportes', proxyMiddleware);
 
-// Estudiantes routes proxy (instrumented for request/response lifecycle)
-app.use('/estudiantes', createProxyMiddleware({
-  target: estudiantes,
-  changeOrigin: true,
-  logLevel: 'debug',
-  proxyTimeout: 30000,
-  timeout: 30000,
-  selfHandleResponse: true,
-  pathRewrite: { '^/estudiantes': '' },
-  onProxyReq: (proxyReq, req, res) => {
-    try {
-      // Remove Origin header so microservices will treat this as server-to-server
-      // call (API Gateway already applied CORS to the client).
-      try { proxyReq.removeHeader && proxyReq.removeHeader('origin'); proxyReq.removeHeader && proxyReq.removeHeader('Origin'); } catch (e) {}
-      req._proxyStart = Date.now();
-      console.log(`➡️ [estudiantes] Proxying request to ${proxyReq.getHeader('host')}${proxyReq.path} ${req.method}`);
-      if (req.body && Object.keys(req.body).length > 0 && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
-        const bodyStr = JSON.stringify(req.body);
-        proxyReq.setHeader('Content-Type', 'application/json');
-        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyStr));
-        proxyReq.write(bodyStr);
-        try {
-          proxyReq.end();
-          console.log(`   ✍️ Wrote and ended ${Buffer.byteLength(bodyStr)} bytes of JSON body to proxy request`);
-        } catch (e) {
-          console.error('❌ Error ending proxyReq [estudiantes]:', e && e.message ? e.message : e);
-        }
-      }
-    } catch (e) {
-      console.error('❌ Error in onProxyReq [estudiantes]:', e && e.message ? e.message : e);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    console.log(`[onProxyRes /estudiantes] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
-    let body = '';
-    proxyRes.on('data', chunk => { body += chunk.toString(); });
-    proxyRes.on('end', () => {
-      console.log(`[onProxyRes /estudiantes] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
-      try {
-        if (res.headersSent) {
-          console.warn('[onProxyRes /estudiantes] headers already sent, skipping response send');
-          return;
-        }
-        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
-      } catch (e) {
-        console.error('❌ Error sending proxied response [/estudiantes]:', e && e.message ? e.message : e);
-      }
-    });
-    proxyRes.on('aborted', () => {
-      if (!res.headersSent) {
-        res.status(504).json({ message: 'Timeout esperando respuesta de micro-estudiantes' });
-      }
-    });
-  },
-  onError: (err, req, res) => {
-    console.error(`❌ Estudiantes proxy error: ${err && err.message ? err.message : err}`);
-    if (!res.headersSent) {
-      res.status(504).json({ success: false, error: 'Estudiantes service unavailable (proxy error)' });
-    } else {
-      console.error('❌ Headers already sent when proxy error occurred');
-    }
-  }
-}));
-
-// API Estudiantes routes proxy (for /api/estudiantes/... paths)
-app.use('/api/estudiantes', createProxyMiddleware({
-  target: estudiantes,
-  changeOrigin: true,
-  logLevel: 'debug',
-  proxyTimeout: 30000,
-  timeout: 30000,
-  selfHandleResponse: true,
-  pathRewrite: { '^/api/estudiantes': '' },
-  onProxyReq: (proxyReq, req, res) => {
-    try {
-      // Remove Origin header to avoid upstream CORS rejection
-      try { proxyReq.removeHeader && proxyReq.removeHeader('origin'); proxyReq.removeHeader && proxyReq.removeHeader('Origin'); } catch (e) {}
-      req._proxyStart = Date.now();
-      console.log(`➡️ [/api/estudiantes] Proxying request to ${proxyReq.getHeader('host')}${proxyReq.path} ${req.method}`);
-      if (req.body && Object.keys(req.body).length > 0 && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
-        const bodyStr = JSON.stringify(req.body);
-        proxyReq.setHeader('Content-Type', 'application/json');
-        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyStr));
-        proxyReq.write(bodyStr);
-        try {
-          proxyReq.end();
-          console.log(`   ✍️ Wrote and ended ${Buffer.byteLength(bodyStr)} bytes of JSON body to proxy request`);
-        } catch (e) {
-          console.error('❌ Error ending proxyReq [/api/estudiantes]:', e && e.message ? e.message : e);
-        }
-      }
-    } catch (e) {
-      console.error('❌ Error in onProxyReq [/api/estudiantes]:', e && e.message ? e.message : e);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    console.log(`[onProxyRes /api/estudiantes] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
-    let body = '';
-    proxyRes.on('data', chunk => { body += chunk.toString(); });
-    proxyRes.on('end', () => {
-      console.log(`[onProxyRes /api/estudiantes] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
-      try {
-        if (res.headersSent) {
-          console.warn('[onProxyRes /api/estudiantes] headers already sent, skipping response send');
-          return;
-        }
-        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
-      } catch (e) {
-        console.error('❌ Error sending proxied response [/api/estudiantes]:', e && e.message ? e.message : e);
-      }
-    });
-    proxyRes.on('aborted', () => {
-      if (!res.headersSent) {
-        res.status(504).json({ message: 'Timeout esperando respuesta de micro-estudiantes' });
-      }
-    });
-  },
-  onError: (err, req, res) => {
-    console.error(`❌ API Estudiantes proxy error: ${err && err.message ? err.message : err}`);
-    if (!res.headersSent) {
-      res.status(504).json({ success: false, error: 'Estudiantes service unavailable (proxy error)' });
-    } else {
-      console.error('❌ Headers already sent when proxy error occurred');
-    }
-  }
-}));
-
-// Reportes routes proxy (legacy path)
-app.use('/reportes', createProxyMiddleware({
-  target: reportesEst,
-  changeOrigin: true,
-  logLevel: 'info',
-  selfHandleResponse: true,
-  // No pathRewrite: preserve full path so /reportes/estudiantes/reporte/:id is forwarded as-is
-  onError: (err, req, res) => {
-    console.error(`❌ Reportes proxy error: ${err.message}`);
-    if (!res.headersSent) {
-      res.status(503).json({ success: false, error: 'Reportes service unavailable' });
-    } else {
-      console.warn('[Reportes proxy onError] headers already sent, skipping error response');
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    console.log(`[onProxyRes /reportes] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
-    let body = '';
-    proxyRes.on('data', chunk => { body += chunk.toString(); });
-    proxyRes.on('end', () => {
-      console.log(`[onProxyRes /reportes] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
-      try {
-        if (res.headersSent) {
-          console.warn('[onProxyRes /reportes] headers already sent, skipping response send');
-          return;
-        }
-        if (proxyRes.statusCode === 404) {
-          res.status(404).set(proxyRes.headers).send(body);
-        } else {
-          res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
-        }
-      } catch (e) {
-        console.error('❌ Error sending proxied response [/reportes]:', e && e.message ? e.message : e);
-      }
-    });
-    proxyRes.on('aborted', () => {
-      if (!res.headersSent) {
-        res.status(504).json({ message: 'Timeout esperando respuesta de reportes' });
-      }
-    });
-  }
-}));
-
-// API Reportes routes proxy (for /api/reportes/estudiantes/... paths)
-app.use('/api/reportes', createProxyMiddleware({
-  target: reportesEst,
-  changeOrigin: true,
-  logLevel: 'info',
-  selfHandleResponse: true,
-  pathRewrite: { '^/api/reportes': '/api/reportes' },
-  onError: (err, req, res) => {
-    console.error(`❌ API Reportes proxy error: ${err.message}`);
-    if (!res.headersSent) {
-      res.status(503).json({ success: false, error: 'Reportes service unavailable' });
-    } else {
-      console.warn('[API Reportes proxy onError] headers already sent, skipping error response');
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    console.log(`[onProxyRes /api/reportes] status=${proxyRes.statusCode} for ${req.method} ${req.url}`);
-    let body = '';
-    proxyRes.on('data', chunk => { body += chunk.toString(); });
-    proxyRes.on('end', () => {
-      console.log(`[onProxyRes /api/reportes] upstream response ended, ${Buffer.byteLength(body)} bytes for ${req.method} ${req.url}`);
-      try {
-        if (res.headersSent) {
-          console.warn('[onProxyRes /api/reportes] headers already sent, skipping response send');
-          return;
-        }
-        res.status(proxyRes.statusCode).set(proxyRes.headers).send(body);
-      } catch (e) {
-        console.error('❌ Error sending proxied response [/api/reportes]:', e && e.message ? e.message : e);
-      }
-    });
-    proxyRes.on('aborted', () => {
-      if (!res.headersSent) {
-        res.status(504).json({ message: 'Timeout esperando respuesta de reportes' });
-      }
-    });
-  }
-}));
+// ============================================================================
+// DEBUG ENDPOINTS
+// ============================================================================
 
 // Test route
 app.get('/test', (req, res) => {
   res.json({ message: 'API Gateway is working', timestamp: new Date().toISOString() });
 });
 
+// Show registered routes
+app.get('/routes', (req, res) => {
+  res.json({
+    message: 'Available routes:',
+    routes: [
+      'GET /health - Health check',
+      'GET /config - Service configuration',
+      'GET /services - List all services',
+      'GET /health/extended - Extended health status',
+      'GET /test - API Gateway test',
+      '/auth/* - Auth microservice',
+      '/api/auth/* - Auth microservice (alternate)',
+      '/estudiantes/* - Estudiantes microservice',
+      '/api/estudiantes/* - Estudiantes microservice (alternate)',
+      '/maestros/* - Maestros microservice',
+      '/api/maestros/* - Maestros microservice (alternate)',
+      '/horarios/* - Horarios proxy (maestros)',
+      '/api/horarios/* - Horarios proxy (alternate)',
+      '/reportes/* - Reportes microservice',
+      '/api/reportes/* - Reportes microservice (alternate)'
+    ]
+  });
+});
+
+// ============================================================================
+// 404 & ERROR HANDLERS
+// ============================================================================
+
 // 404 handler
 app.use((req, res) => {
   console.log(`⚠️  Not found: ${req.method} ${req.url}`);
-  console.log(`🔗 Registered routes should include: /health, /test, /auth/*, /maestros/*, /estudiantes/*, /horarios/*, /api/horarios`);
   res.status(404).json({ 
     error: 'Endpoint not found',
     path: req.url,
     method: req.method,
-    hint: 'Did you mean /auth/register, /auth/login, /maestros/*, /estudiantes/*, /horarios/* or /api/horarios?'
+    availableEndpoints: [
+      '/health - Health status',
+      '/config - Service configuration',
+      '/services - Available services',
+      '/health/extended - Extended health with service status',
+      '/routes - Show registered routes',
+      '/auth/* - Auth service',
+      '/estudiantes/* - Estudiantes service',
+      '/maestros/* - Maestros service',
+      '/horarios/* - Horarios routes',
+      '/reportes/* - Reportes service'
+    ]
   });
 });
 
 // Error handler
 app.use((err, req, res, next) => {
-  // Log JSON parse body when available
-  if (err && err.type === 'entity.parse.failed') {
-    console.error('❌ JSON parse error body (req.rawBody):', req.rawBody);
-    if (err.body) console.error('❌ JSON parse error body (err.body):', err.body);
-  }
   console.error('❌ Server error:', err);
-  res.status(500).json({ error: 'Internal server error', message: err.message });
+  res.status(500).json({ 
+    error: 'Internal server error', 
+    message: err.message 
+  });
 });
 
-// Start server
-const PORT = process.env.API_GATEWAY_PORT || process.env.PORT || 8080;
-console.log(`🌐 Starting server on port ${PORT}...`);
+// ============================================================================
+// START SERVER
+// ============================================================================
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🎉 API Gateway listening on port ${PORT}`);
+  console.log(`✅ Service Registry initialized with CORE_HOST: ${CORE_HOST}`);
   console.log(`✅ Health check available at: http://localhost:${PORT}/health`);
+  console.log(`✅ Configuration available at: http://localhost:${PORT}/config`);
+  console.log(`✅ Services list available at: http://localhost:${PORT}/services`);
+  console.log('');
+  console.log('💡 QUICK START:');
+  console.log(`   1. Change CORE_HOST in environment: export CORE_HOST="http://new.ip"`);
+  console.log('   2. All routes automatically use new IP');
+  console.log('   3. No other configuration needed!');
+  console.log('');
 });
 
 // Graceful shutdown
