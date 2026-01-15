@@ -17,7 +17,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H 172.31.71.182 >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H 172.31.79.241 >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh-keyscan -H 34.235.224.202 >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Restart Services on Core
@@ -26,12 +26,12 @@ jobs:
           echo "🔄 Attempting to restart services on EC2-Core..."
           
           # Try direct connection first
-          ssh -o ConnectTimeout=10 -o BatchMode=yes ubuntu@172.31.71.182 << 'SCRIPT' 2>&1 || {
+          ssh -o ConnectTimeout=10 -o BatchMode=yes ubuntu@172.31.79.241 << 'SCRIPT' 2>&1 || {
             echo ""
             echo "Direct connection failed, trying via Bastion..."
             ssh -o ConnectTimeout=10 -o BatchMode=yes \
               -o ProxyCommand="ssh -W %h:%p -o StrictHostKeyChecking=no ubuntu@34.235.224.202" \
-              ubuntu@172.31.71.182 << 'SCRIPT'
+              ubuntu@172.31.79.241 << 'SCRIPT'
           }
           
           set -e

@@ -55,7 +55,7 @@ def restart_core_services():
     """Reinicia servicios en EC2-Core"""
     
     bastion_ip = "34.235.224.202"
-    core_ip = "172.31.71.182"
+    core_ip = "172.31.79.241"
     ssh_key = "ssh-key-ec2.pem"
     
     # Script a ejecutar en EC2-Core

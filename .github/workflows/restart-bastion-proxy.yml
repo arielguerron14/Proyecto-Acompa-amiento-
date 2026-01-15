@@ -26,7 +26,7 @@ jobs:
             UserKnownHostsFile /dev/null
           
           Host core
-            HostName 172.31.71.182
+            HostName 172.31.79.241
             User ubuntu
             IdentityFile ~/.ssh/id_rsa
             ProxyCommand ssh -W %h:%p bastion

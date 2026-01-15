@@ -125,7 +125,7 @@ Frontend acepta la respuesta ✅
    ├─ OPTIONS preflight ✅ (CORS headers validados)
    └─ POST registro ✅ (procesado)
 
-2. API Gateway → Auth Service (172.31.71.182:3000)
+2. API Gateway → Auth Service (172.31.79.241:3000)
    └─ Registro completado ✅
 
 3. Response → Frontend

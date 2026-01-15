@@ -33,7 +33,7 @@ Se ha completado exitosamente el despliegue completo de la infraestructura y el 
 | EC-Bastion | 172.31.78.45 | 34.235.224.202 | Gateway | SSH Proxy |
 | EC2-Frontend | 172.31.65.226 | 100.50.80.35 | Web | Frontend (port 3000) |
 | EC2-API-Gateway | 172.31.72.142 | 35.168.118.171 | API | Gateway (port 8080) |
-| EC2-CORE | 172.31.71.182 | 44.223.45.55 | Core | Core (port 8081) |
+| EC2-CORE | 172.31.79.241 | 44.223.45.55 | Core | Core (port 8081) |
 | EC2-DB | 172.31.64.131 | 44.221.70.143 | Database | PostgreSQL (port 5432) |
 | EC2-Messaging | 172.31.73.88 | 3.236.252.150 | Queue | RabbitMQ (port 5672) |
 | EC2-Notificaciones | 172.31.68.132 | 98.92.59.97 | Service | Notifications (port 8082) |
@@ -57,7 +57,7 @@ ssh -i ssh-key-ec2.pem ubuntu@44.223.45.55  # CORE
 # SSH via Bastion proxy
 ssh -J ubuntu@34.235.224.202 ubuntu@172.31.65.226  # Frontend
 ssh -J ubuntu@34.235.224.202 ubuntu@172.31.72.142  # API Gateway
-ssh -J ubuntu@34.235.224.202 ubuntu@172.31.71.182  # CORE
+ssh -J ubuntu@34.235.224.202 ubuntu@172.31.79.241  # CORE
 ```
 
 ### Opción 3: Acceso via ALB (Load Balancer)

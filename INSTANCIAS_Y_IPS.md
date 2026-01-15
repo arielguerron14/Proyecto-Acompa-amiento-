@@ -13,7 +13,7 @@
 │ EC-Bastion          │ 172.31.78.45   │ 34.235.224.202  │ ssh ubuntu@34.194... │
 │ EC2-Frontend        │ 172.31.65.226  │ 100.50.80.35  │ ssh ubuntu@100.50... │
 │ EC2-API-Gateway     │ 172.31.72.142  │ 35.168.118.171│ ssh ubuntu@35.168... │
-│ EC2-CORE            │ 172.31.71.182  │ 44.223.45.55  │ ssh ubuntu@44.223... │
+│ EC2-CORE            │ 172.31.79.241  │ 44.223.45.55  │ ssh ubuntu@44.223... │
 │ EC2-DB              │ 172.31.64.131  │ 44.221.70.143 │ ssh ubuntu@44.221... │
 │ EC2-Messaging       │ 172.31.73.88   │ 3.236.252.150 │ ssh ubuntu@3.236.... │
 │ EC2-Notificaciones  │ 172.31.68.132  │ 98.92.59.97   │ ssh ubuntu@98.92...  │
@@ -52,7 +52,7 @@ SSH: ssh -i ssh-key-ec2.pem ubuntu@35.168.118.171
 ### CORE Service
 ```
 Public IP: 44.223.45.55
-Private IP: 172.31.71.182
+Private IP: 172.31.79.241
 Port: 8081
 SSH: ssh -i ssh-key-ec2.pem ubuntu@44.223.45.55
 ```
@@ -162,7 +162,7 @@ lab-alb-2074b0bbcd4d7bbc.us-east-1.elb.amazonaws.com
     "public_ip": "35.168.118.171"
   },
   "EC2-CORE": {
-    "private_ip": "172.31.71.182",
+    "private_ip": "172.31.79.241",
     "public_ip": "44.223.45.55"
   },
   "EC2-DB": {

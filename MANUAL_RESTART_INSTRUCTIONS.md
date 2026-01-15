@@ -1,7 +1,7 @@
 # 🔧 MANUAL SERVICE RESTART INSTRUCTIONS
 
 ## Problema Actual
-Los microservicios en **EC2-Core (172.31.71.182)** no están respondiendo. 
+Los microservicios en **EC2-Core (172.31.79.241)** no están respondiendo. 
 
 Los endpoints del API Gateway retornan:
 - ❌ `/horarios` → "Horarios service unavailable"
@@ -20,7 +20,7 @@ Los endpoints del API Gateway retornan:
    - Región: **us-east-1**
 
 2. **Selecciona la Instancia:**
-   - Busca: **EC2-Core** o la instancia con IP privada **172.31.71.182**
+   - Busca: **EC2-Core** o la instancia con IP privada **172.31.79.241**
    - Click en "Start session"
 
 3. **Ejecuta los Comandos:**

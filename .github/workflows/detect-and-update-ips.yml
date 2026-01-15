@@ -96,7 +96,7 @@ jobs:
           172.31.70.85=>${{ env.API_PRIVATE }}
           
           # EC2-Core
-          172.31.71.182=>${{ env.CORE_PRIVATE }}
+          172.31.79.241=>${{ env.CORE_PRIVATE }}
           
           # Bastion
           34.235.224.202=>${{ env.BASTION_PUBLIC }}
@@ -133,7 +133,7 @@ jobs:
           replace_ip "172.31.70.85" "${{ env.API_PRIVATE }}" "*.yml *.js"
           
           # Reemplazar EC2-Core
-          replace_ip "172.31.71.182" "${{ env.CORE_PRIVATE }}" "*.yml *.js"
+          replace_ip "172.31.79.241" "${{ env.CORE_PRIVATE }}" "*.yml *.js"
           
           # Reemplazar Bastion
           replace_ip "34.235.224.202" "${{ env.BASTION_PUBLIC }}" "*.yml *.js *.sh"

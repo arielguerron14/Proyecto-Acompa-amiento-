@@ -36,7 +36,7 @@ jobs:
         run: |
           echo "Deploying to Core via Bastion..."
           BASTION_IP="34.235.224.202"
-          CORE_IP="172.31.71.182"
+          CORE_IP="172.31.79.241"
           
           # Try option 1: Direct SSH via bastion proxy
           echo "Attempt 1: Using SSH ProxyJump..."
@@ -112,7 +112,7 @@ jobs:
           echo "Checking specific microservices..."
           for port in 3000 3001 3002; do
             echo "Checking port $port..."
-            (echo >/dev/tcp/172.31.71.182/$port && echo "✅ Port $port open") || echo "❌ Port $port closed/timeout"
+            (echo >/dev/tcp/172.31.79.241/$port && echo "✅ Port $port open") || echo "❌ Port $port closed/timeout"
           done 2>/dev/null || echo "Port test skipped"
 
       - name: Summary
@@ -129,4 +129,4 @@ jobs:
           echo "**Access Points:**"
           echo "- Frontend: http://44.220.126.89"
           echo "- API Gateway: http://52.7.168.4:8080"
-          echo "- Core Services: 172.31.71.182 (internal)"
+          echo "- Core Services: 172.31.79.241 (internal)"

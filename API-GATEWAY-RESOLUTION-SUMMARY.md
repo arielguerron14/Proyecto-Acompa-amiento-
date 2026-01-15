@@ -21,7 +21,7 @@ Se identificaron **3 problemas secuenciales** que prevenían la conexión:
 
 **Solución**:
 - Actualizar docker-compose.api-gateway.yml para usar IPs privados:
-  - `3.234.198.34` → `172.31.71.182` (Core/Auth)
+  - `3.234.198.34` → `172.31.79.241` (Core/Auth)
   - `54.175.62.79` → `172.31.70.166` (Reportes)
   - `98.92.248.110` → `172.31.68.132` (Notificaciones)
 
@@ -113,7 +113,7 @@ Frontend (44.220.126.89)
     ↓ (http://52.7.168.4:8080)
 API Gateway (52.7.168.4:8080) 
     ↓ (Private IPs within VPC)
-    ├→ Core Services (172.31.71.182:3000/3001/3002)
+    ├→ Core Services (172.31.79.241:3000/3001/3002)
     ├→ Reportes (172.31.70.166:5003/5004)
     └→ Notificaciones (172.31.68.132:5006)
 ```

@@ -25,7 +25,7 @@
 ✅ API Gateway (52.7.168.4:8080) responde
 ✅ Frontend (44.220.126.89) accesible
 ❌ Bastion (34.235.224.202) - SSH timeout
-❌ EC2-Core (172.31.71.182) - No alcanzable
+❌ EC2-Core (172.31.79.241) - No alcanzable
 ```
 
 ### Test de Endpoints
@@ -47,7 +47,7 @@
 ### Opción 1: Reiniciar via AWS Session Manager (Recomendado)
 
 1. **Ve a:** https://console.aws.amazon.com/systems-manager/session-manager/start-session
-2. **Selecciona:** EC2-Core (instancia con IP 172.31.71.182)
+2. **Selecciona:** EC2-Core (instancia con IP 172.31.79.241)
 3. **Ejecuta:**
    ```bash
    cd ~/Proyecto-Acompa-amiento-
@@ -63,7 +63,7 @@
 ```bash
 ssh -i ssh-key-ec2.pem ubuntu@34.235.224.202
 # Desde el Bastion:
-ssh ubuntu@172.31.71.182
+ssh ubuntu@172.31.79.241
 # Ejecutar los mismos comandos que Opción 1
 ```
 

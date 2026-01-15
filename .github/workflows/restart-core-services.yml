@@ -27,7 +27,7 @@ jobs:
             ConnectTimeout 15
           
           Host core-internal
-            HostName 172.31.71.182
+            HostName 172.31.79.241
             User ubuntu
             IdentityFile ~/.ssh/ec2.pem
             StrictHostKeyChecking no
@@ -57,7 +57,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=20 \
             -o ProxyCommand="ssh -i ~/.ssh/ec2.pem -W %h:%p -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@34.235.224.202" \
-            ubuntu@172.31.71.182 << 'REMOTE_SCRIPT' 2>&1
+            ubuntu@172.31.79.241 << 'REMOTE_SCRIPT' 2>&1
           
           set -e
           echo "Connected to EC2-Core!"

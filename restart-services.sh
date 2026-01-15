@@ -3,7 +3,7 @@
 
 set -e
 
-CORE_IP="172.31.71.182"
+CORE_IP="172.31.79.241"
 SSH_KEY="ssh-key-ec2.pem"
 
 echo "🔄 Restarting Core Services..."

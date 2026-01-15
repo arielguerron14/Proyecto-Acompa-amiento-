@@ -29,7 +29,7 @@
 
 | Instance Name | Private IP | Public IP | Instance ID |
 |---------------|-----------|-----------|-------------|
-| EC2-CORE | 172.31.71.182 | 44.223.45.55 | i-0d4991b462e1d0e29 |
+| EC2-CORE | 172.31.79.241 | 44.223.45.55 | i-0d4991b462e1d0e29 |
 | EC2-DB | 172.31.64.131 | 44.221.70.143 | i-00e10746c5dabf172 |
 | EC2-Frontend | 172.31.65.226 | 100.50.80.35 | i-0f5b0435b09d5e9e0 |
 | EC2-Messaging | 172.31.73.88 | 3.236.252.150 | i-01fa6a8c8520e71f8 |
@@ -59,7 +59,7 @@ Bastion: 34.235.224.202
 Internal Network (172.31.x.x)
     ├─ EC2-Frontend (172.31.65.226) → Port 3000
     ├─ EC2-API-Gateway (172.31.72.142) → Port 8080
-    ├─ EC2-CORE (172.31.71.182) → Port 8081
+    ├─ EC2-CORE (172.31.79.241) → Port 8081
     ├─ EC2-Reportes (172.31.70.166) → Port 8083
     ├─ EC2-Notificaciones (172.31.68.132) → Port 8082
     ├─ EC2-Messaging (172.31.73.88) → Port 5672

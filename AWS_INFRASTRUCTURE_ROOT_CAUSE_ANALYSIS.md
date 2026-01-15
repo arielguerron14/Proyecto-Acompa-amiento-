@@ -8,7 +8,7 @@ El análisis exhaustivo ha determinado que los errores **503 "Service Unavailabl
 ### 1. Intentos de Conexión (Workflow 21022171513)
 ```
 ❌ Bastion (34.235.224.202)          → Connection timeout (port 22)
-❌ EC2-Core (172.31.71.182)        → Unreachable via SSH
+❌ EC2-Core (172.31.79.241)        → Unreachable via SSH
 ❌ Frontend (44.220.126.89)        → SSH Permission denied
 ❌ API Gateway (52.7.168.4)        → SSH Permission denied
 ```
@@ -17,7 +17,7 @@ El análisis exhaustivo ha determinado que los errores **503 "Service Unavailabl
 - **Frontend reporta**: 
   - `GET /horarios 503: Service Unavailable`
   - `GET /estudiantes/reservas/estudiante/3 504: Gateway Timeout`
-- **Root cause**: API Gateway (52.7.168.4:8080) no puede conectar a microservicios en 172.31.71.182:3000/3001/3002
+- **Root cause**: API Gateway (52.7.168.4:8080) no puede conectar a microservicios en 172.31.79.241:3000/3001/3002
 
 ### 3. Verificaciones Completadas
 ✅ Código Docker corregido (commits: d64dec2, 25f6e87, ff2c3f4, ff2c3f4)
@@ -31,7 +31,7 @@ El análisis exhaustivo ha determinado que los errores **503 "Service Unavailabl
 |-----------|-----------|-----------|-----------|--------|
 | Frontend | 44.220.126.89 | 172.31.69.107 | ❌ Timeout | ? |
 | API Gateway | 52.7.168.4 | 172.31.70.85 | ❌ Timeout | ? |
-| EC2-Core | N/A | 172.31.71.182 | ❌ Timeout | 🔴 DOWN |
+| EC2-Core | N/A | 172.31.79.241 | ❌ Timeout | 🔴 DOWN |
 | Bastion | 34.235.224.202 | 172.31.78.45 | ❌ Timeout | 🔴 DOWN |
 | Otros (DB, Messaging, etc) | ? | ? | ❌ Timeout | 🔴 DOWN |
 
@@ -53,7 +53,7 @@ El análisis exhaustivo ha determinado que los errores **503 "Service Unavailabl
 ### Problema 2: Microservicios en EC2-Core No Responden
 **Evidencia:**
 - El docker-compose en EC2-Core no se puede reiniciar (instancia inaccesible)
-- API Gateway obtiene 503/504 al intentar conectar a 172.31.71.182:3000/3001/3002
+- API Gateway obtiene 503/504 al intentar conectar a 172.31.79.241:3000/3001/3002
 
 **Causa Probable:**
 - EC2-Core está completamente caída o sin poder de cómputo

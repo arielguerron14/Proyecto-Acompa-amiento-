@@ -33,7 +33,7 @@ jobs:
             API_IP="52.7.168.4"
           fi
           if [ -z "$CORE_IP" ]; then
-            CORE_IP="172.31.71.182"
+            CORE_IP="172.31.79.241"
           fi
           
           echo "frontend_ip=$FRONTEND_IP" >> $GITHUB_OUTPUT
@@ -73,7 +73,7 @@ jobs:
       - name: Restart Services on Core
         run: |
           echo "Restarting services on Core..."
-          ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem -t ubuntu@172.31.71.182 << 'EOF'
+          ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem -t ubuntu@172.31.79.241 << 'EOF'
           set -e
           cd ~/Proyecto-Acompa-amiento- || exit 0
           echo "Checking Docker status..."
@@ -106,6 +106,6 @@ jobs:
           echo "## ✅ Deployment Complete"
           echo "- Frontend: 44.220.126.89"
           echo "- API Gateway: 52.7.168.4:8080"
-          echo "- Core Services: Should be running on 172.31.71.182"
+          echo "- Core Services: Should be running on 172.31.79.241"
           echo ""
           echo "To verify, check the frontend at http://44.220.126.89"

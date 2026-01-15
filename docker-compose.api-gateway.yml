@@ -17,9 +17,9 @@ services:
       LOG_LEVEL: info
       
       # Private IPs for inter-EC2 communication (within AWS VPC)
-      AUTH_SERVICE: http://172.31.71.182:3000
-      ESTUDIANTES_SERVICE: http://172.31.71.182:3001
-      MAESTROS_SERVICE: http://172.31.71.182:3002
+      AUTH_SERVICE: http://172.31.79.241:3000
+      ESTUDIANTES_SERVICE: http://172.31.79.241:3001
+      MAESTROS_SERVICE: http://172.31.79.241:3002
       REPORTES_EST_SERVICE: http://172.31.70.166:5003
       REPORTES_MAEST_SERVICE: http://172.31.70.166:5004
       NOTIFICACIONES_SERVICE: http://172.31.68.132:5006

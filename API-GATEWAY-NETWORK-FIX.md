@@ -52,9 +52,9 @@ Basándome en la información de `DEPLOYMENT_COMPLETE.md`, actualicé todos los 
 
 ```yaml
 # ✅ DESPUÉS - IPs Privados (accesibles dentro de VPC)
-AUTH_SERVICE: http://172.31.71.182:3000
-ESTUDIANTES_SERVICE: http://172.31.71.182:3001
-MAESTROS_SERVICE: http://172.31.71.182:3002
+AUTH_SERVICE: http://172.31.79.241:3000
+ESTUDIANTES_SERVICE: http://172.31.79.241:3001
+MAESTROS_SERVICE: http://172.31.79.241:3002
 REPORTES_EST_SERVICE: http://172.31.70.166:5003
 REPORTES_MAEST_SERVICE: http://172.31.70.166:5004
 NOTIFICACIONES_SERVICE: http://172.31.68.132:5006
@@ -64,7 +64,7 @@ ANALYTICS_SERVICE: http://172.31.68.132:5007
 **Mapeo de IPs Privados**:
 | Servicio | IP Privado | Puerto |
 |----------|-----------|--------|
-| EC2-CORE (Auth/Estudiantes/Maestros) | 172.31.71.182 | 3000/3001/3002 |
+| EC2-CORE (Auth/Estudiantes/Maestros) | 172.31.79.241 | 3000/3001/3002 |
 | EC2-Reportes | 172.31.70.166 | 5003/5004 |
 | EC2-Notificaciones | 172.31.68.132 | 5006/5007 |
 | EC2-API-Gateway | 172.31.72.142 | 8080 |
@@ -161,13 +161,13 @@ AWS VPC (172.31.0.0/16)
 ├─ EC2-API-Gateway (172.31.72.142)
 │  ├─ Port 8080 ← PUBLIC: 52.7.168.4:8080
 │  └─ Connectivity:
-│     ├─ → Auth (172.31.71.182:3000) ✅ PRIVATE
-│     ├─ → Estudiantes (172.31.71.182:3001) ✅ PRIVATE
-│     ├─ → Maestros (172.31.71.182:3002) ✅ PRIVATE
+│     ├─ → Auth (172.31.79.241:3000) ✅ PRIVATE
+│     ├─ → Estudiantes (172.31.79.241:3001) ✅ PRIVATE
+│     ├─ → Maestros (172.31.79.241:3002) ✅ PRIVATE
 │     ├─ → Reportes (172.31.70.166:5003/5004) ✅ PRIVATE
 │     └─ → Notificaciones (172.31.68.132:5006) ✅ PRIVATE
 │
-├─ EC2-CORE (172.31.71.182)
+├─ EC2-CORE (172.31.79.241)
 │  ├─ Micro-Auth on :3000
 │  ├─ Micro-Estudiantes on :3001
 │  └─ Micro-Maestros on :3002

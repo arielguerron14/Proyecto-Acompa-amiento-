@@ -24,17 +24,17 @@ jobs:
           ssh-keyscan -H 34.235.224.202 >> ~/.ssh/known_hosts 2>/dev/null || true
           
           echo "=== Test Bastion Connection ==="
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@34.235.224.202 "echo 'Bastion OK'; ip route; echo '---'; ping -c 2 172.31.71.182 || echo 'Ping to Core failed'"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@34.235.224.202 "echo 'Bastion OK'; ip route; echo '---'; ping -c 2 172.31.79.241 || echo 'Ping to Core failed'"
           
           echo ""
           echo "=== Try Direct SSH to Core from Bastion ==="
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@34.235.224.202 "ssh -i ~/.ssh/vockey.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no ubuntu@172.31.71.182 'docker ps -a' || echo 'SSH to Core from Bastion failed'"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@34.235.224.202 "ssh -i ~/.ssh/vockey.pem -o ConnectTimeout=5 -o StrictHostKeyChecking=no ubuntu@172.31.79.241 'docker ps -a' || echo 'SSH to Core from Bastion failed'"
 
       - name: Try Port Forwarding
         continue-on-error: true
         run: |
           echo "=== SSH Tunnel to Core Docker ==="
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -L 2375:172.31.71.182:2375 ubuntu@34.235.224.202 "sleep 30" &
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -L 2375:172.31.79.241:2375 ubuntu@34.235.224.202 "sleep 30" &
           sleep 5
           docker -H tcp://localhost:2375 ps -a || echo "Docker tunnel failed"
 

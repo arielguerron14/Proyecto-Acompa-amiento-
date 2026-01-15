@@ -17,13 +17,13 @@ jobs:
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H 172.31.71.182 >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H 172.31.79.241 >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Restart via Simple SSH
         continue-on-error: true
         run: |
           echo "Connecting to EC2-Core..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@172.31.71.182 "
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@172.31.79.241 "
           cd ~/Proyecto-Acompa-amiento-
           echo 'Stopping services...'
           sudo docker-compose -f docker-compose.core.yml down 2>/dev/null || true
