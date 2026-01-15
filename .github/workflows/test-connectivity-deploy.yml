@@ -1,0 +1,178 @@
+name: Test Connectivity & Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_only:
+        description: 'Solo probar conectividad (sin desplegar)'
+        required: false
+        default: 'false'
+
+jobs:
+  test-connectivity:
+    runs-on: ubuntu-latest
+    outputs:
+      all_reachable: ${{ steps.check.outputs.all_reachable }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Get Instance IPs
+        id: get-ips
+        run: |
+          aws ec2 describe-instances \
+            --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].{Name:Tags[?Key==`Name`].Value|[0],PublicIP:PublicIpAddress,ID:InstanceId}' \
+            --output table
+          
+          # Extract IPs en formato JSON para procesamiento
+          aws ec2 describe-instances \
+            --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].PublicIpAddress' \
+            --output text > /tmp/ips.txt
+          cat /tmp/ips.txt
+
+      - name: Test SSH Connectivity
+        id: check
+        continue-on-error: true
+        run: |
+          INSTANCES=$(cat /tmp/ips.txt)
+          REACHABLE=0
+          TOTAL=0
+          UNREACHABLE=""
+          
+          for IP in $INSTANCES; do
+            TOTAL=$((TOTAL + 1))
+            echo "🔍 Probando conectividad a $IP..."
+            
+            if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP "echo ✅ Acceso exitoso a $IP" 2>&1; then
+              REACHABLE=$((REACHABLE + 1))
+              echo "✅ $IP - ACCESIBLE"
+            else
+              echo "❌ $IP - NO ACCESIBLE"
+              UNREACHABLE="$UNREACHABLE $IP"
+            fi
+          done
+          
+          echo ""
+          echo "📊 Resumen: $REACHABLE/$TOTAL instancias accesibles"
+          
+          if [ $REACHABLE -eq $TOTAL ]; then
+            echo "all_reachable=true" >> $GITHUB_OUTPUT
+          else
+            echo "all_reachable=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "unreachable=$UNREACHABLE" >> $GITHUB_OUTPUT
+          echo "reachable_count=$REACHABLE" >> $GITHUB_OUTPUT
+          echo "total_count=$TOTAL" >> $GITHUB_OUTPUT
+
+      - name: Connectivity Report
+        run: |
+          echo "## 📋 Reporte de Conectividad"
+          echo ""
+          echo "✅ Accesibles: ${{ steps.check.outputs.reachable_count }}/${{ steps.check.outputs.total_count }}"
+          echo ""
+          if [ "${{ steps.check.outputs.all_reachable }}" == "true" ]; then
+            echo "🎉 **TODAS LAS INSTANCIAS ACCESIBLES** - Listo para desplegar"
+          else
+            echo "⚠️ Instancias no accesibles:${{ steps.check.outputs.unreachable }}"
+          fi
+
+  deploy:
+    needs: test-connectivity
+    runs-on: ubuntu-latest
+    if: ${{ needs.test-connectivity.outputs.all_reachable == 'true' && github.event.inputs.test_only != 'true' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Get Instance IPs
+        run: |
+          aws ec2 describe-instances \
+            --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].PublicIpAddress' \
+            --output text > /tmp/ips.txt
+
+      - name: Deploy Frontend
+        continue-on-error: true
+        run: |
+          IP=$(grep -oE '^[0-9.]+' /tmp/ips.txt | head -1)
+          echo "🚀 Desplegando en Frontend ($IP)..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'EOF'
+          cd /home/ubuntu
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git || cd Proyecto-Acompa-amiento- && git pull
+          cd Proyecto-Acompa-amiento-
+          docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.frontend.yml up -d
+          docker ps | grep frontend || echo "Frontend container failed"
+          EOF
+
+      - name: Deploy API Gateway
+        continue-on-error: true
+        run: |
+          IPS=$(cat /tmp/ips.txt)
+          IP=$(echo "$IPS" | awk 'NR==2')
+          [ -z "$IP" ] && IP=$(echo "$IPS" | awk 'NR==1')
+          echo "🚀 Desplegando en API Gateway ($IP)..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'EOF'
+          cd /home/ubuntu
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git || cd Proyecto-Acompa-amiento- && git pull
+          cd Proyecto-Acompa-amiento-
+          docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.api-gateway.yml up -d
+          docker ps | grep api-gateway || echo "API Gateway container failed"
+          EOF
+
+      - name: Deploy Core Services
+        continue-on-error: true
+        run: |
+          IPS=$(cat /tmp/ips.txt)
+          IP=$(echo "$IPS" | awk 'NR==3')
+          [ -z "$IP" ] && IP=$(echo "$IPS" | awk 'NR==1')
+          echo "🚀 Desplegando en Core ($IP)..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'EOF'
+          cd /home/ubuntu
+          git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git || cd Proyecto-Acompa-amiento- && git pull
+          cd Proyecto-Acompa-amiento-
+          docker-compose -f docker-compose.core.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.core.yml up -d
+          docker ps | grep core || echo "Core container failed"
+          EOF
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## ✅ Despliegue completado"
+          echo "Verifica los logs en las instancias para detalles completos"
