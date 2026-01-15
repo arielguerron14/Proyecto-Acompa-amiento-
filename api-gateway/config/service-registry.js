@@ -8,13 +8,15 @@
 
 const SERVICE_REGISTRY = {
   // IP de tu EC2-CORE (actualizar aquí cuando cambie)
-  CORE_HOST: process.env.CORE_HOST || 'http://172.31.79.241',
+  // En Docker, usar 'localhost' o nombres de contenedores
+  // En producción, usar la IP publica o nombre DNS
+  CORE_HOST: process.env.CORE_HOST || 'http://localhost',
   
   // Microservicios disponibles
   services: {
     auth: {
       name: 'Authentication Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://172.31.79.241'}:3000`,
+      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:3000`,
       routes: {
         login: '/auth/login',
         register: '/auth/register',
@@ -25,7 +27,7 @@ const SERVICE_REGISTRY = {
     
     estudiantes: {
       name: 'Students Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://172.31.79.241'}:3001`,
+      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:3001`,
       routes: {
         getAll: '/estudiantes',
         getById: '/estudiantes/:id',
@@ -40,7 +42,7 @@ const SERVICE_REGISTRY = {
     
     maestros: {
       name: 'Teachers Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://172.31.79.241'}:3002`,
+      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:3002`,
       routes: {
         getAll: '/maestros',
         getById: '/maestros/:id',
@@ -55,7 +57,7 @@ const SERVICE_REGISTRY = {
     
     reportesEstudiantes: {
       name: 'Student Reports Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://172.31.79.241'}:5003`,
+      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:5003`,
       routes: {
         getReport: '/reportes/estudiante/:id',
         getAll: '/reportes',
@@ -66,7 +68,7 @@ const SERVICE_REGISTRY = {
     
     reportesMaestros: {
       name: 'Teacher Reports Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://172.31.79.241'}:5004`,
+      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:5004`,
       routes: {
         getReport: '/reportes/maestro/:id',
         getAll: '/reportes',
