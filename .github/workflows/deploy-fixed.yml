@@ -153,10 +153,11 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          cp ./ssh-key-ec2.pem ~/.ssh/id_rsa
+          # Decode SSH private key from GitHub secret (base64 encoded)
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ steps.get-ip.outputs.ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          echo "SSH setup complete"
+          echo "✅ SSH setup complete for IP: ${{ steps.get-ip.outputs.ip }}"
       
       - name: Build Docker Images on GitHub
         if: steps.defaults.outputs.rebuild_docker == 'true' && steps.defaults.outputs.build_location == 'github'
