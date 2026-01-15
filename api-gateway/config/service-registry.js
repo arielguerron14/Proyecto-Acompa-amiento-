@@ -6,76 +6,86 @@
  * El API Gateway consume este archivo
  */
 
+// Get CORE_HOST dynamically from environment or default to localhost
+const getCoreHost = () => {
+  return process.env.CORE_HOST || 'http://localhost';
+};
+
 const SERVICE_REGISTRY = {
   // IP de tu EC2-CORE (actualizar aquí cuando cambie)
   // En Docker, usar 'localhost' o nombres de contenedores
   // En producción, usar la IP publica o nombre DNS
-  CORE_HOST: process.env.CORE_HOST || 'http://localhost',
+  get CORE_HOST() {
+    return getCoreHost();
+  },
   
   // Microservicios disponibles
-  services: {
-    auth: {
-      name: 'Authentication Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:3000`,
-      routes: {
-        login: '/auth/login',
-        register: '/auth/register',
-        verify: '/auth/verify',
-        health: '/health'
+  get services() {
+    const coreHost = getCoreHost();
+    return {
+      auth: {
+        name: 'Authentication Service',
+        baseUrl: `${coreHost}:3000`,
+        routes: {
+          login: '/auth/login',
+          register: '/auth/register',
+          verify: '/auth/verify',
+          health: '/health'
+        }
+      },
+      
+      estudiantes: {
+        name: 'Students Service',
+        baseUrl: `${coreHost}:3001`,
+        routes: {
+          getAll: '/estudiantes',
+          getById: '/estudiantes/:id',
+          create: '/estudiantes',
+          update: '/estudiantes/:id',
+          delete: '/estudiantes/:id',
+          horarios: '/estudiantes/:id/horarios',
+          reservas: '/estudiantes/reservas/estudiante/:id',
+          health: '/health'
+        }
+      },
+      
+      maestros: {
+        name: 'Teachers Service',
+        baseUrl: `${coreHost}:3002`,
+        routes: {
+          getAll: '/maestros',
+          getById: '/maestros/:id',
+          create: '/maestros',
+          update: '/maestros/:id',
+          delete: '/maestros/:id',
+          horarios: '/maestros/:id/horarios',
+          horariosList: '/horarios',
+          health: '/health'
+        }
+      },
+      
+      reportesEstudiantes: {
+        name: 'Student Reports Service',
+        baseUrl: `${coreHost}:5003`,
+        routes: {
+          getReport: '/reportes/estudiante/:id',
+          getAll: '/reportes',
+          generate: '/reportes/generar',
+          health: '/health'
+        }
+      },
+      
+      reportesMaestros: {
+        name: 'Teacher Reports Service',
+        baseUrl: `${coreHost}:5004`,
+        routes: {
+          getReport: '/reportes/maestro/:id',
+          getAll: '/reportes',
+          generate: '/reportes/generar',
+          health: '/health'
+        }
       }
-    },
-    
-    estudiantes: {
-      name: 'Students Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:3001`,
-      routes: {
-        getAll: '/estudiantes',
-        getById: '/estudiantes/:id',
-        create: '/estudiantes',
-        update: '/estudiantes/:id',
-        delete: '/estudiantes/:id',
-        horarios: '/estudiantes/:id/horarios',
-        reservas: '/estudiantes/reservas/estudiante/:id',
-        health: '/health'
-      }
-    },
-    
-    maestros: {
-      name: 'Teachers Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:3002`,
-      routes: {
-        getAll: '/maestros',
-        getById: '/maestros/:id',
-        create: '/maestros',
-        update: '/maestros/:id',
-        delete: '/maestros/:id',
-        horarios: '/maestros/:id/horarios',
-        horariosList: '/horarios',
-        health: '/health'
-      }
-    },
-    
-    reportesEstudiantes: {
-      name: 'Student Reports Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:5003`,
-      routes: {
-        getReport: '/reportes/estudiante/:id',
-        getAll: '/reportes',
-        generate: '/reportes/generar',
-        health: '/health'
-      }
-    },
-    
-    reportesMaestros: {
-      name: 'Teacher Reports Service',
-      baseUrl: `${process.env.CORE_HOST || 'http://localhost'}:5004`,
-      routes: {
-        getReport: '/reportes/maestro/:id',
-        getAll: '/reportes',
-        generate: '/reportes/generar',
-        health: '/health'
-      }
-    }
+    };
   },
   
   // Gateway routes mapping - Qué servicio maneja cada ruta
@@ -102,24 +112,24 @@ const SERVICE_REGISTRY = {
   },
   
   // Get service by name
-  getService: (serviceName) => {
-    return SERVICE_REGISTRY.services[serviceName];
+  getService(serviceName) {
+    return this.services[serviceName];
   },
   
   // Get service for route
-  getServiceByRoute: (route) => {
-    for (const [pattern, serviceName] of Object.entries(SERVICE_REGISTRY.routes)) {
+  getServiceByRoute(route) {
+    for (const [pattern, serviceName] of Object.entries(this.routes)) {
       const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
       if (regex.test(route)) {
-        return SERVICE_REGISTRY.getService(serviceName);
+        return this.getService(serviceName);
       }
     }
     return null;
   },
   
   // Get all services
-  getAllServices: () => {
-    return Object.entries(SERVICE_REGISTRY.services).map(([key, service]) => ({
+  getAllServices() {
+    return Object.entries(this.services).map(([key, service]) => ({
       id: key,
       ...service,
       baseUrl: service.baseUrl
@@ -127,12 +137,12 @@ const SERVICE_REGISTRY = {
   },
   
   // Health check endpoint
-  health: () => {
+  health() {
     return {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      coreHost: SERVICE_REGISTRY.CORE_HOST,
-      services: SERVICE_REGISTRY.getAllServices().map(s => ({
+      coreHost: this.CORE_HOST,
+      services: this.getAllServices().map(s => ({
         name: s.name,
         baseUrl: s.baseUrl,
         id: s.id
