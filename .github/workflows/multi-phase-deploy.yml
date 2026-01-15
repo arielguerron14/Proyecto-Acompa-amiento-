@@ -196,7 +196,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include: ${{ fromJson(needs.discover-instances.outputs.target_instances) }}
+        instance: ${{ fromJson(needs.discover-instances.outputs.target_instances) }}
     
     steps:
       - name: Checkout Code
@@ -207,22 +207,22 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/deploy-key.pem
           chmod 600 ~/.ssh/deploy-key.pem
-          ssh-keyscan -H ${{ matrix[5] }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H ${{ matrix.instance[5] }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
       - name: Display Deployment Info
         run: |
           echo "🚀 Deploying Instance:"
-          echo "  Name: ${{ matrix[1] }}"
-          echo "  ID: ${{ matrix[0] }}"
-          echo "  Type: ${{ matrix[2] }}"
-          echo "  Public IP: ${{ matrix[5] }}"
-          echo "  Private IP: ${{ matrix[4] }}"
+          echo "  Name: ${{ matrix.instance[1] }}"
+          echo "  ID: ${{ matrix.instance[0] }}"
+          echo "  Type: ${{ matrix.instance[2] }}"
+          echo "  Public IP: ${{ matrix.instance[5] }}"
+          echo "  Private IP: ${{ matrix.instance[4] }}"
           echo ""
       
       - name: Pre-Deployment Checks
         continue-on-error: true
         run: |
-          IP="${{ matrix[5] }}"
+          IP="${{ matrix.instance[5] }}"
           
           echo "✓ SSH Connectivity Check:"
           ssh -i ~/.ssh/deploy-key.pem \
@@ -233,8 +233,8 @@ jobs:
       - name: Deploy Code via SSH
         id: deploy
         run: |
-          IP="${{ matrix[5] }}"
-          INSTANCE_NAME="${{ matrix[1] }}"
+          IP="${{ matrix.instance[5] }}"
+          INSTANCE_NAME="${{ matrix.instance[1] }}"
           
           echo "📤 Deploying code to $INSTANCE_NAME..."
           
@@ -254,8 +254,8 @@ jobs:
       - name: Stop Current Services
         continue-on-error: true
         run: |
-          IP="${{ matrix[5] }}"
-          INSTANCE_NAME="${{ matrix[1] }}"
+          IP="${{ matrix.instance[5] }}"
+          INSTANCE_NAME="${{ matrix.instance[1] }}"
           
           echo "🛑 Stopping services on $INSTANCE_NAME..."
           
@@ -273,8 +273,8 @@ jobs:
         if: ${{ github.event.inputs.rebuild_docker == 'true' }}
         continue-on-error: true
         run: |
-          IP="${{ matrix[5] }}"
-          INSTANCE_NAME="${{ matrix[1] }}"
+          IP="${{ matrix.instance[5] }}"
+          INSTANCE_NAME="${{ matrix.instance[1] }}"
           
           echo "🔨 Rebuilding Docker images on $INSTANCE_NAME..."
           
@@ -293,8 +293,8 @@ jobs:
       
       - name: Start Services
         run: |
-          IP="${{ matrix[5] }}"
-          INSTANCE_NAME="${{ matrix[1] }}"
+          IP="${{ matrix.instance[5] }}"
+          INSTANCE_NAME="${{ matrix.instance[1] }}"
           
           echo "🚀 Starting services on $INSTANCE_NAME..."
           
@@ -315,8 +315,8 @@ jobs:
       - name: Verify Deployment
         continue-on-error: true
         run: |
-          IP="${{ matrix[5] }}"
-          INSTANCE_NAME="${{ matrix[1] }}"
+          IP="${{ matrix.instance[5] }}"
+          INSTANCE_NAME="${{ matrix.instance[1] }}"
           
           echo "✓ Verifying deployment on $INSTANCE_NAME..."
           sleep 10
@@ -341,15 +341,15 @@ jobs:
           echo "✅ DEPLOYMENT COMPLETE"
           echo "=========================================="
           echo ""
-          echo "Instance: ${{ matrix[1] }}"
-          echo "Public IP: ${{ matrix[5] }}"
-          echo "Private IP: ${{ matrix[4] }}"
+          echo "Instance: ${{ matrix.instance[1] }}"
+          echo "Public IP: ${{ matrix.instance[5] }}"
+          echo "Private IP: ${{ matrix.instance[4] }}"
           echo ""
           echo "Access Application:"
-          echo "  http://${{ matrix[5] }}:3000"
+          echo "  http://${{ matrix.instance[5] }}:3000"
           echo ""
           echo "SSH Access:"
-          echo "  ssh -i ~/.ssh/deploy-key.pem ubuntu@${{ matrix[5] }}"
+          echo "  ssh -i ~/.ssh/deploy-key.pem ubuntu@${{ matrix.instance[5] }}"
           echo ""
 
   # ============================================================================
