@@ -35,16 +35,24 @@ jobs:
       - name: Get Instance IPs
         id: get-ips
         run: |
-          aws ec2 describe-instances \
-            --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[].Instances[].{Name:Tags[?Key==`Name`].Value|[0],PublicIP:PublicIpAddress,ID:InstanceId}' \
-            --output table
+          # Usar secretos de GitHub en lugar de describe-instances (que requiere permisos IAM elevados)
+          cat > /tmp/ips.txt << 'EOF'
+          ${{ secrets.EC2_FRONTEND_IP }}
+          ${{ secrets.EC2_API_GATEWAY_IP }}
+          ${{ secrets.EC2_CORE_IP }}
+          ${{ secrets.EC2_DB_IP }}
+          ${{ secrets.EC2_MESSAGING_IP }}
+          ${{ secrets.EC2_NOTIFICACIONES_IP }}
+          ${{ secrets.EC2_REPORTES_IP }}
+          ${{ secrets.EC2_MONITORING_IP }}
+          ${{ secrets.EC2_BASTION_IP }}
+          EOF
           
-          # Extract IPs en formato JSON para procesamiento
-          aws ec2 describe-instances \
-            --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[].Instances[].PublicIpAddress' \
-            --output text > /tmp/ips.txt
+          # Filtrar líneas vacías
+          grep -v '^[[:space:]]*$' /tmp/ips.txt | sort -u > /tmp/ips_clean.txt
+          mv /tmp/ips_clean.txt /tmp/ips.txt
+          
+          echo "📋 IPs Configuradas:"
           cat /tmp/ips.txt
 
       - name: Test SSH Connectivity
@@ -103,14 +111,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: us-east-1
-
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
@@ -120,25 +120,18 @@ jobs:
       - name: Discover & Assign Instances
         id: instances
         run: |
-          echo "🔍 Descubriendo todas las instancias AWS..."
-          aws ec2 describe-instances \
-            --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value|[0],PublicIpAddress,InstanceId]' \
-            --output text | sort > /tmp/instances.txt
+          echo "🔍 Leyendo IPs desde secretos de GitHub..."
           
-          echo "📋 Todas las instancias encontradas:"
-          cat /tmp/instances.txt
-          
-          # Asignar IPs a variables por nombre de instancia (con patrón EC2-*)
-          FRONTEND_IP=$(grep -i "EC2-Frontend" /tmp/instances.txt | awk '{print $2}')
-          API_IP=$(grep -i "EC2-API-Gateway" /tmp/instances.txt | awk '{print $2}')
-          CORE_IP=$(grep -i "EC2-CORE" /tmp/instances.txt | awk '{print $2}')
-          DB_IP=$(grep -i "EC2-DB" /tmp/instances.txt | awk '{print $2}')
-          MESSAGING_IP=$(grep -i "EC2-Messaging" /tmp/instances.txt | awk '{print $2}')
-          NOTIFICACIONES_IP=$(grep -i "EC2-Notificaciones" /tmp/instances.txt | awk '{print $2}')
-          REPORTES_IP=$(grep -i "EC2-Reportes" /tmp/instances.txt | awk '{print $2}')
-          MONITORING_IP=$(grep -i "EC2-Monitoring" /tmp/instances.txt | awk '{print $2}')
-          BASTION_IP=$(grep -i "EC-Bastion" /tmp/instances.txt | awk '{print $2}')
+          # Asignar IPs desde secretos
+          FRONTEND_IP="${{ secrets.EC2_FRONTEND_IP }}"
+          API_IP="${{ secrets.EC2_API_GATEWAY_IP }}"
+          CORE_IP="${{ secrets.EC2_CORE_IP }}"
+          DB_IP="${{ secrets.EC2_DB_IP }}"
+          MESSAGING_IP="${{ secrets.EC2_MESSAGING_IP }}"
+          NOTIFICACIONES_IP="${{ secrets.EC2_NOTIFICACIONES_IP }}"
+          REPORTES_IP="${{ secrets.EC2_REPORTES_IP }}"
+          MONITORING_IP="${{ secrets.EC2_MONITORING_IP }}"
+          BASTION_IP="${{ secrets.EC2_BASTION_IP }}"
           
           echo ""
           echo "✅ IPs Asignadas:"
