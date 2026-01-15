@@ -3,6 +3,9 @@ version: '3.8'
 services:
   api-gateway:
     container_name: api-gateway
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
     image: api-gateway:latest
     network_mode: host
     entrypoint: []

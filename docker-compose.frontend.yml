@@ -3,6 +3,9 @@ version: '3.8'
 services:
   frontend-web:
     container_name: frontend-web
+    build:
+      context: ./frontend-web
+      dockerfile: Dockerfile
     image: frontend-web:latest
     ports:
       - "80:80"

@@ -490,10 +490,10 @@ jobs:
             cd Proyecto-Acompa-amiento-
           fi
           echo "🐳 Construyendo imágenes Docker..."
-          sudo docker-compose -f docker-compose.prod.yml build --no-cache
+          sudo docker-compose -f docker-compose.reportes.yml build --no-cache
           echo "🐳 Iniciando contenedores..."
-          sudo docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
-          sudo docker-compose -f docker-compose.prod.yml up -d
+          sudo docker-compose -f docker-compose.reportes.yml down 2>/dev/null || true
+          sudo docker-compose -f docker-compose.reportes.yml up -d
           echo "✅ Reportes desplegado exitosamente"
           sudo docker ps
           DEPLOY
@@ -538,10 +538,10 @@ jobs:
             cd Proyecto-Acompa-amiento-
           fi
           echo "🐳 Construyendo imágenes Docker..."
-          sudo docker-compose -f docker-compose.prod.yml build --no-cache
+          sudo docker-compose -f monitoring/docker-compose.yml build --no-cache
           echo "🐳 Iniciando contenedores..."
-          sudo docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
-          sudo docker-compose -f docker-compose.prod.yml up -d
+          sudo docker-compose -f monitoring/docker-compose.yml down 2>/dev/null || true
+          sudo docker-compose -f monitoring/docker-compose.yml up -d
           echo "✅ Monitoring desplegado exitosamente"
           sudo docker ps
           DEPLOY
