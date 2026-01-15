@@ -1,0 +1,382 @@
+name: Terraform Inventory & Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      run_inventory:
+        description: 'Run inventory step (true/false)'
+        required: false
+        default: 'true'
+      run_terraform:
+        description: 'Run terraform after inventory (true/false)'
+        required: false
+        default: 'false'
+      deploy_role_arn:
+        description: 'Role ARN to assume in target account (optional)'
+        required: false
+      deploy_region:
+        description: 'Region to run Terraform in (optional)'
+        required: false
+      tf_var_ami_id:
+        description: 'AMI id to pass to Terraform (optional)'
+        required: false
+      tf_var_azs:
+        description: 'AZs to pass to Terraform (JSON array, optional)'
+        required: false
+      apply:
+        description: 'Perform terraform apply (true/false)'
+        required: false
+        default: 'false'
+      environment:
+        description: 'Environment name (e.g., dev, staging, prod). Jobs using this environment will be gated by environment protection rules if configured.'
+        required: false
+        default: 'staging'
+      deploy_targets:
+        description: 'JSON array of deploy targets. Example: [{"name":"acct-a","role_arn":"arn:aws:iam::123456789012:role/DeployRole","region":"us-east-1","tf_var_ami_id":"ami-...","tf_var_azs":"[\"us-east-1a\"]"}]'
+        required: false
+        default: ''
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.run_inventory == 'true' }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS credentials for inventory
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Create output dir
+      run: mkdir -p artifact
+
+    - name: Caller identity
+      run: aws sts get-caller-identity --output json > artifact/caller_identity.json
+
+    - name: Describe EC2 instances
+      run: aws ec2 describe-instances --region us-east-1 --output json > artifact/ec2_instances.json || true
+
+    - name: Describe VPCs
+      run: aws ec2 describe-vpcs --region us-east-1 --output json > artifact/vpcs.json || true
+
+    - name: List S3 buckets (optional)
+      run: aws s3api list-buckets --output json > artifact/s3_buckets.json || true
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: aws-inventory
+        path: artifact
+
+  assume_role:
+    runs-on: ubuntu-latest
+    needs: inventory
+    if: ${{ github.event.inputs.run_terraform == 'true' }}
+    outputs:
+      aws_access_key_id: ${{ steps.assume.outputs.aws_access_key_id }}
+      aws_secret_access_key: ${{ steps.assume.outputs.aws_secret_access_key }}
+      aws_session_token: ${{ steps.assume.outputs.aws_session_token }}
+
+    steps:
+    - name: Configure AWS (caller creds)
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Assume role
+      id: assume
+      run: |
+        ROLE_ARN="${{ github.event.inputs.deploy_role_arn }}"
+        if [ -z "$ROLE_ARN" ]; then
+          echo "No deploy_role_arn provided - will use repo secrets for deploy"
+          echo "aws_access_key_id=" >> $GITHUB_OUTPUT
+          echo "aws_secret_access_key=" >> $GITHUB_OUTPUT
+          echo "aws_session_token=" >> $GITHUB_OUTPUT
+        else
+          echo "Assuming role $ROLE_ARN"
+          CREDS=$(aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "gh-workflow" --duration-seconds 3600 --output json)
+          AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.Credentials.AccessKeyId')
+          AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.Credentials.SecretAccessKey')
+          AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.Credentials.SessionToken')
+          echo "aws_access_key_id=$AWS_ACCESS_KEY_ID" >> $GITHUB_OUTPUT
+          echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_OUTPUT
+          echo "aws_session_token=$AWS_SESSION_TOKEN" >> $GITHUB_OUTPUT
+        fi
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: assume_role
+    if: ${{ github.event.inputs.run_terraform == 'true' }}
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set AWS creds (assumed or repo secrets)
+      run: |
+        echo "AWS_ACCESS_KEY_ID=${{ needs.assume_role.outputs.aws_access_key_id || secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+        echo "AWS_SECRET_ACCESS_KEY=${{ needs.assume_role.outputs.aws_secret_access_key || secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+        echo "AWS_SESSION_TOKEN=${{ needs.assume_role.outputs.aws_session_token || secrets.AWS_SESSION_TOKEN }}" >> $GITHUB_ENV
+        echo "AWS_REGION=${{ github.event.inputs.deploy_region || 'us-east-1' }}" >> $GITHUB_ENV
+
+    - name: Show environment info
+      run: |
+        echo "Deployment environment: ${{ github.event.inputs.environment }}"
+        echo "If this environment has protection rules, this job will pause until reviewers approve."
+
+    - uses: hashicorp/setup-terraform@v3
+
+    - name: Configure AWS (for terraform)
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Clean up conflicting resources (if exists)
+      if: ${{ github.event.inputs.apply == 'true' }}
+      run: |
+        # Delete ALB if it exists
+        ALB_ARN=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?LoadBalancerName=='lab-alb'].LoadBalancerArn" --output text || true)
+        if [ ! -z "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
+          echo "Found existing ALB: $ALB_ARN"
+          aws elbv2 delete-load-balancer --load-balancer-arn "$ALB_ARN" 2>/dev/null && echo "Deleted ALB" || echo "Could not delete ALB"
+          sleep 10  # Wait for ALB deletion before deleting target group
+        fi
+        
+        # Delete target group if it exists
+        TG_ARN=$(aws elbv2 describe-target-groups --query "TargetGroups[?TargetGroupName=='lab-alb-web-tg'].TargetGroupArn" --output text || true)
+        if [ ! -z "$TG_ARN" ] && [ "$TG_ARN" != "None" ]; then
+          echo "Found existing target group: $TG_ARN"
+          aws elbv2 delete-target-group --target-group-arn "$TG_ARN" 2>/dev/null && echo "Deleted target group" || echo "Could not delete target group"
+        fi
+        
+        # Terminate EC2 instances with Project tag to free up security group
+        INSTANCE_IDS=$(aws ec2 describe-instances --filters "Name=tag:Project,Values=lab-8-ec2" "Name=instance-state-name,Values=running,stopped" --query 'Reservations[*].Instances[*].InstanceId' --output text || true)
+        if [ ! -z "$INSTANCE_IDS" ]; then
+          echo "Found instances to terminate: $INSTANCE_IDS"
+          aws ec2 terminate-instances --instance-ids $INSTANCE_IDS 2>/dev/null && echo "Terminated instances" || echo "Could not terminate instances"
+          sleep 20  # Wait longer for instances to fully terminate and release resources
+        fi
+        
+        # Release ALL unassociated EIPs in the account (not associated with any instance)
+        echo "Releasing unassociated EIPs..."
+        EIP_ALLOCS=$(aws ec2 describe-addresses --query 'Addresses[?AssociationId==null].AllocationId' --output text || true)
+        if [ ! -z "$EIP_ALLOCS" ]; then
+          echo "Found unassociated EIPs to release: $EIP_ALLOCS"
+          for EIP_ID in $EIP_ALLOCS; do
+            echo "Releasing EIP: $EIP_ID"
+            aws ec2 release-address --allocation-id $EIP_ID 2>/dev/null && echo "Released EIP $EIP_ID" || echo "Could not release EIP $EIP_ID"
+          done
+        else
+          echo "No unassociated EIPs found"
+        fi
+        
+        # Delete security group by name (works across all VPCs)
+        SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=web-sg --query 'SecurityGroups[0].GroupId' --output text || true)
+        if [ ! -z "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
+          echo "Found existing security group: $SG_ID"
+          # Revoke all rules
+          aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true
+          aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 80 --cidr 0.0.0.0/0 2>/dev/null || true
+          aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 0.0.0.0/0 2>/dev/null || true
+          # Try to delete with retries
+          for attempt in 1 2 3; do
+            aws ec2 delete-security-group --group-id $SG_ID 2>/dev/null && echo "Deleted existing security group" && break || echo "Attempt $attempt: Could not delete security group yet..."
+            if [ $attempt -lt 3 ]; then sleep 5; fi
+          done
+        fi
+
+    - name: Debug - show runner paths and terraform folder
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Repo root content:"
+        ls -l
+        echo "\nParent directory content:"
+        ls -l ..
+        echo "\nTerraform directory content:"
+        ls -l terraform || echo "No terraform directory found!"
+
+    - name: Detect VPC, Subnet (us-east-1f), keypair, and AMI
+      run: |
+        # Try to read inventory artifact if present
+        if [ -f artifact/vpcs.json ]; then
+          VPC_ID=$(jq -r '.Vpcs[] | select(.IsDefault==true) | .VpcId' artifact/vpcs.json || true)
+        fi
+        if [ -z "$VPC_ID" ] || [ "$VPC_ID" = "null" ]; then
+          VPC_ID=$(aws ec2 describe-vpcs --filters Name=is-default,Values=true --query 'Vpcs[0].VpcId' --output text || true)
+        fi
+        echo "Found VPC: $VPC_ID"
+        SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=availability-zone,Values=us-east-1f --query 'Subnets[0].SubnetId' --output text || true)
+        if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" = "None" ]; then
+          SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[0].SubnetId' --output text || true)
+        fi
+        echo "Found Subnet: $SUBNET_ID"
+        KEY_NAME=$(aws ec2 describe-key-pairs --query 'KeyPairs[0].KeyName' --output text || true)
+        echo "Found KeyPair: $KEY_NAME"
+        # Lookup latest Canonical Ubuntu 24.04 AMI in us-east-1
+        AMI_ID=$(aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-noble-24.04-amd64-server-*" --region us-east-1 --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text || true)
+        if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "None" ]; then
+          # Fallback: use a generic Ubuntu AMI query
+          AMI_ID=$(aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-*-amd64-server-*" --region us-east-1 --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text || true)
+        fi
+        echo "Found Ubuntu AMI: $AMI_ID"
+        echo "TF_VAR_existing_vpc_id=$VPC_ID" >> $GITHUB_ENV
+        echo "TF_VAR_subnet_id=$SUBNET_ID" >> $GITHUB_ENV
+        echo "TF_VAR_ssh_key_name=$KEY_NAME" >> $GITHUB_ENV
+        echo "TF_VAR_azs=[\"us-east-1f\"]" >> $GITHUB_ENV
+        echo "TF_VAR_instance_type=t3.small" >> $GITHUB_ENV
+        echo "TF_VAR_create_instances=true" >> $GITHUB_ENV
+        echo "TF_VAR_create_security_group=true" >> $GITHUB_ENV
+        echo "TF_VAR_ami_id=$AMI_ID" >> $GITHUB_ENV
+        echo "TF_VAR_eip_instances=[\"EC-Bastion\",\"EC2-Frontend\",\"EC2-API-Gateway\",\"EC2-Reportes\",\"EC2-Monitoring\"]" >> $GITHUB_ENV
+
+    - name: Init
+      run: cd terraform && terraform init
+
+    - name: Plan
+      env:
+        TF_VAR_azs: ${{ github.event.inputs.tf_var_azs || '["us-east-1a","us-east-1b"]' }}
+      run: cd terraform && terraform plan -out=tfplan
+
+    - name: Apply
+      if: ${{ github.event.inputs.apply == 'true' }}
+      run: cd terraform && terraform apply -auto-approve tfplan
+
+  deploy-matrix:
+    runs-on: ubuntu-latest
+    needs: inventory
+    if: ${{ github.event.inputs.deploy_targets != '' && github.event.inputs.run_terraform == 'true' }}
+    environment: ${{ github.event.inputs.environment }}
+    strategy:
+      matrix:
+        target: ${{ fromJson(github.event.inputs.deploy_targets) }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Assume role (per target)
+      id: assume_matrix
+      env:
+        ROLE_ARN: ${{ matrix.target.role_arn }}
+        DEFAULT_REGION: ${{ github.event.inputs.deploy_region || 'us-east-1' }}
+      run: |
+        if [ -z "$ROLE_ARN" ] || [ "$ROLE_ARN" = "null" ]; then
+          echo "No role ARN for target - will use repo secrets"
+          echo "aws_access_key_id=" >> $GITHUB_OUTPUT
+          echo "aws_secret_access_key=" >> $GITHUB_OUTPUT
+          echo "aws_session_token=" >> $GITHUB_OUTPUT
+        else
+          echo "Assuming role $ROLE_ARN"
+          CREDS=$(aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "gh-matrix" --duration-seconds 3600 --output json)
+          AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.Credentials.AccessKeyId')
+          AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.Credentials.SecretAccessKey')
+          AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.Credentials.SessionToken')
+          echo "aws_access_key_id=$AWS_ACCESS_KEY_ID" >> $GITHUB_OUTPUT
+          echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_OUTPUT
+          echo "aws_session_token=$AWS_SESSION_TOKEN" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Set AWS creds (assumed or repo secrets)
+      run: |
+        echo "AWS_ACCESS_KEY_ID=${{ needs.deploy-matrix.outputs.aws_access_key_id || steps.assume_matrix.outputs.aws_access_key_id || secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+        echo "AWS_SECRET_ACCESS_KEY=${{ needs.deploy-matrix.outputs.aws_secret_access_key || steps.assume_matrix.outputs.aws_secret_access_key || secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+        echo "AWS_SESSION_TOKEN=${{ needs.deploy-matrix.outputs.aws_session_token || steps.assume_matrix.outputs.aws_session_token || secrets.AWS_SESSION_TOKEN }}" >> $GITHUB_ENV
+        TARGET_REGION="${{ matrix.target.region || github.event.inputs.deploy_region || 'us-east-1' }}"
+        echo "AWS_REGION=${TARGET_REGION}" >> $GITHUB_ENV
+
+    - name: Show target info
+      run: |
+        echo "Target name: ${{ matrix.target.name }}"
+        echo "Target role_arn: ${{ matrix.target.role_arn }}"
+        echo "Target region: ${{ matrix.target.region || github.event.inputs.deploy_region || 'us-east-1' }}"
+
+    - uses: hashicorp/setup-terraform@v3
+
+    - name: Configure AWS (for terraform)
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Debug - show terraform dir
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Terraform directory content:" 
+        ls -l terraform || echo "No terraform directory found!"
+
+    - name: Detect VPC, Subnet (us-east-1f), keypair, and AMI
+      run: |
+        # Try to read inventory artifact if present
+        if [ -f artifact/vpcs.json ]; then
+          VPC_ID=$(jq -r '.Vpcs[] | select(.IsDefault==true) | .VpcId' artifact/vpcs.json || true)
+        fi
+        if [ -z "$VPC_ID" ] || [ "$VPC_ID" = "null" ]; then
+          VPC_ID=$(aws ec2 describe-vpcs --filters Name=is-default,Values=true --query 'Vpcs[0].VpcId' --output text || true)
+        fi
+        echo "Found VPC: $VPC_ID"
+        SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=availability-zone,Values=us-east-1f --query 'Subnets[0].SubnetId' --output text || true)
+        if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" = "None" ]; then
+          SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[0].SubnetId' --output text || true)
+        fi
+        echo "Found Subnet: $SUBNET_ID"
+        KEY_NAME=$(aws ec2 describe-key-pairs --query 'KeyPairs[0].KeyName' --output text || true)
+        echo "Found KeyPair: $KEY_NAME"
+        # Lookup latest Canonical Ubuntu 24.04 AMI in us-east-1
+        AMI_ID=$(aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-noble-24.04-amd64-server-*" --region us-east-1 --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text || true)
+        if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "None" ]; then
+          # Fallback: use a generic Ubuntu AMI query
+          AMI_ID=$(aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-*-amd64-server-*" --region us-east-1 --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text || true)
+        fi
+        echo "Found Ubuntu AMI: $AMI_ID"
+        echo "TF_VAR_existing_vpc_id=$VPC_ID" >> $GITHUB_ENV
+        echo "TF_VAR_subnet_id=$SUBNET_ID" >> $GITHUB_ENV
+        echo "TF_VAR_ssh_key_name=$KEY_NAME" >> $GITHUB_ENV
+        echo "TF_VAR_azs=[\"us-east-1f\"]" >> $GITHUB_ENV
+        echo "TF_VAR_instance_type=t3.small" >> $GITHUB_ENV
+        echo "TF_VAR_create_instances=true" >> $GITHUB_ENV
+        echo "TF_VAR_create_security_group=true" >> $GITHUB_ENV
+        echo "TF_VAR_ami_id=$AMI_ID" >> $GITHUB_ENV
+        echo "TF_VAR_eip_instances=[\"EC-Bastion\",\"EC2-Frontend\",\"EC2-API-Gateway\",\"EC2-Reportes\",\"EC2-Monitoring\"]" >> $GITHUB_ENV
+
+    - name: Init
+      run: cd terraform && terraform init
+
+    - name: Plan
+      env:
+        TF_VAR_azs: ${{ matrix.target.tf_var_azs || github.event.inputs.tf_var_azs || '["us-east-1a","us-east-1b"]' }}
+      run: |
+        cd terraform && terraform plan -out=tfplan
+        mkdir -p ../artifact
+        mv tfplan ../artifact/tfplan-${{ matrix.target.name || matrix.target.region || env.AWS_REGION }}
+
+    - name: Upload tfplan artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: tfplan-${{ matrix.target.name || matrix.target.region || env.AWS_REGION }}
+        path: artifact/tfplan-${{ matrix.target.name || matrix.target.region || env.AWS_REGION }}
+
+    - name: Apply (per target)
+      if: ${{ github.event.inputs.apply == 'true' }}
+      run: |
+        cd terraform && terraform apply -auto-approve tfplan
+
