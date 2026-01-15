@@ -90,7 +90,7 @@ jobs:
               echo "ip=3.237.32.106" >> $GITHUB_OUTPUT
               ;;
             EC2_API_GATEWAY)
-              echo "ip=3.214.212.205" >> $GITHUB_OUTPUT
+              echo "ip=52.7.168.4" >> $GITHUB_OUTPUT
               ;;
             EC2_FRONTEND)
               echo "ip=54.85.92.175" >> $GITHUB_OUTPUT

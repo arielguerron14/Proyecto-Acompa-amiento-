@@ -123,7 +123,7 @@ GitHub → Actions → Deploy Infrastructure with Terraform
 | 1 | EC2-Messaging | i-0413c190dbf686769 | 54.146.164.8 | us-east-1b |
 | 2 | EC2-Bastion ✅ | i-0bd13b8e83e8679bb | 3.87.155.74 | us-east-1b |
 | 3 | EC2-Frontend | i-00a121b00e2e8aa55 | 54.85.92.175 | us-east-1f |
-| 4 | EC2-API-Gateway | i-01fb14943445a6820 | 3.214.212.205 | us-east-1f |
+| 4 | EC2-API-Gateway | i-01fb14943445a6820 | 52.7.168.4 | us-east-1f |
 | 5 | EC2-Reportes | i-0cbed7ea84129a7ca | 3.94.74.223 | us-east-1f |
 | 6 | EC2-CORE | i-0cb7fc180ec736b7a | 3.234.198.34 | us-east-1f |
 | 7 | EC2-Notificaciones | i-0e4141c9befb46701 | 18.232.53.140 | us-east-1f |

@@ -1,13 +1,12 @@
 /**
- * 🏗️ CONFIGURACIÓN SEPARADA POR INSTANCIA EC2
+ * AUTO-GENERATED: Instance Configuration with Dynamic IPs
+ * Generated: 2026-01-14T23:40:00Z
+ * Updated automatically by CI/CD pipeline
  * 
- * Nueva arquitectura: Cada servicio en su propia instancia
- * - Direccionamiento público y privado separados
- * - Mejor escalabilidad y mantenimiento
- * - Seguridad mejorada con instancias privadas
- * 
- * Fecha: Enero 2026
- * Versión: 2.0 (Instancias Separadas)
+ * This file contains the mapping of all EC2 instances with their IPs
+ * - Private IPs: For internal VPC communication (172.31.x.x)
+ * - Public IPs: Temporary external IPs (X.X.X.X)
+ * - Elastic IPs: Static external IPs (X.X.X.X)
  */
 
 module.exports = {

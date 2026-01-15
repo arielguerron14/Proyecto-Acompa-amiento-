@@ -13,7 +13,7 @@ window.API_CONFIG = (function() {
   } else {
     // Production -> prefer an explicit API_GATEWAY URL when provided (window.__API_GATEWAY_URL__)
     // Fallback to the known API Gateway public IP to avoid silent 'null'/'undefined' fetches.
-    API_BASE = window.__API_GATEWAY_URL__ || 'http://3.214.212.205:8080';
+    API_BASE = window.__API_GATEWAY_URL__ || 'http://52.7.168.4:8080';
   }
   
   return {

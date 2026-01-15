@@ -33,7 +33,7 @@ module.exports = {
     CORE_IP: process.env.CORE_PUBLIC_IP || '3.234.198.34',
 
     // API Gateway - IP pública para acceso desde frontend
-    API_GATEWAY_IP: process.env.API_GATEWAY_IP || '3.214.212.205',
+    API_GATEWAY_IP: process.env.API_GATEWAY_IP || '52.7.168.4',
     API_GATEWAY_PORT: process.env.API_GATEWAY_PORT || 3000,
     API_GATEWAY_URL: function() {
       return `http://${this.API_GATEWAY_IP}:${this.API_GATEWAY_PORT}`;
