@@ -1,0 +1,132 @@
+name: Deploy via Bastion Gateway
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restart-services:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          cp ssh-key-ec2.pem ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          echo "Host bastion"  > ~/.ssh/config
+          echo "  HostName 34.194.48.73" >> ~/.ssh/config
+          echo "  User ubuntu" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "  UserKnownHostsFile=/dev/null" >> ~/.ssh/config
+          echo "" >> ~/.ssh/config
+          echo "Host 172.31.*.*" >> ~/.ssh/config
+          echo "  ProxyJump bastion" >> ~/.ssh/config
+          echo "  User ubuntu" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+
+      - name: Test Bastion Connectivity
+        run: |
+          echo "Testing connection to Bastion..."
+          ssh -i ~/.ssh/labsuser.pem -o ConnectTimeout=10 -o BatchMode=yes ubuntu@34.194.48.73 "echo ✅ Bastion reachable" || echo "⚠️  Bastion may not be available"
+
+      - name: Deploy via Bastion to Core
+        run: |
+          echo "Deploying to Core via Bastion..."
+          BASTION_IP="34.194.48.73"
+          CORE_IP="172.31.71.182"
+          
+          # Try option 1: Direct SSH via bastion proxy
+          echo "Attempt 1: Using SSH ProxyJump..."
+          ssh -i ~/.ssh/labsuser.pem \
+            -o ConnectTimeout=10 \
+            -o ProxyCommand="ssh -i ~/.ssh/labsuser.pem -W %h:%p ubuntu@$BASTION_IP" \
+            ubuntu@$CORE_IP << 'DEPLOY_SCRIPT' 2>&1 || {
+            
+            echo ""
+            echo "Attempt 1 failed, trying direct connection..."
+            ssh -i ~/.ssh/labsuser.pem \
+              -o ConnectTimeout=10 \
+              ubuntu@$CORE_IP << 'DEPLOY_SCRIPT'
+          }
+          
+          # Script de deploy
+          set +e
+          cd ~/Proyecto-Acompa-amiento- 2>/dev/null || cd ~ || true
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔍 Docker Status"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          docker --version 2>/dev/null || echo "⚠️  Docker not found in PATH"
+          which docker 2>/dev/null || echo "⚠️  Docker not in PATH"
+          
+          # Try different docker commands
+          echo ""
+          echo "Trying docker ps..."
+          docker ps -a 2>/dev/null || sudo docker ps -a 2>/dev/null || echo "Could not run docker ps"
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔄 Restarting Docker Compose Services"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          if [ -d "Proyecto-Acompa-amiento-" ]; then
+            cd Proyecto-Acompa-amiento-
+          fi
+          
+          if [ -f docker-compose.core.yml ]; then
+            echo "Found docker-compose.core.yml, restarting..."
+            sudo docker-compose -f docker-compose.core.yml down 2>/dev/null || true
+            sleep 3
+            sudo docker-compose -f docker-compose.core.yml up -d 2>/dev/null || docker-compose -f docker-compose.core.yml up -d || true
+            echo "✅ Restart command sent"
+            sleep 10
+            docker ps -a --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || echo "Containers status:"
+          else
+            echo "⚠️  docker-compose.core.yml not found"
+            ls -la docker-compose* 2>/dev/null || echo "No docker-compose files found"
+          fi
+          
+          echo ""
+          echo "✅ Script completed"
+          
+          DEPLOY_SCRIPT
+          
+          echo ""
+          echo "Deploy step completed"
+
+      - name: Verify Services Running
+        continue-on-error: true
+        run: |
+          echo "Checking if services are responding..."
+          for i in {1..5}; do
+            echo "Attempt $i..."
+            curl -s -m 3 http://52.7.168.4:8080/health && echo "✅ API Gateway responding" && break || echo "Waiting... (attempt $i/5)"
+            sleep 5
+          done
+          
+          echo ""
+          echo "Checking specific microservices..."
+          for port in 3000 3001 3002; do
+            echo "Checking port $port..."
+            (echo >/dev/tcp/172.31.71.182/$port && echo "✅ Port $port open") || echo "❌ Port $port closed/timeout"
+          done 2>/dev/null || echo "Port test skipped"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## ✅ Deployment Attempt Complete"
+          echo ""
+          echo "**Services Expected:**"
+          echo "- micro-auth on port 3000"
+          echo "- micro-estudiantes on port 3001"
+          echo "- micro-maestros on port 3002"
+          echo "- MongoDB on port 27017"
+          echo ""
+          echo "**Access Points:**"
+          echo "- Frontend: http://44.220.126.89"
+          echo "- API Gateway: http://52.7.168.4:8080"
+          echo "- Core Services: 172.31.71.182 (internal)"
