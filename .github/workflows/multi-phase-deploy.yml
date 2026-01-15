@@ -230,7 +230,7 @@ jobs:
           echo "✓ SSH Connectivity Check:"
           ssh -o ConnectTimeout=10 \
               -o StrictHostKeyChecking=no \
-              ubuntu@$IP "echo 'SSH connection successful'; whoami; pwd"
+              ubuntu@$IP "echo 'SSH connection successful'; whoami; pwd; mkdir -p /home/ubuntu/project"
       
       - name: Deploy Code via SSH
         id: deploy
@@ -252,6 +252,39 @@ jobs:
           }
           
           echo "✅ Code deployed"
+      
+      - name: Setup Docker Compose Configuration
+        continue-on-error: true
+        run: |
+          IP="${{ matrix.instance[5] }}"
+          INSTANCE_NAME="${{ matrix.instance[1] }}"
+          
+          echo "⚙️  Setting up Docker Compose..."
+          
+          ssh -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              ubuntu@$IP << 'SCRIPT'
+          cd /home/ubuntu/project
+          
+          # Verify docker-compose.yml exists
+          if [ ! -f docker-compose.yml ]; then
+            echo "❌ docker-compose.yml not found!"
+            ls -la
+            exit 1
+          fi
+          
+          # Verify docker-compose.ec2-core.yml exists
+          if [ ! -f docker-compose.ec2-core.yml ]; then
+            echo "⚠️ docker-compose.ec2-core.yml not found, using docker-compose.yml"
+          fi
+          
+          # Check Docker status
+          docker --version
+          docker-compose --version
+          
+          SCRIPT
+          
+          echo "✅ Docker Compose configured"
       
       - name: Stop Current Services
         continue-on-error: true
