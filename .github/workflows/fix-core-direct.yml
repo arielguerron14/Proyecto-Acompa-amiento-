@@ -1,0 +1,89 @@
+name: Fix Core Services - Direct Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.LABSUSER_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H 172.31.71.182 >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H 34.194.48.73 >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Restart Services on Core
+        continue-on-error: true
+        run: |
+          echo "🔄 Attempting to restart services on EC2-Core..."
+          
+          # Try direct connection first
+          ssh -o ConnectTimeout=10 -o BatchMode=yes ubuntu@172.31.71.182 << 'SCRIPT' 2>&1 || {
+            echo ""
+            echo "Direct connection failed, trying via Bastion..."
+            ssh -o ConnectTimeout=10 -o BatchMode=yes \
+              -o ProxyCommand="ssh -W %h:%p -o StrictHostKeyChecking=no ubuntu@34.194.48.73" \
+              ubuntu@172.31.71.182 << 'SCRIPT'
+          }
+          
+          set -e
+          cd ~/Proyecto-Acompa-amiento-
+          
+          echo "Current containers:"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}" || true
+          
+          echo ""
+          echo "Restarting docker-compose..."
+          sudo docker-compose -f docker-compose.core.yml down 2>/dev/null || docker-compose -f docker-compose.core.yml down || true
+          sleep 5
+          
+          sudo docker-compose -f docker-compose.core.yml up -d 2>/dev/null || docker-compose -f docker-compose.core.yml up -d || true
+          sleep 15
+          
+          echo ""
+          echo "Containers after restart:"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}"
+          
+          SCRIPT
+
+      - name: Verify Endpoints
+        continue-on-error: true
+        run: |
+          echo "Waiting for services..."
+          sleep 10
+          
+          echo ""
+          echo "Testing endpoints:"
+          
+          echo "1. Health check:"
+          curl -s -m 5 http://52.7.168.4:8080/health || echo "Health check failed"
+          
+          echo ""
+          echo "2. Horarios endpoint:"
+          curl -s -m 5 http://52.7.168.4:8080/horarios || echo "Horarios failed"
+          
+          echo ""
+          echo "3. Estudiantes endpoint:"
+          curl -s -m 5 http://52.7.168.4:8080/estudiantes/reservas/estudiante/1 || echo "Estudiantes failed"
+
+      - name: Final Report
+        if: always()
+        run: |
+          echo "✅ Core services restart workflow completed"
+          echo ""
+          echo "Next steps:"
+          echo "1. Visit http://44.220.126.89 in browser"
+          echo "2. Test loading horarios and reservas"
+          echo "3. Check browser console for errors"
+          echo ""
+          echo "If still seeing 503/504, check:"
+          echo "- Docker logs: docker logs micro-estudiantes"
+          echo "- MongoDB: docker logs mongo"
