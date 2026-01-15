@@ -7,7 +7,7 @@ El análisis exhaustivo ha determinado que los errores **503 "Service Unavailabl
 
 ### 1. Intentos de Conexión (Workflow 21022171513)
 ```
-❌ Bastion (34.194.48.73)          → Connection timeout (port 22)
+❌ Bastion (34.235.224.202)          → Connection timeout (port 22)
 ❌ EC2-Core (172.31.71.182)        → Unreachable via SSH
 ❌ Frontend (44.220.126.89)        → SSH Permission denied
 ❌ API Gateway (52.7.168.4)        → SSH Permission denied
@@ -32,7 +32,7 @@ El análisis exhaustivo ha determinado que los errores **503 "Service Unavailabl
 | Frontend | 44.220.126.89 | 172.31.69.107 | ❌ Timeout | ? |
 | API Gateway | 52.7.168.4 | 172.31.70.85 | ❌ Timeout | ? |
 | EC2-Core | N/A | 172.31.71.182 | ❌ Timeout | 🔴 DOWN |
-| Bastion | 34.194.48.73 | 172.31.78.45 | ❌ Timeout | 🔴 DOWN |
+| Bastion | 34.235.224.202 | 172.31.78.45 | ❌ Timeout | 🔴 DOWN |
 | Otros (DB, Messaging, etc) | ? | ? | ❌ Timeout | 🔴 DOWN |
 
 ## 🔴 Problemas Identificados
@@ -118,7 +118,7 @@ El análisis exhaustivo ha determinado que los errores **503 "Service Unavailabl
 2. Verifica que las IPs esperadas estén asignadas:
    - 44.220.126.89 → EC2-Frontend
    - 52.7.168.4 → EC2-ApiGateway
-   - 34.194.48.73 → EC2-Bastion
+   - 34.235.224.202 → EC2-Bastion
 
 ### PASO 5: Una Vez Instancias Online
 **Ejecuta el workflow:**

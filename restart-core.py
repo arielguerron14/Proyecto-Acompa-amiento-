@@ -54,7 +54,7 @@ def run_ssh_command(bastion_ip, core_ip, ssh_key_path, command, timeout=30):
 def restart_core_services():
     """Reinicia servicios en EC2-Core"""
     
-    bastion_ip = "34.194.48.73"
+    bastion_ip = "34.235.224.202"
     core_ip = "172.31.71.182"
     ssh_key = "ssh-key-ec2.pem"
     

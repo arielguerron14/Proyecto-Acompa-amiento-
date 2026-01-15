@@ -10,7 +10,7 @@
 ┌─────────────────────┬────────────────┬───────────────┬──────────────────────┐
 │ Instance Name       │ Private IP     │ Public IP     │ SSH Command          │
 ├─────────────────────┼────────────────┼───────────────┼──────────────────────┤
-│ EC-Bastion          │ 172.31.78.45   │ 34.194.48.73  │ ssh ubuntu@34.194... │
+│ EC-Bastion          │ 172.31.78.45   │ 34.235.224.202  │ ssh ubuntu@34.194... │
 │ EC2-Frontend        │ 172.31.65.226  │ 100.50.80.35  │ ssh ubuntu@100.50... │
 │ EC2-API-Gateway     │ 172.31.72.142  │ 35.168.118.171│ ssh ubuntu@35.168... │
 │ EC2-CORE            │ 172.31.71.182  │ 44.223.45.55  │ ssh ubuntu@44.223... │
@@ -28,7 +28,7 @@
 
 ### Bastion Gateway (SSH Proxy)
 ```bash
-IP: 34.194.48.73
+IP: 34.235.224.202
 User: ubuntu
 Key: ssh-key-ec2.pem
 ```
@@ -104,10 +104,10 @@ SSH: ssh -i ssh-key-ec2.pem ubuntu@204.236.250.202
 ### Via Bastion
 ```bash
 # Tunneling local
-ssh -L 3000:172.31.65.226:3000 ubuntu@34.194.48.73
+ssh -L 3000:172.31.65.226:3000 ubuntu@34.235.224.202
 # Then open: http://localhost:3000
 
-ssh -L 8080:172.31.72.142:8080 ubuntu@34.194.48.73
+ssh -L 8080:172.31.72.142:8080 ubuntu@34.235.224.202
 # Then open: http://localhost:8080
 ```
 
@@ -151,7 +151,7 @@ lab-alb-2074b0bbcd4d7bbc.us-east-1.elb.amazonaws.com
 {
   "EC-Bastion": {
     "private_ip": "172.31.78.45",
-    "public_ip": "34.194.48.73"
+    "public_ip": "34.235.224.202"
   },
   "EC2-Frontend": {
     "private_ip": "172.31.65.226",
@@ -194,17 +194,17 @@ lab-alb-2074b0bbcd4d7bbc.us-east-1.elb.amazonaws.com
 
 ```bash
 # Opción 1: SSH directo al Bastion
-ssh -i ssh-key-ec2.pem ubuntu@34.194.48.73
+ssh -i ssh-key-ec2.pem ubuntu@34.235.224.202
 
 # Opción 2: SSH proxy a través de Bastion
-ssh -i ssh-key-ec2.pem -J ubuntu@34.194.48.73 ubuntu@172.31.65.226
+ssh -i ssh-key-ec2.pem -J ubuntu@34.235.224.202 ubuntu@172.31.65.226
 
 # Opción 3: Port forwarding via Bastion
-ssh -i ssh-key-ec2.pem -L 8080:172.31.72.142:8080 ubuntu@34.194.48.73
+ssh -i ssh-key-ec2.pem -L 8080:172.31.72.142:8080 ubuntu@34.235.224.202
 # Luego acceder: http://localhost:8080
 
 # Opción 4: SOCKS proxy
-ssh -i ssh-key-ec2.pem -D 1080 ubuntu@34.194.48.73
+ssh -i ssh-key-ec2.pem -D 1080 ubuntu@34.235.224.202
 # Luego configurar navegador para usar SOCKS 127.0.0.1:1080
 ```
 
@@ -238,7 +238,7 @@ docker start <container-id>
 ## 🎯 CHECKLIST DE CONEXIÓN
 
 - [ ] SSH key configurada: `ssh-key-ec2.pem` con permisos 600
-- [ ] Bastion IP: 34.194.48.73 es accesible
+- [ ] Bastion IP: 34.235.224.202 es accesible
 - [ ] Security Group permite puerto 22 desde tu IP
 - [ ] Elastic IPs están asignadas a las instancias
 - [ ] Instancias están en estado "running"

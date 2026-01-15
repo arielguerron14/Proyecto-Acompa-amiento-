@@ -17,7 +17,7 @@ jobs:
           cp ssh-key-ec2.pem ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
           echo "Host bastion"  > ~/.ssh/config
-          echo "  HostName 34.194.48.73" >> ~/.ssh/config
+          echo "  HostName 34.235.224.202" >> ~/.ssh/config
           echo "  User ubuntu" >> ~/.ssh/config
           echo "  StrictHostKeyChecking no" >> ~/.ssh/config
           echo "  UserKnownHostsFile=/dev/null" >> ~/.ssh/config
@@ -30,12 +30,12 @@ jobs:
       - name: Test Bastion Connectivity
         run: |
           echo "Testing connection to Bastion..."
-          ssh -i ~/.ssh/labsuser.pem -o ConnectTimeout=10 -o BatchMode=yes ubuntu@34.194.48.73 "echo ✅ Bastion reachable" || echo "⚠️  Bastion may not be available"
+          ssh -i ~/.ssh/labsuser.pem -o ConnectTimeout=10 -o BatchMode=yes ubuntu@34.235.224.202 "echo ✅ Bastion reachable" || echo "⚠️  Bastion may not be available"
 
       - name: Deploy via Bastion to Core
         run: |
           echo "Deploying to Core via Bastion..."
-          BASTION_IP="34.194.48.73"
+          BASTION_IP="34.235.224.202"
           CORE_IP="172.31.71.182"
           
           # Try option 1: Direct SSH via bastion proxy

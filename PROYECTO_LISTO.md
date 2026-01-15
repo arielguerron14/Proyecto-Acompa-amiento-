@@ -30,7 +30,7 @@ Se ha completado exitosamente el despliegue completo de la infraestructura y el 
 
 | Instance | Private IP | Public IP | Role | Service |
 |----------|-----------|-----------|------|---------|
-| EC-Bastion | 172.31.78.45 | 34.194.48.73 | Gateway | SSH Proxy |
+| EC-Bastion | 172.31.78.45 | 34.235.224.202 | Gateway | SSH Proxy |
 | EC2-Frontend | 172.31.65.226 | 100.50.80.35 | Web | Frontend (port 3000) |
 | EC2-API-Gateway | 172.31.72.142 | 35.168.118.171 | API | Gateway (port 8080) |
 | EC2-CORE | 172.31.71.182 | 44.223.45.55 | Core | Core (port 8081) |
@@ -55,9 +55,9 @@ ssh -i ssh-key-ec2.pem ubuntu@44.223.45.55  # CORE
 ### Opción 2: Acceso via Bastion (más seguro)
 ```bash
 # SSH via Bastion proxy
-ssh -J ubuntu@34.194.48.73 ubuntu@172.31.65.226  # Frontend
-ssh -J ubuntu@34.194.48.73 ubuntu@172.31.72.142  # API Gateway
-ssh -J ubuntu@34.194.48.73 ubuntu@172.31.71.182  # CORE
+ssh -J ubuntu@34.235.224.202 ubuntu@172.31.65.226  # Frontend
+ssh -J ubuntu@34.235.224.202 ubuntu@172.31.72.142  # API Gateway
+ssh -J ubuntu@34.235.224.202 ubuntu@172.31.71.182  # CORE
 ```
 
 ### Opción 3: Acceso via ALB (Load Balancer)
@@ -238,7 +238,7 @@ infrastructure.config.js  → Configuración del proyecto
 **Solución**:
 1. Verifica que tienes la SSH key: `ssh-key-ec2.pem`
 2. Verifica permisos: `chmod 600 ssh-key-ec2.pem`
-3. Intenta con Bastion: `ssh -J ubuntu@34.194.48.73 ubuntu@172.31.65.226`
+3. Intenta con Bastion: `ssh -J ubuntu@34.235.224.202 ubuntu@172.31.65.226`
 4. Verifica Security Group permite puerto 22
 
 ### ❌ Las instancias no tienen IP pública

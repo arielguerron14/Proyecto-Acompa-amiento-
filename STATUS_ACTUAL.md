@@ -24,7 +24,7 @@
 ```
 ✅ API Gateway (52.7.168.4:8080) responde
 ✅ Frontend (44.220.126.89) accesible
-❌ Bastion (34.194.48.73) - SSH timeout
+❌ Bastion (34.235.224.202) - SSH timeout
 ❌ EC2-Core (172.31.71.182) - No alcanzable
 ```
 
@@ -61,7 +61,7 @@
 ### Opción 2: Reiniciar via Bastion SSH
 
 ```bash
-ssh -i ssh-key-ec2.pem ubuntu@34.194.48.73
+ssh -i ssh-key-ec2.pem ubuntu@34.235.224.202
 # Desde el Bastion:
 ssh ubuntu@172.31.71.182
 # Ejecutar los mismos comandos que Opción 1

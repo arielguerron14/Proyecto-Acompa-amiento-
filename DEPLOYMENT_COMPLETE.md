@@ -34,7 +34,7 @@
 | EC2-Frontend | 172.31.65.226 | 100.50.80.35 | i-0f5b0435b09d5e9e0 |
 | EC2-Messaging | 172.31.73.88 | 3.236.252.150 | i-01fa6a8c8520e71f8 |
 | EC2-Reportes | 172.31.70.166 | 54.243.216.35 | i-0d64521d97170673f |
-| EC-Bastion | 172.31.78.45 | 34.194.48.73 | i-028a133d8c4c1fda6 |
+| EC-Bastion | 172.31.78.45 | 34.235.224.202 | i-028a133d8c4c1fda6 |
 | EC2-API-Gateway | 172.31.72.142 | 35.168.118.171 | i-029db5b016ccb1504 |
 | EC2-Monitoring | 172.31.65.26 | 204.236.250.202 | i-06ac4ad98c296d063 |
 | EC2-Notificaciones | 172.31.68.132 | 98.92.59.97 | i-0f3fbfc4b48aa6ea1 |
@@ -42,7 +42,7 @@
 ### Key Discovery Facts:
 - ✅ All 9 instances are **RUNNING**
 - ✅ All instances have both **private** and **public** IPs
-- ✅ Bastion gateway discovered: **34.194.48.73**
+- ✅ Bastion gateway discovered: **34.235.224.202**
 - ✅ Configuration automatically updated with discovered IPs
 
 ---
@@ -53,7 +53,7 @@
 ```
 External Access
     ↓
-Bastion: 34.194.48.73
+Bastion: 34.235.224.202
 (EC-Bastion)
     ↓
 Internal Network (172.31.x.x)
@@ -118,7 +118,7 @@ All instances have open ports on:
 
 **Via Bastion:**
 ```bash
-ssh -J ubuntu@34.194.48.73 ubuntu@172.31.65.226
+ssh -J ubuntu@34.235.224.202 ubuntu@172.31.65.226
 ```
 
 **Via Public IP (direct):**
@@ -210,7 +210,7 @@ Monitoring:  http://204.236.250.202:9090
 
 **Bastion Gateway:**
 ```bash
-IP: 34.194.48.73
+IP: 34.235.224.202
 User: ubuntu
 Method: SSH key from GitHub Secrets
 ```
@@ -218,7 +218,7 @@ Method: SSH key from GitHub Secrets
 **Internal Services (via Bastion):**
 ```bash
 # Access EC2-Frontend
-ssh -J ubuntu@34.194.48.73 ubuntu@172.31.65.226
+ssh -J ubuntu@34.235.224.202 ubuntu@172.31.65.226
 
 # Then access services
 curl http://172.31.65.226:3000/health

@@ -19,7 +19,7 @@ jobs:
           # Setup SSH config for bastion proxy
           cat > ~/.ssh/config << 'SSH_CONFIG'
           Host bastion
-            HostName 34.194.48.73
+            HostName 34.235.224.202
             User ubuntu
             IdentityFile ~/.ssh/ec2.pem
             StrictHostKeyChecking no
@@ -56,7 +56,7 @@ jobs:
           ssh -i ~/.ssh/ec2.pem \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=20 \
-            -o ProxyCommand="ssh -i ~/.ssh/ec2.pem -W %h:%p -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@34.194.48.73" \
+            -o ProxyCommand="ssh -i ~/.ssh/ec2.pem -W %h:%p -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@34.235.224.202" \
             ubuntu@172.31.71.182 << 'REMOTE_SCRIPT' 2>&1
           
           set -e

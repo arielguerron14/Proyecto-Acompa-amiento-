@@ -1,0 +1,180 @@
+name: Detect IPs and Update Project
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/detect-and-update-ips.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  detect-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+        continue-on-error: true
+
+      - name: Detect IPs via AWS CLI
+        id: detect_ips
+        run: |
+          echo "🔍 Detectando IPs de instancias EC2..."
+          
+          # Obtener IPs de Frontend
+          FRONTEND_DATA=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2_FRONTEND" \
+            --query 'Reservations[0].Instances[0].{PublicIP: PublicIpAddress, PrivateIP: PrivateIpAddress}' \
+            --output json 2>/dev/null || echo '{}')
+          
+          FRONTEND_PUBLIC=$(echo $FRONTEND_DATA | jq -r '.PublicIP // "null"' 2>/dev/null)
+          FRONTEND_PRIVATE=$(echo $FRONTEND_DATA | jq -r '.PrivateIP // "null"' 2>/dev/null)
+          
+          # Obtener IPs de API Gateway
+          API_DATA=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2_API_GATEWAY" \
+            --query 'Reservations[0].Instances[0].{PublicIP: PublicIpAddress, PrivateIP: PrivateIpAddress}' \
+            --output json 2>/dev/null || echo '{}')
+          
+          API_PUBLIC=$(echo $API_DATA | jq -r '.PublicIP // "null"' 2>/dev/null)
+          API_PRIVATE=$(echo $API_DATA | jq -r '.PrivateIP // "null"' 2>/dev/null)
+          
+          # Obtener IPs de EC2-Core
+          CORE_DATA=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2_CORE" \
+            --query 'Reservations[0].Instances[0].{PublicIP: PublicIpAddress, PrivateIP: PrivateIpAddress}' \
+            --output json 2>/dev/null || echo '{}')
+          
+          CORE_PUBLIC=$(echo $CORE_DATA | jq -r '.PublicIP // "null"' 2>/dev/null)
+          CORE_PRIVATE=$(echo $CORE_DATA | jq -r '.PrivateIP // "null"' 2>/dev/null)
+          
+          # Obtener IPs de Bastion
+          BASTION_DATA=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2_BASTION" \
+            --query 'Reservations[0].Instances[0].{PublicIP: PublicIpAddress, PrivateIP: PrivateIpAddress}' \
+            --output json 2>/dev/null || echo '{}')
+          
+          BASTION_PUBLIC=$(echo $BASTION_DATA | jq -r '.PublicIP // "null"' 2>/dev/null)
+          BASTION_PRIVATE=$(echo $BASTION_DATA | jq -r '.PrivateIP // "null"' 2>/dev/null)
+          
+          # Guardar en variables de entorno para siguientes pasos
+          echo "FRONTEND_PUBLIC=$FRONTEND_PUBLIC" >> $GITHUB_ENV
+          echo "FRONTEND_PRIVATE=$FRONTEND_PRIVATE" >> $GITHUB_ENV
+          echo "API_PUBLIC=$API_PUBLIC" >> $GITHUB_ENV
+          echo "API_PRIVATE=$API_PRIVATE" >> $GITHUB_ENV
+          echo "CORE_PUBLIC=$CORE_PUBLIC" >> $GITHUB_ENV
+          echo "CORE_PRIVATE=$CORE_PRIVATE" >> $GITHUB_ENV
+          echo "BASTION_PUBLIC=$BASTION_PUBLIC" >> $GITHUB_ENV
+          echo "BASTION_PRIVATE=$BASTION_PRIVATE" >> $GITHUB_ENV
+          
+          echo "📊 IPs Detectadas:"
+          echo "  Frontend:    PUBLIC=$FRONTEND_PUBLIC, PRIVATE=$FRONTEND_PRIVATE"
+          echo "  API Gateway: PUBLIC=$API_PUBLIC, PRIVATE=$API_PRIVATE"
+          echo "  EC2-Core:    PUBLIC=$CORE_PUBLIC, PRIVATE=$CORE_PRIVATE"
+          echo "  Bastion:     PUBLIC=$BASTION_PUBLIC, PRIVATE=$BASTION_PRIVATE"
+
+      - name: Create IP Mapping
+        id: mapping
+        run: |
+          cat > /tmp/ip_mapping.txt << 'EOF'
+          # Old -> New IP mapping
+          # Frontend
+          44.220.126.89=>${{ env.FRONTEND_PUBLIC }}
+          172.31.69.107=>${{ env.FRONTEND_PRIVATE }}
+          
+          # API Gateway
+          52.7.168.4=>${{ env.API_PUBLIC }}
+          172.31.70.85=>${{ env.API_PRIVATE }}
+          
+          # EC2-Core
+          172.31.71.182=>${{ env.CORE_PRIVATE }}
+          
+          # Bastion
+          34.235.224.202=>${{ env.BASTION_PUBLIC }}
+          172.31.78.45=>${{ env.BASTION_PRIVATE }}
+          EOF
+          cat /tmp/ip_mapping.txt
+
+      - name: Update Files
+        run: |
+          echo "🔄 Actualizando archivos con nuevas IPs..."
+          
+          # Función para reemplazar IPs
+          replace_ip() {
+            local old_ip=$1
+            local new_ip=$2
+            local files=$3
+            
+            if [ "$old_ip" != "null" ] && [ "$new_ip" != "null" ] && [ "$old_ip" != "$new_ip" ]; then
+              echo "  Reemplazando $old_ip → $new_ip"
+              find . -type f \( -name "*.yml" -o -name "*.yaml" -o -name "*.js" -o -name "*.json" -o -name "*.py" -o -name "*.sh" \) \
+                -not -path "./.git/*" \
+                -not -path "./.github/*" \
+                -not -path "./node_modules/*" \
+                -exec sed -i "s|$old_ip|$new_ip|g" {} +
+            fi
+          }
+          
+          # Reemplazar Frontend
+          replace_ip "44.220.126.89" "${{ env.FRONTEND_PUBLIC }}" "*.yml *.js"
+          replace_ip "172.31.69.107" "${{ env.FRONTEND_PRIVATE }}" "*.yml *.js"
+          
+          # Reemplazar API Gateway
+          replace_ip "52.7.168.4" "${{ env.API_PUBLIC }}" "*.yml *.js"
+          replace_ip "172.31.70.85" "${{ env.API_PRIVATE }}" "*.yml *.js"
+          
+          # Reemplazar EC2-Core
+          replace_ip "172.31.71.182" "${{ env.CORE_PRIVATE }}" "*.yml *.js"
+          
+          # Reemplazar Bastion
+          replace_ip "34.235.224.202" "${{ env.BASTION_PUBLIC }}" "*.yml *.js *.sh"
+          replace_ip "172.31.78.45" "${{ env.BASTION_PRIVATE }}" "*.yml *.js *.sh"
+
+      - name: Check Changes
+        run: |
+          echo "📝 Archivos modificados:"
+          git status --short || echo "  Sin cambios"
+          
+          echo ""
+          echo "📋 Diff de cambios:"
+          git diff --no-index /dev/null /dev/null 2>/dev/null || git diff --stat || echo "  Sin cambios"
+
+      - name: Commit and Push
+        if: ${{ env.FRONTEND_PUBLIC != 'null' }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          if [ -n "$(git status --short)" ]; then
+            git add -A
+            git commit -m "chore: Update instance IPs after restart
+            
+- Frontend: ${{ env.FRONTEND_PUBLIC }} (private: ${{ env.FRONTEND_PRIVATE }})
+- API Gateway: ${{ env.API_PUBLIC }} (private: ${{ env.API_PRIVATE }})
+- EC2-Core: private ${{ env.CORE_PRIVATE }}
+- Bastion: ${{ env.BASTION_PUBLIC }} (private: ${{ env.BASTION_PRIVATE }})"
+            git push
+            echo "✅ IPs actualizadas y commitadas"
+          else
+            echo "ℹ️ No hay cambios en las IPs"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## 📊 Resumen de IPs Detectadas" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Instancia | IP Pública | IP Privada |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-----------|-----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ env.FRONTEND_PUBLIC }} | ${{ env.FRONTEND_PRIVATE }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API Gateway | ${{ env.API_PUBLIC }} | ${{ env.API_PRIVATE }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| EC2-Core | - | ${{ env.CORE_PRIVATE }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bastion | ${{ env.BASTION_PUBLIC }} | ${{ env.BASTION_PRIVATE }} |" >> $GITHUB_STEP_SUMMARY
