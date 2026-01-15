@@ -34,18 +34,28 @@ jobs:
 
       - name: Get Instance IPs
         id: get-ips
+        env:
+          FRONTEND_IP: ${{ secrets.EC2_FRONTEND_IP }}
+          API_GATEWAY_IP: ${{ secrets.EC2_API_GATEWAY_IP }}
+          CORE_IP: ${{ secrets.EC2_CORE_IP }}
+          DB_IP: ${{ secrets.EC2_DB_IP }}
+          MESSAGING_IP: ${{ secrets.EC2_MESSAGING_IP }}
+          NOTIFICACIONES_IP: ${{ secrets.EC2_NOTIFICACIONES_IP }}
+          REPORTES_IP: ${{ secrets.EC2_REPORTES_IP }}
+          MONITORING_IP: ${{ secrets.EC2_MONITORING_IP }}
+          BASTION_IP: ${{ secrets.EC2_BASTION_IP }}
         run: |
           # Usar secretos de GitHub en lugar de describe-instances (que requiere permisos IAM elevados)
-          cat > /tmp/ips.txt << 'EOF'
-          ${{ secrets.EC2_FRONTEND_IP }}
-          ${{ secrets.EC2_API_GATEWAY_IP }}
-          ${{ secrets.EC2_CORE_IP }}
-          ${{ secrets.EC2_DB_IP }}
-          ${{ secrets.EC2_MESSAGING_IP }}
-          ${{ secrets.EC2_NOTIFICACIONES_IP }}
-          ${{ secrets.EC2_REPORTES_IP }}
-          ${{ secrets.EC2_MONITORING_IP }}
-          ${{ secrets.EC2_BASTION_IP }}
+          cat > /tmp/ips.txt << EOF
+          $FRONTEND_IP
+          $API_GATEWAY_IP
+          $CORE_IP
+          $DB_IP
+          $MESSAGING_IP
+          $NOTIFICACIONES_IP
+          $REPORTES_IP
+          $MONITORING_IP
+          $BASTION_IP
           EOF
           
           # Filtrar líneas vacías
@@ -119,19 +129,18 @@ jobs:
 
       - name: Discover & Assign Instances
         id: instances
+        env:
+          FRONTEND_IP: ${{ secrets.EC2_FRONTEND_IP }}
+          API_IP: ${{ secrets.EC2_API_GATEWAY_IP }}
+          CORE_IP: ${{ secrets.EC2_CORE_IP }}
+          DB_IP: ${{ secrets.EC2_DB_IP }}
+          MESSAGING_IP: ${{ secrets.EC2_MESSAGING_IP }}
+          NOTIFICACIONES_IP: ${{ secrets.EC2_NOTIFICACIONES_IP }}
+          REPORTES_IP: ${{ secrets.EC2_REPORTES_IP }}
+          MONITORING_IP: ${{ secrets.EC2_MONITORING_IP }}
+          BASTION_IP: ${{ secrets.EC2_BASTION_IP }}
         run: |
           echo "🔍 Leyendo IPs desde secretos de GitHub..."
-          
-          # Asignar IPs desde secretos
-          FRONTEND_IP="${{ secrets.EC2_FRONTEND_IP }}"
-          API_IP="${{ secrets.EC2_API_GATEWAY_IP }}"
-          CORE_IP="${{ secrets.EC2_CORE_IP }}"
-          DB_IP="${{ secrets.EC2_DB_IP }}"
-          MESSAGING_IP="${{ secrets.EC2_MESSAGING_IP }}"
-          NOTIFICACIONES_IP="${{ secrets.EC2_NOTIFICACIONES_IP }}"
-          REPORTES_IP="${{ secrets.EC2_REPORTES_IP }}"
-          MONITORING_IP="${{ secrets.EC2_MONITORING_IP }}"
-          BASTION_IP="${{ secrets.EC2_BASTION_IP }}"
           
           echo ""
           echo "✅ IPs Asignadas:"
