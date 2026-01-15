@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  api-gateway:
+    environment:
+      CORE_HOST: http://localhost
+      NODE_ENV: production
+      PORT: 3000
+    networks:
+      - core-net
