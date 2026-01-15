@@ -94,18 +94,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  api-gateway:
-    build:
-      context: ./api-gateway
-    env_file:
-      - ./api-gateway/.env
-    ports:
-      - "8080:8080"
-    depends_on:
-      - micro-estudiantes
-    restart: unless-stopped
-    networks:
-      - core-net
 # Redes compartidas
 
 # Redes compartidas
@@ -114,4 +102,5 @@ networks:
     external: true
 
 volumes:
+  postgres_data:
   postgres_data:
