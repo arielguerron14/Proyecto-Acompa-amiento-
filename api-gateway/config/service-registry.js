@@ -6,15 +6,22 @@
  * El API Gateway consume este archivo
  */
 
-// Get CORE_HOST dynamically from environment or default to localhost
+// Get CORE_HOST dynamically from environment
+// In Docker: leave empty or use container names
+// In production: use IP or DNS name
 const getCoreHost = () => {
-  return process.env.CORE_HOST || 'http://localhost';
+  return process.env.CORE_HOST || '';
+};
+
+// Determine if we're in Docker or not
+const isDocker = () => {
+  return process.env.NODE_ENV === 'production' || 
+         (process.env.DOCKER_DEPLOYMENT === 'true') ||
+         !getCoreHost();
 };
 
 const SERVICE_REGISTRY = {
-  // IP de tu EC2-CORE (actualizar aquí cuando cambie)
-  // En Docker, usar 'localhost' o nombres de contenedores
-  // En producción, usar la IP publica o nombre DNS
+  // CORE_HOST - dynamic based on deployment context
   get CORE_HOST() {
     return getCoreHost();
   },
@@ -22,10 +29,28 @@ const SERVICE_REGISTRY = {
   // Microservicios disponibles
   get services() {
     const coreHost = getCoreHost();
+    const inDocker = isDocker();
+    
+    // En Docker, usar nombres de contenedor (DNS interno)
+    // En desarrollo/producción, usar CORE_HOST con puertos
+    const baseUrls = inDocker ? {
+      auth: 'http://micro-auth:3000',
+      estudiantes: 'http://micro-estudiantes:3001',
+      maestros: 'http://micro-maestros:3002',
+      reportesEstudiantes: 'http://micro-reportes-estudiantes:5003',
+      reportesMaestros: 'http://micro-reportes-maestros:5004'
+    } : {
+      auth: `${coreHost}:3000`,
+      estudiantes: `${coreHost}:3001`,
+      maestros: `${coreHost}:3002`,
+      reportesEstudiantes: `${coreHost}:5003`,
+      reportesMaestros: `${coreHost}:5004`
+    };
+
     return {
       auth: {
         name: 'Authentication Service',
-        baseUrl: `${coreHost}:3000`,
+        baseUrl: baseUrls.auth,
         routes: {
           login: '/auth/login',
           register: '/auth/register',
@@ -36,7 +61,7 @@ const SERVICE_REGISTRY = {
       
       estudiantes: {
         name: 'Students Service',
-        baseUrl: `${coreHost}:3001`,
+        baseUrl: baseUrls.estudiantes,
         routes: {
           getAll: '/estudiantes',
           getById: '/estudiantes/:id',
@@ -51,7 +76,7 @@ const SERVICE_REGISTRY = {
       
       maestros: {
         name: 'Teachers Service',
-        baseUrl: `${coreHost}:3002`,
+        baseUrl: baseUrls.maestros,
         routes: {
           getAll: '/maestros',
           getById: '/maestros/:id',
@@ -66,7 +91,7 @@ const SERVICE_REGISTRY = {
       
       reportesEstudiantes: {
         name: 'Student Reports Service',
-        baseUrl: `${coreHost}:5003`,
+        baseUrl: baseUrls.reportesEstudiantes,
         routes: {
           getReport: '/reportes/estudiante/:id',
           getAll: '/reportes',
@@ -77,7 +102,7 @@ const SERVICE_REGISTRY = {
       
       reportesMaestros: {
         name: 'Teacher Reports Service',
-        baseUrl: `${coreHost}:5004`,
+        baseUrl: baseUrls.reportesMaestros,
         routes: {
           getReport: '/reportes/maestro/:id',
           getAll: '/reportes',

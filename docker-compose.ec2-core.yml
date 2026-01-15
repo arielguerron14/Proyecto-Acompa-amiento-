@@ -14,13 +14,12 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
 
-  # API Gateway - Main entry point
+  # API Gateway - Main entry point (ONLY exposed port)
   api-gateway:
     image: api-gateway:latest
     container_name: api-gateway
     restart: unless-stopped
     ports:
-      - "3000:3000"
       - "8080:8080"
     depends_on:
       - micro-auth
@@ -30,17 +29,18 @@ services:
       - core-net
     environment:
       NODE_ENV: production
+      DOCKER_DEPLOYMENT: "true"
       API_GATEWAY_PORT: 8080
       PORT: 8080
-      CORE_HOST: http://localhost
+      CORE_HOST: ""
       LOG_LEVEL: debug
 
   micro-auth:
     image: micro-auth:latest
     container_name: micro-auth
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       - mongo
     networks:
@@ -54,8 +54,8 @@ services:
     image: micro-estudiantes:latest
     container_name: micro-estudiantes
     restart: unless-stopped
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     depends_on:
       - mongo
     networks:
@@ -69,8 +69,8 @@ services:
     image: micro-maestros:latest
     container_name: micro-maestros
     restart: unless-stopped
-    ports:
-      - "3002:3002"
+    expose:
+      - "3002"
     depends_on:
       - mongo
     networks:
@@ -84,8 +84,8 @@ services:
     image: micro-reportes-estudiantes:latest
     container_name: micro-reportes-estudiantes
     restart: unless-stopped
-    ports:
-      - "5003:5003"
+    expose:
+      - "5003"
     depends_on:
       - mongo
     networks:
@@ -99,8 +99,8 @@ services:
     image: micro-reportes-maestros:latest
     container_name: micro-reportes-maestros
     restart: unless-stopped
-    ports:
-      - "5004:5004"
+    expose:
+      - "5004"
     depends_on:
       - mongo
     networks:

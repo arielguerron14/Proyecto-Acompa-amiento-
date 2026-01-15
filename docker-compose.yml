@@ -16,13 +16,12 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
 
-  # API Gateway - Main entry point
+  # API Gateway - Main entry point (ONLY exposed port)
   api-gateway:
     image: api-gateway:latest
     container_name: api-gateway
     restart: unless-stopped
     ports:
-      - "3000:3000"
       - "8080:8080"
     depends_on:
       - micro-auth
@@ -32,18 +31,19 @@ services:
       - core-net
     environment:
       NODE_ENV: production
+      DOCKER_DEPLOYMENT: "true"
       API_GATEWAY_PORT: 8080
       PORT: 8080
-      CORE_HOST: http://localhost
+      CORE_HOST: ""
       LOG_LEVEL: debug
 
-  # Authentication Microservice
+  # Authentication Microservice (NO external port)
   micro-auth:
     image: micro-auth:latest
     container_name: micro-auth
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       - mongo
     networks:
@@ -53,13 +53,13 @@ services:
       PORT: 3000
       MONGODB_URI: mongodb://root:example@mongo:27017/auth?authSource=admin
 
-  # Students Microservice
+  # Students Microservice (NO external port)
   micro-estudiantes:
     image: micro-estudiantes:latest
     container_name: micro-estudiantes
     restart: unless-stopped
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     depends_on:
       - mongo
     networks:
@@ -69,13 +69,13 @@ services:
       PORT: 3001
       MONGODB_URI: mongodb://root:example@mongo:27017/estudiantes?authSource=admin
 
-  # Teachers/Schedule Microservice
+  # Teachers/Schedule Microservice (NO external port)
   micro-maestros:
     image: micro-maestros:latest
     container_name: micro-maestros
     restart: unless-stopped
-    ports:
-      - "3002:3002"
+    expose:
+      - "3002"
     depends_on:
       - mongo
     networks:
@@ -85,13 +85,13 @@ services:
       PORT: 3002
       MONGODB_URI: mongodb://root:example@mongo:27017/maestros?authSource=admin
 
-  # Student Reports Microservice
+  # Student Reports Microservice (NO external port)
   micro-reportes-estudiantes:
     image: micro-reportes-estudiantes:latest
     container_name: micro-reportes-estudiantes
     restart: unless-stopped
-    ports:
-      - "5003:5003"
+    expose:
+      - "5003"
     depends_on:
       - mongo
     networks:
@@ -101,13 +101,13 @@ services:
       PORT: 5003
       MONGODB_URI: mongodb://root:example@mongo:27017/reportes-estudiantes?authSource=admin
 
-  # Teacher Reports Microservice
+  # Teacher Reports Microservice (NO external port)
   micro-reportes-maestros:
     image: micro-reportes-maestros:latest
     container_name: micro-reportes-maestros
     restart: unless-stopped
-    ports:
-      - "5004:5004"
+    expose:
+      - "5004"
     depends_on:
       - mongo
     networks:
@@ -122,8 +122,8 @@ services:
     image: core:latest
     container_name: core
     restart: unless-stopped
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     depends_on:
       - mongo
       - micro-auth
