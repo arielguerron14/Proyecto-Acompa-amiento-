@@ -201,7 +201,9 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          echo "🐳 Desplegando Docker Compose..."
+          echo "🐳 Construyendo imágenes Docker..."
+          sudo docker-compose -f docker-compose.frontend.yml build --no-cache
+          echo "🐳 Iniciando contenedores..."
           sudo docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
           sudo docker-compose -f docker-compose.frontend.yml up -d
           echo "✅ Frontend desplegado exitosamente"
@@ -247,7 +249,9 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          echo "🐳 Desplegando Docker Compose..."
+          echo "🐳 Construyendo imágenes Docker..."
+          sudo docker-compose -f docker-compose.api-gateway.yml build --no-cache
+          echo "🐳 Iniciando contenedores..."
           sudo docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
           sudo docker-compose -f docker-compose.api-gateway.yml up -d
           echo "✅ API Gateway desplegado exitosamente"
@@ -293,7 +297,9 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          echo "🐳 Desplegando Docker Compose..."
+          echo "🐳 Construyendo imágenes Docker..."
+          sudo docker-compose -f docker-compose.core.yml build --no-cache
+          echo "🐳 Iniciando contenedores..."
           sudo docker-compose -f docker-compose.core.yml down 2>/dev/null || true
           sudo docker-compose -f docker-compose.core.yml up -d
           echo "✅ Core Services desplegado exitosamente"
@@ -339,7 +345,9 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          echo "🐳 Desplegando Docker Compose..."
+          echo "🐳 Construyendo imágenes Docker..."
+          sudo docker-compose -f docker-compose.infrastructure.yml build --no-cache
+          echo "🐳 Iniciando contenedores..."
           sudo docker-compose -f docker-compose.infrastructure.yml down 2>/dev/null || true
           sudo docker-compose -f docker-compose.infrastructure.yml up -d
           echo "✅ Database desplegado exitosamente"
@@ -385,7 +393,9 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          echo "🐳 Desplegando Docker Compose..."
+          echo "🐳 Construyendo imágenes Docker..."
+          sudo docker-compose -f docker-compose.messaging.yml build --no-cache
+          echo "🐳 Iniciando contenedores..."
           sudo docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true
           sudo docker-compose -f docker-compose.messaging.yml up -d
           echo "✅ Messaging desplegado exitosamente"
@@ -431,7 +441,9 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          echo "🐳 Desplegando Docker Compose..."
+          echo "🐳 Construyendo imágenes Docker..."
+          sudo docker-compose -f docker-compose.notificaciones.yml build --no-cache
+          echo "🐳 Iniciando contenedores..."
           sudo docker-compose -f docker-compose.notificaciones.yml down 2>/dev/null || true
           sudo docker-compose -f docker-compose.notificaciones.yml up -d
           echo "✅ Notificaciones desplegado exitosamente"
@@ -477,7 +489,9 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          echo "🐳 Desplegando Docker Compose..."
+          echo "🐳 Construyendo imágenes Docker..."
+          sudo docker-compose -f docker-compose.prod.yml build --no-cache
+          echo "🐳 Iniciando contenedores..."
           sudo docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
           sudo docker-compose -f docker-compose.prod.yml up -d
           echo "✅ Reportes desplegado exitosamente"
@@ -523,7 +537,9 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          echo "🐳 Desplegando Docker Compose..."
+          echo "🐳 Construyendo imágenes Docker..."
+          sudo docker-compose -f docker-compose.prod.yml build --no-cache
+          echo "🐳 Iniciando contenedores..."
           sudo docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
           sudo docker-compose -f docker-compose.prod.yml up -d
           echo "✅ Monitoring desplegado exitosamente"
