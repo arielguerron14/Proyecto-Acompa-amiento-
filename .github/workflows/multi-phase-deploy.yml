@@ -205,7 +205,9 @@ jobs:
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/deploy-key.pem
+          cat > ~/.ssh/deploy-key.pem << 'EOF'
+          ${{ secrets.SSH_PRIVATE_KEY }}
+          EOF
           chmod 600 ~/.ssh/deploy-key.pem
           ssh-keyscan -H ${{ matrix.instance[5] }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
