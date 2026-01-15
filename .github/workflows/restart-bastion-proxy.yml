@@ -20,7 +20,7 @@ jobs:
           cat >> ~/.ssh/config << 'EOF'
           Host bastion
             HostName 34.235.224.202
-            User ec2-user
+            User ubuntu
             IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
