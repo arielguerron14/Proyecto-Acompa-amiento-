@@ -69,26 +69,36 @@ jobs:
           mkdir -p ~/.ssh
           cp ssh-key-ec2.pem ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
+
+      - name: Restart Services on Core
         run: |
           echo "Restarting services on Core..."
-          ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@172.31.71.182 << 'EOF'
+          ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem -t ubuntu@172.31.71.182 << 'EOF'
+          set -e
           cd ~/Proyecto-Acompa-amiento- || exit 0
           echo "Checking Docker status..."
-          docker ps -a --format "table {{.Names}}\t{{.Status}}"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}" || echo "Docker not running"
+          echo ""
           echo "Restarting docker-compose services..."
           sudo docker-compose -f docker-compose.core.yml down 2>/dev/null || true
+          sleep 5
           sudo docker-compose -f docker-compose.core.yml up -d 2>/dev/null || true
           echo "✅ Services restarted"
           sleep 10
-          echo "Checking container status..."
-          docker ps -a --format "table {{.Names}}\t{{.Status}}"
+          echo ""
+          echo "Checking container status after restart..."
+          docker ps -a --format "table {{.Names}}\t{{.Status}}" || echo "No containers"
           EOF
 
       - name: Verify Services
         continue-on-error: true
         run: |
           echo "Verifying microservices..."
-          curl -v http://52.7.168.4:8080/health 2>&1 | head -20 || echo "Could not connect to API Gateway"
+          for i in {1..3}; do
+            echo "Attempt $i: Testing API Gateway health endpoint..."
+            curl -s -m 5 http://52.7.168.4:8080/health 2>&1 | head -20 || echo "Could not connect to API Gateway"
+            sleep 3
+          done
 
       - name: Summary
         if: always()
@@ -97,3 +107,5 @@ jobs:
           echo "- Frontend: 44.220.126.89"
           echo "- API Gateway: 52.7.168.4:8080"
           echo "- Core Services: Should be running on 172.31.71.182"
+          echo ""
+          echo "To verify, check the frontend at http://44.220.126.89"
