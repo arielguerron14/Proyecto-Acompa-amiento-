@@ -162,7 +162,7 @@ jobs:
           echo "monitoring_ip=$MONITORING_IP" >> $GITHUB_OUTPUT
           echo "bastion_ip=$BASTION_IP" >> $GITHUB_OUTPUT
 
-      - name: Deploy to Frontend
+      - name: Install Docker & Deploy to Frontend
         continue-on-error: true
         run: |
           IP="${{ steps.instances.outputs.frontend_ip }}"
@@ -173,6 +173,25 @@ jobs:
           echo "🚀 Desplegando en FRONTEND ($IP)..."
           ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
           set -e
+          # Install Docker if not already installed
+          if ! command -v docker &> /dev/null; then
+            echo "📦 Instalando Docker..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq docker.io
+            sudo usermod -aG docker ubuntu
+          fi
+          
+          # Install docker-compose if not already installed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Start Docker service
+          sudo systemctl start docker || true
+          sudo systemctl enable docker || true
+          
           echo "📦 Clonando repositorio..."
           cd /home/ubuntu
           if [ -d "Proyecto-Acompa-amiento-" ]; then
@@ -183,13 +202,13 @@ jobs:
             cd Proyecto-Acompa-amiento-
           fi
           echo "🐳 Desplegando Docker Compose..."
-          docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.frontend.yml up -d
+          sudo docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
+          sudo docker-compose -f docker-compose.frontend.yml up -d
           echo "✅ Frontend desplegado exitosamente"
-          docker ps | grep frontend
+          sudo docker ps | grep frontend
           DEPLOY
 
-      - name: Deploy to API Gateway
+      - name: Install Docker & Deploy to API Gateway
         continue-on-error: true
         run: |
           IP="${{ steps.instances.outputs.api_ip }}"
@@ -200,6 +219,25 @@ jobs:
           echo "🚀 Desplegando en API GATEWAY ($IP)..."
           ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
           set -e
+          # Install Docker if not already installed
+          if ! command -v docker &> /dev/null; then
+            echo "📦 Instalando Docker..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq docker.io
+            sudo usermod -aG docker ubuntu
+          fi
+          
+          # Install docker-compose if not already installed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Start Docker service
+          sudo systemctl start docker || true
+          sudo systemctl enable docker || true
+          
           echo "📦 Clonando repositorio..."
           cd /home/ubuntu
           if [ -d "Proyecto-Acompa-amiento-" ]; then
@@ -210,13 +248,13 @@ jobs:
             cd Proyecto-Acompa-amiento-
           fi
           echo "🐳 Desplegando Docker Compose..."
-          docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.api-gateway.yml up -d
+          sudo docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
+          sudo docker-compose -f docker-compose.api-gateway.yml up -d
           echo "✅ API Gateway desplegado exitosamente"
-          docker ps | grep api
+          sudo docker ps | grep api
           DEPLOY
 
-      - name: Deploy to Core Services
+      - name: Install Docker & Deploy to Core Services
         continue-on-error: true
         run: |
           IP="${{ steps.instances.outputs.core_ip }}"
@@ -227,6 +265,25 @@ jobs:
           echo "🚀 Desplegando en CORE SERVICES ($IP)..."
           ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
           set -e
+          # Install Docker if not already installed
+          if ! command -v docker &> /dev/null; then
+            echo "📦 Instalando Docker..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq docker.io
+            sudo usermod -aG docker ubuntu
+          fi
+          
+          # Install docker-compose if not already installed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Start Docker service
+          sudo systemctl start docker || true
+          sudo systemctl enable docker || true
+          
           echo "📦 Clonando repositorio..."
           cd /home/ubuntu
           if [ -d "Proyecto-Acompa-amiento-" ]; then
@@ -237,13 +294,13 @@ jobs:
             cd Proyecto-Acompa-amiento-
           fi
           echo "🐳 Desplegando Docker Compose..."
-          docker-compose -f docker-compose.core.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.core.yml up -d
+          sudo docker-compose -f docker-compose.core.yml down 2>/dev/null || true
+          sudo docker-compose -f docker-compose.core.yml up -d
           echo "✅ Core Services desplegado exitosamente"
-          docker ps | grep core
+          sudo docker ps | grep core
           DEPLOY
 
-      - name: Deploy to Database
+      - name: Install Docker & Deploy to Database
         continue-on-error: true
         run: |
           IP="${{ steps.instances.outputs.db_ip }}"
@@ -254,6 +311,26 @@ jobs:
           echo "🚀 Desplegando en DATABASE ($IP)..."
           ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
           set -e
+          # Install Docker if not already installed
+          if ! command -v docker &> /dev/null; then
+            echo "📦 Instalando Docker..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq docker.io
+            sudo usermod -aG docker ubuntu
+          fi
+          
+          # Install docker-compose if not already installed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Start Docker service
+          sudo systemctl start docker || true
+          sudo systemctl enable docker || true
+          
+          echo "📦 Clonando repositorio..."
           cd /home/ubuntu
           if [ -d "Proyecto-Acompa-amiento-" ]; then
             cd Proyecto-Acompa-amiento-
@@ -262,13 +339,14 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          docker-compose -f docker-compose.infrastructure.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.infrastructure.yml up -d
+          echo "🐳 Desplegando Docker Compose..."
+          sudo docker-compose -f docker-compose.infrastructure.yml down 2>/dev/null || true
+          sudo docker-compose -f docker-compose.infrastructure.yml up -d
           echo "✅ Database desplegado exitosamente"
-          docker ps | grep -i postgres
+          sudo docker ps | grep -i postgres
           DEPLOY
 
-      - name: Deploy to Messaging
+      - name: Install Docker & Deploy to Messaging
         continue-on-error: true
         run: |
           IP="${{ steps.instances.outputs.messaging_ip }}"
@@ -279,6 +357,26 @@ jobs:
           echo "🚀 Desplegando en MESSAGING ($IP)..."
           ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
           set -e
+          # Install Docker if not already installed
+          if ! command -v docker &> /dev/null; then
+            echo "📦 Instalando Docker..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq docker.io
+            sudo usermod -aG docker ubuntu
+          fi
+          
+          # Install docker-compose if not already installed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Start Docker service
+          sudo systemctl start docker || true
+          sudo systemctl enable docker || true
+          
+          echo "📦 Clonando repositorio..."
           cd /home/ubuntu
           if [ -d "Proyecto-Acompa-amiento-" ]; then
             cd Proyecto-Acompa-amiento-
@@ -287,13 +385,14 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.messaging.yml up -d
+          echo "🐳 Desplegando Docker Compose..."
+          sudo docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true
+          sudo docker-compose -f docker-compose.messaging.yml up -d
           echo "✅ Messaging desplegado exitosamente"
-          docker ps | grep rabbit
+          sudo docker ps | grep rabbit
           DEPLOY
 
-      - name: Deploy to Notificaciones
+      - name: Install Docker & Deploy to Notificaciones
         continue-on-error: true
         run: |
           IP="${{ steps.instances.outputs.notificaciones_ip }}"
@@ -304,6 +403,26 @@ jobs:
           echo "🚀 Desplegando en NOTIFICACIONES ($IP)..."
           ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
           set -e
+          # Install Docker if not already installed
+          if ! command -v docker &> /dev/null; then
+            echo "📦 Instalando Docker..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq docker.io
+            sudo usermod -aG docker ubuntu
+          fi
+          
+          # Install docker-compose if not already installed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Start Docker service
+          sudo systemctl start docker || true
+          sudo systemctl enable docker || true
+          
+          echo "📦 Clonando repositorio..."
           cd /home/ubuntu
           if [ -d "Proyecto-Acompa-amiento-" ]; then
             cd Proyecto-Acompa-amiento-
@@ -312,13 +431,14 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          docker-compose -f docker-compose.notificaciones.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.notificaciones.yml up -d
+          echo "🐳 Desplegando Docker Compose..."
+          sudo docker-compose -f docker-compose.notificaciones.yml down 2>/dev/null || true
+          sudo docker-compose -f docker-compose.notificaciones.yml up -d
           echo "✅ Notificaciones desplegado exitosamente"
-          docker ps | grep notifi
+          sudo docker ps | grep notifi
           DEPLOY
 
-      - name: Deploy to Reportes
+      - name: Install Docker & Deploy to Reportes
         continue-on-error: true
         run: |
           IP="${{ steps.instances.outputs.reportes_ip }}"
@@ -329,6 +449,26 @@ jobs:
           echo "🚀 Desplegando en REPORTES ($IP)..."
           ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
           set -e
+          # Install Docker if not already installed
+          if ! command -v docker &> /dev/null; then
+            echo "📦 Instalando Docker..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq docker.io
+            sudo usermod -aG docker ubuntu
+          fi
+          
+          # Install docker-compose if not already installed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Start Docker service
+          sudo systemctl start docker || true
+          sudo systemctl enable docker || true
+          
+          echo "📦 Clonando repositorio..."
           cd /home/ubuntu
           if [ -d "Proyecto-Acompa-amiento-" ]; then
             cd Proyecto-Acompa-amiento-
@@ -337,13 +477,14 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.prod.yml up -d
+          echo "🐳 Desplegando Docker Compose..."
+          sudo docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
+          sudo docker-compose -f docker-compose.prod.yml up -d
           echo "✅ Reportes desplegado exitosamente"
-          docker ps
+          sudo docker ps
           DEPLOY
 
-      - name: Deploy to Monitoring
+      - name: Install Docker & Deploy to Monitoring
         continue-on-error: true
         run: |
           IP="${{ steps.instances.outputs.monitoring_ip }}"
@@ -354,6 +495,26 @@ jobs:
           echo "🚀 Desplegando en MONITORING ($IP)..."
           ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
           set -e
+          # Install Docker if not already installed
+          if ! command -v docker &> /dev/null; then
+            echo "📦 Instalando Docker..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq docker.io
+            sudo usermod -aG docker ubuntu
+          fi
+          
+          # Install docker-compose if not already installed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Start Docker service
+          sudo systemctl start docker || true
+          sudo systemctl enable docker || true
+          
+          echo "📦 Clonando repositorio..."
           cd /home/ubuntu
           if [ -d "Proyecto-Acompa-amiento-" ]; then
             cd Proyecto-Acompa-amiento-
@@ -362,13 +523,14 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.prod.yml up -d
+          echo "🐳 Desplegando Docker Compose..."
+          sudo docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
+          sudo docker-compose -f docker-compose.prod.yml up -d
           echo "✅ Monitoring desplegado exitosamente"
-          docker ps
+          sudo docker ps
           DEPLOY
 
-      - name: Deploy to Bastion
+      - name: Prepare Bastion (Jump Host)
         continue-on-error: true
         run: |
           IP="${{ steps.instances.outputs.bastion_ip }}"
@@ -376,9 +538,10 @@ jobs:
             echo "⏭️ Bastion IP no encontrada (skipping)"
             exit 0
           fi
-          echo "🚀 Desplegando en BASTION ($IP)..."
+          echo "🚀 Preparando BASTION ($IP)..."
           ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/labsuser.pem ubuntu@$IP << 'DEPLOY'
           set -e
+          echo "📦 Clonando repositorio..."
           cd /home/ubuntu
           if [ -d "Proyecto-Acompa-amiento-" ]; then
             cd Proyecto-Acompa-amiento-
