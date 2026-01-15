@@ -240,16 +240,41 @@ jobs:
           
           echo "📤 Deploying code to $INSTANCE_NAME..."
           
-          # Sync code to instance
-          rsync -avz -e "ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no" \
+          # First, ensure directory exists and is clean
+          ssh -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              ubuntu@$IP << 'PREP'
+          rm -rf /home/ubuntu/project
+          mkdir -p /home/ubuntu/project
+          cd /home/ubuntu/project
+          echo "Directory prepared"
+          PREP
+          
+          # Sync entire project
+          rsync -avz --delete -e "ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no" \
             --exclude='.git' \
+            --exclude='.gitignore' \
             --exclude='node_modules' \
             --exclude='.env' \
             --exclude='terraform' \
             --exclude='.DS_Store' \
-            ./ ubuntu@$IP:/home/ubuntu/project/ || {
-            echo "⚠️  rsync had some warnings, continuing..."
-          }
+            --exclude='.venv' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='dist' \
+            --exclude='build' \
+            ./ ubuntu@$IP:/home/ubuntu/project/
+          
+          # Verify files were synced
+          ssh -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              ubuntu@$IP << 'VERIFY'
+          cd /home/ubuntu/project
+          echo "Files synced:"
+          ls -la | head -20
+          echo "Docker compose files:"
+          find . -name "docker-compose*.yml" -type f
+          VERIFY
           
           echo "✅ Code deployed"
       
