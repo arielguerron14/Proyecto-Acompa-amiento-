@@ -369,6 +369,64 @@ jobs:
           
           echo "✅ Services started"
       
+      - name: Comprehensive Service Diagnostics
+        continue-on-error: true
+        run: |
+          IP="${{ matrix.instance[5] }}"
+          INSTANCE_NAME="${{ matrix.instance[1] }}"
+          
+          echo "🔍 Running comprehensive diagnostics on $INSTANCE_NAME..."
+          
+          ssh -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              ubuntu@$IP << 'DIAG'
+          cd /home/ubuntu/project
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "DOCKER SERVICE STATUS"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          docker-compose -f docker-compose.ec2-core.yml ps 2>/dev/null || docker-compose ps
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "NETWORK CONNECTIVITY TEST"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Test API Gateway
+          echo "Testing API Gateway on localhost:3000..."
+          docker exec $(docker ps -q -f name=api-gateway) curl -s -I http://localhost:3000/health || echo "API Gateway health check failed"
+          
+          # Test auth service
+          echo ""
+          echo "Testing Auth Service on localhost:3000..."
+          docker exec $(docker ps -q -f name=auth) curl -s -I http://localhost:3000/health || echo "Auth health check failed"
+          
+          # Test estudiantes service
+          echo ""
+          echo "Testing Estudiantes Service on localhost:3001..."
+          docker exec $(docker ps -q -f name=core) curl -s -I http://core:3001/health || echo "Estudiantes health check failed"
+          
+          # Test maestros service
+          echo ""
+          echo "Testing Maestros Service on localhost:3002..."
+          docker exec $(docker ps -q -f name=core) curl -s -I http://core:3002/horarios || echo "Maestros health check failed"
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "DOCKER NETWORK"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          docker network ls
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "CONTAINER LOGS (API Gateway)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          docker logs $(docker ps -q -f name=api-gateway) 2>&1 | tail -30
+          
+          DIAG
+          
+          echo "✅ Diagnostics complete"
+      
       - name: Verify Deployment
         continue-on-error: true
         run: |
