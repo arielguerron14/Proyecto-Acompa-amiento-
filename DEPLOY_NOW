@@ -1,4 +1,0 @@
-DEPLOY_TRIGGERED: January 15, 2026 22:00 UTC
-Status: Deploying to EC2-CORE with Docker rebuild
-Build Location: EC2 instance
-Environment: Production

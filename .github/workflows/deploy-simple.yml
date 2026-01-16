@@ -256,26 +256,33 @@ jobs:
           echo "✅ Imágenes compiladas"
           
           # 5. Start services with docker-compose
+          # Try to find the compose file in the current directory or in app-build (in case of path issues)
           if [ -f "$COMPOSE_FILE" ]; then
-            echo ""
-            echo "🚀 Iniciando servicios..."
             cp "$COMPOSE_FILE" ~/app/docker-compose.yml
-            cd ~/app
-            docker-compose down 2>/dev/null || true
-            sleep 2
-            docker-compose up -d
-            sleep 15
-            echo ""
-            echo "📊 Estado de servicios:"
-            docker-compose ps
-            echo ""
-            echo "================================================"
-            echo "✅ DESPLIEGUE COMPLETADO: $INSTANCE"
-            echo "================================================"
+          elif [ -f "app-build/$COMPOSE_FILE" ]; then
+            cp "app-build/$COMPOSE_FILE" ~/app/docker-compose.yml
           else
-            echo "❌ ERROR: No se encontró $COMPOSE_FILE"
+            echo "❌ ERROR: No se encontró $COMPOSE_FILE ni en el directorio actual ni en app-build."
+            echo "Directorio actual: $(pwd)"
+            ls -l
+            echo "Contenido de app-build:"
+            ls -l app-build || true
             exit 1
           fi
+          echo ""
+          echo "🚀 Iniciando servicios..."
+          cd ~/app
+          docker-compose down 2>/dev/null || true
+          sleep 2
+          docker-compose up -d
+          sleep 15
+          echo ""
+          echo "📊 Estado de servicios:"
+          docker-compose ps
+          echo ""
+          echo "================================================"
+          echo "✅ DESPLIEGUE COMPLETADO: $INSTANCE"
+          echo "================================================"
           
           DEPLOYSCRIPT
       
