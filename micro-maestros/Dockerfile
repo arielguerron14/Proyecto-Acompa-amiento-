@@ -3,8 +3,6 @@ FROM node:18-alpine
 WORKDIR /usr/src
 
 # Copy shared modules and app (build from repo root context)
-COPY shared-auth/ /usr/src/shared-auth/
-COPY micro-maestros/ /usr/src/app/
 
 # Copiar configuración centralizada
 

@@ -2,9 +2,6 @@ FROM node:18-alpine
 
 WORKDIR /usr/src
 
-COPY shared-auth/ /usr/src/shared-auth/
-COPY shared-monitoring/ /usr/src/shared-monitoring/
-COPY micro-auth/ /usr/src/app/
 
 # Copiar configuración centralizada
 COPY scripts/ /usr/src/scripts/
