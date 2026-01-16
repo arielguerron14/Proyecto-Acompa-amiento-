@@ -42,7 +42,7 @@ jobs:
           - EC2_REPORTES
           - EC2_NOTIFICACIONES
           - EC2_ANALYTICS
-      max-parallel: 3
+      max-parallel: 1
     
     steps:
       - name: Checkout code
