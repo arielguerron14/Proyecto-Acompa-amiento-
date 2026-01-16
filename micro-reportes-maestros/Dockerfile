@@ -8,8 +8,6 @@ COPY micro-reportes-maestros/ /usr/src/app/
 COPY docker-entrypoint.sh /usr/src/app/entrypoint.sh
 
 # install dependencies for shared-auth first
-WORKDIR /usr/src/shared-auth
-RUN npm ci --only=production --silent || npm install --production --silent
 
 WORKDIR /usr/src/app
 # install dependencies (production)

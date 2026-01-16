@@ -15,8 +15,6 @@ COPY api-gateway/ /usr/src/app/
 # Copy infrastructure config
 
 # Install production dependencies for shared modules first
-WORKDIR /usr/src/shared-auth
-RUN npm ci --only=production --silent || npm install --production --silent
 
 WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent

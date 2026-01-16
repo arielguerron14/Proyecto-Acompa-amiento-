@@ -14,9 +14,6 @@ RUN echo "[debug] listing /usr/src/shared-auth" && ls -la /usr/src/shared-auth |
 COPY scripts/ /usr/src/scripts/
 
 # install dependencies for shared-auth first
-WORKDIR /usr/src/shared-auth
-RUN echo "[debug] Installing shared-auth dependencies" && npm ci --only=production || npm install --production
-RUN echo "[debug] shared-auth files" && ls -la /usr/src/shared-auth && cat /usr/src/shared-auth/package.json || true
 
 WORKDIR /usr/src/app
 # copy package manifests and install (production)
