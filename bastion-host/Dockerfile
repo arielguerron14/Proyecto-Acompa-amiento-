@@ -84,7 +84,8 @@ echo "[BASTION] Validando configuración SSH..."
 echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Iniciando daemon SSH..."
 /usr/sbin/sshd -D 2>&1 || { echo "[BASTION] ❌ Error iniciando SSHD"; exit 1; }
 ENTRYPOINT_SCRIPT
-chmod 755 /opt/bastion/scripts/entrypoint.sh
+
+RUN chmod 755 /opt/bastion/scripts/entrypoint.sh
 
 # Hacer ejecutables los scripts restantes
 RUN chmod 755 /opt/bastion/scripts/*.sh && \
