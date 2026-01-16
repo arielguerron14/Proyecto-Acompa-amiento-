@@ -1,198 +1,145 @@
-# Nueva definición del workflow para despliegue secuencial
-
 name: Deploy to EC2_CORE Only
 
 on:
-	workflow_dispatch:
-		inputs:
-			rebuild_docker:
-				description: 'Rebuild Docker images'
-				required: false
-				default: 'true'
-				type: choice
-				options:
-					- 'true'
-					- 'false'
-			build_location:
-				description: 'Where to build images'
-				required: false
-				default: 'ec2'
-				type: choice
-				options:
-					- 'ec2'
-					- 'github'
-			environment:
-				description: 'Environment'
-				required: true
-				default: 'prod'
-				type: choice
-				options:
-					- dev
-					- staging
-					- prod
+  workflow_dispatch:
+    inputs:
+      rebuild_docker:
+        description: 'Rebuild Docker images'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
 
 env:
-	AWS_REGION: us-east-1
-	DOCKER_BUILDKIT: 1
+  AWS_REGION: us-east-1
+  DOCKER_BUILDKIT: 1
 
 jobs:
-	deploy-ec2-core:
-		name: Deploy to EC2_CORE Only
-		runs-on: ubuntu-latest
-		permissions:
-			contents: read
-		steps:
-			- name: Checkout code
-				uses: actions/checkout@v4
+  deploy-ec2-core:
+    name: Deploy EC2_CORE
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
-			- name: Setup Node.js
-				uses: actions/setup-node@v4
-				with:
-					node-version: 18
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-			- name: Configure AWS credentials
-				uses: aws-actions/configure-aws-credentials@v4
-				with:
-					aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-					aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-					aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-					aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-			- name: Deploy to EC2_CORE
-				env:
-					AWS_REGION: ${{ env.AWS_REGION }}
-					DOCKER_BUILDKIT: 1
-					REBUILD_DOCKER: ${{ github.event.inputs.rebuild_docker || 'true' }}
-					BUILD_LOCATION: ${{ github.event.inputs.build_location || 'ec2' }}
-					ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
-				run: |
-					set -e
-					INSTANCE="EC2_CORE"
-					TAG_NAME="EC2-CORE"
-					GITHUB_REPO="${{ github.repository }}"
-					GITHUB_REF="${{ github.ref }}"
-					INSTANCE_DATA=$(aws ec2 describe-instances \
-						--region $AWS_REGION \
-						--filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=$TAG_NAME" \
-						--query 'Reservations[0].Instances[0]' \
-						--output json)
-					if [ "$INSTANCE_DATA" = "null" ] || [ -z "$INSTANCE_DATA" ]; then
-						echo "❌ ERROR: No running instance found with tag Name=$TAG_NAME"
-						exit 1
-					fi
-					PUBLIC_IP=$(echo "$INSTANCE_DATA" | jq -r '.PublicIpAddress // empty')
-					PRIVATE_IP=$(echo "$INSTANCE_DATA" | jq -r '.PrivateIpAddress // empty')
-					INSTANCE_ID=$(echo "$INSTANCE_DATA" | jq -r '.InstanceId // empty')
-					INSTANCE_NAME=$(echo "$INSTANCE_DATA" | jq -r '.Tags[] | select(.Key=="Name") | .Value' | head -1)
-					if [ -z "$PUBLIC_IP" ] || [ "$PUBLIC_IP" = "null" ]; then
-						echo "❌ ERROR: Could not get public IP for instance $TAG_NAME"
-						exit 1
-					fi
-					echo "✅ Found instance: $INSTANCE_NAME ($INSTANCE_ID)"
-					echo "   Public IP (for SSH):  $PUBLIC_IP"
-					echo "   Private IP (for routing): $PRIVATE_IP"
-					mkdir -p ~/.ssh
-					echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-					chmod 600 ~/.ssh/id_rsa
-					ssh-keyscan -H $PUBLIC_IP >> ~/.ssh/known_hosts 2>/dev/null || true
-					echo "✅ SSH setup complete for IP: $PUBLIC_IP"
-					echo "📦 Transferring files to EC2_CORE..."
-					ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP '
-					set -e
-					echo "=== Cleaning old docker resources ==="
-					docker system prune -af --volumes 2>/dev/null || true
-					echo "=== Cleaning old .tar files ==="
-					rm -f /tmp/*.tar /tmp/*.tar.gz 2>/dev/null || true
-					rm -f ~/docker-images/*.tar 2>/dev/null || true
-					echo "=== Creating app directory ==="
-					mkdir -p ~/docker-images ~/app
-					echo "✅ EC2 cleaned and ready"
-					'
-					COMPOSE_FILE="./docker-compose.ec2-core.yml"
-					if [ -f "$COMPOSE_FILE" ]; then
-						scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$COMPOSE_FILE" ubuntu@$PUBLIC_IP:~/app/docker-compose.yml
-					else
-						echo "⚠️ Warning: $COMPOSE_FILE not found, skipping docker-compose transfer"
-					fi
-					echo "🚀 EXECUTING BUILD WITH DYNAMIC IP DISCOVERY"
-					ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash -s <<'BUILDSSH'
-					set -e
-					# Export variables passed from the parent shell
-					export INSTANCE="EC2_CORE"
-					export PRIVATE_IP="$(hostname -I | awk '{print $1}')"
-					export GITHUB_REPO="arielguerron14/Proyecto-Acompa-amiento-"
-					export GITHUB_REF="refs/heads/main"
-					echo "================================================"
-					echo "🔧 EC2 DEPLOYMENT WITH DYNAMIC IP CONFIGURATION"
-					echo "================================================"
-					echo "Instance Type: $INSTANCE"
-					echo "Private IP (for routing): $PRIVATE_IP"
-					echo "Repo: $GITHUB_REPO"
-					echo ""
-					echo "📥 Step 1: Cloning repository..."
-					cd ~
-					rm -rf app-build 2>/dev/null || true
-					git clone --depth 1 https://github.com/${GITHUB_REPO}.git app-build
-					cd app-build
-					git checkout ${GITHUB_REF#refs/heads/}
-					echo "✅ Repository cloned"
-					echo ""
-					echo "🔄 Step 2: Updating configuration with Private IP ($PRIVATE_IP)..."
-					echo "   → Core services use internal Docker network"
-					echo "   ✅ No IP changes needed (using localhost within core-net)"
-					echo ""
-					echo "🏗️  Step 3: Building Docker images..."
-					mkdir -p ~/docker-images
-					for SERVICE in micro-auth micro-estudiantes micro-maestros micro-core; do
-						if [ -f "./$SERVICE/Dockerfile" ]; then
-							echo "   → Building $SERVICE..."
-							docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
-						fi
-					done
-					echo "✅ Docker images built successfully"
-					echo ""
-					echo "📊 Available images:"
-					docker images | grep -E 'proyecto|api-gateway|micro|frontend' || echo "   No custom images found"
-					echo ""
-					echo "🚀 Step 4: Starting services with docker-compose..."
-					cd ~/app
-					docker-compose down 2>/dev/null || true
-					sleep 2
-					docker-compose up -d
-					echo "⏳ Waiting for services to be ready (30 seconds)..."
-					sleep 30
-					echo ""
-					echo "📋 Service Status:"
-					docker-compose ps
-					echo ""
-					echo "📝 Recent logs (last 50 lines):"
-					docker-compose logs --tail=50 2>&1 || true
-					echo ""
-					echo "================================================"
-					echo "✅ DEPLOYMENT COMPLETE"
-					echo "================================================"
-					BUILDSSH
-					echo "================================================"
-					echo "🔍 DEPLOYMENT VERIFICATION"
-					echo "================================================"
-					echo "Instance: $INSTANCE_NAME"
-					echo "Public IP: $PUBLIC_IP"
-					echo "Private IP: $PRIVATE_IP"
-					echo ""
-					ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash <<VERIFYSSH
-					set -e
-					echo "=== Verifying services status ==="
-					cd ~/app || { echo "[ERROR] ~/app no existe"; exit 0; }
-					docker-compose ps || echo "[ERROR] docker-compose ps falló"
-					echo ""
-					echo "=== Service logs (last 30 lines) ==="
-					docker-compose logs --tail=30 2>&1 || echo "No logs available"
-					echo ""
-					echo "=== Checking resource usage ==="
-					docker stats --no-stream | head -10 || echo "No stats available"
-					echo ""
-					echo "================================================"
-					echo "✅ Deployment verification complete"
-					echo "================================================"
-					VERIFYSSH
+      - name: Discover EC2_CORE and Deploy
+        run: |
+          set -e
 
+          INSTANCE="EC2_CORE"
+          TAG_NAME="EC2-CORE"
+          GITHUB_REPO="${{ github.repository }}"
+          GITHUB_REF="${{ github.ref }}"
+
+          echo "🔍 Discovering EC2_CORE instance..."
+
+          INSTANCE_DATA=$(aws ec2 describe-instances \
+            --region $AWS_REGION \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=$TAG_NAME" \
+            --query 'Reservations[0].Instances[0]' \
+            --output json)
+
+          if [ "$INSTANCE_DATA" = "null" ] || [ -z "$INSTANCE_DATA" ]; then
+            echo "❌ EC2_CORE not found"
+            exit 1
+          fi
+
+          PUBLIC_IP=$(echo "$INSTANCE_DATA" | jq -r '.PublicIpAddress')
+          PRIVATE_IP=$(echo "$INSTANCE_DATA" | jq -r '.PrivateIpAddress')
+
+          echo "✅ EC2_CORE found"
+          echo "   Public IP:  $PUBLIC_IP"
+          echo "   Private IP: $PRIVATE_IP"
+
+          echo "🔐 Setting up SSH..."
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $PUBLIC_IP >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          echo "🧹 Cleaning EC2_CORE..."
+          ssh ubuntu@$PUBLIC_IP <<CLEANSSH
+          set -e
+          docker system prune -af --volumes || true
+          rm -rf ~/app ~/app-build ~/docker-images || true
+          mkdir -p ~/app ~/docker-images
+          CLEANSSH
+
+          echo "📦 Sending docker-compose..."
+          scp ./docker-compose.ec2-core.yml ubuntu@$PUBLIC_IP:~/app/docker-compose.yml
+
+          echo "🚀 Deploying on EC2_CORE..."
+
+          ssh ubuntu@$PUBLIC_IP bash -s <<BUILDSSH
+          set -e
+
+          export INSTANCE="$INSTANCE"
+          export PRIVATE_IP="$PRIVATE_IP"
+          export GITHUB_REPO="$GITHUB_REPO"
+          export GITHUB_REF="$GITHUB_REF"
+
+          echo "================================================"
+          echo "🔧 EC2 CORE DEPLOYMENT"
+          echo "================================================"
+          echo "Instance: \$INSTANCE"
+          echo "Repo:     \$GITHUB_REPO"
+          echo "IP:       \$PRIVATE_IP"
+          echo "================================================"
+
+          cd ~
+          git clone --depth 1 https://github.com/\$GITHUB_REPO.git app-build
+          cd app-build
+          git checkout \${GITHUB_REF#refs/heads/}
+
+          echo "🏗️ Building Core services..."
+
+          for SERVICE in micro-auth micro-estudiantes micro-maestros micro-core; do
+            if [ -f "./\$SERVICE/Dockerfile" ]; then
+              echo "→ Building \$SERVICE"
+              docker build --no-cache -t \$SERVICE:latest -f ./\$SERVICE/Dockerfile .
+            fi
+          done
+
+          echo "🚀 Starting services..."
+          cd ~/app
+          docker-compose down || true
+          docker-compose up -d
+
+          echo "⏳ Waiting for services..."
+          sleep 25
+
+          echo "📋 Containers:"
+          docker-compose ps
+
+          echo "================================================"
+          echo "✅ DEPLOYMENT FINISHED"
+          echo "================================================"
+          BUILDSSH
+
+      - name: Verify deployment
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "🔍 Verifying services..."
