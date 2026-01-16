@@ -137,16 +137,15 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_REF: ${{ github.ref }}
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash << DEPLOYSCRIPT
-          set -e
-          
-          INSTANCE="$INSTANCE"
-          GITHUB_REPO="$GITHUB_REPO"
-          GITHUB_REF="$GITHUB_REF"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash -s "$INSTANCE" "$GITHUB_REPO" "$GITHUB_REF" << DEPLOYSCRIPT
+          INSTANCE="$1"
+          GITHUB_REPO="$2"
+          GITHUB_REF="$3"
           
           echo "================================================"
           echo "🚀 Desplegando: $INSTANCE"
           echo "================================================"
+          set -e
           
           # 1. Clone repository
           echo "📥 Clonando repositorio..."
