@@ -14,30 +14,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
 
-  # API Gateway - Main entry point (ONLY exposed port)
-  api-gateway:
-    build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
-    image: api-gateway:latest
-    container_name: api-gateway
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    depends_on:
-      - micro-auth
-      - micro-estudiantes
-      - micro-maestros
-    networks:
-      - core-net
-    environment:
-      NODE_ENV: production
-      DOCKER_DEPLOYMENT: "true"
-      API_GATEWAY_PORT: 8080
-      PORT: 8080
-      CORE_HOST: ""
-      LOG_LEVEL: debug
-
+  # Core Microservices ONLY
   micro-auth:
     build:
       context: ./micro-auth
@@ -47,6 +24,8 @@ services:
     restart: unless-stopped
     expose:
       - "3000"
+    ports:
+      - "3000:3000"
     depends_on:
       - mongo
     networks:
@@ -65,6 +44,8 @@ services:
     restart: unless-stopped
     expose:
       - "3001"
+    ports:
+      - "3001:3001"
     depends_on:
       - mongo
     networks:
@@ -83,6 +64,8 @@ services:
     restart: unless-stopped
     expose:
       - "3002"
+    ports:
+      - "3002:3002"
     depends_on:
       - mongo
     networks:
@@ -92,41 +75,29 @@ services:
       PORT: 3002
       MONGODB_URI: mongodb://root:example@mongo:27017/maestros?authSource=admin
 
-  micro-reportes-estudiantes:
+  # Core Service (aggregator/orchestrator) - if exists
+  micro-core:
     build:
-      context: ./micro-reportes-estudiantes
+      context: ./micro-core
       dockerfile: Dockerfile
-    image: micro-reportes-estudiantes:latest
-    container_name: micro-reportes-estudiantes
+    image: micro-core:latest
+    container_name: micro-core
     restart: unless-stopped
     expose:
-      - "5003"
+      - "5000"
+    ports:
+      - "5000:5000"
     depends_on:
       - mongo
+      - micro-auth
+      - micro-estudiantes
+      - micro-maestros
     networks:
       - core-net
     environment:
       NODE_ENV: production
-      PORT: 5003
-      MONGODB_URI: mongodb://root:example@mongo:27017/reportes-estudiantes?authSource=admin
-
-  micro-reportes-maestros:
-    build:
-      context: ./micro-reportes-maestros
-      dockerfile: Dockerfile
-    image: micro-reportes-maestros:latest
-    container_name: micro-reportes-maestros
-    restart: unless-stopped
-    expose:
-      - "5004"
-    depends_on:
-      - mongo
-    networks:
-      - core-net
-    environment:
-      NODE_ENV: production
-      PORT: 5004
-      MONGODB_URI: mongodb://root:example@mongo:27017/reportes-maestros?authSource=admin
+      PORT: 5000
+      MONGODB_URI: mongodb://root:example@mongo:27017/core?authSource=admin
 
 networks:
   core-net:
@@ -134,3 +105,4 @@ networks:
 
 volumes:
   mongo_data:
+

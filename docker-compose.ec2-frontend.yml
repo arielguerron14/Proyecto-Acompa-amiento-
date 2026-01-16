@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  frontend-web:
+    container_name: frontend-web
+    image: frontend-web:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    expose:
+      - "80"
+      - "443"
+    environment:
+      NODE_ENV: production
+      API_GATEWAY_URL: http://localhost:8080
+      API_GATEWAY_HOST: localhost
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - frontend-net
+
+networks:
+  frontend-net:
+    driver: bridge

@@ -16,6 +16,10 @@ on:
           - EC2_FRONTEND
           - EC2_MESSAGING
           - EC2_MONITORING
+          - EC2_REPORTES
+          - EC2_NOTIFICACIONES
+          - EC2_ANALYTICS
+          - ALL_INSTANCES
       rebuild_docker:
         description: 'Rebuild Docker images'
         required: false
@@ -111,6 +115,19 @@ jobs:
               ;;
             EC2_MONITORING)
               TAG_NAME="EC2-Monitoring"
+              ;;
+            EC2_REPORTES)
+              TAG_NAME="EC2-Reportes"
+              ;;
+            EC2_NOTIFICACIONES)
+              TAG_NAME="EC2-Notificaciones"
+              ;;
+            EC2_ANALYTICS)
+              TAG_NAME="EC2-Analytics"
+              ;;
+            ALL_INSTANCES)
+              echo "🔄 Deploying to ALL instances..."
+              TAG_NAME="*"
               ;;
             *)
               echo "❌ Unknown instance type: $INSTANCE"
@@ -240,22 +257,25 @@ CLEANUP
           if [ "$INSTANCE" = "EC2_BASTION" ]; then
             echo "📤 Transferring Bastion Host files..."
             scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 -r ./bastion-host ubuntu@$PUBLIC_IP:~/app/bastion-host || true
-            COMPOSE_FILE="./bastion-host/docker-compose.yml"
+            COMPOSE_FILE="./docker-compose.ec2-bastion.yml"
           elif [ "$INSTANCE" = "EC2_CORE" ]; then
             COMPOSE_FILE="./docker-compose.ec2-core.yml"
           elif [ "$INSTANCE" = "EC2_API_GATEWAY" ]; then
-            # Special handling: Update docker-compose with CORE private IP
-            echo "🔄 Preparing API Gateway configuration..."
-            # Will be done in deployment step
             COMPOSE_FILE="./docker-compose.api-gateway.yml"
           elif [ "$INSTANCE" = "EC2_FRONTEND" ]; then
-            COMPOSE_FILE="./docker-compose.frontend.yml"
+            COMPOSE_FILE="./docker-compose.ec2-frontend.yml"
           elif [ "$INSTANCE" = "EC2_MESSAGING" ]; then
-            COMPOSE_FILE="./messaging/docker-compose.yml"
+            COMPOSE_FILE="./docker-compose.ec2-messaging.yml"
           elif [ "$INSTANCE" = "EC2_MONITORING" ]; then
-            COMPOSE_FILE="./monitoring/docker-compose.yml"
+            COMPOSE_FILE="./docker-compose.ec2-monitoring.yml"
           elif [ "$INSTANCE" = "EC2_DB" ]; then
-            COMPOSE_FILE="./databases/docker-compose.yml"
+            COMPOSE_FILE="./docker-compose.ec2-db.yml"
+          elif [ "$INSTANCE" = "EC2_REPORTES" ]; then
+            COMPOSE_FILE="./docker-compose.ec2-reportes.yml"
+          elif [ "$INSTANCE" = "EC2_NOTIFICACIONES" ]; then
+            COMPOSE_FILE="./docker-compose.ec2-notificaciones.yml"
+          elif [ "$INSTANCE" = "EC2_ANALYTICS" ]; then
+            COMPOSE_FILE="./docker-compose.ec2-analytics.yml"
           else
             COMPOSE_FILE="./docker-compose.yml"
           fi
@@ -267,6 +287,34 @@ CLEANUP
           fi
 
       
+      - name: Get EC2-CORE private IP (for API Gateway configuration)
+        id: get-core-ip
+        run: |
+          INSTANCE="${{ github.event.inputs.instance }}"
+          
+          # If deploying to API Gateway, we need CORE's private IP
+          if [[ "$INSTANCE" == "EC2_API_GATEWAY" || "$INSTANCE" == "ALL_INSTANCES" ]]; then
+            echo "🔍 Discovering EC2-CORE private IP for API Gateway configuration..."
+            
+            CORE_INSTANCE=$(aws ec2 describe-instances \
+              --region $AWS_REGION \
+              --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=EC2-CORE" \
+              --query 'Reservations[0].Instances[0]' \
+              --output json)
+            
+            if [ "$CORE_INSTANCE" != "null" ] && [ -n "$CORE_INSTANCE" ]; then
+              CORE_PRIVATE_IP=$(echo $CORE_INSTANCE | jq -r '.PrivateIpAddress')
+              echo "✅ Found EC2-CORE at private IP: $CORE_PRIVATE_IP"
+              echo "core_private_ip=$CORE_PRIVATE_IP" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ Warning: EC2-CORE not found. API Gateway will use existing configuration."
+              echo "core_private_ip=NOT_FOUND" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "ℹ️ Not deploying to API Gateway, skipping CORE IP discovery"
+            echo "core_private_ip=NOT_NEEDED" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build Docker Images on EC2 (with Dynamic IP Configuration)
         run: |
           echo "🚀 EXECUTING BUILD WITH DYNAMIC IP DISCOVERY"
@@ -275,13 +323,15 @@ CLEANUP
           INSTANCE="${{ github.event.inputs.instance }}"
           GITHUB_REPO="${{ github.repository }}"
           GITHUB_REF="${{ github.ref }}"
+          CORE_PRIVATE_IP="${{ steps.get-core-ip.outputs.core_private_ip }}"
           
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash -s "$INSTANCE" "$PRIVATE_IP" "$GITHUB_REPO" "$GITHUB_REF" << 'BUILDSSH'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash -s "$INSTANCE" "$PRIVATE_IP" "$GITHUB_REPO" "$GITHUB_REF" "$CORE_PRIVATE_IP" << 'BUILDSSH'
 set -e
 INSTANCE=$1
 PRIVATE_IP=$2
 GITHUB_REPO=$3
 GITHUB_REF=$4
+CORE_PRIVATE_IP=$5
 
 echo "================================================"
 echo "🔧 EC2 DEPLOYMENT WITH DYNAMIC IP CONFIGURATION"
@@ -308,28 +358,22 @@ echo "🔄 Step 2: Updating configuration with Private IP ($PRIVATE_IP)..."
 if [ "$INSTANCE" = "EC2_API_GATEWAY" ]; then
   echo "   → Configuring API Gateway to use CORE private IP..."
   
-  # Check if we can find CORE instance
-  # For now, use environment variable or manual configuration
-  if [ -z "$CORE_PRIVATE_IP" ]; then
-    echo "   ⚠️ CORE_PRIVATE_IP not set, using existing config"
-  else
-    if [ -f "./api-gateway/.env" ]; then
-      sed -i "s|http://[0-9.]*:3000|http://$CORE_PRIVATE_IP:3000|g" "./api-gateway/.env"
-      sed -i "s|http://[0-9.]*:3001|http://$CORE_PRIVATE_IP:3001|g" "./api-gateway/.env"
-      sed -i "s|http://[0-9.]*:3002|http://$CORE_PRIVATE_IP:3002|g" "./api-gateway/.env"
-      sed -i "s|http://[0-9.]*:5003|http://$CORE_PRIVATE_IP:5003|g" "./api-gateway/.env"
-      sed -i "s|http://[0-9.]*:5004|http://$CORE_PRIVATE_IP:5004|g" "./api-gateway/.env"
-      echo "   ✅ API Gateway .env updated with CORE private IP"
+  if [ "$CORE_PRIVATE_IP" != "NOT_FOUND" ] && [ "$CORE_PRIVATE_IP" != "NOT_NEEDED" ] && [ -n "$CORE_PRIVATE_IP" ]; then
+    echo "   ✅ Using CORE_PRIVATE_IP: $CORE_PRIVATE_IP"
+    
+    # Update docker-compose.api-gateway.yml with CORE private IP (no port in CORE_HOST)
+    if [ -f "./docker-compose.api-gateway.yml" ]; then
+      sed -i "s|CORE_HOST: .*|CORE_HOST: \"http://$CORE_PRIVATE_IP\"|g" "./docker-compose.api-gateway.yml"
+      echo "   ✅ docker-compose.api-gateway.yml updated with CORE_HOST"
     fi
-  fi
-  
-  if [ -f "./docker-compose.api-gateway.yml" ]; then
-    sed -i "s|http://[0-9.]*:3000|http://$PRIVATE_IP:3000|g" "./docker-compose.api-gateway.yml"
-    sed -i "s|http://[0-9.]*:3001|http://$PRIVATE_IP:3001|g" "./docker-compose.api-gateway.yml"
-    sed -i "s|http://[0-9.]*:3002|http://$PRIVATE_IP:3002|g" "./docker-compose.api-gateway.yml"
-    sed -i "s|http://[0-9.]*:5003|http://$PRIVATE_IP:5003|g" "./docker-compose.api-gateway.yml"
-    sed -i "s|http://[0-9.]*:5004|http://$PRIVATE_IP:5004|g" "./docker-compose.api-gateway.yml"
-    echo "   ✅ docker-compose.api-gateway.yml updated"
+    
+    # Update api-gateway .env if it exists
+    if [ -f "./api-gateway/.env" ]; then
+      sed -i "s|CORE_HOST=.*|CORE_HOST=http://$CORE_PRIVATE_IP|g" "./api-gateway/.env"
+      echo "   ✅ api-gateway .env updated"
+    fi
+  else
+    echo "   ⚠️ CORE_PRIVATE_IP not available ($CORE_PRIVATE_IP), using default docker-compose configuration"
   fi
 fi
 
@@ -349,6 +393,40 @@ case "$INSTANCE" in
     cd ~/app-build/bastion-host
     docker build --no-cache -t bastion-host:latest .
     ;;
+  EC2_CORE)
+    echo "   Building Core microservices (auth, estudiantes, maestros, core)..."
+    cd ~/app-build
+    for SERVICE in micro-auth micro-estudiantes micro-maestros micro-core; do
+      if [ -f "./$SERVICE/Dockerfile" ]; then
+        echo "   → Building $SERVICE..."
+        docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+      fi
+    done
+    ;;
+  EC2_API_GATEWAY)
+    echo "   Building API Gateway Docker image..."
+    cd ~/app-build
+    if [ -f "./api-gateway/Dockerfile" ]; then
+      docker build --no-cache -t api-gateway:latest -f ./api-gateway/Dockerfile .
+    fi
+    ;;
+  EC2_REPORTES)
+    echo "   Building Reportes microservices..."
+    cd ~/app-build
+    for SERVICE in micro-reportes-estudiantes micro-reportes-maestros; do
+      if [ -f "./$SERVICE/Dockerfile" ]; then
+        echo "   → Building $SERVICE..."
+        docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+      fi
+    done
+    ;;
+  EC2_NOTIFICACIONES)
+    echo "   Building Notificaciones microservice..."
+    cd ~/app-build
+    if [ -f "./micro-notificaciones/Dockerfile" ]; then
+      docker build --no-cache -t micro-notificaciones:latest -f ./micro-notificaciones/Dockerfile .
+    fi
+    ;;
   EC2_MESSAGING)
     echo "   Building infrastructure images for messaging..."
     cd ~/app-build
@@ -365,6 +443,17 @@ case "$INSTANCE" in
       docker build --no-cache -t proyecto-rabbitmq:1.0 -f ./messaging/rabbitmq/Dockerfile ./messaging
     fi
     ;;
+  EC2_DB)
+    echo "   ℹ️ Database instance (mongo, postgres, redis) - no custom builds needed"
+    echo "   Using pre-built Docker Hub images"
+    ;;
+  EC2_ANALYTICS)
+    echo "   Building Analytics microservice..."
+    cd ~/app-build
+    if [ -f "./micro-analytics/Dockerfile" ]; then
+      docker build --no-cache -t micro-analytics:latest -f ./micro-analytics/Dockerfile .
+    fi
+    ;;
   EC2_MONITORING)
     echo "   Building infrastructure images for monitoring..."
     cd ~/app-build
@@ -377,19 +466,63 @@ case "$INSTANCE" in
       docker build --no-cache -t proyecto-grafana:1.0 -f ./monitoring/grafana/Dockerfile ./monitoring
     fi
     ;;
-  *)
-    echo "   Building microservices..."
+  EC2_FRONTEND)
+    echo "   Building Frontend Docker image..."
     cd ~/app-build
-    for SERVICE in api-gateway micro-auth micro-estudiantes micro-maestros frontend-web; do
+    if [ -f "./frontend-web/Dockerfile" ]; then
+      docker build --no-cache -t frontend-web:latest -f ./frontend-web/Dockerfile ./frontend-web
+    fi
+    ;;
+  ALL_INSTANCES)
+    echo "   Building ALL microservices and infrastructure..."
+    cd ~/app-build
+    echo "   → Building Bastion..."
+    cd bastion-host && docker build --no-cache -t bastion-host:latest . && cd ..
+    echo "   → Building Core services..."
+    for SERVICE in micro-auth micro-estudiantes micro-maestros micro-core; do
       if [ -f "./$SERVICE/Dockerfile" ]; then
-        echo "   → Building $SERVICE..."
-        if [ "$SERVICE" = "frontend-web" ]; then
-          docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile ./$SERVICE
-        else
-          docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
-        fi
+        docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
       fi
     done
+    echo "   → Building API Gateway..."
+    if [ -f "./api-gateway/Dockerfile" ]; then
+      docker build --no-cache -t api-gateway:latest -f ./api-gateway/Dockerfile .
+    fi
+    echo "   → Building Reportes services..."
+    for SERVICE in micro-reportes-estudiantes micro-reportes-maestros; do
+      if [ -f "./$SERVICE/Dockerfile" ]; then
+        docker build --no-cache -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+      fi
+    done
+    echo "   → Building Notificaciones..."
+    if [ -f "./micro-notificaciones/Dockerfile" ]; then
+      docker build --no-cache -t micro-notificaciones:latest -f ./micro-notificaciones/Dockerfile .
+    fi
+    echo "   → Building Analytics..."
+    if [ -f "./micro-analytics/Dockerfile" ]; then
+      docker build --no-cache -t micro-analytics:latest -f ./micro-analytics/Dockerfile .
+    fi
+    echo "   → Building Messaging infrastructure..."
+    if [ -f "./messaging/zookeeper/Dockerfile" ]; then
+      docker build --no-cache -t proyecto-zookeeper:1.0 -f ./messaging/zookeeper/Dockerfile ./messaging
+    fi
+    if [ -f "./messaging/kafka/Dockerfile" ]; then
+      docker build --no-cache -t proyecto-kafka:1.0 -f ./messaging/kafka/Dockerfile ./messaging
+    fi
+    if [ -f "./messaging/rabbitmq/Dockerfile" ]; then
+      docker build --no-cache -t proyecto-rabbitmq:1.0 -f ./messaging/rabbitmq/Dockerfile ./messaging
+    fi
+    echo "   → Building Monitoring infrastructure..."
+    if [ -f "./monitoring/prometheus/Dockerfile" ]; then
+      docker build --no-cache -t proyecto-prometheus:1.0 -f ./monitoring/prometheus/Dockerfile ./monitoring
+    fi
+    if [ -f "./monitoring/grafana/Dockerfile" ]; then
+      docker build --no-cache -t proyecto-grafana:1.0 -f ./monitoring/grafana/Dockerfile ./monitoring
+    fi
+    echo "   → Building Frontend..."
+    if [ -f "./frontend-web/Dockerfile" ]; then
+      docker build --no-cache -t frontend-web:latest -f ./frontend-web/Dockerfile ./frontend-web
+    fi
     ;;
 esac
 

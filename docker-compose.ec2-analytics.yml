@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:6
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - analytics-net
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+  # Analytics Microservice
+  micro-analytics:
+    build:
+      context: ./micro-analytics
+      dockerfile: Dockerfile
+    image: micro-analytics:latest
+    container_name: micro-analytics
+    restart: unless-stopped
+    ports:
+      - "5006:5006"
+    depends_on:
+      - mongo
+    networks:
+      - analytics-net
+    environment:
+      NODE_ENV: production
+      PORT: 5006
+      MONGODB_URI: mongodb://root:example@mongo:27017/analytics?authSource=admin
+
+networks:
+  analytics-net:
+    driver: bridge
+
+volumes:
+  mongo_data:

@@ -2,36 +2,34 @@ version: '3.8'
 
 services:
   api-gateway:
-    container_name: api-gateway
     build:
-      context: .
-      dockerfile: ./api-gateway/Dockerfile
+      context: ./api-gateway
+      dockerfile: Dockerfile
     image: api-gateway:latest
+    container_name: api-gateway
+    restart: unless-stopped
     ports:
       - "8080:8080"
-    entrypoint: []
-    command: sh -c "cd /usr/src/app && exec node server.js"
+    networks:
+      - api-gateway-net
     environment:
       NODE_ENV: production
+      DOCKER_DEPLOYMENT: "false"
+      API_GATEWAY_PORT: 8080
       PORT: 8080
-      LOG_LEVEL: info
-      
-      # Public IPs for inter-EC2 communication (reach from EC2-API-Gateway to EC2-Core)
-      AUTH_SERVICE: http://3.237.39.196:3000
-      ESTUDIANTES_SERVICE: http://3.237.39.196:3001
-      MAESTROS_SERVICE: http://3.237.39.196:3002
-      REPORTES_EST_SERVICE: http://3.237.39.196:5003
-      REPORTES_MAEST_SERVICE: http://3.237.39.196:5004
-      NOTIFICACIONES_SERVICE: http://172.31.68.132:5006
-      ANALYTICS_SERVICE: http://172.31.68.132:5007
-      
-      # Configuración
-      JWT_SECRET: ${JWT_SECRET}
+      # These will be dynamically configured based on EC2-CORE private IP
+      CORE_HOST: "http://localhost"
+      LOG_LEVEL: debug
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
       RATE_LIMIT: 100
       TIMEOUT: 30000
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 3
+
+networks:
+  api-gateway-net:
+    driver: bridge
+

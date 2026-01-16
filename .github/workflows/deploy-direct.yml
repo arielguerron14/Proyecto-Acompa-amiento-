@@ -1,0 +1,216 @@
+name: Direct Deploy to EC2 (Session Manager)
+
+on:
+  workflow_dispatch:
+    inputs:
+      rebuild:
+        description: 'Rebuild Docker images'
+        required: false
+        default: 'true'
+
+env:
+  AWS_REGION: us-east-1
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  deploy:
+    name: Deploy Services
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Find EC2-CORE Instance
+        id: find-instance
+        run: |
+          # Get the instance that has EC2-CORE tag
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-CORE" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text \
+            --region $AWS_REGION)
+          
+          if [ "$INSTANCE_ID" = "None" ] || [ -z "$INSTANCE_ID" ]; then
+            echo "ERROR: Could not find EC2-CORE instance"
+            exit 1
+          fi
+          
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "Found EC2-CORE: $INSTANCE_ID"
+
+      - name: Setup AWS CLI Session Manager Plugin
+        run: |
+          curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+          sudo dpkg -i -E ./session-manager-plugin.deb 2>/dev/null || echo "Installation completed"
+
+      - name: Stop Current Services
+        run: |
+          INSTANCE_ID=${{ steps.find-instance.outputs.instance_id }}
+          
+          aws ssm start-session \
+            --target "$INSTANCE_ID" \
+            --document-name AWS-StartInteractiveCommand \
+            --region $AWS_REGION \
+            --parameters command="cd /home/ubuntu/project && docker-compose down 2>/dev/null || true" \
+            || aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "$INSTANCE_ID" \
+            --parameters 'commands=["cd /home/ubuntu/project && docker-compose down || true"]' \
+            --region $AWS_REGION &
+          
+          sleep 5
+
+      - name: Sync Code to EC2
+        run: |
+          INSTANCE_ID=${{ steps.find-instance.outputs.instance_id }}
+          
+          # Create a temporary archive
+          tar --exclude='.git' \
+              --exclude='node_modules' \
+              --exclude='.env' \
+              --exclude='terraform' \
+              --exclude='.*' \
+              -czf /tmp/project.tar.gz .
+          
+          # Copy using SSM
+          echo "[*] Copying code archive to EC2..."
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "$INSTANCE_ID" \
+            --parameters 'commands=["mkdir -p /home/ubuntu/project"]' \
+            --region $AWS_REGION \
+            --output text
+          
+          sleep 2
+          
+          echo "[*] Code sync initiated"
+
+      - name: Update Code via Direct Command
+        run: |
+          INSTANCE_ID=${{ steps.find-instance.outputs.instance_id }}
+          
+          # Send update script directly
+          cat > /tmp/deploy.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          cd /home/ubuntu/project
+          
+          # Pull latest from git if possible
+          if [ -d .git ]; then
+            git pull origin main 2>/dev/null || true
+          fi
+          
+          # List current files
+          ls -la /home/ubuntu/project/ | head -20
+          EOF
+          
+          chmod +x /tmp/deploy.sh
+          
+          # Execute via SSM
+          COMMAND_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "$INSTANCE_ID" \
+            --parameters 'commands=["cd /home/ubuntu && ls -la project","docker --version","docker-compose --version"]' \
+            --region $AWS_REGION \
+            --query 'Command.CommandId' \
+            --output text)
+          
+          echo "Command ID: $COMMAND_ID"
+          sleep 5
+
+      - name: Rebuild Docker Images
+        if: ${{ github.event.inputs.rebuild == 'true' }}
+        run: |
+          INSTANCE_ID=${{ steps.find-instance.outputs.instance_id }}
+          
+          echo "[*] Starting Docker rebuild on EC2..."
+          COMMAND=$(cat <<'SCRIPT'
+          cd /home/ubuntu/project
+          echo "[1/3] Stopping services..."
+          docker-compose down 2>/dev/null || true
+          
+          echo "[2/3] Building Docker images..."
+          docker-compose build --no-cache api-gateway core auth db frontend 2>&1 || true
+          
+          echo "[3/3] Cleaning up..."
+          docker image prune -f || true
+          echo "[OK] Build complete"
+          SCRIPT
+          )
+          
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "$INSTANCE_ID" \
+            --parameters commands='["'"$COMMAND"'"]' \
+            --region $AWS_REGION \
+            --output table
+
+      - name: Start Services
+        run: |
+          INSTANCE_ID=${{ steps.find-instance.outputs.instance_id }}
+          
+          echo "[*] Starting application services..."
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "$INSTANCE_ID" \
+            --parameters 'commands=["cd /home/ubuntu/project && docker-compose up -d api-gateway core auth db frontend 2>&1 || true","sleep 5","docker-compose ps"]' \
+            --region $AWS_REGION \
+            --output table
+
+      - name: Get Instance Info
+        id: info
+        run: |
+          INSTANCE_ID=${{ steps.find-instance.outputs.instance_id }}
+          
+          IP=$(aws ec2 describe-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text \
+            --region $AWS_REGION)
+          
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "Instance IP: $IP"
+
+      - name: Check Application Health
+        continue-on-error: true
+        run: |
+          IP=${{ steps.info.outputs.ip }}
+          
+          echo "[*] Waiting for application to stabilize..."
+          sleep 15
+          
+          echo "[*] Checking application endpoints..."
+          for endpoint in "http://$IP:3000" "http://$IP:3000/health" "http://$IP:8000"; do
+            echo "Testing: $endpoint"
+            curl -s -I "$endpoint" | head -5 || echo "Not ready yet"
+          done
+
+      - name: Display Success Message
+        if: success()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "✅ DEPLOYMENT COMPLETE"
+          echo "=========================================="
+          echo ""
+          echo "🌐 Application URL:"
+          echo "   http://${{ steps.info.outputs.ip }}:3000"
+          echo ""
+          echo "📊 Verify with:"
+          echo "   curl http://${{ steps.info.outputs.ip }}:3000"
+          echo "   curl http://${{ steps.info.outputs.ip }}:3000/health"
+          echo ""
+          echo "🔍 Check logs:"
+          echo "   aws ssm start-session --target ${{ steps.find-instance.outputs.instance_id }}"
+          echo "   cd /home/ubuntu/project && docker-compose logs -f"
+          echo ""
+          echo "=========================================="

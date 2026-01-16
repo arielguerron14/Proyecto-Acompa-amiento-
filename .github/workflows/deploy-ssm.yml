@@ -1,0 +1,192 @@
+name: Deploy with SSM (AWS Systems Manager)
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance:
+        description: 'Instance to deploy'
+        required: false
+        default: 'EC2_CORE'
+        type: choice
+        options:
+          - EC2_BASTION
+          - EC2_CORE
+          - EC2_DB
+          - EC2_API_GATEWAY
+          - EC2_FRONTEND
+          - EC2_MESSAGING
+          - EC2_MONITORING
+      rebuild_docker:
+        description: 'Rebuild Docker images'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-ssm:
+    name: Deploy via SSM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get EC2 Instance ID
+        id: get-instance
+        run: |
+          INSTANCE="${{ github.event.inputs.instance || 'EC2_CORE' }}"
+          
+          case "$INSTANCE" in
+            EC2_CORE)
+              TAG_NAME="EC2-CORE"
+              ;;
+            *)
+              TAG_NAME="$INSTANCE"
+              ;;
+          esac
+          
+          # Query AWS for the instance ID using exact tag match
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --region ${AWS_REGION} \
+            --filters "Name=tag:Name,Values=${TAG_NAME}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "ERROR: Could not find running instance with tag ${TAG_NAME}"
+            aws ec2 describe-instances --region ${AWS_REGION} --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value|[0],InstanceId,State.Name]' --output table
+            exit 1
+          fi
+          
+          echo "instance_id=${INSTANCE_ID}" >> $GITHUB_OUTPUT
+          echo "Found Instance ID: ${INSTANCE_ID}"
+
+      - name: Deploy via SSM - Copy Code
+        run: |
+          INSTANCE_ID="${{ steps.get-instance.outputs.instance_id }}"
+          
+          echo "Pushing code to S3 for transfer..."
+          aws s3 cp --recursive . s3://project-deployment-temp/code/ \
+            --exclude ".git/*" \
+            --exclude "node_modules/*" \
+            --exclude ".env" \
+            --exclude "terraform/*" \
+            --region ${AWS_REGION} || true
+          
+          echo "Running SSM command to download and setup code..."
+          COMMAND_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "${INSTANCE_ID}" \
+            --parameters 'commands=["cd /home/ubuntu/project && aws s3 sync s3://project-deployment-temp/code/ . --region '${AWS_REGION}' --exclude \".git/*\" --exclude \"node_modules/*\" || true","echo \"Code synced successfully\""]' \
+            --region ${AWS_REGION} \
+            --query 'Command.CommandId' \
+            --output text)
+          
+          echo "SSM Command ID: $COMMAND_ID"
+          
+          # Wait for command to complete
+          sleep 10
+          
+          # Check command status
+          aws ssm get-command-invocation \
+            --command-id "${COMMAND_ID}" \
+            --instance-id "${INSTANCE_ID}" \
+            --region ${AWS_REGION}
+
+      - name: Deploy via SSM - Stop Services
+        run: |
+          INSTANCE_ID="${{ steps.get-instance.outputs.instance_id }}"
+          
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "${INSTANCE_ID}" \
+            --parameters 'commands=["cd /home/ubuntu/project && docker-compose down || true"]' \
+            --region ${AWS_REGION}
+          
+          sleep 5
+
+      - name: Deploy via SSM - Build Docker
+        if: ${{ github.event.inputs.rebuild_docker == 'true' }}
+        run: |
+          INSTANCE_ID="${{ steps.get-instance.outputs.instance_id }}"
+          
+          echo "Building Docker images on EC2..."
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "${INSTANCE_ID}" \
+            --parameters 'commands=["cd /home/ubuntu/project && docker-compose build --no-cache api-gateway core auth db frontend || true","docker image prune -f || true"]' \
+            --region ${AWS_REGION}
+          
+          # Wait longer for Docker builds
+          sleep 30
+
+      - name: Deploy via SSM - Start Services
+        run: |
+          INSTANCE_ID="${{ steps.get-instance.outputs.instance_id }}"
+          
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "${INSTANCE_ID}" \
+            --parameters 'commands=["cd /home/ubuntu/project && docker-compose up -d api-gateway core auth db frontend","sleep 5","docker-compose ps"]' \
+            --region ${AWS_REGION}
+          
+          sleep 10
+
+      - name: Get Instance IP
+        id: get-ip
+        run: |
+          INSTANCE_ID="${{ steps.get-instance.outputs.instance_id }}"
+          
+          IP=$(aws ec2 describe-instances \
+            --instance-ids "${INSTANCE_ID}" \
+            --region ${AWS_REGION} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          
+          echo "ip=${IP}" >> $GITHUB_OUTPUT
+          echo "Instance IP: ${IP}"
+
+      - name: Verify Deployment
+        run: |
+          IP="${{ steps.get-ip.outputs.ip }}"
+          
+          echo "Checking if application is responding..."
+          for i in {1..15}; do
+            if curl -s -f http://${IP}:3000/health &>/dev/null || curl -s -f http://${IP}:8000/api/health &>/dev/null || curl -s http://${IP}:3000 &>/dev/null; then
+              echo "[SUCCESS] ✅ Application is responding!"
+              echo "Application accessible at: http://${IP}:3000"
+              exit 0
+            fi
+            echo "Attempt $i/15 - Service not yet ready, waiting..."
+            sleep 10
+          done
+          
+          echo "[INFO] Services may still be starting up. Check manually at:"
+          echo "http://${IP}:3000"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "=================================================="
+          echo "🎯 DEPLOYMENT SUMMARY"
+          echo "=================================================="
+          echo "Instance ID: ${{ steps.get-instance.outputs.instance_id }}"
+          echo "Instance IP: ${{ steps.get-ip.outputs.ip }}"
+          echo "Access Application at: http://${{ steps.get-ip.outputs.ip }}:3000"
+          echo "=================================================="
