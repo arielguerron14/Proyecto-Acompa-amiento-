@@ -13,7 +13,6 @@ COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Copiar shared-config para que los servicios puedan requerir '../../../shared-config'
-COPY shared-config/ /usr/src/shared-config/
 
 # install dependencies for shared modules first
 WORKDIR /usr/src/shared-auth
