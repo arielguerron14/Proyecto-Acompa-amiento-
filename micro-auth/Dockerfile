@@ -9,7 +9,6 @@ COPY micro-auth/ /usr/src/app/
 # Copiar configuración centralizada
 COPY infrastructure.config.js /usr/src/
 COPY scripts/ /usr/src/scripts/
-COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Copiar shared-config para que los servicios puedan requerir '../../../shared-config'
