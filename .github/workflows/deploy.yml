@@ -85,7 +85,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Get EC2 IPs (Dynamic Discovery with Exact Tag Match)
@@ -354,12 +354,12 @@ jobs:
           case "$INSTANCE" in
             EC2_BASTION)
               echo "   Building Bastion Host Docker image..."
-              cd ~/app-build/bastion-host
+               # cd ~/app-build/bastion-host
               docker build --no-cache -t bastion-host:latest .
               ;;
             EC2_CORE)
               echo "   Building Core microservices (auth, estudiantes, maestros, core)..."
-              cd ~/app-build
+               # cd ~/app-build
               for SERVICE in micro-auth micro-estudiantes micro-maestros micro-core; do
                 if [ -f "./$SERVICE/Dockerfile" ]; then
                   echo "   → Building $SERVICE..."
@@ -369,14 +369,14 @@ jobs:
               ;;
             EC2_API_GATEWAY)
               echo "   Building API Gateway Docker image..."
-              cd ~/app-build
+               # cd ~/app-build
               if [ -f "./api-gateway/Dockerfile" ]; then
                 docker build --no-cache -t api-gateway:latest -f ./api-gateway/Dockerfile .
               fi
               ;;
             EC2_REPORTES)
               echo "   Building Reportes microservices..."
-              cd ~/app-build
+               # cd ~/app-build
               for SERVICE in micro-reportes-estudiantes micro-reportes-maestros; do
                 if [ -f "./$SERVICE/Dockerfile" ]; then
                   echo "   → Building $SERVICE..."
@@ -386,14 +386,14 @@ jobs:
               ;;
             EC2_NOTIFICACIONES)
               echo "   Building Notificaciones microservice..."
-              cd ~/app-build
+               # cd ~/app-build
               if [ -f "./micro-notificaciones/Dockerfile" ]; then
                 docker build --no-cache -t micro-notificaciones:latest -f ./micro-notificaciones/Dockerfile .
               fi
               ;;
             EC2_MESSAGING)
               echo "   Building infrastructure images for messaging..."
-              cd ~/app-build
+               # cd ~/app-build
               if [ -f "./messaging/zookeeper/Dockerfile" ]; then
                 echo "   → Building zookeeper..."
                 docker build --no-cache -t proyecto-zookeeper:1.0 -f ./messaging/zookeeper/Dockerfile ./messaging
@@ -413,14 +413,13 @@ jobs:
               ;;
             EC2_ANALYTICS)
               echo "   Building Analytics microservice..."
-              cd ~/app-build
-              if [ -f "./micro-analytics/Dockerfile" ]; then
-                docker build --no-cache -t micro-analytics:latest -f ./micro-analytics/Dockerfile .
+              if [ -f "~/app-build/micro-analytics/Dockerfile" ]; then
+                docker build --no-cache -t micro-analytics:latest -f ~/app-build/micro-analytics/Dockerfile ~/app-build
               fi
               ;;
             EC2_MONITORING)
               echo "   Building infrastructure images for monitoring..."
-              cd ~/app-build
+               # cd ~/app-build
               if [ -f "./monitoring/prometheus/Dockerfile" ]; then
                 echo "   → Building prometheus..."
                 docker build --no-cache -t proyecto-prometheus:1.0 -f ./monitoring/prometheus/Dockerfile ./monitoring
@@ -432,14 +431,14 @@ jobs:
               ;;
             EC2_FRONTEND)
               echo "   Building Frontend Docker image..."
-              cd ~/app-build
+               # cd ~/app-build
               if [ -f "./frontend-web/Dockerfile" ]; then
                 docker build --no-cache -t frontend-web:latest -f ./frontend-web/Dockerfile ./frontend-web
               fi
               ;;
             ALL_INSTANCES)
               echo "   Building ALL microservices and infrastructure..."
-              cd ~/app-build
+               # cd ~/app-build
               echo "   → Building Bastion..."
               cd bastion-host && docker build --no-cache -t bastion-host:latest . && cd ..
               echo "   → Building Core services..."
