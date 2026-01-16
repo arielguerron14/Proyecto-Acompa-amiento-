@@ -137,12 +137,12 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_REF: ${{ github.ref }}
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash << 'DEPLOYSCRIPT'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash << DEPLOYSCRIPT
           set -e
           
-          INSTANCE="${INSTANCE}"
-          GITHUB_REPO="${GITHUB_REPO}"
-          GITHUB_REF="${GITHUB_REF}"
+          INSTANCE="$INSTANCE"
+          GITHUB_REPO="$GITHUB_REPO"
+          GITHUB_REF="$GITHUB_REF"
           
           echo "================================================"
           echo "🚀 Desplegando: $INSTANCE"
@@ -281,7 +281,7 @@ jobs:
           PUBLIC_IP: ${{ steps.get-ip.outputs.public_ip }}
         run: |
           echo "✅ Verificando despliegue de ${{ matrix.instance }}..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP << 'VERIFYSCRIPT'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash << VERIFYSCRIPT
           cd ~/app
           echo "📋 Estado de servicios:"
           docker-compose ps
