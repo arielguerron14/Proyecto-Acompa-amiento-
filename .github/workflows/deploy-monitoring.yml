@@ -2,16 +2,59 @@ name: Deploy EC2-Monitoring
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/deploy-monitoring.yml'
+
+env:
+  INSTANCE_IP: 98.88.93.98
+  SSH_USER: ubuntu
+  SSH_KEY: labsuser.pem
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to EC2-Monitoring
+        run: |
+          ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
+          set -e
+          echo "🚀 Deploying to EC2-Monitoring..."
+          
+          # Pull images
+          docker pull proyecto-prometheus:1.0
+          docker pull proyecto-grafana:1.0
+          
+          # Stop and remove old containers
+          for container in prometheus grafana; do
+            docker stop $container 2>/dev/null || true
+            docker rm $container 2>/dev/null || true
+          done
+          
+          # Create volumes if not exist
+          docker volume create prometheus_data 2>/dev/null || true
+          docker volume create grafana_data 2>/dev/null || true
+          
+          # Run new containers
+          docker run -d --name prometheus -p 9090:9090 -v prometheus_data:/prometheus proyecto-prometheus:1.0
+          docker run -d --name grafana -p 3000:3000 -v grafana_data:/var/lib/grafana proyecto-grafana:1.0
+          
+          # Verify
+          echo "✅ Verifying deployment..."
+          docker ps | grep -E "prometheus|grafana"
+          DEPLOY
   push:
     branches:
       - main

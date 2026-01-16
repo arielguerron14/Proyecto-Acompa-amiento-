@@ -2,16 +2,51 @@ name: Deploy EC2-API-Gateway
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/deploy-api-gateway.yml'
+
+env:
+  INSTANCE_IP: 52.7.168.4
+  SSH_USER: ubuntu
+  SSH_KEY: labsuser.pem
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to EC2-API-Gateway
+        run: |
+          ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
+          set -e
+          echo "🚀 Deploying to EC2-API-Gateway..."
+          
+          # Pull image
+          docker pull api-gateway:latest
+          
+          # Stop and remove old container
+          docker stop api-gateway 2>/dev/null || true
+          docker rm api-gateway 2>/dev/null || true
+          
+          # Run new container
+          docker run -d --name api-gateway -p 8080:8080 api-gateway:latest
+          
+          # Verify
+          echo "✅ Verifying deployment..."
+          docker ps | grep api-gateway
+          DEPLOY
   push:
     branches:
       - main

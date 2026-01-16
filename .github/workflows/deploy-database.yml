@@ -2,16 +2,62 @@ name: Deploy EC2-DB
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/deploy-database.yml'
+
+env:
+  INSTANCE_IP: 98.92.241.98
+  SSH_USER: ubuntu
+  SSH_KEY: labsuser.pem
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to EC2-DB
+        run: |
+          ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
+          set -e
+          echo "🚀 Deploying to EC2-DB..."
+          
+          # Pull images
+          docker pull mongo:latest
+          docker pull postgres:latest
+          docker pull redis:latest
+          
+          # Stop and remove old containers
+          for container in mongo postgres redis; do
+            docker stop $container 2>/dev/null || true
+            docker rm $container 2>/dev/null || true
+          done
+          
+          # Create volumes if not exist
+          docker volume create mongo_data 2>/dev/null || true
+          docker volume create postgres_data 2>/dev/null || true
+          docker volume create redis_data 2>/dev/null || true
+          
+          # Run new containers
+          docker run -d --name mongo -p 27017:27017 -v mongo_data:/data/db mongo:latest
+          docker run -d --name postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -v postgres_data:/var/lib/postgresql/data postgres:latest
+          docker run -d --name redis -p 6379:6379 -v redis_data:/data redis:latest
+          
+          # Verify
+          echo "✅ Verifying deployment..."
+          docker ps | grep -E "mongo|postgres|redis"
+          DEPLOY
   push:
     branches:
       - main

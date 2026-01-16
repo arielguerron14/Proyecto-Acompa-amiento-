@@ -2,74 +2,55 @@ name: Deploy EC2-Reportes
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
   push:
     branches:
       - main
     paths:
-      - 'deployment/scripts/deploy-reportes.sh'
       - '.github/workflows/deploy-reportes.yml'
 
 env:
-  REGISTRY: docker.io
-  AWS_REGION: us-east-1
+  INSTANCE_IP: 52.200.32.56
+  SSH_USER: ubuntu
+  SSH_KEY: labsuser.pem
 
 jobs:
-  deploy-reportes:
+  deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
     
     steps:
       - uses: actions/checkout@v3
       
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Get Reportes Instance ID
-        id: get-instance
+      - name: Setup SSH key
         run: |
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=EC2-Reportes" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[0].Instances[0].InstanceId' \
-            --output text)
-          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
       
-      - name: Deploy reportes services
+      - name: Deploy to EC2-Reportes
         run: |
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
-            --parameters "commands=[
-              'docker pull micro-reportes-estudiantes:latest',
-              'docker pull micro-reportes-maestros:latest',
-              'docker stop micro-reportes-estudiantes || true',
-              'docker stop micro-reportes-maestros || true',
-              'docker rm micro-reportes-estudiantes || true',
-              'docker rm micro-reportes-maestros || true',
-              'docker run -d --name micro-reportes-estudiantes -p 4001:3000 micro-reportes-estudiantes:latest',
-              'docker run -d --name micro-reportes-maestros -p 4002:3000 micro-reportes-maestros:latest'
-            ]"
-      
-      - name: Verify services
-        run: |
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
-            --parameters "commands=['docker ps | grep reportes']"
+          ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
+          set -e
+          echo "🚀 Deploying to EC2-Reportes..."
+          
+          # Pull images
+          docker pull micro-reportes-estudiantes:latest
+          docker pull micro-reportes-maestros:latest
+          
+          # Stop and remove old containers
+          docker stop micro-reportes-estudiantes 2>/dev/null || true
+          docker stop micro-reportes-maestros 2>/dev/null || true
+          docker rm micro-reportes-estudiantes 2>/dev/null || true
+          docker rm micro-reportes-maestros 2>/dev/null || true
+          
+          # Run new containers
+          docker run -d --name micro-reportes-estudiantes -p 4001:3000 micro-reportes-estudiantes:latest
+          docker run -d --name micro-reportes-maestros -p 4002:3000 micro-reportes-maestros:latest
+          
+          # Verify
+          echo "✅ Verifying deployment..."
+          docker ps | grep micro-reportes
+          DEPLOY
       
       - name: Slack notification on success
         if: success()

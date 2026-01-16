@@ -2,16 +2,57 @@ name: Deploy EC2-Messaging
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/deploy-messaging.yml'
+
+env:
+  INSTANCE_IP: 100.48.101.145
+  SSH_USER: ubuntu
+  SSH_KEY: labsuser.pem
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to EC2-Messaging
+        run: |
+          ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
+          set -e
+          echo "🚀 Deploying to EC2-Messaging..."
+          
+          # Pull images
+          docker pull proyecto-zookeeper:1.0
+          docker pull proyecto-kafka:1.0
+          docker pull proyecto-rabbitmq:1.0
+          
+          # Stop and remove old containers
+          for container in zookeeper kafka rabbitmq; do
+            docker stop $container 2>/dev/null || true
+            docker rm $container 2>/dev/null || true
+          done
+          
+          # Run new containers
+          docker run -d --name zookeeper -p 2181:2181 proyecto-zookeeper:1.0
+          docker run -d --name kafka -p 9092:9092 proyecto-kafka:1.0
+          docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 proyecto-rabbitmq:1.0
+          
+          # Verify
+          echo "✅ Verifying deployment..."
+          docker ps | grep -E "zookeeper|kafka|rabbitmq"
+          DEPLOY
   push:
     branches:
       - main

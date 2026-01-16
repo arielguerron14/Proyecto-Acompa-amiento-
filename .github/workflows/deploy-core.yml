@@ -2,16 +2,59 @@ name: Deploy EC2-CORE
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/deploy-core.yml'
+
+env:
+  INSTANCE_IP: 98.82.116.59
+  SSH_USER: ubuntu
+  SSH_KEY: labsuser.pem
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to EC2-CORE
+        run: |
+          ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
+          set -e
+          echo "🚀 Deploying to EC2-CORE..."
+          
+          # Pull images
+          docker pull micro-auth:latest
+          docker pull micro-estudiantes:latest
+          docker pull micro-maestros:latest
+          docker pull micro-core:latest
+          
+          # Stop and remove old containers
+          for container in micro-auth micro-estudiantes micro-maestros micro-core; do
+            docker stop $container 2>/dev/null || true
+            docker rm $container 2>/dev/null || true
+          done
+          
+          # Run new containers
+          docker run -d --name micro-auth -p 3000:3000 micro-auth:latest
+          docker run -d --name micro-estudiantes -p 3001:3000 micro-estudiantes:latest
+          docker run -d --name micro-maestros -p 3002:3000 micro-maestros:latest
+          docker run -d --name micro-core -p 3003:3000 micro-core:latest
+          
+          # Verify
+          echo "✅ Verifying deployment..."
+          docker ps | grep micro-
+          DEPLOY
   push:
     branches:
       - main

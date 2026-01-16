@@ -2,16 +2,51 @@ name: Deploy EC2-Bastion
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/deploy-bastion.yml'
+
+env:
+  INSTANCE_IP: 34.235.224.202
+  SSH_USER: ubuntu
+  SSH_KEY: labsuser.pem
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
+          chmod 600 ~/.ssh/labsuser.pem
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to EC2-Bastion
+        run: |
+          ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
+          set -e
+          echo "🚀 Deploying to EC2-Bastion..."
+          
+          # Pull image
+          docker pull bastion-host:latest
+          
+          # Stop and remove old container
+          docker stop bastion-host 2>/dev/null || true
+          docker rm bastion-host 2>/dev/null || true
+          
+          # Run new container
+          docker run -d --name bastion-host -p 8022:22 bastion-host:latest
+          
+          # Verify
+          echo "✅ Verifying deployment..."
+          docker ps | grep bastion-host
+          DEPLOY
   push:
     branches:
       - main
