@@ -1,12 +1,34 @@
 #!/bin/bash
-################################################################################
-#                  EC2-CORE MICROSERVICES DEPLOYMENT SCRIPT                    #
-#                                                                              #
-# Este script despliega todos los microservicios (Auth, Estudiantes, Maestros)#
-# en la instancia EC2-CORE                                                    #
-#                                                                              #
-# Uso: bash deploy-ec2-core.sh                                               #
-################################################################################
+# EC2-CORE DEPLOYMENT - Simple and Fast
+set -e
+
+echo "🚀 DESPLEGANDO EC2-CORE"
+echo "======================="
+
+cd /tmp
+rm -rf proyecto 2>/dev/null || true
+git clone --depth 1 https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git proyecto
+cd proyecto
+
+echo "🏗️ Compilando microservicios..."
+for SERVICE in micro-auth micro-estudiantes micro-maestros micro-core; do
+  [ -f "./$SERVICE/Dockerfile" ] && docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile . 2>&1 | tail -3
+done
+
+echo "📋 Iniciando servicios..."
+mkdir -p ~/app
+cp docker-compose.ec2-core.yml ~/app/docker-compose.yml
+cd ~/app
+
+docker-compose down 2>/dev/null || true
+sleep 2
+docker-compose up -d
+sleep 10
+
+echo "✅ EC2-CORE DESPLEGADO"
+echo ""
+docker-compose ps
+docker ps
 
 set -e
 
