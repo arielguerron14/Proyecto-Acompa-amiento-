@@ -7,7 +7,7 @@ on:
       - main
     paths:
       - 'monitoring/**'
-      - '.github/workflows/deploy-monitoring.yml'
+      - '.github/workflows/deploy-ec2-monitoring.yml'
 
 env:
   SSH_USER: ubuntu
@@ -29,7 +29,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
       
-      - name: Build and push prometheus
+      - name: Build and push proyecto-prometheus
         uses: docker/build-push-action@v4
         with:
           context: monitoring/prometheus
@@ -37,7 +37,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-prometheus:1.0
       
-      - name: Build and push grafana
+      - name: Build and push proyecto-grafana
         uses: docker/build-push-action@v4
         with:
           context: monitoring/grafana
@@ -53,38 +53,37 @@ jobs:
         run: |
           INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})
           echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
+          echo "✅ Instance IP: $INSTANCE_IP"
 
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
-          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
       - name: Deploy to EC2-Monitoring
         run: |
           ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
           set -e
           echo "🚀 Deploying to EC2-Monitoring..."
+          
+          # Deploy Prometheus
           docker pull ${{ secrets.DOCKER_USERNAME }}/proyecto-prometheus:1.0
+          docker stop prometheus 2>/dev/null || true
+          docker rm prometheus 2>/dev/null || true
+          docker run -d --name prometheus -p 9090:9090 ${{ secrets.DOCKER_USERNAME }}/proyecto-prometheus:1.0
+          
+          # Deploy Grafana
           docker pull ${{ secrets.DOCKER_USERNAME }}/proyecto-grafana:1.0
-          for container in prometheus grafana; do
-            docker stop $container 2>/dev/null || true
-            docker rm $container 2>/dev/null || true
-          done
-          docker volume create prometheus_data 2>/dev/null || true
-          docker volume create grafana_data 2>/dev/null || true
-          docker run -d --name prometheus -p 9090:9090 -v prometheus_data:/prometheus ${{ secrets.DOCKER_USERNAME }}/proyecto-prometheus:1.0
-          docker run -d --name grafana -p 3000:3000 -v grafana_data:/var/lib/grafana ${{ secrets.DOCKER_USERNAME }}/proyecto-grafana:1.0
+          docker stop grafana 2>/dev/null || true
+          docker rm grafana 2>/dev/null || true
+          docker run -d --name grafana -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/proyecto-grafana:1.0
+          
           echo "✅ Verifying deployment..."
           docker ps | grep -E "prometheus|grafana"
           DEPLOY
 
-      # Verificar logs y endpoints
       - name: Check logs
         run: |
           python3 check-container-logs.py
-
-      - name: Verify endpoints
-        run: |
-          python3 check-api-gateway-config.py

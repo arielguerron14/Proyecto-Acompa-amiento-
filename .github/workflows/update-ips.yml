@@ -1,0 +1,40 @@
+name: Update AWS Instance IPs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-ips:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS CLI
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Fetch instance IPs
+        run: |
+          echo "Fetching public and private IPs of EC2 instances..."
+          aws ec2 describe-instances \
+            --query 'Reservations[*].Instances[*].[InstanceId,PublicIpAddress,PrivateIpAddress]' \
+            --output json > instance_ips.json
+
+      - name: Update configuration files
+        run: |
+          echo "Updating configuration files with new IPs..."
+          python3 update_instance_ips.py instance_ips.json
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add config/instance_ips.json
+          git commit -m "Update instance IPs"
+          git push

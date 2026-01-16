@@ -7,7 +7,7 @@ on:
       - main
     paths:
       - 'messaging/**'
-      - '.github/workflows/deploy-messaging.yml'
+      - '.github/workflows/deploy-ec2-messaging.yml'
 
 env:
   SSH_USER: ubuntu
@@ -29,7 +29,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
       
-      - name: Build and push zookeeper
+      - name: Build and push proyecto-zookeeper
         uses: docker/build-push-action@v4
         with:
           context: messaging/zookeeper
@@ -37,7 +37,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-zookeeper:1.0
       
-      - name: Build and push kafka
+      - name: Build and push proyecto-kafka
         uses: docker/build-push-action@v4
         with:
           context: messaging/kafka
@@ -45,7 +45,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-kafka:1.0
       
-      - name: Build and push rabbitmq
+      - name: Build and push proyecto-rabbitmq
         uses: docker/build-push-action@v4
         with:
           context: messaging/rabbitmq
@@ -61,38 +61,43 @@ jobs:
         run: |
           INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})
           echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
+          echo "✅ Instance IP: $INSTANCE_IP"
 
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
-          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
       - name: Deploy to EC2-Messaging
         run: |
           ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
           set -e
           echo "🚀 Deploying to EC2-Messaging..."
+          
+          # Deploy Zookeeper
           docker pull ${{ secrets.DOCKER_USERNAME }}/proyecto-zookeeper:1.0
-          docker pull ${{ secrets.DOCKER_USERNAME }}/proyecto-kafka:1.0
-          docker pull ${{ secrets.DOCKER_USERNAME }}/proyecto-rabbitmq:1.0
-          for container in zookeeper kafka rabbitmq; do
-            docker stop $container 2>/dev/null || true
-            docker rm $container 2>/dev/null || true
-          done
+          docker stop zookeeper 2>/dev/null || true
+          docker rm zookeeper 2>/dev/null || true
           docker run -d --name zookeeper -p 2181:2181 ${{ secrets.DOCKER_USERNAME }}/proyecto-zookeeper:1.0
-          docker run -d --name kafka -p 9092:9092 ${{ secrets.DOCKER_USERNAME }}/proyecto-kafka:1.0
+          
+          # Deploy Kafka
+          docker pull ${{ secrets.DOCKER_USERNAME }}/proyecto-kafka:1.0
+          docker stop kafka 2>/dev/null || true
+          docker rm kafka 2>/dev/null || true
+          docker run -d --name kafka -p 9092:9092 --link zookeeper:zk ${{ secrets.DOCKER_USERNAME }}/proyecto-kafka:1.0
+          
+          # Deploy RabbitMQ
+          docker pull ${{ secrets.DOCKER_USERNAME }}/proyecto-rabbitmq:1.0
+          docker stop rabbitmq 2>/dev/null || true
+          docker rm rabbitmq 2>/dev/null || true
           docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 ${{ secrets.DOCKER_USERNAME }}/proyecto-rabbitmq:1.0
+          
           echo "✅ Verifying deployment..."
           docker ps | grep -E "zookeeper|kafka|rabbitmq"
           DEPLOY
 
-      # Verificar logs y endpoints
       - name: Check logs
         run: |
           python3 check-container-logs.py
-
-      - name: Verify endpoints
-        run: |
-          python3 check-api-gateway-config.py

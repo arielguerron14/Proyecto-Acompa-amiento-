@@ -8,14 +8,11 @@ on:
     paths:
       - 'micro-reportes-estudiantes/**'
       - 'micro-reportes-maestros/**'
-      - '.github/workflows/deploy-reportes.yml'
+      - '.github/workflows/deploy-ec2-reportes.yml'
 
 env:
   SSH_USER: ubuntu
   SERVICE_NAME: reportes
-  SSH_KEY: labsuser.pem
-  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-  DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
 
 jobs:
   build-and-deploy:
@@ -23,12 +20,6 @@ jobs:
     
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Check Dockerfiles
-        run: |
-          echo "Checking Dockerfiles..."
-          ls -la micro-reportes-estudiantes/Dockerfile
-          ls -la micro-reportes-maestros/Dockerfile
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -55,9 +46,6 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-reportes-maestros:latest
       
-      - name: Docker images built and pushed
-        run: echo "✅ Images pushed to Docker Hub as caguerronp/micro-reportes-*:latest"
-      
       - name: Update instance IPs
         run: |
           python3 update_instance_ips.py
@@ -66,13 +54,14 @@ jobs:
         run: |
           INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})
           echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
+          echo "✅ Instance IP: $INSTANCE_IP"
 
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
-          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
       - name: Deploy to EC2-Reportes
         run: |
@@ -80,33 +69,22 @@ jobs:
           set -e
           echo "🚀 Deploying to EC2-Reportes..."
           
-          # Pull images from Docker Hub
+          # Deploy micro-reportes-estudiantes
           docker pull ${{ secrets.DOCKER_USERNAME }}/micro-reportes-estudiantes:latest
-          docker pull ${{ secrets.DOCKER_USERNAME }}/micro-reportes-maestros:latest
-          
-          # Stop and remove old containers
           docker stop micro-reportes-estudiantes 2>/dev/null || true
-          docker stop micro-reportes-maestros 2>/dev/null || true
           docker rm micro-reportes-estudiantes 2>/dev/null || true
+          docker run -d --name micro-reportes-estudiantes -p 5003:5003 ${{ secrets.DOCKER_USERNAME }}/micro-reportes-estudiantes:latest
+          
+          # Deploy micro-reportes-maestros
+          docker pull ${{ secrets.DOCKER_USERNAME }}/micro-reportes-maestros:latest
+          docker stop micro-reportes-maestros 2>/dev/null || true
           docker rm micro-reportes-maestros 2>/dev/null || true
+          docker run -d --name micro-reportes-maestros -p 5004:5004 ${{ secrets.DOCKER_USERNAME }}/micro-reportes-maestros:latest
           
-          # Run new containers
-          docker run -d --name micro-reportes-estudiantes -p 4001:5003 ${{ secrets.DOCKER_USERNAME }}/micro-reportes-estudiantes:latest
-          docker run -d --name micro-reportes-maestros -p 4002:5003 ${{ secrets.DOCKER_USERNAME }}/micro-reportes-maestros:latest
-          
-          # Verify
           echo "✅ Verifying deployment..."
-          docker ps | grep micro-reportes
+          docker ps | grep -E "micro-reportes-estudiantes|micro-reportes-maestros"
           DEPLOY
-      
-      - name: ✅ Deployment complete
-        run: echo "EC2-Reportes updated with latest images"
-      
-      # Verificar logs y endpoints
+
       - name: Check logs
         run: |
           python3 check-container-logs.py
-
-      - name: Verify endpoints
-        run: |
-          python3 check-api-gateway-config.py

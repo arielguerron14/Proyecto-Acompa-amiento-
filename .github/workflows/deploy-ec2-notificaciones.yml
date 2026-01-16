@@ -7,7 +7,7 @@ on:
       - main
     paths:
       - 'micro-notificaciones/**'
-      - '.github/workflows/deploy-notificaciones.yml'
+      - '.github/workflows/deploy-ec2-notificaciones.yml'
 
 env:
   SSH_USER: ubuntu
@@ -45,13 +45,14 @@ jobs:
         run: |
           INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})
           echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
+          echo "✅ Instance IP: $INSTANCE_IP"
 
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
-          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
       - name: Deploy to EC2-Notificaciones
         run: |
@@ -61,16 +62,11 @@ jobs:
           docker pull ${{ secrets.DOCKER_USERNAME }}/micro-notificaciones:latest
           docker stop micro-notificaciones 2>/dev/null || true
           docker rm micro-notificaciones 2>/dev/null || true
-          docker run -d --name micro-notificaciones -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/micro-notificaciones:latest
+          docker run -d --name micro-notificaciones -p 5006:5006 ${{ secrets.DOCKER_USERNAME }}/micro-notificaciones:latest
           echo "✅ Verifying deployment..."
           docker ps | grep micro-notificaciones
           DEPLOY
 
-      # Verificar logs y endpoints
       - name: Check logs
         run: |
           python3 check-container-logs.py
-
-      - name: Verify endpoints
-        run: |
-          python3 check-api-gateway-config.py

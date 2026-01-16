@@ -1,4 +1,4 @@
-name: Deploy EC2-Notificaciones
+name: Deploy EC2-API-Gateway
 
 on:
   workflow_dispatch:
@@ -6,12 +6,13 @@ on:
     branches:
       - main
     paths:
-      - 'micro-notificaciones/**'
-      - '.github/workflows/deploy-notificaciones.yml'
+      - 'api-gateway/**'
+      - '.github/workflows/deploy-ec2-api-gateway.yml'
 
 env:
   SSH_USER: ubuntu
-  SERVICE_NAME: notificaciones
+  SERVICE_NAME: api-gateway
+  DOCKER_SERVICE: api-gateway:latest
 
 jobs:
   build-and-deploy:
@@ -29,13 +30,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
       
-      - name: Build and push micro-notificaciones
+      - name: Build and push api-gateway
         uses: docker/build-push-action@v4
         with:
-          context: micro-notificaciones
-          file: micro-notificaciones/Dockerfile
+          context: api-gateway
+          file: api-gateway/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/micro-notificaciones:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
       
       - name: Update instance IPs
         run: |
@@ -45,28 +46,28 @@ jobs:
         run: |
           INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})
           echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
+          echo "✅ Instance IP: $INSTANCE_IP"
 
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
           chmod 600 ~/.ssh/labsuser.pem
-          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
-      - name: Deploy to EC2-Notificaciones
+      - name: Deploy to EC2-API-Gateway
         run: |
           ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
           set -e
-          echo "🚀 Deploying to EC2-Notificaciones..."
-          docker pull ${{ secrets.DOCKER_USERNAME }}/micro-notificaciones:latest
-          docker stop micro-notificaciones 2>/dev/null || true
-          docker rm micro-notificaciones 2>/dev/null || true
-          docker run -d --name micro-notificaciones -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/micro-notificaciones:latest
+          echo "🚀 Deploying to EC2-API-Gateway..."
+          docker pull ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
+          docker stop api-gateway 2>/dev/null || true
+          docker rm api-gateway 2>/dev/null || true
+          docker run -d --name api-gateway -p 8080:8080 ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
           echo "✅ Verifying deployment..."
-          docker ps | grep micro-notificaciones
+          docker ps | grep api-gateway
           DEPLOY
 
-      # Verificar logs y endpoints
       - name: Check logs
         run: |
           python3 check-container-logs.py

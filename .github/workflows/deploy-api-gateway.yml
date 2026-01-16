@@ -10,8 +10,8 @@ on:
       - '.github/workflows/deploy-api-gateway.yml'
 
 env:
-  INSTANCE_IP: 52.7.168.4
   SSH_USER: ubuntu
+  SERVICE_NAME: api-gateway
 
 jobs:
   build-and-deploy:
@@ -37,6 +37,15 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
       
+      - name: Update instance IPs
+        run: |
+          python3 update_instance_ips.py
+
+      - name: Get Instance IP
+        run: |
+          INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})
+          echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
+
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
@@ -56,3 +65,12 @@ jobs:
           echo "✅ Verifying deployment..."
           docker ps | grep api-gateway
           DEPLOY
+
+      # Verificar logs y endpoints
+      - name: Check logs
+        run: |
+          python3 check-container-logs.py
+
+      - name: Verify endpoints
+        run: |
+          python3 check-api-gateway-config.py

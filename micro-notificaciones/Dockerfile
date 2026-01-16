@@ -14,7 +14,7 @@ RUN mkdir -p node_modules && \
     ln -sf /usr/src/shared-monitoring node_modules/shared-monitoring
 
 # Copy entrypoint script (from repo root)
-COPY docker-entrypoint.sh /usr/src/app/entrypoint.sh
+COPY ./docker-entrypoint.sh /usr/src/app/entrypoint.sh
 RUN chmod +x /usr/src/app/entrypoint.sh
 
 ENV NODE_ENV=production

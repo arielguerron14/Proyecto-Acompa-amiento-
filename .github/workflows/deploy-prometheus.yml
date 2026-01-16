@@ -25,6 +25,10 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
+      - name: Update instance IPs
+        run: |
+          python3 update_instance_ips.py
+
       - name: Build and push Prometheus
         uses: docker/build-push-action@v4
         with:
@@ -36,3 +40,12 @@ jobs:
       - name: Deploy Prometheus
         run: |
           echo "Deployment step for Prometheus can be added here."
+
+      # Verificar logs y endpoints
+      - name: Check logs
+        run: |
+          python3 check-container-logs.py
+
+      - name: Verify endpoints
+        run: |
+          python3 check-api-gateway-config.py
