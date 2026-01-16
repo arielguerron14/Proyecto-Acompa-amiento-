@@ -186,8 +186,8 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          # Use SSH key from repository secrets (base64 encoded)
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          # Use SSH key from repository secrets (plain text, not base64)
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ steps.get-ip.outputs.public_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
           echo "✅ SSH setup complete for IP: ${{ steps.get-ip.outputs.public_ip }}"
