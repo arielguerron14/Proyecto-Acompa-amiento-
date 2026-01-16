@@ -68,28 +68,35 @@ def update_ssh_config(instances):
         return
     
     with open(ssh_config_path, 'r') as f:
-        content = f.read()
+        lines = f.readlines()
     
     # Actualizar cada host con su nueva IP pública
     for key, instance_info in instances.items():
         if instance_info['PublicIpAddress'] != 'N/A':
-            # Patrón para encontrar el Host y su HostName
-            # Busca: "Host <nombre>" y luego "HostName <ip>"
-            host_names = INSTANCE_MAPPING[key]['ssh_host'].split()
+            host_name = INSTANCE_MAPPING[key]['ssh_host']
+            new_ip = instance_info['PublicIpAddress']
             
-            for host_name in host_names:
-                # Patrón: Host <nombre> seguido de HostName
-                pattern = rf"(Host\s+{re.escape(host_name)}[^\n]*\n(?:\s{4}\S+[^\n]*\n)*?\s{{4}}HostName\s+)\S+"
-                replacement = rf"\1{instance_info['PublicIpAddress']}"
+            # Buscar la sección del host y actualizar HostName
+            i = 0
+            while i < len(lines):
+                line = lines[i].strip()
                 
-                new_content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
-                
-                if new_content != content:
-                    print(f"✅ Updated SSH config for host '{host_name}': {instance_info['PublicIpAddress']}")
-                    content = new_content
+                # Buscar línea "Host <nombre>"
+                if line.startswith(f"Host {host_name}"):
+                    # Buscar la siguiente línea "HostName"
+                    j = i + 1
+                    while j < len(lines) and (lines[j].startswith(' ') or lines[j].startswith('\t')):
+                        if lines[j].strip().startswith('HostName'):
+                            # Reemplazar la IP
+                            indent = len(lines[j]) - len(lines[j].lstrip())
+                            lines[j] = ' ' * indent + f'HostName {new_ip}\n'
+                            print(f"✅ Updated SSH config for host '{host_name}': {new_ip}")
+                            break
+                        j += 1
+                i += 1
     
     with open(ssh_config_path, 'w') as f:
-        f.write(content)
+        f.writelines(lines)
 
 def update_env_aws(instances):
     """Actualiza .env.aws con las IPs privadas, especialmente la de BD"""
