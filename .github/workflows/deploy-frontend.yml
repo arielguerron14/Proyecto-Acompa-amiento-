@@ -32,7 +32,7 @@ jobs:
       - name: Build and push frontend-web
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: frontend-web
           file: frontend-web/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/frontend-web:latest

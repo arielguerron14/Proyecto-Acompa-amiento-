@@ -32,7 +32,7 @@ jobs:
       - name: Build and push api-gateway
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: api-gateway
           file: api-gateway/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest

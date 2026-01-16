@@ -32,7 +32,7 @@ jobs:
       - name: Build and push zookeeper
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: messaging/zookeeper
           file: messaging/zookeeper/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-zookeeper:1.0
@@ -40,7 +40,7 @@ jobs:
       - name: Build and push kafka
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: messaging/kafka
           file: messaging/kafka/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-kafka:1.0
@@ -48,7 +48,7 @@ jobs:
       - name: Build and push rabbitmq
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: messaging/rabbitmq
           file: messaging/rabbitmq/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-rabbitmq:1.0
