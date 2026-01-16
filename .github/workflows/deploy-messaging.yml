@@ -1,0 +1,91 @@
+name: Deploy EC2-Messaging
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - 'deployment/scripts/deploy-messaging.sh'
+      - '.github/workflows/deploy-messaging.yml'
+
+env:
+  REGISTRY: docker.io
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-messaging:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get Messaging Instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Messaging" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+      
+      - name: Deploy messaging stack
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
+            --parameters "commands=[
+              'docker pull proyecto-zookeeper:1.0',
+              'docker pull proyecto-kafka:1.0',
+              'docker pull proyecto-rabbitmq:1.0',
+              'docker stop zookeeper kafka rabbitmq || true',
+              'docker rm zookeeper kafka rabbitmq || true',
+              'docker run -d --name zookeeper -p 2181:2181 proyecto-zookeeper:1.0',
+              'sleep 5',
+              'docker run -d --name kafka -p 9092:9092 -e ZOOKEEPER_HOST=zookeeper:2181 proyecto-kafka:1.0',
+              'docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 proyecto-rabbitmq:1.0'
+            ]"
+      
+      - name: Verify messaging services
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
+            --parameters "commands=['docker ps | grep -E \"zookeeper|kafka|rabbitmq\"']"
+      
+      - name: Slack notification on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "✅ EC2-Messaging deployment successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ *EC2-Messaging Deployment Successful*\n*Services:*\n• proyecto-zookeeper:1.0\n• proyecto-kafka:1.0\n• proyecto-rabbitmq:1.0"
+                  }
+                }
+              ]
+            }

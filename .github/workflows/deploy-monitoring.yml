@@ -1,0 +1,88 @@
+name: Deploy EC2-Monitoring
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - 'deployment/scripts/deploy-monitoring.sh'
+      - '.github/workflows/deploy-monitoring.yml'
+
+env:
+  REGISTRY: docker.io
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-monitoring:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get Monitoring Instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Monitoring" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+      
+      - name: Deploy monitoring stack
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
+            --parameters "commands=[
+              'docker pull proyecto-prometheus:1.0',
+              'docker pull proyecto-grafana:1.0',
+              'docker stop prometheus grafana || true',
+              'docker rm prometheus grafana || true',
+              'docker run -d --name prometheus -p 9090:9090 -v prometheus_data:/prometheus proyecto-prometheus:1.0',
+              'docker run -d --name grafana -p 3000:3000 -v grafana_data:/var/lib/grafana proyecto-grafana:1.0'
+            ]"
+      
+      - name: Verify monitoring services
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
+            --parameters "commands=['docker ps | grep -E \"prometheus|grafana\"']"
+      
+      - name: Slack notification on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "✅ EC2-Monitoring deployment successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ *EC2-Monitoring Deployment Successful*\n*Services:*\n• proyecto-prometheus:1.0\n• proyecto-grafana:1.0"
+                  }
+                }
+              ]
+            }

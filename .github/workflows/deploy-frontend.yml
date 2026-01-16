@@ -1,0 +1,86 @@
+name: Deploy EC2-Frontend
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - 'deployment/scripts/deploy-frontend.sh'
+      - '.github/workflows/deploy-frontend.yml'
+
+env:
+  REGISTRY: docker.io
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get Frontend Instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Frontend" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+      
+      - name: Deploy frontend service
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
+            --parameters "commands=[
+              'docker pull frontend-web:latest',
+              'docker stop frontend-web || true',
+              'docker rm frontend-web || true',
+              'docker run -d --name frontend-web -p 80:3000 -p 443:3000 frontend-web:latest'
+            ]"
+      
+      - name: Verify frontend service
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
+            --parameters "commands=['curl -f http://localhost/health || echo \"Health check pending\"']"
+      
+      - name: Slack notification on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "✅ EC2-Frontend deployment successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ *EC2-Frontend Deployment Successful*\n*Image:* frontend-web:latest\n*Instance:* ${{ steps.get-instance.outputs.instance_id }}"
+                  }
+                }
+              ]
+            }

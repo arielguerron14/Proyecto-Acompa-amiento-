@@ -1,0 +1,105 @@
+name: Deploy EC2-Bastion
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - 'deployment/scripts/deploy-bastion.sh'
+      - '.github/workflows/deploy-bastion.yml'
+
+env:
+  REGISTRY: docker.io
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-bastion:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get Bastion Instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Bastion" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+      
+      - name: Deploy bastion-host image
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
+            --parameters "commands=[
+              'docker pull bastion-host:latest',
+              'docker stop bastion-host || true',
+              'docker rm bastion-host || true',
+              'docker run -d --name bastion-host -p 22:22 bastion-host:latest'
+            ]"
+      
+      - name: Verify deployment
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
+            --parameters "commands=['docker ps | grep bastion-host']"
+      
+      - name: Slack notification on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "✅ EC2-Bastion deployment successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ *EC2-Bastion Deployment Successful*\n*Image:* bastion-host:latest\n*Instance:* ${{ steps.get-instance.outputs.instance_id }}"
+                  }
+                }
+              ]
+            }
+      
+      - name: Slack notification on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "❌ EC2-Bastion deployment failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "❌ *EC2-Bastion Deployment Failed*\n*Image:* bastion-host:latest"
+                  }
+                }
+              ]
+            }
