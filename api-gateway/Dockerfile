@@ -15,7 +15,6 @@ COPY shared-monitoring/ /usr/src/shared-monitoring/
 COPY api-gateway/ /usr/src/app/
 
 # Copy infrastructure config
-COPY infrastructure.config.js /usr/src/
 
 # Install production dependencies for shared modules first
 WORKDIR /usr/src/shared-auth

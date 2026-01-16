@@ -13,7 +13,6 @@ RUN echo "[debug] listing /usr/src" && ls -la /usr/src || true
 RUN echo "[debug] listing /usr/src/shared-auth" && ls -la /usr/src/shared-auth || true
 
 # Copiar configuración centralizada
-COPY infrastructure.config.js /usr/src/
 COPY scripts/ /usr/src/scripts/
 
 # install dependencies for shared-auth first

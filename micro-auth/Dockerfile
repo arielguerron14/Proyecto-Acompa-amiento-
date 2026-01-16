@@ -7,7 +7,6 @@ COPY shared-monitoring/ /usr/src/shared-monitoring/
 COPY micro-auth/ /usr/src/app/
 
 # Copiar configuración centralizada
-COPY infrastructure.config.js /usr/src/
 COPY scripts/ /usr/src/scripts/
 RUN chmod +x /entrypoint.sh
 
