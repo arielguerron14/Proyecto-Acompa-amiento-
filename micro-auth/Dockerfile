@@ -9,8 +9,6 @@ COPY scripts/ /usr/src/scripts/
 # Copiar shared-config para que los servicios puedan requerir '../../../shared-config'
 
 # install dependencies for shared modules first
-WORKDIR /usr/src/shared-auth
-RUN npm ci --only=production --silent || npm install --production --silent
 
 WORKDIR /usr/src/app
 RUN npm ci --only=production --silent || npm install --production --silent
