@@ -36,6 +36,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Docker Hub Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and Push micro-auth
+        run: |
+          docker build -t caguerronp/micro-auth:latest ./micro-auth
+          docker push caguerronp/micro-auth:latest
+
+      - name: Build and Push micro-estudiantes
+        run: |
+          docker build -t caguerronp/micro-estudiantes:latest ./micro-estudiantes
+          docker push caguerronp/micro-estudiantes:latest
+
+      - name: Build and Push micro-maestros
+        run: |
+          docker build -t caguerronp/micro-maestros:latest ./micro-maestros
+          docker push caguerronp/micro-maestros:latest
+
+      - name: Build and Push micro-core
+        run: |
+          docker build -t caguerronp/micro-core:latest ./micro-core
+          docker push caguerronp/micro-core:latest
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

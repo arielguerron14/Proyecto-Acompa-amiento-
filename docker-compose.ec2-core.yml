@@ -16,7 +16,7 @@ services:
 
   # Core Microservices ONLY
   micro-auth:
-    image: micro-auth:latest
+    image: caguerronp/micro-auth:latest
     container_name: micro-auth
     restart: unless-stopped
     expose:
@@ -33,7 +33,7 @@ services:
       MONGODB_URI: mongodb://root:example@mongo:27017/auth?authSource=admin
 
   micro-estudiantes:
-    image: micro-estudiantes:latest
+    image: caguerronp/micro-estudiantes:latest
     container_name: micro-estudiantes
     restart: unless-stopped
     expose:
@@ -50,7 +50,7 @@ services:
       MONGODB_URI: mongodb://root:example@mongo:27017/estudiantes?authSource=admin
 
   micro-maestros:
-    image: micro-maestros:latest
+    image: caguerronp/micro-maestros:latest
     container_name: micro-maestros
     restart: unless-stopped
     expose:
@@ -68,7 +68,7 @@ services:
 
   # Core Service (aggregator/orchestrator) - if exists
   micro-core:
-    image: micro-core:latest
+    image: caguerronp/micro-core:latest
     container_name: micro-core
     restart: unless-stopped
     expose:
