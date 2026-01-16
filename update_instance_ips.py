@@ -18,7 +18,9 @@ INSTANCE_MAPPING = {
 
 def get_instance_details():
     """Obtiene detalles de instancias EC2 con sus IPs públicas y privadas"""
-    ec2 = boto3.client('ec2')
+    # Usar región de entorno o defaultear a us-east-1
+    region = os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION') or 'us-east-1'
+    ec2 = boto3.client('ec2', region_name=region)
     response = ec2.describe_instances()
     
     instances = {}
