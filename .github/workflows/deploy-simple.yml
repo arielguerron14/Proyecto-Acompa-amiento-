@@ -136,8 +136,9 @@ jobs:
           INSTANCE: ${{ matrix.instance }}
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_REF: ${{ github.ref }}
+        timeout-minutes: 45
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash -s "$INSTANCE" "$GITHUB_REPO" "$GITHUB_REF" << DEPLOYSCRIPT
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=60 ubuntu@$PUBLIC_IP bash -s "$INSTANCE" "$GITHUB_REPO" "$GITHUB_REF" << DEPLOYSCRIPT
           INSTANCE="$1"
           GITHUB_REPO="$2"
           GITHUB_REF="$3"
@@ -151,6 +152,11 @@ jobs:
           echo "📥 Clonando repositorio..."
           cd ~
           rm -rf app-build 2>/dev/null || true
+          # Verificar si git está disponible
+          if ! command -v git &> /dev/null; then
+            echo "⚠️  Git no encontrado, instalando..."
+            sudo apt-get update -qq && sudo apt-get install -y -qq git > /dev/null 2>&1 || true
+          fi
           git clone --depth 1 https://github.com/${GITHUB_REPO}.git app-build
           cd app-build
           git checkout ${GITHUB_REF#refs/heads/}
