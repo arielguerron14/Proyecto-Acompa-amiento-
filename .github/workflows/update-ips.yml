@@ -43,4 +43,5 @@ jobs:
           echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
           git add config/instance_ips.json
           git commit -m "Update instance IPs" || echo "No changes to commit"
-          git push
+          git pull --rebase origin main
+          git push origin main
