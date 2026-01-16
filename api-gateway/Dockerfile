@@ -8,8 +8,6 @@ RUN apt-get update \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Copy shared modules
-COPY shared-auth/ /usr/src/shared-auth/
-COPY shared-monitoring/ /usr/src/shared-monitoring/
 
 # Copy api-gateway code
 COPY api-gateway/ /usr/src/app/

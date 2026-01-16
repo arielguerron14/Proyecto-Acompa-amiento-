@@ -4,7 +4,6 @@ WORKDIR /
 
 # Copy shared modules into the absolute path expected by the code (/usr/shared-auth)
 # Some source files require('/usr/shared-auth/...') so we place shared-auth there.
-COPY shared-auth/ /usr/shared-auth/
 WORKDIR /usr/shared-auth
 RUN npm ci --only=production --silent || npm install --production --silent
 

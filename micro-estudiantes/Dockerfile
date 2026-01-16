@@ -3,9 +3,7 @@ FROM node:18-alpine
 WORKDIR /usr/src
 
 # Copy shared modules first
-COPY shared-auth/ ./shared-auth/
 COPY shared-config/ ./shared-config/
-COPY shared-monitoring/ ./shared-monitoring/
 
 # Copy the microservice
 COPY micro-estudiantes/ ./app/

@@ -2,7 +2,6 @@ FROM node:18-alpine
 WORKDIR /usr/src
 
 # copy shared modules
-COPY shared-auth/ /usr/src/shared-auth/
 # copy app files except entrypoint
 COPY micro-reportes-estudiantes/ /usr/src/app/
 # overwrite entrypoint last (from repo root)
