@@ -43,7 +43,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./micro-reportes-estudiantes/Dockerfile
+          file: micro-reportes-estudiantes/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-reportes-estudiantes:latest
       
@@ -51,7 +51,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./micro-reportes-maestros/Dockerfile
+          file: micro-reportes-maestros/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-reportes-maestros:latest
       

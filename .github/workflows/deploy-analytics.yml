@@ -34,7 +34,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./micro-analytics/Dockerfile
+          file: micro-analytics/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-analytics:latest
       

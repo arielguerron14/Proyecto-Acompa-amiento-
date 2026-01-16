@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./monitoring/prometheus/Dockerfile
+          file: monitoring/prometheus/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-prometheus:1.0
       
@@ -41,7 +41,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./monitoring/grafana/Dockerfile
+          file: monitoring/grafana/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-grafana:1.0
       

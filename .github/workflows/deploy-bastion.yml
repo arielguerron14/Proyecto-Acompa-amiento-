@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./bastion-host/Dockerfile
+          file: bastion-host/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/bastion-host:latest
       

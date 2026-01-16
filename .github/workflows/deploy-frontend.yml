@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./frontend-web/Dockerfile
+          file: frontend-web/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/frontend-web:latest
       

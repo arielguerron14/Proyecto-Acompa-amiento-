@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./micro-notificaciones/Dockerfile
+          file: micro-notificaciones/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-notificaciones:latest
       

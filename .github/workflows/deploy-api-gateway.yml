@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./api-gateway/Dockerfile
+          file: api-gateway/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
       
