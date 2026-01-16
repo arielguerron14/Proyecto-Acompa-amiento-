@@ -48,11 +48,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-      
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -97,9 +92,6 @@ jobs:
             EC2_ANALYTICS)
               TAG_NAME="EC2-Analytics"
               ;;
-            ALL_INSTANCES)
-              TAG_NAME="*"
-              ;;
             *)
               echo "Unknown instance: $INSTANCE"
               exit 1
@@ -127,9 +119,9 @@ jobs:
           echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
           echo "instance_name=$INSTANCE_NAME" >> $GITHUB_OUTPUT
           
-          echo "Found: $INSTANCE_NAME"
-          echo "Public IP: $PUBLIC_IP"
-          echo "Private IP: $PRIVATE_IP"
+          echo "✅ Encontrada: $INSTANCE_NAME"
+          echo "   IP Pública: $PUBLIC_IP"
+          echo "   IP Privada: $PRIVATE_IP"
       
       - name: Setup SSH
         run: |
@@ -138,40 +130,39 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ steps.get-ip.outputs.public_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
-      - name: Transfer and Deploy
+      - name: Deploy to EC2 Instance
         env:
           PUBLIC_IP: ${{ steps.get-ip.outputs.public_ip }}
-          PRIVATE_IP: ${{ steps.get-ip.outputs.private_ip }}
-          INSTANCE: ${{ github.event.inputs.instance }}
+          INSTANCE: ${{ matrix.instance }}
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_REF: ${{ github.ref }}
         run: |
-          # Create deployment script
-          cat > /tmp/deploy.sh << 'EOF'
-          #!/bin/bash
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash << 'DEPLOYSCRIPT'
           set -e
           
-          INSTANCE="$1"
-          PRIVATE_IP="$2"
-          GITHUB_REPO="$3"
-          GITHUB_REF="$4"
+          INSTANCE="${INSTANCE}"
+          GITHUB_REPO="${GITHUB_REPO}"
+          GITHUB_REF="${GITHUB_REF}"
           
           echo "================================================"
           echo "🚀 Desplegando: $INSTANCE"
           echo "================================================"
           
-          # Clone repository
+          # 1. Clone repository
+          echo "📥 Clonando repositorio..."
           cd ~
           rm -rf app-build 2>/dev/null || true
           git clone --depth 1 https://github.com/${GITHUB_REPO}.git app-build
           cd app-build
           git checkout ${GITHUB_REF#refs/heads/}
+          echo "✅ Repositorio clonado"
           
-          # Clean Docker
+          # 2. Clean Docker
+          echo "🧹 Limpiando Docker..."
           docker system prune -af --volumes 2>/dev/null || true
           mkdir -p ~/docker-images ~/app
           
-          # Determine docker-compose file
+          # 3. Determine docker-compose file
           COMPOSE_FILE=""
           case "$INSTANCE" in
             EC2_BASTION)
@@ -206,53 +197,82 @@ jobs:
               ;;
           esac
           
-          # Build and start services
-          echo "Building Docker images..."
+          # 4. Build Docker images
+          echo "🏗️  Compilando imágenes Docker..."
           case "$INSTANCE" in
             EC2_BASTION)
+              echo "   → Compilando bastion-host..."
               cd bastion-host && docker build -t bastion-host:latest . && cd ..
               ;;
             EC2_CORE)
               for SERVICE in micro-auth micro-estudiantes micro-maestros micro-core; do
-                [ -f "./$SERVICE/Dockerfile" ] && docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+                if [ -f "./$SERVICE/Dockerfile" ]; then
+                  echo "   → Compilando $SERVICE..."
+                  docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+                fi
               done
               ;;
             EC2_API_GATEWAY)
-              [ -f "./api-gateway/Dockerfile" ] && docker build -t api-gateway:latest -f ./api-gateway/Dockerfile .
+              if [ -f "./api-gateway/Dockerfile" ]; then
+                echo "   → Compilando api-gateway..."
+                docker build -t api-gateway:latest -f ./api-gateway/Dockerfile .
+              fi
               ;;
             EC2_REPORTES)
               for SERVICE in micro-reportes-estudiantes micro-reportes-maestros; do
-                [ -f "./$SERVICE/Dockerfile" ] && docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+                if [ -f "./$SERVICE/Dockerfile" ]; then
+                  echo "   → Compilando $SERVICE..."
+                  docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+                fi
               done
               ;;
             EC2_NOTIFICACIONES)
-              [ -f "./micro-notificaciones/Dockerfile" ] && docker build -t micro-notificaciones:latest -f ./micro-notificaciones/Dockerfile .
+              if [ -f "./micro-notificaciones/Dockerfile" ]; then
+                echo "   → Compilando micro-notificaciones..."
+                docker build -t micro-notificaciones:latest -f ./micro-notificaciones/Dockerfile .
+              fi
               ;;
             EC2_ANALYTICS)
-              [ -f "./micro-analytics/Dockerfile" ] && docker build -t micro-analytics:latest -f ./micro-analytics/Dockerfile .
+              if [ -f "./micro-analytics/Dockerfile" ]; then
+                echo "   → Compilando micro-analytics..."
+                docker build -t micro-analytics:latest -f ./micro-analytics/Dockerfile .
+              fi
               ;;
             EC2_FRONTEND)
-              [ -f "./frontend-web/Dockerfile" ] && docker build -t frontend-web:latest -f ./frontend-web/Dockerfile ./frontend-web
+              if [ -f "./frontend-web/Dockerfile" ]; then
+                echo "   → Compilando frontend-web..."
+                docker build -t frontend-web:latest -f ./frontend-web/Dockerfile ./frontend-web
+              fi
+              ;;
+            EC2_MESSAGING|EC2_MONITORING|EC2_DB)
+              echo "   ℹ️  Usando imágenes pre-construidas de Docker Hub"
               ;;
           esac
+          echo "✅ Imágenes compiladas"
           
-          # Copy docker-compose and start services
+          # 5. Start services with docker-compose
           if [ -f "$COMPOSE_FILE" ]; then
+            echo ""
+            echo "🚀 Iniciando servicios..."
             cp "$COMPOSE_FILE" ~/app/docker-compose.yml
             cd ~/app
             docker-compose down 2>/dev/null || true
             sleep 2
             docker-compose up -d
-            sleep 10
+            sleep 15
+            echo ""
+            echo "📊 Estado de servicios:"
             docker-compose ps
-            echo "Deployment complete!"
+            echo ""
+            echo "================================================"
+            echo "✅ DESPLIEGUE COMPLETADO: $INSTANCE"
+            echo "================================================"
+          else
+            echo "❌ ERROR: No se encontró $COMPOSE_FILE"
+            exit 1
           fi
-          EOF
           
-          chmod +x /tmp/deploy.sh
-          
-          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 /tmp/deploy.sh ubuntu@$PUBLIC_IP:~/deploy.sh
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash ~/deploy.sh "$INSTANCE" "$PRIVATE_IP" "$GITHUB_REPO" "$GITHUB_REF"
+          DEPLOYSCRIPT
       
       - name: Verify Deployment
         if: always()
@@ -261,4 +281,11 @@ jobs:
           PUBLIC_IP: ${{ steps.get-ip.outputs.public_ip }}
         run: |
           echo "✅ Verificando despliegue de ${{ matrix.instance }}..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP 'cd ~/app && docker-compose ps && echo "" && docker-compose logs --tail=20' || true
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP << 'VERIFYSCRIPT'
+          cd ~/app
+          echo "📋 Estado de servicios:"
+          docker-compose ps
+          echo ""
+          echo "📝 Últimos logs (20 líneas):"
+          docker-compose logs --tail=20 2>&1 || true
+          VERIFYSCRIPT
