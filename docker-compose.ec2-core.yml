@@ -16,9 +16,6 @@ services:
 
   # Core Microservices ONLY
   micro-auth:
-    build:
-      context: ./micro-auth
-      dockerfile: Dockerfile
     image: micro-auth:latest
     container_name: micro-auth
     restart: unless-stopped
@@ -36,9 +33,6 @@ services:
       MONGODB_URI: mongodb://root:example@mongo:27017/auth?authSource=admin
 
   micro-estudiantes:
-    build:
-      context: ./micro-estudiantes
-      dockerfile: Dockerfile
     image: micro-estudiantes:latest
     container_name: micro-estudiantes
     restart: unless-stopped
@@ -56,9 +50,6 @@ services:
       MONGODB_URI: mongodb://root:example@mongo:27017/estudiantes?authSource=admin
 
   micro-maestros:
-    build:
-      context: ./micro-maestros
-      dockerfile: Dockerfile
     image: micro-maestros:latest
     container_name: micro-maestros
     restart: unless-stopped
@@ -77,9 +68,6 @@ services:
 
   # Core Service (aggregator/orchestrator) - if exists
   micro-core:
-    build:
-      context: ./micro-core
-      dockerfile: Dockerfile
     image: micro-core:latest
     container_name: micro-core
     restart: unless-stopped
