@@ -6,19 +6,44 @@ on:
     branches:
       - main
     paths:
+      - 'monitoring/**'
       - '.github/workflows/deploy-monitoring.yml'
 
 env:
   INSTANCE_IP: 98.88.93.98
   SSH_USER: ubuntu
-  SSH_KEY: labsuser.pem
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     
     steps:
       - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      
+      - name: Build and push prometheus
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          dockerfile: ./monitoring/prometheus/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-prometheus:1.0
+      
+      - name: Build and push grafana
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          dockerfile: ./monitoring/grafana/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-grafana:1.0
       
       - name: Setup SSH key
         run: |
@@ -32,26 +57,16 @@ jobs:
           ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
           set -e
           echo "🚀 Deploying to EC2-Monitoring..."
-          
-          # Pull images
-          docker pull proyecto-prometheus:1.0
-          docker pull proyecto-grafana:1.0
-          
-          # Stop and remove old containers
+          docker pull ${{ secrets.DOCKER_USERNAME }}/proyecto-prometheus:1.0
+          docker pull ${{ secrets.DOCKER_USERNAME }}/proyecto-grafana:1.0
           for container in prometheus grafana; do
             docker stop $container 2>/dev/null || true
             docker rm $container 2>/dev/null || true
           done
-          
-          # Create volumes if not exist
           docker volume create prometheus_data 2>/dev/null || true
           docker volume create grafana_data 2>/dev/null || true
-          
-          # Run new containers
-          docker run -d --name prometheus -p 9090:9090 -v prometheus_data:/prometheus proyecto-prometheus:1.0
-          docker run -d --name grafana -p 3000:3000 -v grafana_data:/var/lib/grafana proyecto-grafana:1.0
-          
-          # Verify
+          docker run -d --name prometheus -p 9090:9090 -v prometheus_data:/prometheus ${{ secrets.DOCKER_USERNAME }}/proyecto-prometheus:1.0
+          docker run -d --name grafana -p 3000:3000 -v grafana_data:/var/lib/grafana ${{ secrets.DOCKER_USERNAME }}/proyecto-grafana:1.0
           echo "✅ Verifying deployment..."
           docker ps | grep -E "prometheus|grafana"
           DEPLOY

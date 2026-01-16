@@ -6,19 +6,36 @@ on:
     branches:
       - main
     paths:
+      - 'frontend-web/**'
       - '.github/workflows/deploy-frontend.yml'
 
 env:
   INSTANCE_IP: 44.220.126.89
   SSH_USER: ubuntu
-  SSH_KEY: labsuser.pem
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     
     steps:
       - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      
+      - name: Build and push frontend-web
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          dockerfile: ./frontend-web/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/frontend-web:latest
       
       - name: Setup SSH key
         run: |
@@ -32,18 +49,10 @@ jobs:
           ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
           set -e
           echo "🚀 Deploying to EC2-Frontend..."
-          
-          # Pull image
-          docker pull frontend-web:latest
-          
-          # Stop and remove old container
+          docker pull ${{ secrets.DOCKER_USERNAME }}/frontend-web:latest
           docker stop frontend-web 2>/dev/null || true
           docker rm frontend-web 2>/dev/null || true
-          
-          # Run new container
-          docker run -d --name frontend-web -p 80:80 -p 443:443 frontend-web:latest
-          
-          # Verify
+          docker run -d --name frontend-web -p 80:80 -p 443:443 ${{ secrets.DOCKER_USERNAME }}/frontend-web:latest
           echo "✅ Verifying deployment..."
           docker ps | grep frontend-web
           DEPLOY
