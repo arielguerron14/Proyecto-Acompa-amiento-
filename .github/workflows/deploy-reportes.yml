@@ -24,6 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
+      - name: Check Dockerfiles
+        run: |
+          echo "Checking Dockerfiles..."
+          ls -la micro-reportes-estudiantes/Dockerfile
+          ls -la micro-reportes-maestros/Dockerfile
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       
@@ -48,6 +54,9 @@ jobs:
           dockerfile: ./micro-reportes-maestros/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-reportes-maestros:latest
+      
+      - name: Docker images built and pushed
+        run: echo "✅ Images pushed to Docker Hub as caguerronp/micro-reportes-*:latest"
       
       - name: Setup SSH key
         run: |
@@ -81,21 +90,5 @@ jobs:
           docker ps | grep micro-reportes
           DEPLOY
       
-      - name: Slack notification on success
-        if: success()
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
-          payload: |
-            {
-              "text": "✅ EC2-Reportes deployment successful",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "✅ *EC2-Reportes Deployment Successful*\n*Services:*\n• micro-reportes-estudiantes:latest\n• micro-reportes-maestros:latest"
-                  }
-                }
-              ]
-            }
+      - name: ✅ Deployment complete
+        run: echo "EC2-Reportes updated with latest images"
