@@ -56,15 +56,3 @@ jobs:
           echo "✅ Verifying deployment..."
           docker ps | grep micro-analytics
           DEPLOY
-              'docker pull micro-analytics:latest',
-              'docker stop micro-analytics || true',
-              'docker rm micro-analytics || true',
-              'docker run -d --name micro-analytics -p 6000:3000 micro-analytics:latest'
-            ]"
-      
-      - name: Verify service
-        run: |
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
-            --parameters "commands=['docker ps | grep analytics']"
