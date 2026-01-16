@@ -5,7 +5,6 @@ WORKDIR /usr/src
 
 # Copiar configuración centralizada
 COPY scripts/ /usr/src/scripts/
-RUN chmod +x /entrypoint.sh
 
 # Copiar shared-config para que los servicios puedan requerir '../../../shared-config'
 
