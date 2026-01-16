@@ -201,26 +201,6 @@ jobs:
           echo "🔧 Updating configuration files..."
           echo "   Using PUBLIC IP ($PUBLIC_IP) for SSH"
           echo "   Using PRIVATE IP ($PRIVATE_IP) for inter-service routing"
-          
-          # Update docker-compose.api-gateway.yml with Core private IP
-          if [ "$INSTANCE" = "EC2_API_GATEWAY" ] && [ -f "./docker-compose.api-gateway.yml" ]; then
-            echo "   Updating API Gateway config with CORE private IP..."
-            # This will be done via script on EC2
-          fi
-          
-          # For EC2_CORE: create a script that will update all .env files
-          if [ "$INSTANCE" = "EC2_CORE" ]; then
-            # Generate Python script to update .env files on EC2
-            cat > /tmp/update-core-env.py << 'EOFPY'
-import os
-import glob
-
-# .env files in microservices use localhost (internal Docker network)
-# No changes needed for internal communication within core-net
-print("✅ Core services use internal Docker network - no IP changes needed for internal services")
-EOFPY
-          fi
-
       
       - name: Transfer files to EC2
         run: |
@@ -234,24 +214,17 @@ EOFPY
           
           # Aggressively clean space on EC2
           echo "🧹 Cleaning EC2 instance..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP << CLEANUP
-set -e
-echo "=== Cleaning old docker resources ==="
-docker system prune -af --volumes 2>/dev/null || true
-
-echo "=== Cleaning old .tar files ==="
-rm -f /tmp/*.tar /tmp/*.tar.gz 2>/dev/null || true
-rm -f ~/docker-images/*.tar 2>/dev/null || true
-
-echo "=== Disk usage before cleanup ==="
-df -h / | tail -1
-
-echo "=== Creating app directory ==="
-mkdir -p ~/docker-images ~/app
-
-echo "=== Disk usage after cleanup ==="
-df -h / | tail -1
-CLEANUP
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP '
+          set -e
+          echo "=== Cleaning old docker resources ==="
+          docker system prune -af --volumes 2>/dev/null || true
+          echo "=== Cleaning old .tar files ==="
+          rm -f /tmp/*.tar /tmp/*.tar.gz 2>/dev/null || true
+          rm -f ~/docker-images/*.tar 2>/dev/null || true
+          echo "=== Creating app directory ==="
+          mkdir -p ~/docker-images ~/app
+          echo "✅ EC2 cleaned and ready"
+          '
           
           # Determine docker-compose.yml based on instance
           if [ "$INSTANCE" = "EC2_BASTION" ]; then

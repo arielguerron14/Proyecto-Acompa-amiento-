@@ -1,0 +1,264 @@
+name: Deploy to EC2
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance:
+        description: 'Instance to deploy'
+        required: true
+        default: 'EC2_CORE'
+        type: choice
+        options:
+          - EC2_BASTION
+          - EC2_CORE
+          - EC2_DB
+          - EC2_API_GATEWAY
+          - EC2_FRONTEND
+          - EC2_MESSAGING
+          - EC2_MONITORING
+          - EC2_REPORTES
+          - EC2_NOTIFICACIONES
+          - EC2_ANALYTICS
+          - ALL_INSTANCES
+      rebuild_docker:
+        description: 'Rebuild Docker images'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  deploy-ec2:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get EC2 IPs
+        id: get-ip
+        run: |
+          INSTANCE="${{ github.event.inputs.instance }}"
+          
+          case "$INSTANCE" in
+            EC2_BASTION)
+              TAG_NAME="EC-Bastion"
+              ;;
+            EC2_CORE)
+              TAG_NAME="EC2-CORE"
+              ;;
+            EC2_DB)
+              TAG_NAME="EC2-DB"
+              ;;
+            EC2_API_GATEWAY)
+              TAG_NAME="EC2-API-Gateway"
+              ;;
+            EC2_FRONTEND)
+              TAG_NAME="EC2-Frontend"
+              ;;
+            EC2_MESSAGING)
+              TAG_NAME="EC2-Messaging"
+              ;;
+            EC2_MONITORING)
+              TAG_NAME="EC2-Monitoring"
+              ;;
+            EC2_REPORTES)
+              TAG_NAME="EC2-Reportes"
+              ;;
+            EC2_NOTIFICACIONES)
+              TAG_NAME="EC2-Notificaciones"
+              ;;
+            EC2_ANALYTICS)
+              TAG_NAME="EC2-Analytics"
+              ;;
+            ALL_INSTANCES)
+              TAG_NAME="*"
+              ;;
+            *)
+              echo "Unknown instance: $INSTANCE"
+              exit 1
+              ;;
+          esac
+          
+          INSTANCE_DATA=$(aws ec2 describe-instances \
+            --region $AWS_REGION \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=$TAG_NAME" \
+            --query 'Reservations[0].Instances[0]' \
+            --output json)
+          
+          if [ "$INSTANCE_DATA" = "null" ] || [ -z "$INSTANCE_DATA" ]; then
+            echo "ERROR: No running instance found with tag Name=$TAG_NAME"
+            exit 1
+          fi
+          
+          PUBLIC_IP=$(echo "$INSTANCE_DATA" | jq -r '.PublicIpAddress')
+          PRIVATE_IP=$(echo "$INSTANCE_DATA" | jq -r '.PrivateIpAddress')
+          INSTANCE_ID=$(echo "$INSTANCE_DATA" | jq -r '.InstanceId')
+          INSTANCE_NAME=$(echo "$INSTANCE_DATA" | jq -r '.Tags[] | select(.Key=="Name") | .Value' | head -1)
+          
+          echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
+          echo "private_ip=$PRIVATE_IP" >> $GITHUB_OUTPUT
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "instance_name=$INSTANCE_NAME" >> $GITHUB_OUTPUT
+          
+          echo "Found: $INSTANCE_NAME"
+          echo "Public IP: $PUBLIC_IP"
+          echo "Private IP: $PRIVATE_IP"
+      
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ steps.get-ip.outputs.public_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+      
+      - name: Transfer and Deploy
+        env:
+          PUBLIC_IP: ${{ steps.get-ip.outputs.public_ip }}
+          PRIVATE_IP: ${{ steps.get-ip.outputs.private_ip }}
+          INSTANCE: ${{ github.event.inputs.instance }}
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          # Create deployment script
+          cat > /tmp/deploy.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          INSTANCE="$1"
+          PRIVATE_IP="$2"
+          GITHUB_REPO="$3"
+          GITHUB_REF="$4"
+          
+          echo "Starting deployment for $INSTANCE"
+          
+          # Clone repository
+          cd ~
+          rm -rf app-build 2>/dev/null || true
+          git clone --depth 1 https://github.com/${GITHUB_REPO}.git app-build
+          cd app-build
+          git checkout ${GITHUB_REF#refs/heads/}
+          
+          # Clean Docker
+          docker system prune -af --volumes 2>/dev/null || true
+          mkdir -p ~/docker-images ~/app
+          
+          # Determine docker-compose file
+          COMPOSE_FILE=""
+          case "$INSTANCE" in
+            EC2_BASTION)
+              COMPOSE_FILE="docker-compose.ec2-bastion.yml"
+              ;;
+            EC2_CORE)
+              COMPOSE_FILE="docker-compose.ec2-core.yml"
+              ;;
+            EC2_API_GATEWAY)
+              COMPOSE_FILE="docker-compose.api-gateway.yml"
+              ;;
+            EC2_FRONTEND)
+              COMPOSE_FILE="docker-compose.ec2-frontend.yml"
+              ;;
+            EC2_MESSAGING)
+              COMPOSE_FILE="docker-compose.ec2-messaging.yml"
+              ;;
+            EC2_MONITORING)
+              COMPOSE_FILE="docker-compose.ec2-monitoring.yml"
+              ;;
+            EC2_DB)
+              COMPOSE_FILE="docker-compose.ec2-db.yml"
+              ;;
+            EC2_REPORTES)
+              COMPOSE_FILE="docker-compose.ec2-reportes.yml"
+              ;;
+            EC2_NOTIFICACIONES)
+              COMPOSE_FILE="docker-compose.ec2-notificaciones.yml"
+              ;;
+            EC2_ANALYTICS)
+              COMPOSE_FILE="docker-compose.ec2-analytics.yml"
+              ;;
+          esac
+          
+          # Build and start services
+          echo "Building Docker images..."
+          case "$INSTANCE" in
+            EC2_BASTION)
+              cd bastion-host && docker build -t bastion-host:latest . && cd ..
+              ;;
+            EC2_CORE)
+              for SERVICE in micro-auth micro-estudiantes micro-maestros micro-core; do
+                [ -f "./$SERVICE/Dockerfile" ] && docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+              done
+              ;;
+            EC2_API_GATEWAY)
+              [ -f "./api-gateway/Dockerfile" ] && docker build -t api-gateway:latest -f ./api-gateway/Dockerfile .
+              ;;
+            EC2_REPORTES)
+              for SERVICE in micro-reportes-estudiantes micro-reportes-maestros; do
+                [ -f "./$SERVICE/Dockerfile" ] && docker build -t $SERVICE:latest -f ./$SERVICE/Dockerfile .
+              done
+              ;;
+            EC2_NOTIFICACIONES)
+              [ -f "./micro-notificaciones/Dockerfile" ] && docker build -t micro-notificaciones:latest -f ./micro-notificaciones/Dockerfile .
+              ;;
+            EC2_ANALYTICS)
+              [ -f "./micro-analytics/Dockerfile" ] && docker build -t micro-analytics:latest -f ./micro-analytics/Dockerfile .
+              ;;
+            EC2_FRONTEND)
+              [ -f "./frontend-web/Dockerfile" ] && docker build -t frontend-web:latest -f ./frontend-web/Dockerfile ./frontend-web
+              ;;
+          esac
+          
+          # Copy docker-compose and start services
+          if [ -f "$COMPOSE_FILE" ]; then
+            cp "$COMPOSE_FILE" ~/app/docker-compose.yml
+            cd ~/app
+            docker-compose down 2>/dev/null || true
+            sleep 2
+            docker-compose up -d
+            sleep 10
+            docker-compose ps
+            echo "Deployment complete!"
+          fi
+          EOF
+          
+          chmod +x /tmp/deploy.sh
+          
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 /tmp/deploy.sh ubuntu@$PUBLIC_IP:~/deploy.sh
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP bash ~/deploy.sh "$INSTANCE" "$PRIVATE_IP" "$GITHUB_REPO" "$GITHUB_REF"
+      
+      - name: Verify Deployment
+        if: always()
+        continue-on-error: true
+        env:
+          PUBLIC_IP: ${{ steps.get-ip.outputs.public_ip }}
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP 'cd ~/app && docker-compose ps && docker-compose logs --tail=20' || true
