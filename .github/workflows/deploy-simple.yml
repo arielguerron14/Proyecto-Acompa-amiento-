@@ -3,23 +3,6 @@ name: Deploy to EC2
 on:
   workflow_dispatch:
     inputs:
-      instance:
-        description: 'Instance to deploy'
-        required: true
-        default: 'EC2_CORE'
-        type: choice
-        options:
-          - EC2_BASTION
-          - EC2_CORE
-          - EC2_DB
-          - EC2_API_GATEWAY
-          - EC2_FRONTEND
-          - EC2_MESSAGING
-          - EC2_MONITORING
-          - EC2_REPORTES
-          - EC2_NOTIFICACIONES
-          - EC2_ANALYTICS
-          - ALL_INSTANCES
       rebuild_docker:
         description: 'Rebuild Docker images'
         required: false
@@ -43,9 +26,23 @@ env:
   DOCKER_BUILDKIT: 1
 
 jobs:
-  deploy-ec2:
-    name: Deploy to EC2
+  deploy-all-instances:
+    name: Deploy All Instances
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        instance:
+          - EC2_BASTION
+          - EC2_CORE
+          - EC2_DB
+          - EC2_API_GATEWAY
+          - EC2_FRONTEND
+          - EC2_MESSAGING
+          - EC2_MONITORING
+          - EC2_REPORTES
+          - EC2_NOTIFICACIONES
+          - EC2_ANALYTICS
+      max-parallel: 3
     
     steps:
       - name: Checkout code
@@ -67,7 +64,7 @@ jobs:
       - name: Get EC2 IPs
         id: get-ip
         run: |
-          INSTANCE="${{ github.event.inputs.instance }}"
+          INSTANCE="${{ matrix.instance }}"
           
           case "$INSTANCE" in
             EC2_BASTION)
@@ -159,7 +156,9 @@ jobs:
           GITHUB_REPO="$3"
           GITHUB_REF="$4"
           
-          echo "Starting deployment for $INSTANCE"
+          echo "================================================"
+          echo "🚀 Desplegando: $INSTANCE"
+          echo "================================================"
           
           # Clone repository
           cd ~
@@ -261,4 +260,5 @@ jobs:
         env:
           PUBLIC_IP: ${{ steps.get-ip.outputs.public_ip }}
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP 'cd ~/app && docker-compose ps && docker-compose logs --tail=20' || true
+          echo "✅ Verificando despliegue de ${{ matrix.instance }}..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@$PUBLIC_IP 'cd ~/app && docker-compose ps && echo "" && docker-compose logs --tail=20' || true
