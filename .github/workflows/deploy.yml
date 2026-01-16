@@ -39,7 +39,7 @@ jobs:
       - name: Docker Hub Login
         run: |
           echo "Haciendo login en Docker Hub..."
-          echo "Reco1688" | docker login -u caguerronp --password-stdin
+          echo "Reco16888" | docker login -u caguerronp@uce.edu.ec --password-stdin
 
       - name: Build and Push micro-auth
         run: |
