@@ -187,7 +187,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           # Use SSH key from repository secrets (plain text, not base64)
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ steps.get-ip.outputs.public_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
           echo "✅ SSH setup complete for IP: ${{ steps.get-ip.outputs.public_ip }}"
