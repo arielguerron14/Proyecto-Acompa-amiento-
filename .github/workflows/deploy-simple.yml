@@ -262,11 +262,13 @@ jobs:
           elif [ -f "app-build/$COMPOSE_FILE" ]; then
             cp "app-build/$COMPOSE_FILE" ~/app/docker-compose.yml
           else
-            echo "❌ ERROR: No se encontró $COMPOSE_FILE ni en el directorio actual ni en app-build."
+            echo "❌ ERROR: No se encontró el archivo de docker-compose requerido: $COMPOSE_FILE"
             echo "Directorio actual: $(pwd)"
+            echo "Archivos en el directorio actual:"
             ls -l
-            echo "Contenido de app-build:"
+            echo "Archivos en app-build:"
             ls -l app-build || true
+            echo "NOTA: Los scripts de verificación y actualización listados no afectan el despliegue. Solo se requiere el archivo docker-compose correspondiente."
             exit 1
           fi
           echo ""
