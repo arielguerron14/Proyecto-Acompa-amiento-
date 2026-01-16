@@ -1,136 +1,22 @@
 # Bastion Host - Jump Host para acceso seguro a todas las instancias
 FROM ubuntu:24.04
 
-# Metadata
-LABEL maintainer="Infrastructure Team"
-LABEL description="Bastion Host - SSH Jump Host para acceso seguro a EC2 instances"
-LABEL version="1.0"
-
-# Configurar timezone y locale
-ENV TZ=UTC
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
-# Actualizar sistema y instalar dependencias
-RUN apt-get update && \
-    apt-get install -y \
+# Install openssh-server
+RUN apt-get update && apt-get install -y \
     openssh-server \
     openssh-client \
     curl \
-    wget \
-    git \
-    vim \
-    nano \
-    htop \
-    net-tools \
-    telnet \
-    traceroute \
-    dnsutils \
-    iputils-ping \
-    jq \
     ca-certificates \
-    && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Crear directorio SSH
-RUN mkdir -p /root/.ssh && \
-    mkdir -p /var/run/sshd && \
+# Configure SSH
+RUN mkdir -p /run/sshd && \
+    mkdir -p /root/.ssh && \
     chmod 700 /root/.ssh && \
-    echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC60SOhcAV4q637KCupB3JTFHJifqqz1b4lmQriNI841pzBgs+z+YQCJAiX3gubq/1TXIv7q7jELA9EY8/+76MNnVLh/iI0azmcqpfqIv73cpF8WMMMsoRRW2KFZm1tUi6ctzZ/ZfW8HaDkntC2pQ6Pr5w9dWhaKuIJX2azht2uwWjKgql3qTcsT8Um8llA3BhWXRxlqRCKcC+8YOVs6gcL/oREL7VfiliKRapbvod2vMaruKmqUKLvQnfu+fTngwGx5cBsrZpfGMN6F3O7RFchMfXjgInrge6TjlfNXvMhmwd9ilTKEuMoq1Fvlo3SweodoXAPuR58nx2+IyWj+tZf' > /root/.ssh/authorized_keys && \
-    chmod 600 /root/.ssh/authorized_keys
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 
-# Configuración de SSH para máxima seguridad
-RUN mkdir -p /etc/ssh/sshd_config.d && \
-    printf '%s\n' \
-    '# Bastion SSH Configuration' \
-    'PermitRootLogin yes' \
-    'PubkeyAuthentication yes' \
-    'PasswordAuthentication no' \
-    'PermitEmptyPasswords no' \
-    'X11Forwarding no' \
-    'X11UseLocalhost yes' \
-    'MaxAuthTries 3' \
-    'MaxSessions 10' \
-    'AllowAgentForwarding yes' \
-    'AllowTcpForwarding yes' \
-    'GatewayPorts no' \
-    'PermitTTY yes' \
-    'Compression delayed' \
-    'ClientAliveInterval 300' \
-    'ClientAliveCountMax 2' \
-    'UsePAM yes' \
-    'LogLevel VERBOSE' \
-    > /etc/ssh/sshd_config.d/99-bastion.conf && \
-    chmod 600 /etc/ssh/sshd_config.d/99-bastion.conf
-
-# Agregar scripts de monitoreo y utilidades
-RUN mkdir -p /opt/bastion/scripts
-
-COPY scripts/health-check.sh /opt/bastion/scripts/health-check.sh
-COPY scripts/bastion-monitor.sh /opt/bastion/scripts/bastion-monitor.sh
-COPY scripts/audit-log.sh /opt/bastion/scripts/audit-log.sh
-
-# Entrypoint generado inline
-RUN cat > /opt/bastion/scripts/entrypoint.sh << 'ENTRYPOINT_SCRIPT'
-#!/bin/bash
-set -e
-echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Iniciando Bastion Host..."
-mkdir -p /var/log/bastion /var/run/sshd
-chmod 755 /var/log/bastion
-
-echo "[BASTION] Validando configuración SSH..."
-/usr/sbin/sshd -t && echo "[BASTION] ✅ Configuración SSH válida" || { echo "[BASTION] ❌ Error en SSH config"; exit 1; }
-
-echo "[BASTION] $(date '+%Y-%m-%d %H:%M:%S') - Iniciando daemon SSH..."
-/usr/sbin/sshd -D 2>&1 || { echo "[BASTION] ❌ Error iniciando SSHD"; exit 1; }
-ENTRYPOINT_SCRIPT
-
-RUN chmod 755 /opt/bastion/scripts/entrypoint.sh
-
-# Hacer ejecutables los scripts restantes
-RUN chmod 755 /opt/bastion/scripts/*.sh && \
-    mkdir -p /etc/ssh/sshd_config.d && \
-    cat > /etc/ssh/sshd_config.d/99-audit.conf << 'AUDIT_EOF'
-# Bastion SSH Audit Configuration
-LogLevel VERBOSE
-SyslogFacility AUTH
-AuthorizedKeysFile .ssh/authorized_keys
-StrictModes yes
-IgnoreRhosts yes
-HostbasedAuthentication no
-PubkeyAuthentication yes
-PasswordAuthentication no
-PermitEmptyPasswords no
-ChallengeResponseAuthentication no
-UsePAM yes
-X11Forwarding no
-PrintMotd no
-AcceptEnv LANG LC_*
-Subsystem sftp /usr/lib/openssh/sftp-server
-AUDIT_EOF
-
-
-# Crear usuario para auditoría y logging
-RUN mkdir -p /var/log/bastion && \
-    chmod 755 /var/log/bastion && \
-    mkdir -p /etc/sudoers.d && \
-    useradd -m -s /bin/bash ec2-user || true && \
-    mkdir -p /home/ec2-user/.ssh && \
-    chmod 700 /home/ec2-user/.ssh && \
-    chown -R ec2-user:ec2-user /home/ec2-user/.ssh && \
-    echo "ec2-user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ec2-user && \
-    chmod 440 /etc/sudoers.d/ec2-user
-
-# Configurar AWS CLI para logging en CloudWatch
-RUN mkdir -p /etc/amazon/amazon-cloudwatch-agent && \
-    mkdir -p /opt/bastion/config
-
-# Exponer puerto SSH
 EXPOSE 22
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD /opt/bastion/scripts/health-check.sh || exit 1
-
-# Entrypoint - ejecutar script directamente
-CMD ["/bin/bash", "/opt/bastion/scripts/entrypoint.sh"]
+CMD ["/usr/sbin/sshd", "-D"]

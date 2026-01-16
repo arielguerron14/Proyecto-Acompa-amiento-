@@ -32,10 +32,26 @@ jobs:
       - name: Build and push micro-analytics
         uses: docker/build-push-action@v4
         with:
-          context: micro-analytics
+          context: .
           file: micro-analytics/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-analytics:latest
+      
+      - name: Build and push api-gateway
+        uses: docker/build-push-action@v4
+        with:
+          context: api-gateway
+          file: api-gateway/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
+      
+      - name: Build and push micro-notificaciones
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: micro-notificaciones/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/micro-notificaciones:latest
       
       - name: Setup SSH key
         run: |

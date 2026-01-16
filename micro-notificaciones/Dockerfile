@@ -1,13 +1,9 @@
 FROM node:18-alpine
 
-WORKDIR /usr/src
-
-
-
-# Copy shared modules (from monorepo root context)
-COPY micro-notificaciones/ /usr/src/app/
-
 WORKDIR /usr/src/app
+
+# Copy application code
+COPY . .
 
 # copy package manifests and install (production)
 RUN npm ci --only=production --silent || npm install --production --silent

@@ -1,22 +1,14 @@
 FROM node:18-slim
 
-WORKDIR /usr/src
+WORKDIR /usr/src/app
 
 # Install curl for container healthcheck
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends curl ca-certificates \
 	&& rm -rf /var/lib/apt/lists/*
 
-# Copy shared modules
-
-# Copy api-gateway code
-COPY api-gateway/ /usr/src/app/
-
-# Copy infrastructure config
-
-# Install production dependencies for shared modules first
-
-WORKDIR /usr/src/app
+# Copy application code
+COPY . .
 RUN npm ci --only=production --silent || npm install --production --silent
 
 # Verify required files and dependencies
