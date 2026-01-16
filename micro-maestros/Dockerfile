@@ -1,32 +1,14 @@
 FROM node:18-alpine
 
-WORKDIR /usr/src
-
-# Copy shared modules and app (build from repo root context)
-
-# Copiar configuración centralizada
-
-# Sanity checks so build logs reveal missing files early
-RUN echo "[debug] listing /usr/src" && ls -la /usr/src || true
-RUN echo "[debug] listing /usr/src/shared-auth" && ls -la /usr/src/shared-auth || true
-
-# Copiar configuración centralizada
-COPY scripts/ /usr/src/scripts/
-
-# install dependencies for shared-auth first
-
 WORKDIR /usr/src/app
-# copy package manifests and install (production)
-RUN echo "[debug] Installing app dependencies" && npm ci --only=production || npm install --production
-RUN echo "[debug] app node_modules" && ls -la /usr/src/app/node_modules || true
-RUN echo "[debug] app package.json" && cat /usr/src/app/package.json || true
+
+# Copy the microservice code
+COPY . .
+
+# Install dependencies
+RUN npm ci --only=production || npm install --production
 
 ENV NODE_ENV=production
-EXPOSE 5001
+EXPOSE 3002
 
-# Copy entrypoint at the end so it's not overwritten by later COPY steps
-RUN chmod +x /entrypoint.sh
-
-# Use custom entrypoint for diagnostics and process management
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["npm", "start"]
+CMD ["node", "src/app.js"]
