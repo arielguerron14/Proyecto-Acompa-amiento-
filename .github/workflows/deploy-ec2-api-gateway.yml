@@ -8,6 +8,7 @@ on:
     paths:
       - 'api-gateway/**'
       - '.github/workflows/deploy-ec2-api-gateway.yml'
+      - 'config/instance_ips.json'
 
 env:
   SSH_USER: ubuntu
@@ -22,6 +23,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
+      - name: Sync IPs to configuration files
+        run: |
+          echo "🔄 Syncing instance IPs to API Gateway .env..."
+          python3 sync-ips-to-config.py
+          echo "✅ Configuration files updated"
       
       - name: Install dependencies
         run: |

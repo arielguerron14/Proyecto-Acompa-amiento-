@@ -8,6 +8,7 @@ on:
     paths:
       - 'frontend-web/**'
       - '.github/workflows/deploy-ec2-frontend.yml'
+      - 'config/instance_ips.json'
 
 env:
   SSH_USER: ubuntu
@@ -21,6 +22,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
+      - name: Sync IPs to configuration files
+        run: |
+          echo "🔄 Syncing instance IPs to frontend .env..."
+          python3 sync-ips-to-config.py
+          echo "✅ Configuration files updated"
       
       - name: Install dependencies
         run: |
