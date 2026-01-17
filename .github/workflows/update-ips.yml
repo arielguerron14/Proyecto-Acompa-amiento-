@@ -2,6 +2,8 @@ name: Update AWS Instance IPs
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'  # Cada hora
 
 jobs:
   update-ips:
@@ -19,20 +21,116 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: us-east-1
 
-      - name: Fetch instance IPs
+      - name: Fetch and update instance IPs
         run: |
-          echo "Fetching public and private IPs of EC2 instances..."
+          echo "🔄 Fetching EC2 instances from AWS..."
+          
+          # Obtener todas las instancias en ejecución
           aws ec2 describe-instances \
-            --query 'Reservations[*].Instances[*].[InstanceId,PublicIpAddress,PrivateIpAddress]' \
-            --output json > instance_ips.json
-
-      - name: Update configuration files
+            --filters "Name=instance-state-name,Values=running" \
+            --query 'Reservations[*].Instances[*].[Tags[?Key==`Name`].Value|[0],InstanceId,PublicIpAddress,PrivateIpAddress]' \
+            --output text --region us-east-1 > instances.txt
+          
+          cat instances.txt
+          
+          # Actualizar config/instance_ips.json
+          echo "📝 Updating config/instance_ips.json..."
+          python3 << 'EOF'
+          import json
+          import subprocess
+          import sys
+          
+          # Leer instancias de AWS
+          result = subprocess.run(['aws', 'ec2', 'describe-instances', 
+                                  '--filters', 'Name=instance-state-name,Values=running',
+                                  '--query', 'Reservations[*].Instances[*]',
+                                  '--region', 'us-east-1'], 
+                                 capture_output=True, text=True)
+          data = json.loads(result.stdout)
+          
+          instances = {}
+          for reservation in data:
+              for inst in reservation:
+                  name = None
+                  if inst.get('Tags'):
+                      for tag in inst['Tags']:
+                          if tag['Key'] == 'Name':
+                              name = tag['Value']
+                              break
+                  
+                  if name:
+                      instances[name] = {
+                          'InstanceId': inst['InstanceId'],
+                          'Name': name,
+                          'PublicIpAddress': inst.get('PublicIpAddress', 'N/A'),
+                          'PrivateIpAddress': inst.get('PrivateIpAddress', 'N/A'),
+                          'Type': inst.get('InstanceType', 'unknown')
+                      }
+          
+          # Guardar en config/instance_ips.json
+          with open('config/instance_ips.json', 'w') as f:
+              json.dump(instances, f, indent=4)
+          
+          print(f"✅ Updated {len(instances)} instances in config/instance_ips.json")
+          for name, info in instances.items():
+              print(f"  - {name}: {info['PublicIpAddress']}")
+          EOF
+          
+      - name: Update .ssh/config
         run: |
-          echo "Updating configuration files with new IPs..."
-          # Pass the instance_ips.json file to the script to avoid calling AWS again
-          python3 update_instance_ips.py
+          echo "🔐 Updating .ssh/config with new IPs..."
+          python3 << 'EOF'
+          import json
+          import re
+          
+          # Mapeo de nombres de instancias a host SSH
+          MAPPING = {
+              'EC-Bastion': 'bastion',
+              'EC2-CORE': 'core',
+              'EC2-DB': 'db',
+              'EC2-Frontend': 'frontend',
+              'EC2-API-Gateway': 'api-gateway',
+              'EC2-Messaging': 'messaging',
+              'EC2-Monitoring': 'monitoring',
+              'EC2-Notificaciones': 'notificaciones',
+              'EC2-Reportes': 'reportes',
+          }
+          
+          # Leer instancias
+          with open('config/instance_ips.json', 'r') as f:
+              instances = json.load(f)
+          
+          # Leer .ssh/config
+          with open('.ssh/config', 'r') as f:
+              config_lines = f.readlines()
+          
+          # Actualizar cada host
+          for inst_name, ssh_host in MAPPING.items():
+              if inst_name in instances:
+                  new_ip = instances[inst_name]['PublicIpAddress']
+                  
+                  # Buscar la sección del host
+                  i = 0
+                  while i < len(config_lines):
+                      if config_lines[i].strip().startswith(f'Host {ssh_host}'):
+                          # Buscar HostName en las siguientes líneas
+                          j = i + 1
+                          while j < len(config_lines) and (config_lines[j].startswith('    ') or config_lines[j].startswith('\t')):
+                              if config_lines[j].strip().startswith('HostName'):
+                                  indent = len(config_lines[j]) - len(config_lines[j].lstrip())
+                                  config_lines[j] = ' ' * indent + f'HostName {new_ip}\n'
+                                  print(f"✅ Updated SSH host '{ssh_host}': {new_ip}")
+                                  break
+                              j += 1
+                          break
+                      i += 1
+          
+          # Guardar .ssh/config
+          with open('.ssh/config', 'w') as f:
+              f.writelines(config_lines)
+          EOF
 
       - name: Commit and push changes
         env:
@@ -42,7 +140,15 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global credential.helper store
           echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+          
           git pull --rebase origin main || true
-          git add config/instance_ips.json .ssh/config .env.aws
-          git commit -m "Update instance IPs" || echo "No changes to commit"
-          git push origin main || true
+          
+          git add config/instance_ips.json .ssh/config .env.aws 2>/dev/null || true
+          
+          if git diff --cached --quiet; then
+            echo "✅ No changes to commit"
+          else
+            git commit -m "chore: Update instance IPs from AWS [automated]"
+            git push origin main || true
+            echo "✅ Changes pushed successfully"
+          fi
