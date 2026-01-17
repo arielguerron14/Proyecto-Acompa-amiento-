@@ -12,8 +12,10 @@ const SERVICE_REGISTRY = require('../config/service-registry');
  */
 const proxyMiddleware = async (req, res, next) => {
   try {
-    // Rutas especiales que no se proxean
-    if (req.path === '/health' || req.path === '/config' || req.path === '/services') {
+    // These are API Gateway special endpoints, not microservice endpoints
+    // Don't proxy them (the server already handles them)
+    // But DO proxy /health when coming from microservice routes
+    if ((req.path === '/config' || req.path === '/services') && !req.baseUrl.includes('/auth')) {
       return next();
     }
 
