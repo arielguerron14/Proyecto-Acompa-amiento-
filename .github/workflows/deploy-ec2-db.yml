@@ -60,11 +60,10 @@ jobs:
               
               # Deploy commands
               commands = [
-                  "set -e",
-                  "echo '🚀 Deploying databases...'",
                   "docker volume create mongo_data 2>/dev/null || true",
                   "docker volume create postgres_data 2>/dev/null || true",
                   "docker volume create redis_data 2>/dev/null || true",
+                  "echo '🚀 Deploying databases...'",
                   "docker pull mongo:latest",
                   "docker stop mongo 2>/dev/null || true",
                   "docker rm mongo 2>/dev/null || true",
@@ -77,30 +76,32 @@ jobs:
                   "docker stop redis 2>/dev/null || true",
                   "docker rm redis 2>/dev/null || true",
                   "docker run -d --name redis -p 6379:6379 -v redis_data:/data redis:latest",
-                  "echo '✅ Database deployment complete'"
+                  "sleep 3",
+                  "echo '✅ Database deployment complete'",
+                  "docker ps -a --filter 'name=mongo|postgres|redis' --format='table {{.Names}}\t{{.Status}}'",
               ]
               
               deploy_cmd = "; ".join(commands)
               stdin, stdout, stderr = ssh.exec_command(deploy_cmd)
               
-              output = stdout.read().decode()
-              errors = stderr.read().decode()
+              output = stdout.read().decode('utf-8', errors='ignore')
+              errors = stderr.read().decode('utf-8', errors='ignore')
               
               if output:
                   print(output)
               if errors:
-                  print("Errors:", errors)
+                  print("⚠️ STDERR:", errors)
+              
+              exit_code = stdout.channel.recv_exit_status()
+              if exit_code != 0:
+                  print(f"⚠️ Exit code: {exit_code}")
               
               ssh.close()
+              print("✅ Deployment completed")
           except Exception as e:
               print(f"❌ Connection failed: {e}")
               exit(1)
           PYSCRIPT
-          docker run -d --name redis -p 6379:6379 -v redis_data:/data redis:latest
-          
-          echo "✅ Verifying deployment..."
-          docker ps | grep -E "mongo|postgres|redis"
-          DEPLOY
 
       - name: Check logs
         env:
