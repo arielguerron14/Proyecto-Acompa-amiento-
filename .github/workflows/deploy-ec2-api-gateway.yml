@@ -108,15 +108,16 @@ jobs:
               
               # Deploy using docker run (since docker-compose may not be installed)
               env_file_path = f"{target_dir}/.env"
+              docker_user = "${{ secrets.DOCKER_USERNAME }}"
               cmd = f"""
-              export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} && \
+              export DOCKER_USERNAME={docker_user} && \
               docker stop api-gateway 2>/dev/null || true && \
               docker rm api-gateway 2>/dev/null || true && \
               docker run -d \
                 --name api-gateway \
                 -p 8080:8080 \
                 --env-file {env_file_path} \
-                ${{DOCKER_USERNAME}}/api-gateway:latest && \
+                ${{docker_user}}/api-gateway:latest && \
               sleep 2 && \
               docker ps | grep api-gateway
               """
