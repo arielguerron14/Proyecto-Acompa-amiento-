@@ -10,7 +10,6 @@ RUN npm ci --only=production --silent || npm install --production --silent || tr
 
 # Copy application source
 COPY src ./src
-COPY .env* ./ || true
 
 ENV NODE_ENV=production
 # Build version: 2025-01-17-v2
