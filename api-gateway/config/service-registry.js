@@ -29,22 +29,22 @@ const SERVICE_REGISTRY = {
   // Microservicios disponibles
   get services() {
     const coreHost = getCoreHost();
-    const inDocker = isDocker();
     
-    // En Docker, usar nombres de contenedor (DNS interno)
-    // En desarrollo/producción, usar CORE_HOST con puertos
-    const baseUrls = inDocker ? {
+    // Usar CORE_HOST si está disponible (producción en AWS)
+    // Fallback a nombres de contenedor (desarrollo local)
+    const baseUrls = coreHost ? {
+      auth: `http://${coreHost}:3000`,
+      estudiantes: `http://${coreHost}:3001`,
+      maestros: `http://${coreHost}:3002`,
+      reportesEstudiantes: `http://${coreHost}:5003`,
+      reportesMaestros: `http://${coreHost}:5004`
+    } : {
+      // Fallback para desarrollo local con docker-compose
       auth: 'http://micro-auth:3000',
       estudiantes: 'http://micro-estudiantes:3001',
       maestros: 'http://micro-maestros:3002',
       reportesEstudiantes: 'http://micro-reportes-estudiantes:5003',
       reportesMaestros: 'http://micro-reportes-maestros:5004'
-    } : {
-      auth: `${coreHost}:3000`,
-      estudiantes: `${coreHost}:3001`,
-      maestros: `${coreHost}:3002`,
-      reportesEstudiantes: `${coreHost}:5003`,
-      reportesMaestros: `${coreHost}:5004`
     };
 
     return {

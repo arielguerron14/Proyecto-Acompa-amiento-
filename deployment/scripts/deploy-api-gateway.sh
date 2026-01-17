@@ -6,6 +6,7 @@ INSTANCE_TAG="EC2-API-Gateway"
 AWS_REGION="us-east-1"
 IMAGE="api-gateway:latest"
 PORT="8080"
+CORE_HOST="172.31.65.0"  # EC2-CORE private IP within VPC
 
 echo "🚀 Deploying $IMAGE to $INSTANCE_TAG..."
 
@@ -35,10 +36,4 @@ aws ssm send-command \
         'docker stop api-gateway || true',
         'docker rm api-gateway || true',
         'echo \"Starting new container...\",
-        'docker run -d --name api-gateway -p $PORT:8080 --restart always $IMAGE',
-        'sleep 5',
-        'echo \"Performing health check...\",
-        'curl -f http://localhost:$PORT/health || echo \"Health check pending\"'
-    ]"
-
-echo "✅ Deployment command sent. Check AWS Systems Manager for execution details."
+        'docker run -d --name api-gateway -p $PORT:8080 -e CORE_HOST=$CORE_HOST -e NODE_ENV=production --restart always $IMAGE',
