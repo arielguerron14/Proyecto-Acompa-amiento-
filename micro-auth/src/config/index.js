@@ -1,5 +1,11 @@
 const dotenv = require('dotenv');
-const sharedConfig = require('../../../shared-config');
+
+let sharedConfig = {};
+try {
+  sharedConfig = require('../../../shared-config');
+} catch (err) {
+  console.warn('⚠️  shared-config not found, using environment variables only');
+}
 
 dotenv.config();
 
