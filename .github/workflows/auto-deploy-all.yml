@@ -137,7 +137,7 @@ jobs:
                   "docker stop mongo 2>/dev/null || true",
                   "docker rm mongo 2>/dev/null || true",
                   "docker volume create mongo_data 2>/dev/null || true",
-                  'docker run -d --name mongo -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=example -v mongo_data:/data/db mongo:6.0 --auth',
+                  'docker run -d --name mongo -p 0.0.0.0:27017:27017 -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=example -v mongo_data:/data/db mongo:6.0 --auth --bind_ip_all',
               ]
               
               # PostgreSQL
@@ -263,11 +263,11 @@ jobs:
                   f"docker pull {docker_user}/micro-maestros:latest",
                   "docker stop micro-auth micro-estudiantes micro-maestros 2>/dev/null || true",
                   "docker rm micro-auth micro-estudiantes micro-maestros 2>/dev/null || true",
-                  f'docker run -d --name micro-auth --network core-net -p 0.0.0.0:3000:3000 -e PORT=3000 -e MONGODB_URI="mongodb://root:example@{db_private_ip}:27017/auth?authSource=admin" -e NODE_ENV=production {docker_user}/micro-auth:latest',
+                  f'docker run -d --name micro-auth --network core-net --add-host=db-host:{db_private_ip} -p 0.0.0.0:3000:3000 -e PORT=3000 -e MONGODB_URI="mongodb://root:example@{db_private_ip}:27017/auth?authSource=admin" -e NODE_ENV=production {docker_user}/micro-auth:latest',
                   "sleep 3",
-                  f'docker run -d --name micro-estudiantes --network core-net -p 0.0.0.0:3001:3001 -e PORT=3001 -e MONGODB_URI="mongodb://root:example@{db_private_ip}:27017/estudiantes?authSource=admin" -e NODE_ENV=production {docker_user}/micro-estudiantes:latest',
+                  f'docker run -d --name micro-estudiantes --network core-net --add-host=db-host:{db_private_ip} -p 0.0.0.0:3001:3001 -e PORT=3001 -e MONGODB_URI="mongodb://root:example@{db_private_ip}:27017/estudiantes?authSource=admin" -e NODE_ENV=production {docker_user}/micro-estudiantes:latest',
                   "sleep 3",
-                  f'docker run -d --name micro-maestros --network core-net -p 0.0.0.0:3002:3002 -e PORT=3002 -e MONGODB_URI="mongodb://root:example@{db_private_ip}:27017/maestros?authSource=admin" -e NODE_ENV=production {docker_user}/micro-maestros:latest',
+                  f'docker run -d --name micro-maestros --network core-net --add-host=db-host:{db_private_ip} -p 0.0.0.0:3002:3002 -e PORT=3002 -e MONGODB_URI="mongodb://root:example@{db_private_ip}:27017/maestros?authSource=admin" -e NODE_ENV=production {docker_user}/micro-maestros:latest',
                   "sleep 5",
                   "docker ps -a",
               ]
