@@ -23,10 +23,14 @@ services:
       - "27017:27017"
     expose:
       - "27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
     volumes:
       - mongo_data:/data/db
     networks:
       - db-net
+    command: mongod --auth
 
   redis:
     image: redis:7-alpine
