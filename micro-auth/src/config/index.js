@@ -24,6 +24,11 @@ const getMongoUri = () => {
     return process.env.MONGO_URI;
   }
   
+  // También intenta MONGODB_URI (alternativa común)
+  if (process.env.MONGODB_URI) {
+    return process.env.MONGODB_URI;
+  }
+  
   // Luego usa shared-config (recomendado)
   try {
     return sharedConfig.getMongoUrl();

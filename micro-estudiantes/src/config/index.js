@@ -20,6 +20,7 @@ try {
 
 const getMongoUri = () => {
   if (process.env.MONGO_URI) return process.env.MONGO_URI;
+  if (process.env.MONGODB_URI) return process.env.MONGODB_URI;
   
   try {
     return sharedConfig.getMongoUrl();
