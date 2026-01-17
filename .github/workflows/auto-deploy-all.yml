@@ -6,7 +6,6 @@ on:
     branches:
       - main
     paths:
-      - 'terraform/**'
       - 'config/instance_ips.json'
 
 env:
@@ -17,72 +16,48 @@ jobs:
   # PHASE 1: WAIT FOR INSTANCES
   # ============================================================================
   wait-instances:
-    name: Wait for EC2 Instances to be Ready
+    name: Verify Instance IPs Configuration
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install AWS CLI
-        run: pip install awscli boto3
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Wait for instances to be running
+      - name: Verify instance_ips.json exists
         run: |
           python3 << 'PYSCRIPT'
-          import boto3
-          import time
+          import json
           import sys
           
-          ec2 = boto3.client('ec2', region_name='us-east-1')
-          
-          required_instances = [
-              'EC2-DB', 'EC2-CORE', 'EC2-API-Gateway', 
-              'EC2-Frontend', 'EC2-Bastion'
-          ]
-          
-          print(f"⏳ Waiting for {len(required_instances)} instances...")
-          max_attempts = 60
-          attempt = 0
-          
-          while attempt < max_attempts:
-              response = ec2.describe_instances(
-                  Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]
-              )
+          try:
+              with open('config/instance_ips.json', 'r') as f:
+                  ips = json.load(f)
               
-              running_names = []
-              for reservation in response['Reservations']:
-                  for instance in reservation['Instances']:
-                      name_tag = next(
-                          (tag['Value'] for tag in instance.get('Tags', []) if tag['Key'] == 'Name'),
-                          None
-                      )
-                      if name_tag in required_instances:
-                          running_names.append(name_tag)
+              required_instances = [
+                  'EC2-DB', 'EC2-CORE', 'EC2-API-Gateway', 
+                  'EC2-Frontend', 'EC-Bastion'
+              ]
               
-              missing = set(required_instances) - set(running_names)
+              print(f"✅ Found instance_ips.json with {len(ips)} instances")
               
-              if not missing:
-                  print(f"✅ All {len(required_instances)} instances are running!")
-                  break
+              found = [name for name in required_instances if name in ips]
+              missing = set(required_instances) - set(found)
               
-              print(f"⏳ Waiting... ({attempt + 1}/{max_attempts}) Missing: {', '.join(missing)}")
-              time.sleep(10)
-              attempt += 1
-          
-          if missing:
-              print(f"❌ Timeout: Some instances never started: {missing}")
+              if missing:
+                  print(f"⚠️  Missing instances in config: {', '.join(missing)}")
+                  print("ℹ️  Available instances:", ', '.join(ips.keys()))
+              else:
+                  print(f"✅ All required instances configured!")
+                  for name in required_instances:
+                      print(f"   - {name}: {ips[name]['PublicIpAddress']}")
+              
+          except FileNotFoundError:
+              print("❌ config/instance_ips.json not found!")
+              print("Please run 'terraform output' to generate instance_ips.json")
               sys.exit(1)
-          
-          print("✅ Ready to deploy!")
+          except Exception as e:
+              print(f"❌ Error: {e}")
+              sys.exit(1)
           PYSCRIPT
 
   # ============================================================================
@@ -103,27 +78,16 @@ jobs:
       - name: Get EC2-DB IP
         run: |
           python3 << 'PYSCRIPT'
-          import boto3
           import json
           
-          ec2 = boto3.client('ec2', region_name='us-east-1')
-          response = ec2.describe_instances(
-              Filters=[
-                  {'Name': 'tag:Name', 'Values': ['EC2-DB']},
-                  {'Name': 'instance-state-name', 'Values': ['running']}
-              ]
-          )
+          with open('config/instance_ips.json', 'r') as f:
+              ips = json.load(f)
           
-          if response['Reservations']:
-              instance = response['Reservations'][0]['Instances'][0]
-              ip = instance['PublicIpAddress']
-              print(f"INSTANCE_IP={ip}")
-              with open('instance_ip.txt', 'w') as f:
-                  f.write(ip)
-              print(f"✅ Found EC2-DB: {ip}")
-          else:
-              print("❌ EC2-DB not found")
-              exit(1)
+          db_ip = ips['EC2-DB']['PublicIpAddress']
+          print(f"INSTANCE_IP={db_ip}")
+          with open('instance_ip.txt', 'w') as f:
+              f.write(db_ip)
+          print(f"✅ Found EC2-DB: {db_ip}")
           PYSCRIPT
 
       - name: Deploy Databases
@@ -232,27 +196,21 @@ jobs:
       - name: Get IPs
         run: |
           python3 << 'PYSCRIPT'
-          import boto3
+          import json
           
-          ec2 = boto3.client('ec2', region_name='us-east-1')
+          with open('config/instance_ips.json', 'r') as f:
+              ips = json.load(f)
           
           instances_info = {}
           for name in ['EC2-CORE', 'EC2-DB']:
-              response = ec2.describe_instances(
-                  Filters=[
-                      {'Name': 'tag:Name', 'Values': [name]},
-                      {'Name': 'instance-state-name', 'Values': ['running']}
-                  ]
-              )
-              if response['Reservations']:
-                  instance = response['Reservations'][0]['Instances'][0]
-                  public_ip = instance.get('PublicIpAddress', 'N/A')
-                  private_ip = instance['PrivateIpAddress']
-                  instances_info[name] = {'public': public_ip, 'private': private_ip}
-                  print(f"{name}: public={public_ip}, private={private_ip}")
+              if name in ips:
+                  instances_info[name] = {
+                      'public': ips[name]['PublicIpAddress'],
+                      'private': ips[name]['PrivateIpAddress']
+                  }
+                  print(f"{name}: public={ips[name]['PublicIpAddress']}, private={ips[name]['PrivateIpAddress']}")
           
           with open('ips.txt', 'w') as f:
-              import json
               json.dump(instances_info, f)
           PYSCRIPT
 
@@ -340,27 +298,20 @@ jobs:
       - name: Get IPs
         run: |
           python3 << 'PYSCRIPT'
-          import boto3
+          import json
           
-          ec2 = boto3.client('ec2', region_name='us-east-1')
+          with open('config/instance_ips.json', 'r') as f:
+              ips = json.load(f)
           
           instances_info = {}
           for name in ['EC2-API-Gateway', 'EC2-CORE']:
-              response = ec2.describe_instances(
-                  Filters=[
-                      {'Name': 'tag:Name', 'Values': [name]},
-                      {'Name': 'instance-state-name', 'Values': ['running']}
-                  ]
-              )
-              if response['Reservations']:
-                  instance = response['Reservations'][0]['Instances'][0]
+              if name in ips:
                   instances_info[name] = {
-                      'public': instance.get('PublicIpAddress', 'N/A'),
-                      'private': instance['PrivateIpAddress']
+                      'public': ips[name]['PublicIpAddress'],
+                      'private': ips[name]['PrivateIpAddress']
                   }
           
           with open('ips.txt', 'w') as f:
-              import json
               json.dump(instances_info, f)
           PYSCRIPT
 
@@ -429,26 +380,19 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install dependencies
-        run: pip install boto3 requests
+        run: pip install requests
 
       - name: Verify Services
         run: |
           python3 << 'PYSCRIPT'
-          import boto3
+          import json
           import requests
           import time
           
-          ec2 = boto3.client('ec2', region_name='us-east-1')
+          with open('config/instance_ips.json', 'r') as f:
+              ips = json.load(f)
           
-          # Get API Gateway IP
-          response = ec2.describe_instances(
-              Filters=[
-                  {'Name': 'tag:Name', 'Values': ['EC2-API-Gateway']},
-                  {'Name': 'instance-state-name', 'Values': ['running']}
-              ]
-          )
-          
-          gateway_ip = response['Reservations'][0]['Instances'][0]['PublicIpAddress']
+          gateway_ip = ips['EC2-API-Gateway']['PublicIpAddress']
           
           print(f"🔍 Verifying deployment on {gateway_ip}...")
           
