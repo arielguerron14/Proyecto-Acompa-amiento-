@@ -84,6 +84,7 @@ try:
     print("\n📋 Desplegando microservicios...")
     for service in services:
         mongo_uri = f"mongodb://root:example@{db_host}:27017/{service['mongo_db']}?authSource=admin"
+        port_num = service['port'].split(':')[0]  # e.g., "3000"
         
         # Expose on all interfaces (0.0.0.0) so it's accessible from other instances
         port_mapping = service['port']  # e.g., "3000:3000"
@@ -93,6 +94,7 @@ try:
           --name {service['name']} \\
           --network core-net \\
           -p {exposed_port} \\
+          -e PORT={port_num} \\
           -e MONGODB_URI="{mongo_uri}" \\
           -e NODE_ENV=production \\
           {service['image']}"""
