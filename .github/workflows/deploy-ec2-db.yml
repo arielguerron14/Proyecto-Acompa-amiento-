@@ -18,11 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Update instance IPs
-        run: |
-          python3 update_instance_ips.py
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Get Instance IP
         run: |

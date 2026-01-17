@@ -18,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -28,8 +29,14 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
-      
-      - name: Build and push proyecto-zookeeper
+            - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+            - name: Build and push proyecto-zookeeper
         uses: docker/build-push-action@v4
         with:
           context: messaging/zookeeper
@@ -53,9 +60,6 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/proyecto-rabbitmq:1.0
       
-      - name: Update instance IPs
-        run: |
-          python3 update_instance_ips.py
 
       - name: Get Instance IP
         run: |

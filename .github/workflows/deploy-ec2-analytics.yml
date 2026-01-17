@@ -18,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -37,10 +38,6 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-analytics:latest
       
-      - name: Update instance IPs
-        run: |
-          python3 update_instance_ips.py
-
       - name: Get Instance IP
         run: |
           INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})

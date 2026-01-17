@@ -31,7 +31,8 @@ jobs:
       - name: Update configuration files
         run: |
           echo "Updating configuration files with new IPs..."
-          python3 update_instance_ips.py instance_ips.json
+          # Pass the instance_ips.json file to the script to avoid calling AWS again
+          python3 update_instance_ips.py
 
       - name: Commit and push changes
         env:
