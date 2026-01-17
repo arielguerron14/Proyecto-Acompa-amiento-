@@ -12,6 +12,7 @@ on:
 env:
   SSH_USER: ubuntu
   SERVICE_NAME: EC2-DB
+  EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
 
 jobs:
   build-and-deploy:
@@ -31,47 +32,70 @@ jobs:
           echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
           echo "✅ Instance IP: $INSTANCE_IP"
 
-      - name: Setup SSH key
+      - name: Deploy to EC2-DB via SSH
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
-          mkdir -p ~/.ssh
-          echo -n "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/labsuser.pem
-          if [ ! -s ~/.ssh/labsuser.pem ]; then
-            echo "ERROR: SSH key file is empty. Check that SSH_PRIVATE_KEY secret is set correctly."
-            exit 1
-          fi
-          chmod 600 ~/.ssh/labsuser.pem
-          ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
-      
-      - name: Deploy to EC2-DB
-        run: |
-          ssh -i ~/.ssh/labsuser.pem ${{ env.SSH_USER }}@${{ env.INSTANCE_IP }} << 'DEPLOY'
-          set -e
-          echo "🚀 Deploying to EC2-DB..."
+          python3 << 'PYSCRIPT'
+          import paramiko
+          import io
+          import os
           
-          # Create volumes if not exist
-          docker volume create mongo_data 2>/dev/null || true
-          docker volume create postgres_data 2>/dev/null || true
-          docker volume create redis_data 2>/dev/null || true
+          ssh_key = os.environ.get("EC2_SSH_KEY", "")
+          if not ssh_key:
+              print("❌ ERROR: EC2_SSH_KEY not set")
+              exit(1)
           
-          # Deploy MongoDB
-          docker pull mongo:latest
-          docker stop mongo 2>/dev/null || true
-          docker rm mongo 2>/dev/null || true
-          docker run -d --name mongo -p 27017:27017 -v mongo_data:/data/db mongo:latest
+          target_host = os.environ.get("INSTANCE_IP")
+          user = os.environ.get("SSH_USER")
           
-          # Deploy PostgreSQL
-          docker pull postgres:latest
-          docker stop postgres 2>/dev/null || true
-          docker rm postgres 2>/dev/null || true
-          docker run -d --name postgres -p 5432:5432 \
-            -e POSTGRES_PASSWORD=postgres \
-            -v postgres_data:/var/lib/postgresql/data \
-            postgres:latest
+          print(f"🔗 Connecting to {target_host}...")
+          ssh = paramiko.SSHClient()
+          ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
           
-          # Deploy Redis
-          docker pull redis:latest
-          docker stop redis 2>/dev/null || true
-          docker rm redis 2>/dev/null || true
+          try:
+              key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
+              ssh.connect(target_host, username=user, pkey=key, timeout=30)
+              print(f"✅ Connected to {target_host}")
+              
+              # Deploy commands
+              commands = [
+                  "set -e",
+                  "echo '🚀 Deploying databases...'",
+                  "docker volume create mongo_data 2>/dev/null || true",
+                  "docker volume create postgres_data 2>/dev/null || true",
+                  "docker volume create redis_data 2>/dev/null || true",
+                  "docker pull mongo:latest",
+                  "docker stop mongo 2>/dev/null || true",
+                  "docker rm mongo 2>/dev/null || true",
+                  "docker run -d --name mongo -p 27017:27017 -v mongo_data:/data/db mongo:latest",
+                  "docker pull postgres:latest",
+                  "docker stop postgres 2>/dev/null || true",
+                  "docker rm postgres 2>/dev/null || true",
+                  "docker run -d --name postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -v postgres_data:/var/lib/postgresql/data postgres:latest",
+                  "docker pull redis:latest",
+                  "docker stop redis 2>/dev/null || true",
+                  "docker rm redis 2>/dev/null || true",
+                  "docker run -d --name redis -p 6379:6379 -v redis_data:/data redis:latest",
+                  "echo '✅ Database deployment complete'"
+              ]
+              
+              deploy_cmd = "; ".join(commands)
+              stdin, stdout, stderr = ssh.exec_command(deploy_cmd)
+              
+              output = stdout.read().decode()
+              errors = stderr.read().decode()
+              
+              if output:
+                  print(output)
+              if errors:
+                  print("Errors:", errors)
+              
+              ssh.close()
+          except Exception as e:
+              print(f"❌ Connection failed: {e}")
+              exit(1)
+          PYSCRIPT
           docker run -d --name redis -p 6379:6379 -v redis_data:/data redis:latest
           
           echo "✅ Verifying deployment..."
@@ -79,5 +103,7 @@ jobs:
           DEPLOY
 
       - name: Check logs
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
           python3 check-container-logs.py
