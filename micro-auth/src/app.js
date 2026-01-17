@@ -49,7 +49,24 @@ const ensureMongoConnected = async (req, res, next) => {
     }
   }
 
-  // If not connecting and not connected, something's wrong
+  // If not connected and not connecting, try to connect now (retry)
+  if (!mongoConnected && !mongoConnecting) {
+    mongoConnecting = true;
+    mongoConnectionPromise = mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+    
+    try {
+      await mongoConnectionPromise;
+      mongoConnected = true;
+      mongoConnecting = false;
+      logger.info(`Mongo connected for micro-auth (retry)`);
+      return next();
+    } catch (err) {
+      mongoConnecting = false;
+      logger.warn(`Mongo connection retry failed: ${err.message}`);
+      return res.status(503).json({ error: 'Database connection failed', message: err.message });
+    }
+  }
+
   return res.status(503).json({ error: 'Database not initialized' });
 };
 
