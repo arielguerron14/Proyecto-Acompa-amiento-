@@ -21,8 +21,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: us-east-1
-
+          aws-region: us-east-1        continue-on-error: true
       - name: Fetch and update instance IPs
         run: |
           echo "🔄 Fetching EC2 instances from AWS..."
