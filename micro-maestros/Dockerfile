@@ -1,21 +1,23 @@
 FROM node:18-alpine
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copy package.json first for caching
+# Copy package.json
 COPY package*.json ./
-
-# Install dependencies (fail fast if there's a real issue)
-RUN npm ci --only=production 2>&1 || npm install --production 2>&1
-
-# Copy application source
 COPY src ./src
 
-# Copy fallback shared-config
-COPY shared-config.js ../shared-config/index.js
+# Copy shared modules to parent directory level so npm can find them via file: references
+COPY shared-auth ../shared-auth
+COPY shared-monitoring ../shared-monitoring
+COPY message-broker ../message-broker
+
+# Create fallback config
+COPY shared-config.js ../shared-config.js
+
+# Install dependencies
+RUN npm install --production
 
 ENV NODE_ENV=production
-# Build version: 2025-01-17-v4
 EXPOSE 3002
 
 CMD ["node", "src/app.js"]
