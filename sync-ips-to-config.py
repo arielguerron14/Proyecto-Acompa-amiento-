@@ -56,6 +56,34 @@ API_GATEWAY_HOST={api_gateway_ip}
 API_GATEWAY_PORT=8080
 """
     
+    # Update api-gateway/.env
+    env_api_gateway = f"""# Auto-generated from config/instance_ips.json
+# Generated: {datetime.now().isoformat()}
+# This .env is used when API Gateway runs in Docker on EC2-CORE
+
+PORT=8080
+
+# Microservices - use localhost since API Gateway runs in Docker on same host
+AUTH_SERVICE_URL=http://micro-auth:3000
+ESTUDIANTES_SERVICE_URL=http://micro-estudiantes:3001
+MAESTROS_SERVICE_URL=http://micro-maestros:3002
+REPORTES_EST_SERVICE=http://micro-reportes-estudiantes:5003
+REPORTES_MAEST_SERVICE=http://micro-reportes-maestros:5004
+
+# Database connections
+MONGO_URL=mongodb://admin:MyMongoProd123!@db:27017/acompaamiento?authSource=admin
+POSTGRES_URL=postgresql://admin:MyPostgresProd123!@db:5432/acompaamiento
+
+LOG_LEVEL=info
+
+# CORS - Allow requests from frontend
+CORS_ORIGIN=http://localhost:5500,http://127.0.0.1:5500,http://{frontend_ip}:5500,https://{frontend_ip}:5500
+
+# Service Registry Configuration
+CORE_HOST=http://localhost
+EC2_CORE_IP={core_ip}
+"""
+    
     # Update docker-compose.frontend.yml
     docker_compose_frontend = f"""version: '3.8'
 services:
@@ -81,6 +109,7 @@ networks:
     files_to_update = {
         '.env.generated': env_generated,
         '.env.prod.frontend': env_prod_frontend,
+        'api-gateway/.env': env_api_gateway,
         'docker-compose.frontend.yml': docker_compose_frontend,
     }
     
