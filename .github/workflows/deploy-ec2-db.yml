@@ -21,6 +21,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Install dependencies
+        run: |
+          pip install paramiko
+
       - name: Get Instance IP
         run: |
           INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})
