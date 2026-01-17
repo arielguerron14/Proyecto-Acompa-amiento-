@@ -30,12 +30,16 @@ const proxyMiddleware = async (req, res, next) => {
       });
     }
 
-    // Determinar el path destino basado en el baseUrl
-    // Si el servicio es auth, agregar /auth al path
+    // Determinar el path destino basado en el servicio
+    // Auth service monta sus rutas bajo /auth, BUT has root-level endpoints like /health, /metrics, /debug/*, /config
     let targetPath = req.path;
     if (service.baseUrl.includes(':3000')) {
-      // Auth service - necesita /auth prefijo
-      if (!req.path.startsWith('/auth')) {
+      // Auth service
+      const rootLevelRoutes = ['/health', '/metrics', '/config', '/debug'];
+      const isRootRoute = rootLevelRoutes.some(route => req.path === route || req.path.startsWith(route + '/'));
+      
+      if (!isRootRoute && !req.path.startsWith('/auth')) {
+        // Auth routes need /auth prefix (e.g., /register → /auth/register)
         targetPath = `/auth${req.path}`;
       }
     }
