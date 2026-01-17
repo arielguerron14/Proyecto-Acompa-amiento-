@@ -4,8 +4,15 @@ const { connectDB } = require('./database');
 const { applySecurity } = require('./middlewares/security');
 const { requestLogger, logger } = require('./middlewares/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
+
 // Import auth middleware from shared package (works both locally and in containers)
-const { optionalAuth } = require('shared-auth');
+let optionalAuth = (req, res, next) => next();
+try {
+  ({ optionalAuth } = require('shared-auth'));
+} catch (err) {
+  console.warn('⚠️  shared-auth not found, optionalAuth is passthrough');
+}
+
 const horariosRoutes = require('./routes/horariosRoutes');
 
 const app = express();
