@@ -93,24 +93,30 @@ jobs:
               
               # Copy .env file to EC2 instance
               print("📄 Copying api-gateway/.env to instance...")
+              # Get home directory first (SFTP doesn't expand ~)
+              stdin, stdout, stderr = ssh.exec_command("echo $HOME")
+              home_dir = stdout.read().decode().strip()
+              target_dir = f"{home_dir}/Projeto-Acompa-imiento-/api-gateway"
+              
               # Ensure target directory exists
-              ssh.exec_command("mkdir -p ~/Proyecto-Acompa-amiento-/api-gateway")
+              ssh.exec_command(f"mkdir -p {target_dir}")
               
               sftp = ssh.open_sftp()
-              sftp.put("api-gateway/.env", "~/Proyecto-Acompa-amiento-/api-gateway/.env")
+              sftp.put("api-gateway/.env", f"{target_dir}/.env")
               sftp.close()
+              print(f"✅ .env copied to {target_dir}/.env")
               
               # Deploy using docker run (since docker-compose may not be installed)
-              cmd = """
-              cd ~ && \
+              env_file_path = f"{target_dir}/.env"
+              cmd = f"""
               export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} && \
               docker stop api-gateway 2>/dev/null || true && \
               docker rm api-gateway 2>/dev/null || true && \
               docker run -d \
                 --name api-gateway \
                 -p 8080:8080 \
-                --env-file ~/Proyecto-Acompa-amiento-/api-gateway/.env \
-                ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest && \
+                --env-file {env_file_path} \
+                ${{DOCKER_USERNAME}}/api-gateway:latest && \
               sleep 2 && \
               docker ps | grep api-gateway
               """
