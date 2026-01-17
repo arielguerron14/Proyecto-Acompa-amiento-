@@ -1,65 +1,65 @@
 {
-    "EC2-Reportes": {
-        "InstanceId": "i-0a211f97cc9943331",
-        "Name": "EC2-Reportes",
-        "PublicIpAddress": "52.200.32.56",
-        "PrivateIpAddress": "172.31.64.219",
-        "Type": "t3.small"
-    },
-    "EC2-Monitoring": {
-        "InstanceId": "i-00838dcc58b3d3186",
-        "Name": "EC2-Monitoring",
-        "PublicIpAddress": "98.88.93.98",
-        "PrivateIpAddress": "172.31.66.203",
-        "Type": "t3.small"
-    },
-    "EC-Bastion": {
-        "InstanceId": "i-03e92ea8bde6dde6a",
-        "Name": "EC-Bastion",
-        "PublicIpAddress": "34.235.224.202",
-        "PrivateIpAddress": "172.31.72.222",
-        "Type": "t3.small"
-    },
-    "EC2-CORE": {
-        "InstanceId": "i-015e5f170f8d6f5a9",
-        "Name": "EC2-CORE",
-        "PublicIpAddress": "18.232.51.134",
-        "PrivateIpAddress": "172.31.79.241",
-        "Type": "t3.small"
-    },
     "EC2-DB": {
-        "InstanceId": "i-0b74bf6db31f46d61",
+        "InstanceId": "i-044d5e68b427462d2",
         "Name": "EC2-DB",
-        "PublicIpAddress": "100.28.252.104",
-        "PrivateIpAddress": "172.31.67.126",
-        "Type": "t3.small"
-    },
-    "EC2-Notificaciones": {
-        "InstanceId": "i-0126c2b076d2faa95",
-        "Name": "EC2-Notificaciones",
-        "PublicIpAddress": "3.229.118.110",
-        "PrivateIpAddress": "172.31.68.227",
-        "Type": "t3.small"
-    },
-    "EC2-Frontend": {
-        "InstanceId": "i-032f3ecc20e4ec058",
-        "Name": "EC2-Frontend",
-        "PublicIpAddress": "44.220.126.89",
-        "PrivateIpAddress": "172.31.69.107",
+        "PublicIpAddress": "3.235.242.53",
+        "PrivateIpAddress": "172.31.65.122",
         "Type": "t3.small"
     },
     "EC2-Messaging": {
-        "InstanceId": "i-06df53474388c3641",
+        "InstanceId": "i-05b542859eb9b6773",
         "Name": "EC2-Messaging",
-        "PublicIpAddress": "44.192.50.144",
-        "PrivateIpAddress": "172.31.67.203",
+        "PublicIpAddress": "44.201.68.131",
+        "PrivateIpAddress": "172.31.68.53",
+        "Type": "t3.small"
+    },
+    "EC2-Notificaciones": {
+        "InstanceId": "i-0310057c92934ed7f",
+        "Name": "EC2-Notificaciones",
+        "PublicIpAddress": "13.222.108.162",
+        "PrivateIpAddress": "172.31.78.38",
+        "Type": "t3.small"
+    },
+    "EC2-Monitoring": {
+        "InstanceId": "i-0c64645c516c89508",
+        "Name": "EC2-Monitoring",
+        "PublicIpAddress": "100.29.147.5",
+        "PrivateIpAddress": "172.31.73.216",
+        "Type": "t3.small"
+    },
+    "EC2-CORE": {
+        "InstanceId": "i-081f465622ca0724a",
+        "Name": "EC2-CORE",
+        "PublicIpAddress": "44.197.251.135",
+        "PrivateIpAddress": "172.31.65.0",
+        "Type": "t3.small"
+    },
+    "EC-Bastion": {
+        "InstanceId": "i-0b042e910a1da4a1f",
+        "Name": "EC-Bastion",
+        "PublicIpAddress": "54.91.218.98",
+        "PrivateIpAddress": "172.31.75.78",
+        "Type": "t3.small"
+    },
+    "EC2-Reportes": {
+        "InstanceId": "i-0341e0dd14abdeb6c",
+        "Name": "EC2-Reportes",
+        "PublicIpAddress": "44.206.88.188",
+        "PrivateIpAddress": "172.31.77.76",
+        "Type": "t3.small"
+    },
+    "EC2-Frontend": {
+        "InstanceId": "i-0d9d6c117eb625c42",
+        "Name": "EC2-Frontend",
+        "PublicIpAddress": "3.231.12.130",
+        "PrivateIpAddress": "172.31.77.249",
         "Type": "t3.small"
     },
     "EC2-API-Gateway": {
-        "InstanceId": "i-0b9cbb0d643ae4c07",
+        "InstanceId": "i-0d545182b7804482d",
         "Name": "EC2-API-Gateway",
-        "PublicIpAddress": "52.7.168.4",
-        "PrivateIpAddress": "172.31.70.85",
+        "PublicIpAddress": "35.168.216.132",
+        "PrivateIpAddress": "172.31.64.195",
         "Type": "t3.small"
     }
 }
