@@ -9,7 +9,6 @@ on:
       - 'micro-auth/**'
       - 'micro-estudiantes/**'
       - 'micro-maestros/**'
-      - 'micro-core/**'
       - '.github/workflows/deploy-ec2-core.yml'
 
 env:
@@ -61,14 +60,6 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-maestros:latest
       
-      - name: Build and push micro-core
-        uses: docker/build-push-action@v4
-        with:
-          context: micro-core
-          file: micro-core/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/micro-core:latest
-      
 
       - name: Get Instance IP
         run: |
@@ -107,14 +98,8 @@ jobs:
           docker rm micro-maestros 2>/dev/null || true
           docker run -d --name micro-maestros -p 5001:5001 ${{ secrets.DOCKER_USERNAME }}/micro-maestros:latest
           
-          # Deploy micro-core
-          docker pull ${{ secrets.DOCKER_USERNAME }}/micro-core:latest
-          docker stop micro-core 2>/dev/null || true
-          docker rm micro-core 2>/dev/null || true
-          docker run -d --name micro-core -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/micro-core:latest
-          
           echo "✅ Verifying deployment..."
-          docker ps | grep -E "micro-auth|micro-estudiantes|micro-maestros|micro-core"
+          docker ps | grep -E "micro-auth|micro-estudiantes|micro-maestros"
           DEPLOY
 
       - name: Check logs
