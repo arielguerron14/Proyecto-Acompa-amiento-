@@ -93,7 +93,7 @@ const server = http.createServer((req, res) => {
     });
 });
 
-const PORT = process.env.FRONTEND_PORT || process.env.PORT || 80;
+const PORT = process.env.FRONTEND_PORT || process.env.PORT || 5500;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Frontend server running at http://0.0.0.0:${PORT}/`);
     console.log(`🔗 API Gateway proxied from: ${API_GATEWAY_URL}`);

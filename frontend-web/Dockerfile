@@ -1,11 +1,22 @@
-FROM nginx:alpine
+FROM node:18-alpine
 
-# Copy frontend files to nginx (paths are relative to build context `./frontend-web`)
-COPY public /usr/share/nginx/html/
+# Set working directory
+WORKDIR /app
 
-# Create a template nginx config that will be processed at runtime
-RUN printf 'server {\n  listen 5500;\n  root /usr/share/nginx/html;\n  index index.html;\n  \n  location / {\n    try_files $uri $uri/ /index.html;\n  }\n}' > /etc/nginx/conf.d/default.conf
+# Copy package files
+COPY package*.json ./
 
+# Install dependencies
+RUN npm install --production
+
+# Copy application files
+COPY . .
+
+# Build Vite/React application if needed
+RUN npm run build 2>/dev/null || true
+
+# Expose port 5500 (server.js listens here)
 EXPOSE 5500
 
-CMD ["nginx", "-g", "daemon off;"]
+# Start server
+CMD ["node", "server.js"]
