@@ -93,14 +93,11 @@ jobs:
               
               # Copy .env file to EC2 instance
               print("📄 Copying api-gateway/.env to instance...")
-              sftp = ssh.open_sftp()
-              try:
-                  sftp.stat("Proyecto-Acompa-amiento-/api-gateway")
-              except IOError:
-                  print("Creating project directories...")
-                  ssh.exec_command("mkdir -p ~/Proyecto-Acompa-amiento-/api-gateway")
+              # Ensure target directory exists
+              ssh.exec_command("mkdir -p ~/Proyecto-Acompa-amiento-/api-gateway")
               
-              sftp.put("api-gateway/.env", "Proyecto-Acompa-imiento-/api-gateway/.env")
+              sftp = ssh.open_sftp()
+              sftp.put("api-gateway/.env", "~/Proyecto-Acompa-amiento-/api-gateway/.env")
               sftp.close()
               
               # Deploy using docker run (since docker-compose may not be installed)
@@ -112,7 +109,7 @@ jobs:
               docker run -d \
                 --name api-gateway \
                 -p 8080:8080 \
-                --env-file Proyecto-Acompa-imiento-/api-gateway/.env \
+                --env-file ~/Proyecto-Acompa-amiento-/api-gateway/.env \
                 ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest && \
               sleep 2 && \
               docker ps | grep api-gateway
