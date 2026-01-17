@@ -28,10 +28,20 @@ const proxyMiddleware = async (req, res, next) => {
       });
     }
 
-    // Construir URL del microservicio
-    const targetUrl = `${service.baseUrl}${req.path}`;
+    // Determinar el path destino basado en el baseUrl
+    // Si el servicio es auth, agregar /auth al path
+    let targetPath = req.path;
+    if (service.baseUrl.includes(':3000')) {
+      // Auth service - necesita /auth prefijo
+      if (!req.path.startsWith('/auth')) {
+        targetPath = `/auth${req.path}`;
+      }
+    }
     
-    console.log(`[PROXY] ${req.method} ${req.path} → ${targetUrl}`);
+    // Construir URL del microservicio
+    const targetUrl = `${service.baseUrl}${targetPath}`;
+    
+    console.log(`[PROXY] ${req.method} ${req.path} → ${targetUrl} (service: ${service.name})`);
 
     // Preparar opciones de la solicitud
     const axiosConfig = {
