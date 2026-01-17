@@ -2,21 +2,21 @@
     "EC2-DB": {
         "InstanceId": "i-044d5e68b427462d2",
         "Name": "EC2-DB",
-        "PublicIpAddress": "3.238.245.148",
+        "PublicIpAddress": "44.201.106.25",
         "PrivateIpAddress": "172.31.65.122",
         "Type": "t3.small"
     },
     "EC2-Messaging": {
         "InstanceId": "i-05b542859eb9b6773",
         "Name": "EC2-Messaging",
-        "PublicIpAddress": "3.236.4.107",
+        "PublicIpAddress": "3.235.188.132",
         "PrivateIpAddress": "172.31.68.53",
         "Type": "t3.small"
     },
     "EC2-Notificaciones": {
         "InstanceId": "i-0310057c92934ed7f",
         "Name": "EC2-Notificaciones",
-        "PublicIpAddress": "44.222.85.84",
+        "PublicIpAddress": "98.93.193.88",
         "PrivateIpAddress": "172.31.78.38",
         "Type": "t3.small"
     },
@@ -30,7 +30,7 @@
     "EC2-CORE": {
         "InstanceId": "i-081f465622ca0724a",
         "Name": "EC2-CORE",
-        "PublicIpAddress": "44.210.132.215",
+        "PublicIpAddress": "3.226.242.64",
         "PrivateIpAddress": "172.31.65.0",
         "Type": "t3.small"
     },
