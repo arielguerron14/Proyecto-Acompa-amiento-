@@ -123,6 +123,11 @@ jobs:
               traceback.print_exc()
               sys.exit(1)
           PYSCRIPT
+
+      - name: Sync IPs to configuration files
+        run: |
+          echo "🔄 Syncing IPs to all configuration files..."
+          python3 sync-ips-to-config.py
     
       - name: Commit and push changes
         env:
@@ -135,12 +140,13 @@ jobs:
           
           git pull --rebase origin main || true
           
-          git add config/instance_ips.json .ssh/config .env.aws 2>/dev/null || true
+          # Stage all updated files
+          git add config/instance_ips.json .ssh/config .env.generated .env.prod.frontend api-gateway/.env docker-compose.frontend.yml 2>/dev/null || true
           
           if git diff --cached --quiet; then
             echo "✅ No changes to commit"
           else
-            git commit -m "chore: Update instance IPs from AWS [automated]"
+            git commit -m "chore: Update instance IPs and sync all configs [automated]"
             git push origin main || true
             echo "✅ Changes pushed successfully"
           fi
