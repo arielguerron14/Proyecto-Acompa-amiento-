@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - 'analytics/**'
+      - 'micro-analytics/**'
       - '.github/workflows/deploy-ec2-analytics.yml'
 
 env:
@@ -37,8 +37,8 @@ jobs:
       - name: Build and push micro-analytics
         uses: docker/build-push-action@v4
         with:
-          context: analytics
-          file: analytics/Dockerfile
+          context: micro-analytics
+          file: micro-analytics/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/micro-analytics:latest
       
