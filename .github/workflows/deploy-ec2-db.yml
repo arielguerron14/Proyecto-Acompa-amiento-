@@ -67,7 +67,7 @@ jobs:
                   "docker pull mongo:6.0",
                   "docker stop mongo 2>/dev/null || true",
                   "docker rm mongo 2>/dev/null || true",
-                  "docker run -d --name mongo -p 27017:27017 -v mongo_data:/data/db mongo:6.0",
+                  "docker run -d --name mongo -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=example -v mongo_data:/data/db mongo:6.0 --auth",
                   "docker pull postgres:15-alpine",
                   "docker stop postgres 2>/dev/null || true",
                   "docker rm postgres 2>/dev/null || true",
@@ -78,7 +78,7 @@ jobs:
                   "docker stop redis 2>/dev/null || true",
                   "docker rm redis 2>/dev/null || true",
                   "docker run -d --name redis -p 6379:6379 -v redis_data:/data redis:7-alpine",
-                  "sleep 3",
+                  "sleep 5",
                   "echo '✅ Database deployment complete'",
                   "docker ps -a --filter 'name=mongo|postgres|redis' --format='table {{.Names}}\t{{.Status}}'",
               ]
