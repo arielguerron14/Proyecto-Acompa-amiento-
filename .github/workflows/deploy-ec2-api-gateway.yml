@@ -117,7 +117,10 @@ jobs:
               docker run -d \
                 --name api-gateway \
                 -p 8080:8080 \
+                -e CORE_HOST=172.31.65.0 \
+                -e NODE_ENV=production \
                 --env-file {env_file_path} \
+                --restart always \
                 {docker_user}/api-gateway:latest && \
               sleep 2 && \
               docker ps | grep api-gateway
