@@ -85,15 +85,19 @@ try:
     for service in services:
         mongo_uri = f"mongodb://root:example@{db_host}:27017/{service['mongo_db']}?authSource=admin"
         
+        # Expose on all interfaces (0.0.0.0) so it's accessible from other instances
+        port_mapping = service['port']  # e.g., "3000:3000"
+        exposed_port = f"0.0.0.0:{port_mapping}"  # e.g., "0.0.0.0:3000:3000"
+        
         cmd = f"""docker run -d \\
           --name {service['name']} \\
           --network core-net \\
-          -p {service['port']} \\
+          -p {exposed_port} \\
           -e MONGODB_URI="{mongo_uri}" \\
           -e NODE_ENV=production \\
           {service['image']}"""
         
-        print(f"  → Desplegando {service['name']}...")
+        print(f"  → Desplegando {service['name']} en 0.0.0.0:{service['port'].split(':')[0]}...")
         stdin, stdout, stderr = ssh.exec_command(cmd)
         container_id = stdout.read().decode('utf-8', errors='ignore').strip()
         if container_id:
