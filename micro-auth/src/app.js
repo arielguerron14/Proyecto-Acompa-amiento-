@@ -19,8 +19,8 @@ try {
   ({ createMetrics } = require('@proyecto/shared-monitoring/src/metrics'));
   ({ metricsMiddleware, metricsRoute } = createMetrics(promClient));
 } catch (err) {
-  // Metrics optional
-  metricsMiddleware = (req, res, next) => next();
+  // Metrics optional - create fallback middleware factories
+  metricsMiddleware = () => (req, res, next) => next();
   metricsRoute = (req, res) => res.status(404).json({ error: 'Metrics not available' });
 }
 
