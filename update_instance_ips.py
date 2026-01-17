@@ -5,15 +5,15 @@ import re
 
 # Mapeo de nombres de instancias a identificadores
 INSTANCE_MAPPING = {
-    'bastion': {'type': 'bastion', 'name_pattern': 'EC2?Bastion|bastion', 'ssh_host': 'bastion'},
-    'core': {'type': 'service', 'name_pattern': 'EC2?Core|core', 'ssh_host': 'core'},
-    'db': {'type': 'database', 'name_pattern': 'EC2?DB|database|db', 'ssh_host': 'db'},
-    'frontend': {'type': 'service', 'name_pattern': 'EC2?Frontend|frontend', 'ssh_host': 'frontend'},
-    'api-gateway': {'type': 'service', 'name_pattern': 'EC2?API|api', 'ssh_host': 'api-gateway'},
-    'messaging': {'type': 'service', 'name_pattern': 'messaging|notificaciones', 'ssh_host': 'messaging'},
-    'monitoring': {'type': 'service', 'name_pattern': 'monitoring|observability', 'ssh_host': 'monitoring'},
-    'notificaciones': {'type': 'service', 'name_pattern': 'notificaciones|notifications', 'ssh_host': 'notificaciones'},
-    'reportes': {'type': 'service', 'name_pattern': 'reportes|reports', 'ssh_host': 'reportes'},
+    'bastion': {'type': 'bastion', 'name_pattern': 'EC-?Bastion|bastion', 'ssh_host': 'bastion'},
+    'core': {'type': 'service', 'name_pattern': 'EC2-CORE|core', 'ssh_host': 'core'},
+    'db': {'type': 'database', 'name_pattern': 'EC2-DB|database|db', 'ssh_host': 'db'},
+    'frontend': {'type': 'service', 'name_pattern': 'EC2-Frontend|frontend', 'ssh_host': 'frontend'},
+    'api-gateway': {'type': 'service', 'name_pattern': 'EC2-API|api-gateway', 'ssh_host': 'api-gateway'},
+    'messaging': {'type': 'service', 'name_pattern': 'messaging', 'ssh_host': 'messaging'},
+    'monitoring': {'type': 'service', 'name_pattern': 'EC2-Monitoring|monitoring', 'ssh_host': 'monitoring'},
+    'notificaciones': {'type': 'service', 'name_pattern': 'EC2-Notificaciones|notificaciones', 'ssh_host': 'notificaciones'},
+    'reportes': {'type': 'service', 'name_pattern': 'EC2-Reportes|reportes', 'ssh_host': 'reportes'},
 }
 
 def get_instance_details():

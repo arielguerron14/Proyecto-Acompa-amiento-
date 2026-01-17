@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 # Instance mapping
 $Instances = @{
     "frontend"       = "44.220.126.89"
-    "api-gateway"    = "52.7.168.4"
+    "api-gateway"    = "35.168.216.132"
     "core"           = "13.222.63.75"
     "db"             = "100.31.104.252"
     "messaging"      = "98.93.37.132"
@@ -127,7 +127,7 @@ Write-Host "══════════════════════�
 Write-Host ""
 Write-Host "Services available at:" -ForegroundColor Green
 Write-Host "🌐 Frontend:        http://44.220.126.89" -ForegroundColor Cyan
-Write-Host "🔌 API Gateway:     http://52.7.168.4:8080" -ForegroundColor Cyan
+Write-Host "🔌 API Gateway:     http://35.168.216.132:8080" -ForegroundColor Cyan
 Write-Host "🔐 Core Services:   http://13.222.63.75:3000" -ForegroundColor Cyan
 Write-Host "💾 Database:        postgresql://100.31.104.252:5432" -ForegroundColor Cyan
 Write-Host "📢 Messaging:       98.93.37.132:5672" -ForegroundColor Cyan

@@ -10,7 +10,7 @@ SSH_USER="ubuntu"
 # Instance mapping
 declare -A INSTANCES=(
     ["frontend"]="44.220.126.89"
-    ["api-gateway"]="52.7.168.4"
+    ["api-gateway"]="35.168.216.132"
     ["core"]="13.222.63.75"
     ["db"]="100.31.104.252"
     ["messaging"]="98.93.37.132"
@@ -110,7 +110,7 @@ echo "════════════════════════�
 echo ""
 echo "Services available at:"
 echo "🌐 Frontend:        http://44.220.126.89"
-echo "🔌 API Gateway:     http://52.7.168.4:8080"
+echo "🔌 API Gateway:     http://35.168.216.132:8080"
 echo "🔐 Core Services:   http://13.222.63.75:3000"
 echo "💾 Database:        postgresql://100.31.104.252:5432"
 echo "📢 Messaging:       98.93.37.132:5672"

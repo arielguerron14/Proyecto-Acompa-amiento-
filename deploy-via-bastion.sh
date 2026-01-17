@@ -10,7 +10,7 @@ echo ""
 # Array of instances
 declare -a INSTANCES=(
     "ubuntu@44.220.126.89:docker-compose.frontend.yml"
-    "ubuntu@52.7.168.4:docker-compose.api-gateway.yml"
+    "ubuntu@35.168.216.132:docker-compose.api-gateway.yml"
     "ubuntu@13.222.63.75:docker-compose.core.yml"
     "ubuntu@100.31.104.252:docker-compose.infrastructure.yml"
     "ubuntu@98.93.37.132:docker-compose.messaging.yml"

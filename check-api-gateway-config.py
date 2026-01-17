@@ -11,7 +11,7 @@ if not SSH_KEY_CONTENT:
     exit(1)
 
 # API Gateway public IP
-API_GATEWAY_HOST = "52.7.168.4"
+API_GATEWAY_HOST = "35.168.216.132"
 USER = "ubuntu"
 
 ssh = paramiko.SSHClient()
