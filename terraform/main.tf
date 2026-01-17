@@ -1,5 +1,5 @@
-# Trigger: push para ejecutar workflow tras credenciales
-# Trigger: cambio menor para ejecutar workflow
+# Auto-trigger workflow on push
+# Last updated: 2026-01-16
 provider "aws" {
   region = var.region
 }
