@@ -45,6 +45,7 @@ let corsOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:5500',
   'http://127.0.0.1:3000',
+  'http://3.231.12.130:5500',  // Current EC2-Frontend IP
 ];
 
 // Add origins from environment variables
