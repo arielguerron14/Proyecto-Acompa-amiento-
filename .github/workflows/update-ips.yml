@@ -53,5 +53,21 @@ jobs:
             echo "✅ No changes to commit"
           else
             git commit -m "chore: Update instance IPs and sync all configs [automated]"
-            git push origin main || echo "⚠️ Push failed, but configuration synced locally"
+            
+            # Pull before push to avoid conflicts
+            echo "📥 Pulling latest changes..."
+            git pull --rebase origin main || true
+            
+            # Push with retry
+            echo "📤 Pushing changes..."
+            for i in {1..3}; do
+              if git push origin main; then
+                echo "✅ Push successful"
+                exit 0
+              else
+                echo "⏳ Push attempt $i failed, retrying..."
+                sleep 5
+              fi
+            done
+            echo "⚠️ Push failed after 3 attempts, but configuration synced"
           fi
