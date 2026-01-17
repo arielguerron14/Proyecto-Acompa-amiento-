@@ -112,11 +112,24 @@ jobs:
           ssh = paramiko.SSHClient()
           ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
           
+          # Retry connection up to 5 times
+          max_retries = 5
+          for attempt in range(max_retries):
+              try:
+                  key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key_str))
+                  ssh.connect(target_host, username='ubuntu', pkey=key, timeout=30)
+                  print("✅ Connected")
+                  break
+              except Exception as e:
+                  if attempt < max_retries - 1:
+                      print(f"⏳ Connection attempt {attempt + 1} failed: {str(e)[:50]}")
+                      print(f"   Retrying in 10 seconds...")
+                      time.sleep(10)
+                  else:
+                      print(f"❌ Failed to connect after {max_retries} attempts: {e}")
+                      exit(1)
+          
           try:
-              key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key_str))
-              ssh.connect(target_host, username='ubuntu', pkey=key, timeout=30)
-              print("✅ Connected")
-              
               # MongoDB
               print("\n📦 Deploying MongoDB...")
               commands = [
