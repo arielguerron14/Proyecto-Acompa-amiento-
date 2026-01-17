@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import paramiko
 import io
+import os
 
 SSH_KEY_CONTENT = """-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEAwNZvdzm4oVXLj4H6MONFoJozy7e4IR6WKkzEQB7K6SaSoJJd
@@ -30,13 +31,16 @@ eupWWNpR71UITrPz+V6Se1bnu3ZU3tQpfGYjQLSGzdda8iecMgVpkHwa2gQqalCX
 ZQ0T//skZFEaxod2MIoVK14xmksGh1NZymeXfKPrtek2lDHklB+AtQ==
 -----END RSA PRIVATE KEY-----"""
 
-CORE_HOST = "3.236.51.29"
+# Get instance IP from environment variable, fallback to hardcoded
+TARGET_HOST = os.environ.get("INSTANCE_IP", "3.236.51.29")
 USER = "ubuntu"
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 key = paramiko.RSAKey.from_private_key(io.StringIO(SSH_KEY_CONTENT))
-ssh.connect(CORE_HOST, username=USER, pkey=key, timeout=30)
+print(f"🔗 Connecting to {TARGET_HOST}...")
+ssh.connect(TARGET_HOST, username=USER, pkey=key, timeout=30)
+print(f"✅ Connected to {TARGET_HOST}")
 
 containers = [
     "proyecto-acompa-amiento--micro-maestros-1",
