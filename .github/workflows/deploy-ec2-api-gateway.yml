@@ -69,6 +69,7 @@ jobs:
       - name: Deploy to EC2-API-Gateway via SSH
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          DOCKER_USERNAME_VAR: ${{ secrets.DOCKER_USERNAME }}
         run: |
           python3 << 'PYSCRIPT'
           import paramiko, io, os
@@ -77,6 +78,7 @@ jobs:
               print("❌ ERROR: EC2_SSH_KEY not set"); exit(1)
           target_host = os.environ.get("INSTANCE_IP")
           user = os.environ.get("SSH_USER")
+          docker_user = os.environ.get("DOCKER_USERNAME_VAR")
           print(f"🔗 Connecting to {target_host}...")
           ssh = paramiko.SSHClient()
           ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -86,7 +88,7 @@ jobs:
               print(f"✅ Connected")
               
               # Pull latest image
-              cmd_pull = "docker pull ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest"
+              cmd_pull = f"docker pull {docker_user}/api-gateway:latest"
               stdin, stdout, stderr = ssh.exec_command(cmd_pull)
               print("Pulling image...")
               print(stdout.read().decode())
@@ -108,7 +110,6 @@ jobs:
               
               # Deploy using docker run (since docker-compose may not be installed)
               env_file_path = f"{target_dir}/.env"
-              docker_user = "${{ secrets.DOCKER_USERNAME }}"
               cmd = f"""
               export DOCKER_USERNAME={docker_user} && \
               docker stop api-gateway 2>/dev/null || true && \
@@ -117,7 +118,7 @@ jobs:
                 --name api-gateway \
                 -p 8080:8080 \
                 --env-file {env_file_path} \
-                ${{docker_user}}/api-gateway:latest && \
+                {docker_user}/api-gateway:latest && \
               sleep 2 && \
               docker ps | grep api-gateway
               """
