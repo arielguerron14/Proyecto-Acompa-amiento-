@@ -12,6 +12,15 @@ const SERVICE_REGISTRY = require('../config/service-registry');
  */
 const proxyMiddleware = async (req, res, next) => {
   try {
+    // Handle CORS preflight requests - respond immediately with CORS headers
+    if (req.method === 'OPTIONS') {
+      console.log(`[CORS PREFLIGHT] ${req.method} ${req.path}`);
+      res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+      res.set('Access-Control-Allow-Credentials', 'true');
+      return res.status(200).send('');
+    }
+
     // These are API Gateway special endpoints, not microservice endpoints
     // Don't proxy them (the server already handles them)
     // But DO proxy /health when coming from microservice routes
