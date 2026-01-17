@@ -4,7 +4,6 @@ WORKDIR /usr/src/app
 
 # Copy shared modules and this service
 COPY shared-monitoring ../shared-monitoring/
-COPY message-broker ../message-broker/
 COPY micro-reportes-estudiantes .
 
 # Install dependencies

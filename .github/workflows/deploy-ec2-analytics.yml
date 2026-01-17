@@ -11,7 +11,7 @@ on:
 
 env:
   SSH_USER: ubuntu
-  SERVICE_NAME: EC2-CORE
+  SERVICE_NAME: EC2-Reportes
   EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
 
 jobs:
@@ -45,7 +45,7 @@ jobs:
       
       - name: Get Instance IP
         run: |
-          INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})
+          INSTANCE_IP=$(python3 get_instance_ip.py "EC2-Reportes")
           echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
           echo "✅ Instance IP: $INSTANCE_IP"
 

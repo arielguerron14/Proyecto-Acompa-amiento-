@@ -11,17 +11,26 @@ import os
 
 # Mapeo de nombres de servicio a nombres de instancia
 SERVICE_MAPPING = {
-    'api-gateway': 'api-gateway',
-    'bastion': 'bastion',
-    'core': 'core',
-    'database': 'db',
-    'db': 'db',
-    'analytics': 'analytics',
-    'monitoring': 'monitoring',
-    'notificaciones': 'notificaciones',
-    'messaging': 'messaging',
-    'frontend': 'frontend',
-    'reportes': 'reportes',
+    'api-gateway': 'EC2-API-Gateway',
+    'EC2-API-Gateway': 'EC2-API-Gateway',
+    'bastion': 'EC-Bastion',
+    'EC-Bastion': 'EC-Bastion',
+    'core': 'EC2-CORE',
+    'EC2-CORE': 'EC2-CORE',
+    'database': 'EC2-DB',
+    'db': 'EC2-DB',
+    'EC2-DB': 'EC2-DB',
+    'analytics': 'EC2-Reportes',
+    'EC2-Reportes': 'EC2-Reportes',
+    'monitoring': 'EC2-Monitoring',
+    'EC2-Monitoring': 'EC2-Monitoring',
+    'notificaciones': 'EC2-Notificaciones',
+    'EC2-Notificaciones': 'EC2-Notificaciones',
+    'messaging': 'EC2-Messaging',
+    'EC2-Messaging': 'EC2-Messaging',
+    'frontend': 'EC2-Frontend',
+    'EC2-Frontend': 'EC2-Frontend',
+    'reportes': 'EC2-Reportes',
 }
 
 def get_instance_ip(service_name):

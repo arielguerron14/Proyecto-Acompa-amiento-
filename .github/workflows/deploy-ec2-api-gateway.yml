@@ -62,7 +62,7 @@ jobs:
 
       - name: Get Instance IP
         run: |
-          INSTANCE_IP=$(python3 get_instance_ip.py ${{ env.SERVICE_NAME }})
+          INSTANCE_IP=$(python3 get_instance_ip.py "EC2-API-Gateway")
           echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
           echo "✅ Instance IP: $INSTANCE_IP"
 
