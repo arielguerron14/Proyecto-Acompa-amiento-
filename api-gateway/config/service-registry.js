@@ -114,12 +114,17 @@ const SERVICE_REGISTRY = {
   },
   
   // Gateway routes mapping - Qué servicio maneja cada ruta
+  // NOTA: Estas rutas son evaluadas DESPUÉS de que Express elimina el prefijo
+  // Ej: POST /auth/register llega a la middleware como /register
   routes: {
-    // Auth routes
-    '/auth/*': 'auth',
-    '/login': 'auth',
+    // Auth routes (handled by /auth middleware)
     '/register': 'auth',
+    '/login': 'auth',
     '/verify': 'auth',
+    '/health': 'auth',
+    '/auth/*': 'auth',
+    '/': 'auth',
+    '/*': 'auth',
     
     // Students routes
     '/estudiantes': 'estudiantes',
