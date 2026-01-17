@@ -1,6 +1,6 @@
 const express = require('express');
 const analyticsController = require('../controllers/analyticsController');
-const { authenticateToken, requireRole } = require('../../../shared-auth/src/middlewares/authMiddleware');
+const { authenticateToken, requireRole } = require('@proyecto/shared-auth/src/middlewares/authMiddleware');
 
 const router = express.Router();
 

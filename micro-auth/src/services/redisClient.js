@@ -1,5 +1,5 @@
 const redis = require('redis');
-const { logger } = require('../../../shared-auth/src/middlewares/logger');
+const { logger } = require('@proyecto/shared-auth/src/middlewares/logger');
 
 // Redis client configuration
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';

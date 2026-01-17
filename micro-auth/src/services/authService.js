@@ -1,1 +1,1 @@
-module.exports = require('../../../shared-auth/src/services/authService');
+module.exports = require('@proyecto/shared-auth/src/services/authService');

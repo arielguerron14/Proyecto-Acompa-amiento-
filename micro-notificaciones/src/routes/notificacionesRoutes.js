@@ -1,6 +1,6 @@
 const express = require('express');
 const notificacionesController = require('../controllers/notificacionesController');
-const { authenticateToken } = require('../../../shared-auth/src/middlewares/authMiddleware');
+const { authenticateToken } = require('@proyecto/shared-auth/src/middlewares/authMiddleware');
 
 const router = express.Router();
 

@@ -1,5 +1,5 @@
 const { getClient, isConnected } = require('./redisClient');
-const { logger } = require('../../../shared-auth/src/middlewares/logger');
+const { logger } = require('@proyecto/shared-auth/src/middlewares/logger');
 
 // Fallback to in-memory cache if Redis is not available
 const memoryCache = new Map();

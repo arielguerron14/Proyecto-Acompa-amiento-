@@ -1,6 +1,6 @@
-const AuthService = require('../../../shared-auth/src/services/authService');
+const AuthService = require('@proyecto/shared-auth/src/services/authService');
 const SessionService = require('../services/sessionService');
-const { logger } = require('../../../shared-auth/src/middlewares/logger');
+const { logger } = require('@proyecto/shared-auth/src/middlewares/logger');
 
 /**
  * Middleware de autenticación con verificación de tokenVersion

@@ -1,8 +1,8 @@
 const express = require('express');
 require('dotenv').config();
 const soapRoutes = require('./routes/soapRoutes');
-const { requestLogger, logger } = require('../../../shared-auth/src/middlewares/logger');
-const { errorHandler, notFound } = require('../../../shared-auth/src/middlewares/errorHandler');
+const { requestLogger, logger } = require('@proyecto/shared-auth/src/middlewares/logger');
+const { errorHandler, notFound } = require('@proyecto/shared-auth/src/middlewares/errorHandler');
 
 const app = express();
 

@@ -1,4 +1,4 @@
-const AuthService = require('../../../shared-auth/src/services/authService');
+const AuthService = require('@proyecto/shared-auth/src/services/authService');
 
 /**
  * verifyToken: Valida la identidad únicamente mediante JWT.
@@ -48,7 +48,7 @@ exports.validatePermission = (req, res) => {
       return res.status(400).json({ error: 'Role and requiredPermission required' });
     }
 
-    const { ROLE_PERMISSIONS } = require('../../../shared-auth/src/constants/roles');
+    const { ROLE_PERMISSIONS } = require('@proyecto/shared-auth/src/constants/roles');
     const perms = ROLE_PERMISSIONS[role] || [];
 
     // Match exact or prefix (e.g., 'manage' matches 'manage:users')
@@ -64,7 +64,7 @@ exports.validatePermission = (req, res) => {
  * Return available roles
  */
 exports.getRoles = (req, res) => {
-  const { ROLES } = require('../../../shared-auth/src/constants/roles');
+  const { ROLES } = require('@proyecto/shared-auth/src/constants/roles');
   return res.status(200).json({ roles: Object.values(ROLES) });
 };
 
@@ -73,7 +73,7 @@ exports.getRoles = (req, res) => {
  */
 exports.getRolePermissions = (req, res) => {
   const roleId = req.params.roleId;
-  const { ROLE_PERMISSIONS } = require('../../../shared-auth/src/constants/roles');
+  const { ROLE_PERMISSIONS } = require('@proyecto/shared-auth/src/constants/roles');
   const perms = ROLE_PERMISSIONS[roleId];
   if (!perms) {
     return res.status(404).json({ error: `${roleId} not found` });

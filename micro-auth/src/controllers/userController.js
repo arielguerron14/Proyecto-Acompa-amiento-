@@ -1,7 +1,7 @@
-const AuthService = require('../../../shared-auth/src/services/authService');
+const AuthService = require('@proyecto/shared-auth/src/services/authService');
 const SessionService = require('../services/sessionService');
 const User = require('../models/User');
-const { logger } = require('../../../shared-auth/src/middlewares/logger');
+const { logger } = require('@proyecto/shared-auth/src/middlewares/logger');
 
 /**
  * UserController: Maneja login, register, logout

@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const serviceRegistry = require('./config/service-registry');
 const { proxyMiddleware, configEndpoint, servicesEndpoint, healthEndpoint } = require('./middleware/proxy');
 
@@ -36,31 +38,56 @@ console.log(`  🔑 KEY: Change CORE_HOST once and all routes automatically upda
 
 const app = express();
 
-// CORS - Allow frontend and development origins
-const corsOrigins = [
+// Build CORS origins dynamically
+let corsOrigins = [
   'http://localhost:5500',
   'http://localhost:3000',
   'http://localhost:8080',
-  'http://54.85.92.175',
-  'https://54.85.92.175',
-  'http://107.21.124.81',
-  'https://107.21.124.81',
-  'http://44.220.126.89',
-  'https://44.220.126.89'
+  'http://127.0.0.1:5500',
+  'http://127.0.0.1:3000',
 ];
+
+// Add origins from environment variables
+const envOrigins = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '';
+if (envOrigins) {
+  corsOrigins.push(...envOrigins.split(',').map(o => o.trim()).filter(o => o));
+}
+
+// Add Frontend IP from config/instance_ips.json
+try {
+  const configPath = path.join(__dirname, '..', 'config', 'instance_ips.json');
+  if (fs.existsSync(configPath)) {
+    const instances = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    if (instances['EC2-Frontend']) {
+      const frontendIp = instances['EC2-Frontend'].PublicIpAddress;
+      corsOrigins.push(`http://${frontendIp}:5500`);
+      corsOrigins.push(`https://${frontendIp}:5500`);
+    }
+  }
+} catch (e) {
+  console.warn('⚠️  Could not load Frontend IP from config:', e.message);
+}
+
+// Remove duplicates
+corsOrigins = [...new Set(corsOrigins)];
+
+console.log(`\n📌 CORS Origins allowed (${corsOrigins.length}):`);
+corsOrigins.forEach(origin => console.log(`   • ${origin}`));
 
 app.use(cors({
   origin: corsOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
 app.options('*', cors({
   origin: corsOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
 // Middleware
