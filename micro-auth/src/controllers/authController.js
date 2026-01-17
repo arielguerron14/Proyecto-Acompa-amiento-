@@ -66,7 +66,12 @@ exports.validatePermission = (req, res) => {
       return res.status(400).json({ error: 'Role and requiredPermission required' });
     }
 
-    const { ROLE_PERMISSIONS } = require('@proyecto/shared-auth/src/constants/roles');
+    let ROLE_PERMISSIONS;
+    try {
+      ({ ROLE_PERMISSIONS } = require('@proyecto/shared-auth/src/constants/roles'));
+    } catch (err) {
+      ({ ROLE_PERMISSIONS } = require('../fallback/roles'));
+    }
     const perms = ROLE_PERMISSIONS[role] || [];
 
     // Match exact or prefix (e.g., 'manage' matches 'manage:users')
@@ -82,7 +87,12 @@ exports.validatePermission = (req, res) => {
  * Return available roles
  */
 exports.getRoles = (req, res) => {
-  const { ROLES } = require('@proyecto/shared-auth/src/constants/roles');
+  let ROLES;
+  try {
+    ({ ROLES } = require('@proyecto/shared-auth/src/constants/roles'));
+  } catch (err) {
+    ({ ROLES } = require('../fallback/roles'));
+  }
   return res.status(200).json({ roles: Object.values(ROLES) });
 };
 
@@ -91,7 +101,12 @@ exports.getRoles = (req, res) => {
  */
 exports.getRolePermissions = (req, res) => {
   const roleId = req.params.roleId;
-  const { ROLE_PERMISSIONS } = require('@proyecto/shared-auth/src/constants/roles');
+  let ROLE_PERMISSIONS;
+  try {
+    ({ ROLE_PERMISSIONS } = require('@proyecto/shared-auth/src/constants/roles'));
+  } catch (err) {
+    ({ ROLE_PERMISSIONS } = require('../fallback/roles'));
+  }
   const perms = ROLE_PERMISSIONS[roleId];
   if (!perms) {
     return res.status(404).json({ error: `${roleId} not found` });

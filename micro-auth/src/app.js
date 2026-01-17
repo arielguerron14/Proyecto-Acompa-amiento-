@@ -4,11 +4,25 @@ const authRoutes = require('./routes/authRoutes');
 const { initRedis } = require('./services/redisClient');
 const mongoose = require('mongoose');
 const { MONGO_URI } = require('./config');
-const { requestLogger, logger } = require('@proyecto/shared-auth/src/middlewares/logger');
-const { errorHandler, notFound } = require('@proyecto/shared-auth/src/middlewares/errorHandler');
-const promClient = require('prom-client');
-const { createMetrics } = require('@proyecto/shared-monitoring/src/metrics');
-const { metricsMiddleware, metricsRoute } = createMetrics(promClient);
+
+let requestLogger, logger, errorHandler, notFound;
+try {
+  ({ requestLogger, logger } = require('@proyecto/shared-auth/src/middlewares/logger'));
+  ({ errorHandler, notFound } = require('@proyecto/shared-auth/src/middlewares/errorHandler'));
+} catch (err) {
+  ({ requestLogger, logger, errorHandler, notFound } = require('./fallback/logger'));
+}
+
+let promClient, createMetrics, metricsMiddleware, metricsRoute;
+try {
+  promClient = require('prom-client');
+  ({ createMetrics } = require('@proyecto/shared-monitoring/src/metrics'));
+  ({ metricsMiddleware, metricsRoute } = createMetrics(promClient));
+} catch (err) {
+  // Metrics optional
+  metricsMiddleware = (req, res, next) => next();
+  metricsRoute = (req, res) => res.status(404).json({ error: 'Metrics not available' });
+}
 
 const app = express();
 

@@ -1,5 +1,11 @@
 const { getClient, isConnected } = require('./redisClient');
-const { logger } = require('@proyecto/shared-auth/src/middlewares/logger');
+
+let logger;
+try {
+  ({ logger } = require('@proyecto/shared-auth/src/middlewares/logger'));
+} catch (err) {
+  ({ logger } = require('../fallback/logger'));
+}
 
 /**
  * SessionService: Maneja versiones de token en Redis/memoria

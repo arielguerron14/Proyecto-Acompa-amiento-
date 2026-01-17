@@ -1,6 +1,18 @@
-const AuthService = require('@proyecto/shared-auth/src/services/authService');
+let AuthService;
+try {
+  AuthService = require('@proyecto/shared-auth/src/services/authService');
+} catch (err) {
+  AuthService = require('../fallback/authService');
+}
+
 const SessionService = require('../services/sessionService');
-const { logger } = require('@proyecto/shared-auth/src/middlewares/logger');
+
+let logger;
+try {
+  ({ logger } = require('@proyecto/shared-auth/src/middlewares/logger'));
+} catch (err) {
+  ({ logger } = require('../fallback/logger'));
+}
 
 /**
  * Middleware de autenticación con verificación de tokenVersion
