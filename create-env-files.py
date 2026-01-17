@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
+"""
+Create .env files on EC2 instances using config/instance_ips.json as source of truth
+"""
 import paramiko
 import io
+import json
+from pathlib import Path
+
+# Read instance IPs from config
+config_path = Path(__file__).parent / 'config' / 'instance_ips.json'
+with open(config_path) as f:
+    instances = json.load(f)
+
+# Extract IPs from config (source of truth)
+core_ip = instances['EC2-CORE']['PublicIpAddress']
+db_ip = instances['EC2-DB']['PublicIpAddress']
 
 SSH_KEY_CONTENT = """-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEAwNZvdzm4oVXLj4H6MONFoJozy7e4IR6WKkzEQB7K6SaSoJJd
@@ -30,10 +44,12 @@ eupWWNpR71UITrPz+V6Se1bnu3ZU3tQpfGYjQLSGzdda8iecMgVpkHwa2gQqalCX
 ZQ0T//skZFEaxod2MIoVK14xmksGh1NZymeXfKPrtek2lDHklB+AtQ==
 -----END RSA PRIVATE KEY-----"""
 
-HOST = "3.236.51.29"
+HOST = core_ip
 USER = "ubuntu"
 
-# Create .env files content
+print(f"📍 Using EC2-CORE IP from config: {HOST}")
+
+# Create .env files content (IPs consumed from config/instance_ips.json)
 env_files = {
     "micro-auth/.env": """NODE_ENV=production
 SERVICE_NAME=micro-auth
@@ -67,7 +83,7 @@ MONGO_URL=mongodb://admin:MyMongoProd123!@localhost:27017/acompaamiento?authSour
 PORT=5004
 LOG_LEVEL=info
 """,
-    "api-gateway/.env": """NODE_ENV=production
+    "api-gateway/.env": f"""NODE_ENV=production
 SERVICE_NAME=api-gateway
 PORT=8080
 AUTH_SERVICE_URL=http://localhost:3000
@@ -76,7 +92,7 @@ MAESTROS_SERVICE_URL=http://localhost:3002
 REPORTES_EST_SERVICE=http://localhost:5003
 REPORTES_MAEST_SERVICE=http://localhost:5004
 LOG_LEVEL=info
-CORS_ORIGIN=http://44.220.126.89,http://52.7.168.4
+CORS_ORIGIN=http://localhost,http://127.0.0.1
 """
 }
 
