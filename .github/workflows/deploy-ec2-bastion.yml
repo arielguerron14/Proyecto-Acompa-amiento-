@@ -11,7 +11,7 @@ on:
 
 env:
   SSH_USER: ubuntu
-  SERVICE_NAME: bastion
+  SERVICE_NAME: EC-Bastion
   DOCKER_SERVICE: bastion-host:latest
 
 jobs:

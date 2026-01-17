@@ -11,7 +11,7 @@ on:
 
 env:
   SSH_USER: ubuntu
-  SERVICE_NAME: notificaciones
+  SERVICE_NAME: EC2-Notificaciones
 
 jobs:
   build-and-deploy:

@@ -11,7 +11,7 @@ on:
 
 env:
   SSH_USER: ubuntu
-  SERVICE_NAME: frontend
+  SERVICE_NAME: EC2-Frontend
 
 jobs:
   build-and-deploy:

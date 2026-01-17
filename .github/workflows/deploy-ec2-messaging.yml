@@ -11,7 +11,7 @@ on:
 
 env:
   SSH_USER: ubuntu
-  SERVICE_NAME: messaging
+  SERVICE_NAME: EC2-Messaging
 
 jobs:
   build-and-deploy:

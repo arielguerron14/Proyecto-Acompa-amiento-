@@ -12,7 +12,7 @@ on:
 
 env:
   SSH_USER: ubuntu
-  SERVICE_NAME: reportes
+  SERVICE_NAME: EC2-Reportes
 
 jobs:
   build-and-deploy:

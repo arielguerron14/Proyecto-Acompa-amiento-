@@ -11,7 +11,7 @@ on:
 
 env:
   SSH_USER: ubuntu
-  SERVICE_NAME: database
+  SERVICE_NAME: EC2-DB
 
 jobs:
   build-and-deploy:

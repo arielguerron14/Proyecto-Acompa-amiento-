@@ -11,7 +11,7 @@ on:
 
 env:
   SSH_USER: ubuntu
-  SERVICE_NAME: analytics
+  SERVICE_NAME: EC2-CORE
 
 jobs:
   build-and-deploy:
