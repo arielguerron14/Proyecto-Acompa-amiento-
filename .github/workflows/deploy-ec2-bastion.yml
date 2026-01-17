@@ -10,7 +10,7 @@ on:
       - '.github/workflows/deploy-ec2-bastion.yml'
 
 env:
-  SSH_USER: ec2-user
+  SSH_USER: ubuntu
   SERVICE_NAME: bastion
   DOCKER_SERVICE: bastion-host:latest
 
