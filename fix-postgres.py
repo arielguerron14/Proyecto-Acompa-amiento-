@@ -36,6 +36,8 @@ try:
     cmds = [
         "docker stop postgres 2>/dev/null || true",
         "docker rm postgres 2>/dev/null || true",
+        "docker volume rm postgres_data 2>/dev/null || true",
+        "docker volume create postgres_data",
     ]
     
     for cmd in cmds:
@@ -45,7 +47,7 @@ try:
             print(f"  {output.strip()}")
     
     # Levantar PostgreSQL con env vars correctas
-    print("\n📋 Levantando PostgreSQL con variables de entorno correctas...")
+    print("\n📋 Levantando PostgreSQL 15-alpine con variables de entorno correctas...")
     cmd = """docker run -d \\
       --name postgres \\
       -p 5432:5432 \\
