@@ -1,13 +1,14 @@
 const dotenv = require('dotenv');
-const sharedConfig = require('../../../shared-config');
 
 dotenv.config();
 
-// Cargar configuración centralizada de infraestructura
-let infraConfig;
+// Try to load shared config, but continue without if not available
+let sharedConfig = {};
 try {
-  infraConfig = require('../../../infrastructure.config.js');
+  sharedConfig = require('../../../shared-config');
 } catch (err) {
+  console.warn('⚠️  shared-config not found, using environment variables only');
+}
   console.warn('⚠️  No se pudo cargar infrastructure.config.js, usando fallbacks');
   infraConfig = null;
 }

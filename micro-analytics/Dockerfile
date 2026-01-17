@@ -2,16 +2,15 @@ FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
-# Copy application code
-COPY . .
+# Copy only package.json and package-lock.json first for better caching
+COPY micro-analytics/package*.json ./
 
-# copy package manifests and install (production)
+# Install dependencies
 RUN npm ci --only=production --silent || npm install --production --silent
 
-# create symlinks for shared dependencies (point to /usr/src/shared-auth)
-RUN mkdir -p node_modules && \
-    ln -sf /usr/src/shared-auth node_modules/shared-auth && \
-    ln -sf /usr/src/shared-monitoring node_modules/shared-monitoring
+# Copy source code
+COPY micro-analytics/src ./src
+COPY micro-analytics/.env* ./
 
 ENV NODE_ENV=production
 EXPOSE 5007
