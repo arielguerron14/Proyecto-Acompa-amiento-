@@ -2,10 +2,7 @@ version: '3.8'
 
 services:
   api-gateway:
-    build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
-    image: api-gateway:latest
+    image: ${DOCKER_USERNAME}/api-gateway:latest
     container_name: api-gateway
     restart: unless-stopped
     ports:
@@ -14,15 +11,21 @@ services:
       - api-gateway-net
     environment:
       NODE_ENV: production
-      DOCKER_DEPLOYMENT: "false"
-      API_GATEWAY_PORT: 8080
       PORT: 8080
-      # These will be dynamically configured based on EC2-CORE private IP
       CORE_HOST: "http://localhost"
-      LOG_LEVEL: debug
-      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
-      RATE_LIMIT: 100
-      TIMEOUT: 30000
+      LOG_LEVEL: info
+      # CORS Configuration - reads from api-gateway/.env
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      EC2_CORE_IP: ${EC2_CORE_IP}
+      # Microservices URLs (for Docker internal communication)
+      AUTH_SERVICE_URL: http://micro-auth:3000
+      ESTUDIANTES_SERVICE_URL: http://micro-estudiantes:3001
+      MAESTROS_SERVICE_URL: http://micro-maestros:3002
+      REPORTES_EST_SERVICE: http://micro-reportes-estudiantes:5003
+      REPORTES_MAEST_SERVICE: http://micro-reportes-maestros:5004
+      # Database connections
+      MONGO_URL: mongodb://admin:MyMongoProd123!@db:27017/acompaamiento?authSource=admin
+      POSTGRES_URL: postgresql://admin:MyPostgresProd123!@db:5432/acompaamiento
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s

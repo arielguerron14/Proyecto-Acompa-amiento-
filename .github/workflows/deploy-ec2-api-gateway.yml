@@ -84,10 +84,40 @@ jobs:
               key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
               ssh.connect(target_host, username=user, pkey=key, timeout=30)
               print(f"✅ Connected")
-              cmd = "docker pull ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest; docker stop api-gateway 2>/dev/null || true; docker rm api-gateway 2>/dev/null || true; docker run -d --name api-gateway -p 8080:8080 ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest; docker ps | grep api-gateway"
+              
+              # Pull latest image
+              cmd_pull = "docker pull ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest"
+              stdin, stdout, stderr = ssh.exec_command(cmd_pull)
+              print("Pulling image...")
+              print(stdout.read().decode())
+              
+              # Copy .env file to EC2 instance
+              print("📄 Copying api-gateway/.env to instance...")
+              sftp = ssh.open_sftp()
+              try:
+                  sftp.stat("~/Proyecto-Acompa-amiento-")
+              except IOError:
+                  print("Creating project directory...")
+                  ssh.exec_command("mkdir -p ~/Projeto-Acompa-amiento-")
+              
+              sftp.put("api-gateway/.env", "~/Projeto-Acompa-amiento-/api-gateway/.env")
+              sftp.close()
+              
+              # Deploy with docker-compose
+              cmd = """
+              cd ~/Projeto-Acompa-amiento- && \
+              export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} && \
+              source api-gateway/.env && \
+              docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true && \
+              docker-compose -f docker-compose.api-gateway.yml up -d && \
+              docker ps | grep api-gateway
+              """
               stdin, stdout, stderr = ssh.exec_command(cmd)
               print(stdout.read().decode())
+              if stderr:
+                  print("STDERR:", stderr.read().decode())
               ssh.close()
+              print("✅ API Gateway deployed")
           except Exception as e:
               print(f"❌ Failed: {e}"); exit(1)
           PYSCRIPT
