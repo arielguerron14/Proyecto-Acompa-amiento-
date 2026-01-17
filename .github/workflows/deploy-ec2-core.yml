@@ -71,7 +71,11 @@ jobs:
           INSTANCE_IP=$(python3 get_instance_ip.py "EC2-CORE")
           echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_ENV
           echo "✅ Instance IP: $INSTANCE_IP"
-  DOCKER_USERNAME_VAR: ${{ secrets.DOCKER_USERNAME }}
+
+      - name: Deploy to EC2-CORE via SSH
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          DOCKER_USERNAME_VAR: ${{ secrets.DOCKER_USERNAME }}
         run: |
           python3 << 'PYSCRIPT'
           import paramiko, io, os, json
@@ -124,10 +128,7 @@ jobs:
                   print(f"❌ Deployment failed"); exit(1)
               ssh.close()
           except Exception as e:
-              print(f"❌ Error: {e}"); 
-              ssh.close()
-          except Exception as e:
-              print(f"❌ Connection failed: {e}")
+              print(f"❌ Error: {e}")
               exit(1)
           PYSCRIPT
 
