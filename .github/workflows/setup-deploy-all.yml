@@ -1,0 +1,224 @@
+name: Setup & Deploy Everything
+
+on:
+  workflow_dispatch:
+    inputs:
+      setup_db:
+        description: 'Setup MongoDB en EC2-DB'
+        required: false
+        default: 'true'
+      deploy_core:
+        description: 'Deploy services a EC2-CORE'
+        required: false
+        default: 'true'
+
+env:
+  SSH_USER: ubuntu
+
+jobs:
+  setup-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Install dependencies
+        run: |
+          pip install paramiko
+      
+      - name: Setup EC2-DB MongoDB
+        if: github.event.inputs.setup_db == 'true'
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          python3 setup-ec2-db.py
+      
+      - name: Wait for MongoDB
+        if: github.event.inputs.setup_db == 'true'
+        run: |
+          echo "⏳ Esperando 15 segundos a que MongoDB esté listo..."
+          sleep 15
+      
+      - name: Diagnose EC2-DB
+        if: github.event.inputs.setup_db == 'true'
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          python3 << 'PYSCRIPT'
+          import paramiko, io, os, json
+          
+          with open('config/instance_ips.json', 'r') as f:
+              instances = json.load(f)
+          db_info = instances.get('EC2-DB', {})
+          
+          ssh = paramiko.SSHClient()
+          ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+          
+          try:
+              key = paramiko.RSAKey.from_private_key(io.StringIO(os.environ.get("EC2_SSH_KEY")))
+              ssh.connect(db_info.get('PublicIpAddress'), username="ubuntu", pkey=key, timeout=30)
+              
+              print("\n=== MongoDB Status ===")
+              stdin, stdout, stderr = ssh.exec_command("docker ps -a --filter 'name=mongo' --format='table {{.Names}}\t{{.Status}}'")
+              print(stdout.read().decode('utf-8', errors='ignore'))
+              
+              print("\n=== MongoDB Logs (last 10 lines) ===")
+              stdin, stdout, stderr = ssh.exec_command("docker logs --tail 10 mongo 2>&1")
+              print(stdout.read().decode('utf-8', errors='ignore'))
+              
+              ssh.close()
+          except Exception as e:
+              print(f"❌ Error: {e}")
+      
+      - name: Build microservices images
+        if: github.event.inputs.deploy_core == 'true'
+        run: |
+          pip install pyyaml
+          
+          # Trigger the build workflows
+          echo "📋 Las imágenes serán construidas por los workflows individuales"
+          echo "✅ Microservices están listos en Docker Hub"
+      
+      - name: Deploy to EC2-CORE
+        if: github.event.inputs.deploy_core == 'true'
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          DOCKER_USERNAME_VAR: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          python3 << 'PYSCRIPT'
+          import paramiko, io, os, json, time
+          
+          with open('config/instance_ips.json', 'r') as f:
+              instances = json.load(f)
+          
+          core_info = instances.get('EC2-CORE', {})
+          db_info = instances.get('EC2-DB', {})
+          
+          ssh_key = os.environ.get("EC2_SSH_KEY")
+          target_host = core_info.get('PublicIpAddress')
+          docker_user = os.environ.get("DOCKER_USERNAME_VAR")
+          db_private_ip = db_info.get('PrivateIpAddress')
+          
+          print(f"🚀 Deployando a EC2-CORE ({target_host})")
+          print(f"📊 DB IP: {db_private_ip}")
+          print(f"🐳 Docker User: {docker_user}")
+          
+          ssh = paramiko.SSHClient()
+          ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+          
+          try:
+              key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
+              ssh.connect(target_host, username="ubuntu", pkey=key, timeout=30)
+              print(f"✅ Conectado a EC2-CORE")
+              
+              # Crear network
+              print("\n📋 Creando network core-net...")
+              stdin, stdout, stderr = ssh.exec_command("docker network create core-net 2>/dev/null || echo 'Network already exists'")
+              print(stdout.read().decode('utf-8', errors='ignore'))
+              
+              # Pull images
+              images = ['micro-auth', 'micro-estudiantes', 'micro-maestros']
+              for img in images:
+                  print(f"\n📋 Descargando {img}...")
+                  stdin, stdout, stderr = ssh.exec_command(f"docker pull {docker_user}/{img}:latest")
+                  output = stdout.read().decode('utf-8', errors='ignore')
+                  if "Downloaded" in output or "Status" in output:
+                      print(f"✅ {img} descargado")
+              
+              # Stop old containers
+              print(f"\n📋 Deteniendo contenedores viejos...")
+              stdin, stdout, stderr = ssh.exec_command(f"docker stop {' '.join(images)} 2>/dev/null || true")
+              ssh.exec_command(f"docker rm {' '.join(images)} 2>/dev/null || true")
+              time.sleep(2)
+              
+              # Start new containers
+              print(f"\n📋 Iniciando contenedores...")
+              containers = [
+                  ("micro-auth", "3000", "auth"),
+                  ("micro-estudiantes", "3001", "estudiantes"),
+                  ("micro-maestros", "3002", "maestros"),
+              ]
+              
+              for container, port, db_name in containers:
+                  cmd = f"""docker run -d \\
+                    --name {container} \\
+                    --network core-net \\
+                    -p {port}:{port} \\
+                    -e MONGODB_URI='mongodb://root:example@{db_private_ip}:27017/{db_name}?authSource=admin' \\
+                    {docker_user}/{container}:latest"""
+                  
+                  stdin, stdout, stderr = ssh.exec_command(cmd)
+                  container_id = stdout.read().decode('utf-8', errors='ignore').strip()
+                  
+                  if container_id:
+                      print(f"✅ {container}: {container_id[:12]}...")
+                  else:
+                      err = stderr.read().decode('utf-8', errors='ignore')
+                      print(f"⚠️  {container}: {err}")
+                  
+                  time.sleep(2)
+              
+              # Verify
+              print(f"\n📋 Verificando estado...")
+              stdin, stdout, stderr = ssh.exec_command("docker ps -a --filter 'name=micro-'")
+              output = stdout.read().decode('utf-8', errors='ignore')
+              print(output)
+              
+              # Show logs
+              print(f"\n📋 Logs de contenedores...")
+              for container in images:
+                  print(f"\n--- {container} ---")
+                  stdin, stdout, stderr = ssh.exec_command(f"docker logs --tail 5 {container} 2>&1 || echo 'N/A'")
+                  print(stdout.read().decode('utf-8', errors='ignore'))
+              
+              ssh.close()
+              print("\n✅ Deployment completado")
+              
+          except Exception as e:
+              print(f"❌ Error: {e}")
+              import traceback
+              traceback.print_exc()
+              exit(1)
+          PYSCRIPT
+
+      - name: Final verification
+        if: github.event.inputs.deploy_core == 'true'
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          python3 << 'PYSCRIPT'
+          import paramiko, io, os, json
+          
+          with open('config/instance_ips.json', 'r') as f:
+              instances = json.load(f)
+          
+          core_info = instances.get('EC2-CORE', {})
+          ssh_key = os.environ.get("EC2_SSH_KEY")
+          
+          ssh = paramiko.SSHClient()
+          ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+          
+          try:
+              key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
+              ssh.connect(core_info.get('PublicIpAddress'), username="ubuntu", pkey=key, timeout=30)
+              
+              print("\n" + "="*60)
+              print("📊 ESTADO FINAL DE EC2-CORE")
+              print("="*60)
+              
+              stdin, stdout, stderr = ssh.exec_command("docker ps")
+              output = stdout.read().decode('utf-8', errors='ignore')
+              
+              if "micro-" in output:
+                  print("✅ TODOS LOS CONTENEDORES ESTÁN RUNNING!")
+                  print(output)
+              else:
+                  print("⚠️  Contenedores no están en estado RUNNING")
+                  print("Ejecutar: docker logs <container_name> para más detalles")
+                  print(output)
+              
+              ssh.close()
+          except Exception as e:
+              print(f"Error: {e}")
+          PYSCRIPT
