@@ -67,6 +67,8 @@ jobs:
                   "docker pull mongo:6.0",
                   "docker stop mongo 2>/dev/null || true",
                   "docker rm mongo 2>/dev/null || true",
+                  "docker volume rm mongo_data 2>/dev/null || true",
+                  "docker volume create mongo_data",
                   "docker run -d --name mongo -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=example -v mongo_data:/data/db mongo:6.0 --auth",
                   "docker pull postgres:15-alpine",
                   "docker stop postgres 2>/dev/null || true",

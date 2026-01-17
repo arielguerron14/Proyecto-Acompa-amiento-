@@ -36,6 +36,8 @@ try:
     cmds = [
         "docker stop mongo 2>/dev/null || true",
         "docker rm mongo 2>/dev/null || true",
+        "docker volume rm mongo_data 2>/dev/null || true",
+        "docker volume create mongo_data",
     ]
     
     for cmd in cmds:

@@ -1,4 +1,22 @@
-const AuthService = require('@proyecto/shared-auth/src/services/authService');
+let AuthService;
+try {
+  AuthService = require('@proyecto/shared-auth/src/services/authService');
+} catch (err) {
+  console.warn('⚠️  shared-auth not found, using fallback AuthService');
+  // Fallback implementation
+  AuthService = {
+    verifyToken: (token) => {
+      // Basic JWT verification fallback
+      try {
+        const jwt = require('jsonwebtoken');
+        const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+        return { valid: true, payload };
+      } catch (e) {
+        return { valid: false, error: e.message };
+      }
+    }
+  };
+}
 
 /**
  * verifyToken: Valida la identidad únicamente mediante JWT.

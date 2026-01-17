@@ -1,0 +1,877 @@
+setup-and-deploy	Set up job	﻿2026-01-17T15:46:40.9353039Z Current runner version: '2.331.0'
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9392205Z ##[group]Runner Image Provisioner
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9394108Z Hosted Compute Agent
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9395596Z Version: 20251211.462
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9397651Z Commit: 6cbad8c2bb55d58165063d031ccabf57e2d2db61
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9399500Z Build Date: 2025-12-11T16:28:49Z
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9401108Z Worker ID: {30d7989e-a64b-4b5d-baba-1ce43f44caeb}
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9403021Z ##[endgroup]
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9404999Z ##[group]Operating System
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9406833Z Ubuntu
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9408310Z 24.04.3
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9409672Z LTS
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9411016Z ##[endgroup]
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9412434Z ##[group]Runner Image
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9413934Z Image: ubuntu-24.04
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9415278Z Version: 20260111.209.1
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9417733Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260111.209/images/ubuntu/Ubuntu2404-Readme.md
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9420834Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260111.209
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9423524Z ##[endgroup]
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9429243Z ##[group]GITHUB_TOKEN Permissions
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9433192Z Actions: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9434661Z ArtifactMetadata: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9436218Z Attestations: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9437775Z Checks: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9439093Z Contents: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9440458Z Deployments: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9441872Z Discussions: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9443217Z Issues: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9444530Z Metadata: read
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9445835Z Models: read
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9447440Z Packages: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9448860Z Pages: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9450370Z PullRequests: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9451992Z RepositoryProjects: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9453369Z SecurityEvents: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9454800Z Statuses: write
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9456215Z ##[endgroup]
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9460270Z Secret source: Actions
+setup-and-deploy	Set up job	2026-01-17T15:46:40.9462512Z Prepare workflow directory
+setup-and-deploy	Set up job	2026-01-17T15:46:41.0046930Z Prepare all required actions
+setup-and-deploy	Set up job	2026-01-17T15:46:41.0105328Z Getting action download info
+setup-and-deploy	Set up job	2026-01-17T15:46:41.2064557Z Download action repository 'actions/checkout@v3' (SHA:f43a0e5ff2bd294095638e18286ca9a3d1956744)
+setup-and-deploy	Set up job	2026-01-17T15:46:41.4183240Z Complete job name: setup-and-deploy
+setup-and-deploy	Checkout code	﻿2026-01-17T15:46:41.4914910Z ##[group]Run actions/checkout@v3
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4916000Z with:
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4916880Z   repository: arielguerron14/Proyecto-Acompa-amiento-
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4917883Z   token: ***
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4918489Z   ssh-strict: true
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4919127Z   persist-credentials: true
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4919796Z   clean: true
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4920424Z   sparse-checkout-cone-mode: true
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4921123Z   fetch-depth: 1
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4921734Z   fetch-tags: false
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4922362Z   lfs: false
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4922965Z   submodules: false
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4923593Z   set-safe-directory: true
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4924514Z env:
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4925119Z   SSH_USER: ubuntu
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.4925731Z ##[endgroup]
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5763299Z Syncing repository: arielguerron14/Proyecto-Acompa-amiento-
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5765666Z ##[group]Getting Git version info
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5767145Z Working directory is '/home/runner/work/Proyecto-Acompa-amiento-/Proyecto-Acompa-amiento-'
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5768767Z [command]/usr/bin/git version
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5861561Z git version 2.52.0
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5887631Z ##[endgroup]
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5901614Z Temporarily overriding HOME='/home/runner/work/_temp/f5594b3e-4f14-4b5a-a066-c2eeda785f67' before making global git config changes
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5903241Z Adding repository directory to the temporary git global config as a safe directory
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5905056Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Proyecto-Acompa-amiento-/Proyecto-Acompa-amiento-
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5943100Z Deleting the contents of '/home/runner/work/Proyecto-Acompa-amiento-/Proyecto-Acompa-amiento-'
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5946205Z ##[group]Initializing the repository
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.5949508Z [command]/usr/bin/git init /home/runner/work/Proyecto-Acompa-amiento-/Proyecto-Acompa-amiento-
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6046514Z hint: Using 'master' as the name for the initial branch. This default branch name
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6048203Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6050064Z hint: to use in all of your new repositories, which will suppress this warning,
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6051700Z hint: call:
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6052637Z hint:
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6053726Z hint: 	git config --global init.defaultBranch <name>
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6054600Z hint:
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6055387Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6056542Z hint: 'development'. The just-created branch can be renamed via this command:
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6057843Z hint:
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6058740Z hint: 	git branch -m <name>
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6059410Z hint:
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6060222Z hint: Disable this message with "git config set advice.defaultBranchName false"
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6062075Z Initialized empty Git repository in /home/runner/work/Proyecto-Acompa-amiento-/Proyecto-Acompa-amiento-/.git/
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6064388Z [command]/usr/bin/git remote add origin https://github.com/arielguerron14/Proyecto-Acompa-amiento-
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6094986Z ##[endgroup]
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6096019Z ##[group]Disabling automatic garbage collection
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6097272Z [command]/usr/bin/git config --local gc.auto 0
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6123404Z ##[endgroup]
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6124411Z ##[group]Setting up auth
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6128208Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6153573Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6521943Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6548158Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6766876Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6799068Z ##[endgroup]
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6800229Z ##[group]Fetching the repository
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.6806804Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +8ade7397b908a1f8f395a4105f0bc0b9af4a1d0e:refs/remotes/origin/main
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8295454Z remote: Enumerating objects: 1418, done.        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8297937Z remote: Counting objects:   0% (1/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8299538Z remote: Counting objects:   1% (15/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8301138Z remote: Counting objects:   2% (29/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8302765Z remote: Counting objects:   3% (43/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8304351Z remote: Counting objects:   4% (57/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8305470Z remote: Counting objects:   5% (71/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8309232Z remote: Counting objects:   6% (86/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8310599Z remote: Counting objects:   7% (100/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8311600Z remote: Counting objects:   8% (114/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8312729Z remote: Counting objects:   9% (128/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8313666Z remote: Counting objects:  10% (142/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8314530Z remote: Counting objects:  11% (156/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8315368Z remote: Counting objects:  12% (171/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8316227Z remote: Counting objects:  13% (185/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8318221Z remote: Counting objects:  14% (199/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8319130Z remote: Counting objects:  15% (213/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8320203Z remote: Counting objects:  16% (227/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8321668Z remote: Counting objects:  17% (242/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8323058Z remote: Counting objects:  18% (256/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8324297Z remote: Counting objects:  19% (270/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8325188Z remote: Counting objects:  20% (284/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8326123Z remote: Counting objects:  21% (298/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8327582Z remote: Counting objects:  22% (312/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8329056Z remote: Counting objects:  23% (327/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8330438Z remote: Counting objects:  24% (341/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8331466Z remote: Counting objects:  25% (355/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8332465Z remote: Counting objects:  26% (369/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8333765Z remote: Counting objects:  27% (383/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8335362Z remote: Counting objects:  28% (398/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8337100Z remote: Counting objects:  29% (412/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8338241Z remote: Counting objects:  30% (426/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8339245Z remote: Counting objects:  31% (440/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8340263Z remote: Counting objects:  32% (454/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8341250Z remote: Counting objects:  33% (468/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8342331Z remote: Counting objects:  34% (483/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8343332Z remote: Counting objects:  35% (497/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8344327Z remote: Counting objects:  36% (511/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8345313Z remote: Counting objects:  37% (525/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8346302Z remote: Counting objects:  38% (539/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8347541Z remote: Counting objects:  39% (554/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8348542Z remote: Counting objects:  40% (568/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8349527Z remote: Counting objects:  41% (582/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8350537Z remote: Counting objects:  42% (596/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8351582Z remote: Counting objects:  43% (610/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8352673Z remote: Counting objects:  44% (624/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8354025Z remote: Counting objects:  45% (639/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8355264Z remote: Counting objects:  46% (653/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8357018Z remote: Counting objects:  47% (667/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8358742Z remote: Counting objects:  48% (681/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8360132Z remote: Counting objects:  49% (695/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8361233Z remote: Counting objects:  50% (709/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8362305Z remote: Counting objects:  51% (724/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8363383Z remote: Counting objects:  52% (738/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8364475Z remote: Counting objects:  53% (752/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8365538Z remote: Counting objects:  54% (766/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8366805Z remote: Counting objects:  55% (780/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8367996Z remote: Counting objects:  56% (795/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8369419Z remote: Counting objects:  57% (809/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8370949Z remote: Counting objects:  58% (823/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8372017Z remote: Counting objects:  59% (837/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8373057Z remote: Counting objects:  60% (851/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8374098Z remote: Counting objects:  61% (865/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8375138Z remote: Counting objects:  62% (880/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8438111Z remote: Counting objects:  63% (894/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8440053Z remote: Counting objects:  64% (908/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8441454Z remote: Counting objects:  65% (922/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8442849Z remote: Counting objects:  66% (936/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8443927Z remote: Counting objects:  67% (951/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8445009Z remote: Counting objects:  68% (965/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8446061Z remote: Counting objects:  69% (979/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8447250Z remote: Counting objects:  70% (993/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8448307Z remote: Counting objects:  71% (1007/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8449333Z remote: Counting objects:  72% (1021/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8450362Z remote: Counting objects:  73% (1036/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8451403Z remote: Counting objects:  74% (1050/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8452428Z remote: Counting objects:  75% (1064/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8453479Z remote: Counting objects:  76% (1078/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8454514Z remote: Counting objects:  77% (1092/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8455576Z remote: Counting objects:  78% (1107/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8456714Z remote: Counting objects:  79% (1121/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8457752Z remote: Counting objects:  80% (1135/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8458787Z remote: Counting objects:  81% (1149/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8459811Z remote: Counting objects:  82% (1163/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8460844Z remote: Counting objects:  83% (1177/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8461845Z remote: Counting objects:  84% (1192/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8462835Z remote: Counting objects:  85% (1206/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8463820Z remote: Counting objects:  86% (1220/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8464821Z remote: Counting objects:  87% (1234/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8465806Z remote: Counting objects:  88% (1248/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8467050Z remote: Counting objects:  89% (1263/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8468079Z remote: Counting objects:  90% (1277/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8469151Z remote: Counting objects:  91% (1291/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8470185Z remote: Counting objects:  92% (1305/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8471176Z remote: Counting objects:  93% (1319/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8472167Z remote: Counting objects:  94% (1333/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8473168Z remote: Counting objects:  95% (1348/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8474361Z remote: Counting objects:  96% (1362/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8475362Z remote: Counting objects:  97% (1376/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8476363Z remote: Counting objects:  98% (1390/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8477474Z remote: Counting objects:  99% (1404/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8478462Z remote: Counting objects: 100% (1418/1418)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8479506Z remote: Counting objects: 100% (1418/1418), done.        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8480974Z remote: Compressing objects:   0% (1/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8482030Z remote: Compressing objects:   1% (12/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8483053Z remote: Compressing objects:   2% (24/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8484136Z remote: Compressing objects:   3% (35/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8485268Z remote: Compressing objects:   4% (47/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8486281Z remote: Compressing objects:   5% (59/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8487420Z remote: Compressing objects:   6% (70/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8488442Z remote: Compressing objects:   7% (82/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8489456Z remote: Compressing objects:   8% (94/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8490486Z remote: Compressing objects:   9% (105/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8528839Z remote: Compressing objects:  10% (117/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8535194Z remote: Compressing objects:  11% (128/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8541992Z remote: Compressing objects:  12% (140/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8543150Z remote: Compressing objects:  13% (152/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8555907Z remote: Compressing objects:  14% (163/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8557540Z remote: Compressing objects:  15% (175/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8563259Z remote: Compressing objects:  16% (187/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8564489Z remote: Compressing objects:  17% (198/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8565583Z remote: Compressing objects:  18% (210/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8566888Z remote: Compressing objects:  19% (221/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8567992Z remote: Compressing objects:  20% (233/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8570651Z remote: Compressing objects:  21% (245/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8573418Z remote: Compressing objects:  22% (256/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8575179Z remote: Compressing objects:  23% (268/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8577024Z remote: Compressing objects:  24% (280/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8578475Z remote: Compressing objects:  25% (291/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8581885Z remote: Compressing objects:  26% (303/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8583627Z remote: Compressing objects:  27% (315/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8588131Z remote: Compressing objects:  28% (326/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8597532Z remote: Compressing objects:  29% (338/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8598737Z remote: Compressing objects:  30% (349/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8611517Z remote: Compressing objects:  31% (361/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8614813Z remote: Compressing objects:  32% (373/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8625859Z remote: Compressing objects:  33% (384/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8630615Z remote: Compressing objects:  34% (396/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8631870Z remote: Compressing objects:  35% (408/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8642265Z remote: Compressing objects:  36% (419/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8647628Z remote: Compressing objects:  37% (431/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8653117Z remote: Compressing objects:  38% (442/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8654228Z remote: Compressing objects:  39% (454/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8656184Z remote: Compressing objects:  40% (466/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8658049Z remote: Compressing objects:  41% (477/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8659899Z remote: Compressing objects:  42% (489/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8661099Z remote: Compressing objects:  43% (501/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8663240Z remote: Compressing objects:  44% (512/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8672037Z remote: Compressing objects:  45% (524/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8679619Z remote: Compressing objects:  46% (535/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8681197Z remote: Compressing objects:  47% (547/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8682342Z remote: Compressing objects:  48% (559/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8695639Z remote: Compressing objects:  49% (570/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8696977Z remote: Compressing objects:  50% (582/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8699665Z remote: Compressing objects:  51% (594/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8700801Z remote: Compressing objects:  52% (605/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8739414Z remote: Compressing objects:  53% (617/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8741554Z remote: Compressing objects:  54% (629/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8743277Z remote: Compressing objects:  55% (640/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8756518Z remote: Compressing objects:  56% (652/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8763123Z remote: Compressing objects:  57% (663/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8765522Z remote: Compressing objects:  58% (675/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8766911Z remote: Compressing objects:  59% (687/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8773280Z remote: Compressing objects:  60% (698/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8781201Z remote: Compressing objects:  61% (710/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8792319Z remote: Compressing objects:  62% (722/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8804897Z remote: Compressing objects:  63% (733/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8815569Z remote: Compressing objects:  64% (745/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8819957Z remote: Compressing objects:  65% (756/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8823017Z remote: Compressing objects:  66% (768/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8824459Z remote: Compressing objects:  67% (780/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8827088Z remote: Compressing objects:  68% (791/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8828319Z remote: Compressing objects:  69% (803/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8835955Z remote: Compressing objects:  70% (815/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8858630Z remote: Compressing objects:  71% (826/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8876112Z remote: Compressing objects:  72% (838/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8898395Z remote: Compressing objects:  73% (849/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8905549Z remote: Compressing objects:  74% (861/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8918391Z remote: Compressing objects:  75% (873/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8930516Z remote: Compressing objects:  76% (884/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8932178Z remote: Compressing objects:  77% (896/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8946857Z remote: Compressing objects:  78% (908/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8963378Z remote: Compressing objects:  79% (919/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8975624Z remote: Compressing objects:  80% (931/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8980494Z remote: Compressing objects:  81% (943/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.8997616Z remote: Compressing objects:  82% (954/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9018149Z remote: Compressing objects:  83% (966/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9028243Z remote: Compressing objects:  84% (977/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9030224Z remote: Compressing objects:  85% (989/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9032056Z remote: Compressing objects:  86% (1001/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9033946Z remote: Compressing objects:  87% (1012/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9035997Z remote: Compressing objects:  88% (1024/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9038129Z remote: Compressing objects:  89% (1036/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9039362Z remote: Compressing objects:  90% (1047/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9040470Z remote: Compressing objects:  91% (1059/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9041576Z remote: Compressing objects:  92% (1070/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9042833Z remote: Compressing objects:  93% (1082/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9044357Z remote: Compressing objects:  94% (1094/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9045456Z remote: Compressing objects:  95% (1105/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9047416Z remote: Compressing objects:  96% (1117/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9048777Z remote: Compressing objects:  97% (1129/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9049896Z remote: Compressing objects:  98% (1140/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9050971Z remote: Compressing objects:  99% (1152/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9052066Z remote: Compressing objects: 100% (1163/1163)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9053421Z remote: Compressing objects: 100% (1163/1163), done.        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9083608Z Receiving objects:   0% (1/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9087399Z Receiving objects:   1% (15/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9091941Z Receiving objects:   2% (29/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9102223Z Receiving objects:   3% (43/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9110167Z Receiving objects:   4% (57/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9122742Z Receiving objects:   5% (71/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9126175Z Receiving objects:   6% (86/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9130029Z Receiving objects:   7% (100/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9134146Z Receiving objects:   8% (114/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9141470Z Receiving objects:   9% (128/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9145624Z Receiving objects:  10% (142/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9149770Z Receiving objects:  11% (156/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9155774Z Receiving objects:  12% (171/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9166141Z Receiving objects:  13% (185/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9174996Z Receiving objects:  14% (199/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9180925Z Receiving objects:  15% (213/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9187733Z Receiving objects:  16% (227/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9190998Z Receiving objects:  17% (242/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9194966Z Receiving objects:  18% (256/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9215750Z Receiving objects:  19% (270/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9225633Z Receiving objects:  20% (284/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9233526Z Receiving objects:  21% (298/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9242130Z Receiving objects:  22% (312/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9244740Z Receiving objects:  23% (327/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9248838Z Receiving objects:  24% (341/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9250943Z Receiving objects:  25% (355/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9257142Z Receiving objects:  26% (369/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9263134Z Receiving objects:  27% (383/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9266088Z Receiving objects:  28% (398/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9267883Z Receiving objects:  29% (412/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9271522Z Receiving objects:  30% (426/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9276273Z Receiving objects:  31% (440/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9278128Z Receiving objects:  32% (454/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9281085Z Receiving objects:  33% (468/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9282638Z Receiving objects:  34% (483/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9284135Z Receiving objects:  35% (497/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9285642Z Receiving objects:  36% (511/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9287393Z Receiving objects:  37% (525/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9289013Z Receiving objects:  38% (539/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9290929Z Receiving objects:  39% (554/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9297446Z Receiving objects:  40% (568/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9304610Z Receiving objects:  41% (582/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9307757Z Receiving objects:  42% (596/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9309660Z Receiving objects:  43% (610/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9314321Z Receiving objects:  44% (624/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9318276Z Receiving objects:  45% (639/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9322087Z Receiving objects:  46% (653/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9327264Z Receiving objects:  47% (667/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9334018Z Receiving objects:  48% (681/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9339650Z Receiving objects:  49% (695/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9375732Z Receiving objects:  50% (709/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9381156Z Receiving objects:  51% (724/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9383965Z Receiving objects:  52% (738/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9388702Z Receiving objects:  53% (752/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9393220Z Receiving objects:  54% (766/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9398550Z Receiving objects:  55% (780/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9403088Z Receiving objects:  56% (795/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9407489Z Receiving objects:  57% (809/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9417447Z Receiving objects:  58% (823/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9495510Z Receiving objects:  59% (837/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9525233Z Receiving objects:  60% (851/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9530831Z Receiving objects:  61% (865/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9534646Z Receiving objects:  62% (880/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9540089Z Receiving objects:  63% (894/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9543968Z Receiving objects:  64% (908/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9549355Z Receiving objects:  65% (922/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9553614Z Receiving objects:  66% (936/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9562411Z Receiving objects:  67% (951/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9566432Z Receiving objects:  68% (965/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9569619Z Receiving objects:  69% (979/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9573181Z Receiving objects:  70% (993/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9579535Z Receiving objects:  71% (1007/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9584338Z Receiving objects:  72% (1021/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9586139Z Receiving objects:  73% (1036/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9590435Z Receiving objects:  74% (1050/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9595857Z Receiving objects:  75% (1064/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9599507Z Receiving objects:  76% (1078/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9601504Z Receiving objects:  77% (1092/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9607574Z Receiving objects:  78% (1107/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9631428Z Receiving objects:  79% (1121/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9636437Z Receiving objects:  80% (1135/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9640548Z Receiving objects:  81% (1149/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9650156Z Receiving objects:  82% (1163/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9654638Z Receiving objects:  83% (1177/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9661264Z Receiving objects:  84% (1192/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9665786Z Receiving objects:  85% (1206/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9668539Z Receiving objects:  86% (1220/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9670912Z Receiving objects:  87% (1234/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9674571Z Receiving objects:  88% (1248/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9677012Z Receiving objects:  89% (1263/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9680827Z Receiving objects:  90% (1277/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9686391Z Receiving objects:  91% (1291/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9688080Z Receiving objects:  92% (1305/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9695642Z Receiving objects:  93% (1319/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9707738Z Receiving objects:  94% (1333/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9711305Z Receiving objects:  95% (1348/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9713338Z remote: Total 1418 (delta 249), reused 1176 (delta 179), pack-reused 0 (from 0)        
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9715457Z Receiving objects:  96% (1362/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9718799Z Receiving objects:  97% (1376/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9722967Z Receiving objects:  98% (1390/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9730390Z Receiving objects:  99% (1404/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9733658Z Receiving objects: 100% (1418/1418)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9735793Z Receiving objects: 100% (1418/1418), 1.71 MiB | 26.17 MiB/s, done.
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9738191Z Resolving deltas:   0% (0/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9742805Z Resolving deltas:   1% (4/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9744078Z Resolving deltas:   2% (5/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9745532Z Resolving deltas:   3% (8/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9752818Z Resolving deltas:   4% (10/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9755092Z Resolving deltas:   5% (13/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9759962Z Resolving deltas:   6% (15/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9761475Z Resolving deltas:   7% (18/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9762901Z Resolving deltas:   8% (20/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9764340Z Resolving deltas:   9% (23/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9765769Z Resolving deltas:  10% (25/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9767376Z Resolving deltas:  11% (28/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9768845Z Resolving deltas:  12% (30/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9770277Z Resolving deltas:  13% (33/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9771850Z Resolving deltas:  14% (35/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9773113Z Resolving deltas:  15% (38/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9774391Z Resolving deltas:  16% (40/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9776055Z Resolving deltas:  17% (43/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9779071Z Resolving deltas:  18% (45/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9780990Z Resolving deltas:  19% (48/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9787326Z Resolving deltas:  20% (50/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9788808Z Resolving deltas:  21% (53/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9790349Z Resolving deltas:  22% (55/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9791711Z Resolving deltas:  23% (58/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9793044Z Resolving deltas:  24% (60/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9794425Z Resolving deltas:  25% (63/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9795791Z Resolving deltas:  26% (65/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9797406Z Resolving deltas:  27% (68/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9798844Z Resolving deltas:  28% (70/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9800428Z Resolving deltas:  29% (73/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9801810Z Resolving deltas:  30% (75/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9803251Z Resolving deltas:  31% (78/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9804597Z Resolving deltas:  32% (80/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9805955Z Resolving deltas:  33% (83/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9807452Z Resolving deltas:  34% (85/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9808774Z Resolving deltas:  35% (88/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9810053Z Resolving deltas:  36% (90/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9811337Z Resolving deltas:  37% (93/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9812627Z Resolving deltas:  38% (95/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9813913Z Resolving deltas:  39% (98/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9815213Z Resolving deltas:  40% (100/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9816985Z Resolving deltas:  41% (103/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9818457Z Resolving deltas:  42% (105/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9819734Z Resolving deltas:  43% (109/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9821066Z Resolving deltas:  44% (110/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9822408Z Resolving deltas:  45% (113/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9823763Z Resolving deltas:  46% (115/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9825135Z Resolving deltas:  47% (118/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9826532Z Resolving deltas:  48% (120/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9828205Z Resolving deltas:  49% (123/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9829426Z Resolving deltas:  50% (125/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9830772Z Resolving deltas:  51% (127/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9832120Z Resolving deltas:  52% (130/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9833557Z Resolving deltas:  53% (132/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9834914Z Resolving deltas:  54% (135/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9836203Z Resolving deltas:  55% (137/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9837697Z Resolving deltas:  56% (140/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9839113Z Resolving deltas:  57% (142/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9840513Z Resolving deltas:  58% (145/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9841632Z Resolving deltas:  59% (147/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9842989Z Resolving deltas:  60% (150/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9844477Z Resolving deltas:  61% (152/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9845923Z Resolving deltas:  62% (155/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9847498Z Resolving deltas:  63% (157/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9848403Z Resolving deltas:  64% (160/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9849233Z Resolving deltas:  65% (162/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9850054Z Resolving deltas:  66% (165/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9850869Z Resolving deltas:  67% (167/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9851700Z Resolving deltas:  68% (170/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9852628Z Resolving deltas:  69% (172/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9853827Z Resolving deltas:  70% (175/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9855193Z Resolving deltas:  71% (177/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9856725Z Resolving deltas:  72% (180/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9858072Z Resolving deltas:  73% (182/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9859416Z Resolving deltas:  74% (185/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9860759Z Resolving deltas:  75% (187/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9861946Z Resolving deltas:  76% (190/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9862785Z Resolving deltas:  77% (192/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9863617Z Resolving deltas:  78% (195/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9864454Z Resolving deltas:  79% (197/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9870373Z Resolving deltas:  80% (200/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9871280Z Resolving deltas:  81% (202/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9872368Z Resolving deltas:  82% (205/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9873645Z Resolving deltas:  83% (207/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9874986Z Resolving deltas:  84% (211/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9876351Z Resolving deltas:  85% (212/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9877915Z Resolving deltas:  86% (215/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9878798Z Resolving deltas:  87% (217/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9879816Z Resolving deltas:  88% (220/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9880674Z Resolving deltas:  89% (222/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9881649Z Resolving deltas:  90% (225/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9882468Z Resolving deltas:  91% (227/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9883422Z Resolving deltas:  92% (230/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9884254Z Resolving deltas:  93% (232/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9885086Z Resolving deltas:  94% (236/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9885916Z Resolving deltas:  95% (237/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9886929Z Resolving deltas:  96% (240/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9887773Z Resolving deltas:  97% (242/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9888573Z Resolving deltas:  98% (246/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9889389Z Resolving deltas:  99% (247/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9890213Z Resolving deltas: 100% (249/249)
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9891050Z Resolving deltas: 100% (249/249), done.
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9949953Z From https://github.com/arielguerron14/Proyecto-Acompa-amiento-
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9951440Z  * [new ref]         8ade7397b908a1f8f395a4105f0bc0b9af4a1d0e -> origin/main
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9986387Z ##[endgroup]
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9988600Z ##[group]Determining the checkout info
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9991117Z ##[endgroup]
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9992965Z ##[group]Checking out the ref
+setup-and-deploy	Checkout code	2026-01-17T15:46:41.9995023Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+setup-and-deploy	Checkout code	2026-01-17T15:46:42.0778370Z Switched to a new branch 'main'
+setup-and-deploy	Checkout code	2026-01-17T15:46:42.0780509Z branch 'main' set up to track 'origin/main'.
+setup-and-deploy	Checkout code	2026-01-17T15:46:42.0789655Z ##[endgroup]
+setup-and-deploy	Checkout code	2026-01-17T15:46:42.0825671Z [command]/usr/bin/git log -1 --format='%H'
+setup-and-deploy	Checkout code	2026-01-17T15:46:42.0845808Z '8ade7397b908a1f8f395a4105f0bc0b9af4a1d0e'
+setup-and-deploy	Install dependencies	﻿2026-01-17T15:46:42.1061182Z ##[group]Run pip install paramiko
+setup-and-deploy	Install dependencies	2026-01-17T15:46:42.1062247Z [36;1mpip install paramiko[0m
+setup-and-deploy	Install dependencies	2026-01-17T15:46:42.1099003Z shell: /usr/bin/bash -e {0}
+setup-and-deploy	Install dependencies	2026-01-17T15:46:42.1099827Z env:
+setup-and-deploy	Install dependencies	2026-01-17T15:46:42.1100443Z   SSH_USER: ubuntu
+setup-and-deploy	Install dependencies	2026-01-17T15:46:42.1101116Z ##[endgroup]
+setup-and-deploy	Install dependencies	2026-01-17T15:46:43.1801858Z Defaulting to user installation because normal site-packages is not writeable
+setup-and-deploy	Install dependencies	2026-01-17T15:46:43.9329251Z Collecting paramiko
+setup-and-deploy	Install dependencies	2026-01-17T15:46:43.9683453Z   Downloading paramiko-4.0.0-py3-none-any.whl.metadata (3.9 kB)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:43.9776399Z Requirement already satisfied: bcrypt>=3.2 in /usr/lib/python3/dist-packages (from paramiko) (3.2.2)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:43.9788184Z Requirement already satisfied: cryptography>=3.3 in /usr/lib/python3/dist-packages (from paramiko) (41.0.7)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.0043303Z Collecting invoke>=2.0 (from paramiko)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.0081222Z   Downloading invoke-2.2.1-py3-none-any.whl.metadata (3.3 kB)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.0392903Z Collecting pynacl>=1.5 (from paramiko)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.0432002Z   Downloading pynacl-1.6.2-cp38-abi3-manylinux_2_34_x86_64.whl.metadata (10.0 kB)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.1909809Z Collecting cffi>=2.0.0 (from pynacl>=1.5->paramiko)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.1947708Z   Downloading cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.6 kB)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2158745Z Collecting pycparser (from cffi>=2.0.0->pynacl>=1.5->paramiko)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2193884Z   Downloading pycparser-2.23-py3-none-any.whl.metadata (993 bytes)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2281087Z Downloading paramiko-4.0.0-py3-none-any.whl (223 kB)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2425810Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 223.9/223.9 kB 17.5 MB/s eta 0:00:00
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2466544Z Downloading invoke-2.2.1-py3-none-any.whl (160 kB)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2532684Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 160.3/160.3 kB 38.6 MB/s eta 0:00:00
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2572302Z Downloading pynacl-1.6.2-cp38-abi3-manylinux_2_34_x86_64.whl (1.4 MB)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2761414Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 81.5 MB/s eta 0:00:00
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2796373Z Downloading cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (219 kB)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2851743Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 219.6/219.6 kB 55.7 MB/s eta 0:00:00
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2883920Z Downloading pycparser-2.23-py3-none-any.whl (118 kB)
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.2930807Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 118.1/118.1 kB 38.1 MB/s eta 0:00:00
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.5790753Z Installing collected packages: pycparser, invoke, cffi, pynacl, paramiko
+setup-and-deploy	Install dependencies	2026-01-17T15:46:44.9968656Z Successfully installed cffi-2.0.0 invoke-2.2.1 paramiko-4.0.0 pycparser-2.23 pynacl-1.6.2
+setup-and-deploy	Setup EC2-DB MongoDB	﻿2026-01-17T15:46:45.0727860Z ##[group]Run python3 setup-ec2-db.py
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:45.0728321Z [36;1mpython3 setup-ec2-db.py[0m
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:45.0761735Z shell: /usr/bin/bash -e {0}
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:45.0762062Z env:
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:45.0762357Z   SSH_USER: ubuntu
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:45.0770111Z   EC2_SSH_KEY: ***
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:45.0770403Z ##[endgroup]
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1107201Z ✅ Conectado a EC2-DB (44.201.106.25)
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1108473Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1108925Z 📋 Deteniendo servicios previos...
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1109490Z   mongo
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1109827Z postgres
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1110134Z redis
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1110423Z   mongo
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1110718Z postgres
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1111016Z redis
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1111724Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1112009Z 📋 Levantando servicios con docker-compose...
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1112541Z bash: line 1: docker-compose: command not found
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1112856Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1112863Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1113104Z ⏳ Esperando 10 segundos a que MongoDB inicie...
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1113490Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1113695Z 📋 Verificando estado de MongoDB...
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1114093Z NAMES     STATUS
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1114284Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1114289Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1114477Z 📋 Primeros logs de MongoDB...
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1114922Z Error response from daemon: No such container: mongo
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1115393Z Container no existe
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1115587Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1115592Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1115799Z 📋 Creando usuario 'root' en MongoDB...
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1116276Z   ✅ Usuario root creado exitosamente
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1116792Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1117069Z 📋 Testeando conectividad a MongoDB...
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1117494Z (test skipped)
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1117693Z 
+setup-and-deploy	Setup EC2-DB MongoDB	2026-01-17T15:46:57.1117914Z ✅ Configuración de EC2-DB completada
+setup-and-deploy	Wait for MongoDB	﻿2026-01-17T15:46:57.1383829Z ##[group]Run echo "⏳ Esperando 15 segundos a que MongoDB esté listo..."
+setup-and-deploy	Wait for MongoDB	2026-01-17T15:46:57.1384503Z [36;1mecho "⏳ Esperando 15 segundos a que MongoDB esté listo..."[0m
+setup-and-deploy	Wait for MongoDB	2026-01-17T15:46:57.1384942Z [36;1msleep 15[0m
+setup-and-deploy	Wait for MongoDB	2026-01-17T15:46:57.1416900Z shell: /usr/bin/bash -e {0}
+setup-and-deploy	Wait for MongoDB	2026-01-17T15:46:57.1417226Z env:
+setup-and-deploy	Wait for MongoDB	2026-01-17T15:46:57.1417482Z   SSH_USER: ubuntu
+setup-and-deploy	Wait for MongoDB	2026-01-17T15:46:57.1417748Z ##[endgroup]
+setup-and-deploy	Wait for MongoDB	2026-01-17T15:46:57.1468706Z ⏳ Esperando 15 segundos a que MongoDB esté listo...
+setup-and-deploy	Diagnose EC2-DB	﻿2026-01-17T15:47:12.1524375Z ##[group]Run python3 << 'PYSCRIPT'
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1524821Z [36;1mpython3 << 'PYSCRIPT'[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1525163Z [36;1mimport paramiko, io, os, json[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1525495Z [36;1m[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1525809Z [36;1mwith open('config/instance_ips.json', 'r') as f:[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1526216Z [36;1m    instances = json.load(f)[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1526806Z [36;1mdb_info = instances.get('EC2-DB', {})[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1527165Z [36;1m[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1527429Z [36;1mssh = paramiko.SSHClient()[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1527862Z [36;1mssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1528301Z [36;1m[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1528544Z [36;1mtry:[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1529007Z [36;1m    key = paramiko.RSAKey.from_private_key(io.StringIO(os.environ.get("EC2_SSH_KEY")))[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1529718Z [36;1m    ssh.connect(db_info.get('PublicIpAddress'), username="ubuntu", pkey=key, timeout=30)[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1530251Z [36;1m    [0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1530570Z [36;1m    print("\n=== MongoDB Status ===")[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1531201Z [36;1m    stdin, stdout, stderr = ssh.exec_command("docker ps -a --filter 'name=mongo' --format='table {{.Names}}\t{{.Status}}'")[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1531904Z [36;1m    print(stdout.read().decode('utf-8', errors='ignore'))[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1532301Z [36;1m    [0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1532615Z [36;1m    print("\n=== MongoDB Logs (last 10 lines) ===")[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1533143Z [36;1m    stdin, stdout, stderr = ssh.exec_command("docker logs --tail 10 mongo 2>&1")[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1533710Z [36;1m    print(stdout.read().decode('utf-8', errors='ignore'))[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1534110Z [36;1m    [0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1534373Z [36;1m    ssh.close()[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1534675Z [36;1mexcept Exception as e:[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1535001Z [36;1m    print(f"❌ Error: {e}")[0m
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1567272Z shell: /usr/bin/bash -e {0}
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1567596Z env:
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1567841Z   SSH_USER: ubuntu
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1575044Z   EC2_SSH_KEY: ***
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1575341Z ##[endgroup]
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.1625183Z /home/runner/work/_temp/6aa9f3d6-886a-4b19-a8bb-3bc9ad7428b7.sh: line 25: warning: here-document at line 1 delimited by end-of-file (wanted `PYSCRIPT')
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.6733981Z 
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.6734499Z === MongoDB Status ===
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.6735262Z NAMES     STATUS
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.6735468Z 
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.6735475Z 
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.6735640Z === MongoDB Logs (last 10 lines) ===
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.6736116Z Error response from daemon: No such container: mongo
+setup-and-deploy	Diagnose EC2-DB	2026-01-17T15:47:12.6736453Z 
+setup-and-deploy	Build microservices images	﻿2026-01-17T15:47:12.7015543Z ##[group]Run pip install pyyaml
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.7015947Z [36;1mpip install pyyaml[0m
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.7016254Z [36;1m[0m
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.7016531Z [36;1m# Trigger the build workflows[0m
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.7017285Z [36;1mecho "📋 Las imágenes serán construidas por los workflows individuales"[0m
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.7017860Z [36;1mecho "✅ Microservices están listos en Docker Hub"[0m
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.7049336Z shell: /usr/bin/bash -e {0}
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.7049667Z env:
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.7049926Z   SSH_USER: ubuntu
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.7050195Z ##[endgroup]
+setup-and-deploy	Build microservices images	2026-01-17T15:47:12.9868385Z Defaulting to user installation because normal site-packages is not writeable
+setup-and-deploy	Build microservices images	2026-01-17T15:47:13.1400731Z Requirement already satisfied: pyyaml in /usr/lib/python3/dist-packages (6.0.1)
+setup-and-deploy	Build microservices images	2026-01-17T15:47:13.4366051Z 📋 Las imágenes serán construidas por los workflows individuales
+setup-and-deploy	Build microservices images	2026-01-17T15:47:13.4367373Z ✅ Microservices están listos en Docker Hub
+setup-and-deploy	Deploy to EC2-CORE	﻿2026-01-17T15:47:13.4404144Z ##[group]Run python3 << 'PYSCRIPT'
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4404608Z [36;1mpython3 << 'PYSCRIPT'[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4404954Z [36;1mimport paramiko, io, os, json, time[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4405301Z [36;1m[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4405612Z [36;1mwith open('config/instance_ips.json', 'r') as f:[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4406017Z [36;1m    instances = json.load(f)[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4406336Z [36;1m[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4406877Z [36;1mcore_info = instances.get('EC2-CORE', {})[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4407299Z [36;1mdb_info = instances.get('EC2-DB', {})[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4407633Z [36;1m[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4407916Z [36;1mssh_key = os.environ.get("EC2_SSH_KEY")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4408353Z [36;1mtarget_host = core_info.get('PublicIpAddress')[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4408808Z [36;1mdocker_user = os.environ.get("DOCKER_USERNAME_VAR")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4409259Z [36;1mdb_private_ip = db_info.get('PrivateIpAddress')[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4409625Z [36;1m[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4409986Z [36;1mprint(f"🚀 Deployando a EC2-CORE ({target_host})")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4410423Z [36;1mprint(f"📊 DB IP: {db_private_ip}")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4410816Z [36;1mprint(f"🐳 Docker User: {docker_user}")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4411168Z [36;1m[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4411436Z [36;1mssh = paramiko.SSHClient()[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4411866Z [36;1mssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4412281Z [36;1m[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4412524Z [36;1mtry:[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4412894Z [36;1m    key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4413440Z [36;1m    ssh.connect(target_host, username="ubuntu", pkey=key, timeout=30)[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4413933Z [36;1m    print(f"✅ Conectado a EC2-CORE")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4414267Z [36;1m    [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4414525Z [36;1m    # Crear network[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4414884Z [36;1m    print("\n📋 Creando network core-net...")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4415570Z [36;1m    stdin, stdout, stderr = ssh.exec_command("docker network create core-net 2>/dev/null || echo 'Network already exists'")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4416274Z [36;1m    print(stdout.read().decode('utf-8', errors='ignore'))[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4416842Z [36;1m    [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4417110Z [36;1m    # Pull images[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4417542Z [36;1m    images = ['micro-auth', 'micro-estudiantes', 'micro-maestros'][0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4417982Z [36;1m    for img in images:[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4418333Z [36;1m        print(f"\n📋 Descargando {img}...")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4418860Z [36;1m        stdin, stdout, stderr = ssh.exec_command(f"docker pull {docker_user}/{img}:latest")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4419643Z [36;1m        output = stdout.read().decode('utf-8', errors='ignore')[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4420121Z [36;1m        if "Downloaded" in output or "Status" in output:[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4420564Z [36;1m            print(f"✅ {img} descargado")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4420920Z [36;1m    [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4421184Z [36;1m    # Stop old containers[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4421579Z [36;1m    print(f"\n📋 Deteniendo contenedores viejos...")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4422177Z [36;1m    stdin, stdout, stderr = ssh.exec_command(f"docker stop {' '.join(images)} 2>/dev/null || true")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4422835Z [36;1m    ssh.exec_command(f"docker rm {' '.join(images)} 2>/dev/null || true")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4423287Z [36;1m    time.sleep(2)[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4423572Z [36;1m    [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4423830Z [36;1m    # Start new containers[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4424203Z [36;1m    print(f"\n📋 Iniciando contenedores...")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4424587Z [36;1m    containers = [[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4424902Z [36;1m        ("micro-auth", "3000", "auth"),[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4425298Z [36;1m        ("micro-estudiantes", "3001", "estudiantes"),[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4425727Z [36;1m        ("micro-maestros", "3002", "maestros"),[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4426259Z [36;1m    ][0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4426508Z [36;1m    [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4426990Z [36;1m    for container, port, db_name in containers:[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4427386Z [36;1m        cmd = f"""docker run -d \\[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4427754Z [36;1m          --name {container} \\[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4428105Z [36;1m          --network core-net \\[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4428450Z [36;1m          -p {port}:{port} \\[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4429275Z [36;1m          -e MONGODB_URI='***{db_private_ip}:27017/{db_name}?authSource=admin' \\[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4429793Z [36;1m          {docker_user}/{container}:latest"""[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4430156Z [36;1m        [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4430485Z [36;1m        stdin, stdout, stderr = ssh.exec_command(cmd)[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4430997Z [36;1m        container_id = stdout.read().decode('utf-8', errors='ignore').strip()[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4431460Z [36;1m        [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4431734Z [36;1m        if container_id:[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4432133Z [36;1m            print(f"✅ {container}: {container_id[:12]}...")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4432526Z [36;1m        else:[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4432881Z [36;1m            err = stderr.read().decode('utf-8', errors='ignore')[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4433323Z [36;1m            print(f"⚠️  {container}: {err}")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4433677Z [36;1m        [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4433940Z [36;1m        time.sleep(2)[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4434236Z [36;1m    [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4434478Z [36;1m    # Verify[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4434783Z [36;1m    print(f"\n📋 Verificando estado...")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4435300Z [36;1m    stdin, stdout, stderr = ssh.exec_command("docker ps -a --filter 'name=micro-'")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4435880Z [36;1m    output = stdout.read().decode('utf-8', errors='ignore')[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4436284Z [36;1m    print(output)[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4436725Z [36;1m    [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4437081Z [36;1m    # Show logs[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4437421Z [36;1m    print(f"\n📋 Logs de contenedores...")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4437804Z [36;1m    for container in images:[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4438166Z [36;1m        print(f"\n--- {container} ---")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4438736Z [36;1m        stdin, stdout, stderr = ssh.exec_command(f"docker logs --tail 5 {container} 2>&1 || echo 'N/A'")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4439375Z [36;1m        print(stdout.read().decode('utf-8', errors='ignore'))[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4439774Z [36;1m    [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4440031Z [36;1m    ssh.close()[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4440355Z [36;1m    print("\n✅ Deployment completado")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4440696Z [36;1m    [0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4441121Z [36;1mexcept Exception as e:[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4441442Z [36;1m    print(f"❌ Error: {e}")[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4441776Z [36;1m    import traceback[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4442089Z [36;1m    traceback.print_exc()[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4442403Z [36;1m    exit(1)[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4442683Z [36;1mPYSCRIPT[0m
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4473687Z shell: /usr/bin/bash -e {0}
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4474001Z env:
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4474254Z   SSH_USER: ubuntu
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4481637Z   EC2_SSH_KEY: ***
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4481949Z   DOCKER_USERNAME_VAR: ***
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:13.4482242Z ##[endgroup]
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7433946Z 🚀 Deployando a EC2-CORE (3.226.242.64)
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7434955Z 📊 DB IP: 172.31.65.122
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7435912Z 🐳 Docker User: ***
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7436902Z ✅ Conectado a EC2-CORE
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7437289Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7437657Z 📋 Creando network core-net...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7438353Z Network already exists
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7438679Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7438686Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7438945Z 📋 Descargando micro-auth...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7439505Z ✅ micro-auth descargado
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7439790Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7440077Z 📋 Descargando micro-estudiantes...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7440683Z ✅ micro-estudiantes descargado
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7441268Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7441441Z 📋 Descargando micro-maestros...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7441788Z ✅ micro-maestros descargado
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7441968Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7442133Z 📋 Deteniendo contenedores viejos...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7442360Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7442511Z 📋 Iniciando contenedores...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7442847Z ✅ micro-auth: c4b8d77fa061...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7443196Z ✅ micro-estudiantes: 90d3f53247b5...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7443566Z ✅ micro-maestros: 500933a381a3...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7443760Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7443909Z 📋 Verificando estado...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7444407Z CONTAINER ID   IMAGE                                 COMMAND                  CREATED         STATUS                     PORTS     NAMES
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7445602Z 500933a381a3   ***/micro-maestros:latest      "docker-entrypoint.s…"   2 seconds ago   Exited (1) 1 second ago              micro-maestros
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7447001Z 90d3f53247b5   ***/micro-estudiantes:latest   "docker-entrypoint.s…"   4 seconds ago   Exited (1) 3 seconds ago             micro-estudiantes
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7448122Z c4b8d77fa061   ***/micro-auth:latest          "docker-entrypoint.s…"   7 seconds ago   Exited (1) 6 seconds ago             micro-auth
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7449177Z d8f82d086fb8   ***/micro-analytics:latest     "docker-entrypoint.s…"   7 hours ago     Exited (1) 7 hours ago               micro-analytics
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7449690Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7449695Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7449872Z 📋 Logs de contenedores...
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7450064Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7450187Z --- micro-auth ---
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7450462Z     '/usr/src/app/src/app.js'
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7450750Z   ]
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7450987Z }
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7451109Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7451223Z Node.js v18.20.8
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7451373Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7451377Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7451504Z --- micro-estudiantes ---
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7451840Z     at require (node:internal/modules/helpers:177:18)
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7452332Z     at Object.<anonymous> (/usr/src/app/src/database/index.js:2:23)
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7452843Z     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7453139Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7453254Z Node.js v18.20.8
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7453405Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7453408Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7453531Z --- micro-maestros ---
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7453844Z     at require (node:internal/modules/helpers:177:18)
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7454290Z     at Object.<anonymous> (/usr/src/app/src/database/index.js:2:23)
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7454765Z     at Module._compile (node:internal/modules/cjs/loader:1364:14)
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7455044Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7455155Z Node.js v18.20.8
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7455503Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7455507Z 
+setup-and-deploy	Deploy to EC2-CORE	2026-01-17T15:47:23.7455663Z ✅ Deployment completado
+setup-and-deploy	Final verification	﻿2026-01-17T15:47:23.7715765Z ##[group]Run python3 << 'PYSCRIPT'
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7716208Z [36;1mpython3 << 'PYSCRIPT'[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7716538Z [36;1mimport paramiko, io, os, json[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7717105Z [36;1m[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7717423Z [36;1mwith open('config/instance_ips.json', 'r') as f:[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7717825Z [36;1m    instances = json.load(f)[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7718138Z [36;1m[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7718433Z [36;1mcore_info = instances.get('EC2-CORE', {})[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7718840Z [36;1mssh_key = os.environ.get("EC2_SSH_KEY")[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7719189Z [36;1m[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7719458Z [36;1mssh = paramiko.SSHClient()[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7719889Z [36;1mssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7720314Z [36;1m[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7720553Z [36;1mtry:[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7720971Z [36;1m    key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7721624Z [36;1m    ssh.connect(core_info.get('PublicIpAddress'), username="ubuntu", pkey=key, timeout=30)[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7722201Z [36;1m    [0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7722471Z [36;1m    print("\n" + "="*60)[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7722834Z [36;1m    print("📊 ESTADO FINAL DE EC2-CORE")[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7723204Z [36;1m    print("="*60)[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7723484Z [36;1m    [0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7723826Z [36;1m    stdin, stdout, stderr = ssh.exec_command("docker ps")[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7724329Z [36;1m    output = stdout.read().decode('utf-8', errors='ignore')[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7724777Z [36;1m    [0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7725065Z [36;1m    if "micro-" in output:[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7725473Z [36;1m        print("✅ TODOS LOS CONTENEDORES ESTÁN RUNNING!")[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7725908Z [36;1m        print(output)[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7726207Z [36;1m    else:[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7726804Z [36;1m        print("⚠️  Contenedores no están en estado RUNNING")[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7727364Z [36;1m        print("Ejecutar: docker logs <container_name> para más detalles")[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7727843Z [36;1m        print(output)[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7728137Z [36;1m    [0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7728383Z [36;1m    ssh.close()[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7728674Z [36;1mexcept Exception as e:[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7728990Z [36;1m    print(f"Error: {e}")[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7729300Z [36;1mPYSCRIPT[0m
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7760390Z shell: /usr/bin/bash -e {0}
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7760702Z env:
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7760950Z   SSH_USER: ubuntu
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7768346Z   EC2_SSH_KEY: ***
+setup-and-deploy	Final verification	2026-01-17T15:47:23.7768630Z ##[endgroup]
+setup-and-deploy	Final verification	2026-01-17T15:47:24.2104045Z 
+setup-and-deploy	Final verification	2026-01-17T15:47:24.2104574Z ============================================================
+setup-and-deploy	Final verification	2026-01-17T15:47:24.2105301Z 📊 ESTADO FINAL DE EC2-CORE
+setup-and-deploy	Final verification	2026-01-17T15:47:24.2105700Z ============================================================
+setup-and-deploy	Final verification	2026-01-17T15:47:24.2106265Z ⚠️  Contenedores no están en estado RUNNING
+setup-and-deploy	Final verification	2026-01-17T15:47:24.2107080Z Ejecutar: docker logs <container_name> para más detalles
+setup-and-deploy	Final verification	2026-01-17T15:47:24.2107710Z CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+setup-and-deploy	Final verification	2026-01-17T15:47:24.2108089Z 
+setup-and-deploy	Post Checkout code	﻿2026-01-17T15:47:24.2468520Z Post job cleanup.
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3178489Z [command]/usr/bin/git version
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3212010Z git version 2.52.0
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3254539Z Temporarily overriding HOME='/home/runner/work/_temp/ccee0381-6b37-4d50-99e3-429b754cc235' before making global git config changes
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3255997Z Adding repository directory to the temporary git global config as a safe directory
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3258770Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Proyecto-Acompa-amiento-/Proyecto-Acompa-amiento-
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3288802Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3316240Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3540532Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3560230Z http.https://github.com/.extraheader
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3571014Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+setup-and-deploy	Post Checkout code	2026-01-17T15:47:24.3599332Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+setup-and-deploy	Complete job	﻿2026-01-17T15:47:24.3918956Z Cleaning up orphan processes

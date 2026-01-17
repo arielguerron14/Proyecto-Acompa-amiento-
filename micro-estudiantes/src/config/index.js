@@ -9,6 +9,11 @@ try {
 } catch (err) {
   console.warn('⚠️  shared-config not found, using environment variables only');
 }
+
+let infraConfig = null;
+try {
+  infraConfig = require('../../../infrastructure.config.js');
+} catch (err) {
   console.warn('⚠️  No se pudo cargar infrastructure.config.js, usando fallbacks');
   infraConfig = null;
 }
