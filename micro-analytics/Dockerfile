@@ -13,5 +13,6 @@ COPY src ./src
 COPY .env* ./ || true
 
 ENV NODE_ENV=production
+# Build version: 2025-01-17-v2
 EXPOSE 5007
 CMD ["node", "src/app.js"]
