@@ -95,21 +95,26 @@ jobs:
               print("📄 Copying api-gateway/.env to instance...")
               sftp = ssh.open_sftp()
               try:
-                  sftp.stat("~/Proyecto-Acompa-amiento-")
+                  sftp.stat("Proyecto-Acompa-amiento-/api-gateway")
               except IOError:
-                  print("Creating project directory...")
-                  ssh.exec_command("mkdir -p ~/Projeto-Acompa-amiento-")
+                  print("Creating project directories...")
+                  ssh.exec_command("mkdir -p ~/Proyecto-Acompa-amiento-/api-gateway")
               
-              sftp.put("api-gateway/.env", "~/Projeto-Acompa-amiento-/api-gateway/.env")
+              sftp.put("api-gateway/.env", "Proyecto-Acompa-imiento-/api-gateway/.env")
               sftp.close()
               
-              # Deploy with docker-compose
+              # Deploy using docker run (since docker-compose may not be installed)
               cmd = """
-              cd ~/Projeto-Acompa-amiento- && \
+              cd ~ && \
               export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} && \
-              source api-gateway/.env && \
-              docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true && \
-              docker-compose -f docker-compose.api-gateway.yml up -d && \
+              docker stop api-gateway 2>/dev/null || true && \
+              docker rm api-gateway 2>/dev/null || true && \
+              docker run -d \
+                --name api-gateway \
+                -p 8080:8080 \
+                --env-file Proyecto-Acompa-imiento-/api-gateway/.env \
+                ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest && \
+              sleep 2 && \
               docker ps | grep api-gateway
               """
               stdin, stdout, stderr = ssh.exec_command(cmd)
