@@ -119,7 +119,7 @@ jobs:
           fi
           
           # Stage changed files
-          git add config/ api-gateway/ micro-auth/ micro-estudiantes/ micro-maestros/ micro-notificaciones/ micro-messaging/ monitoring/ frontend-web/ 2>/dev/null || true
+          git add config/ .env.generated .env.prod.frontend api-gateway/ micro-auth/ micro-estudiantes/ micro-maestros/ micro-notificaciones/ micro-messaging/ monitoring/ frontend-web/ 2>/dev/null || true
           
           # Commit only if there are staged changes
           if git diff --cached --quiet; then
