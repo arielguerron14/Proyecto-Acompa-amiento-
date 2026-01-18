@@ -65,7 +65,7 @@
     "EC2-Analytics": {
         "InstanceId": "i-0c8a0d2f7f4e3a1b2",
         "Name": "EC2-Analytics",
-        "PublicIpAddress": "3.236.99.88",
+        "PublicIpAddress": "3.87.33.92",
         "PrivateIpAddress": "172.31.71.100",
         "Type": "t3.small"
     }
