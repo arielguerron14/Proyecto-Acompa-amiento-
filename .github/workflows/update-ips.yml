@@ -2,9 +2,6 @@ name: Update AWS Instance IPs
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'config/instance_ips.json'
 
 jobs:
   update-ips:
