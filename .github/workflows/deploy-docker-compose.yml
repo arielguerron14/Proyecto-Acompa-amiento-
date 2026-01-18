@@ -206,7 +206,7 @@ jobs:
             docker-compose --version
           fi
           
-          # Docker login con credenciales
+          # Docker login con credenciales enviadas vía SendEnv
           if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASS" ]; then
             echo "🔐 Autenticando en Docker Registry..."
             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
