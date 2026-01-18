@@ -18,7 +18,66 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install pyyaml -q
+          pip install pyyaml boto3 -q
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Fetch and update instance IPs from AWS
+        run: |
+          echo "🔄 Fetching instance IPs from AWS..."
+          python3 << 'EOF'
+          import json
+          import boto3
+          from pathlib import Path
+
+          ec2 = boto3.client('ec2', region_name='us-east-1')
+          response = ec2.describe_instances(
+              Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]
+          )
+
+          instances = {}
+          print("📋 Found instances:")
+          for reservation in response['Reservations']:
+              for instance in reservation['Instances']:
+                  instance_id = instance['InstanceId']
+                  instance_name = None
+                  
+                  # Get name from tags
+                  if 'Tags' in instance:
+                      for tag in instance['Tags']:
+                          if tag['Key'] == 'Name':
+                              instance_name = tag['Value']
+                              break
+                  
+                  if instance_name:
+                      public_ip = instance.get('PublicIpAddress', 'N/A')
+                      private_ip = instance.get('PrivateIpAddress', 'N/A')
+                      instance_type = instance.get('InstanceType', 'unknown')
+                      
+                      instances[instance_name] = {
+                          'InstanceId': instance_id,
+                          'Name': instance_name,
+                          'PublicIpAddress': public_ip,
+                          'PrivateIpAddress': private_ip,
+                          'Type': instance_type
+                      }
+                      
+                      print(f"  ✅ {instance_name}: ID={instance_id}, Public={public_ip}, Private={private_ip}")
+
+          # Update config/instance_ips.json
+          config_path = Path('config/instance_ips.json')
+          config_path.parent.mkdir(parents=True, exist_ok=True)
+          
+          with open(config_path, 'w') as f:
+              json.dump(instances, f, indent=4)
+          
+          print(f"\n✅ Updated {config_path} with {len(instances)} instances")
+          EOF
 
       - name: Sync IPs to configuration files
         run: |
