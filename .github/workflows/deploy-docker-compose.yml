@@ -186,9 +186,12 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
           scp -i ~/.ssh/id_rsa docker-compose.ec2-core.yml ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/docker-compose.core.yml
           
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🐳 EC2-CORE Deployment"
@@ -197,19 +200,23 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login si hay credenciales
-          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+          # Docker login con credenciales
+          DOCKER_USER="$DOCKER_USER"
+          DOCKER_PASS="$DOCKER_PASS"
+          
+          if [ -n "\$DOCKER_USER" ] && [ -n "\$DOCKER_PASS" ]; then
             echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
           fi
           
           cd /tmp
           docker-compose -f docker-compose.core.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.core.yml pull 2>&1 || true
           
           if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
             docker-compose -f docker-compose.core.yml build
@@ -244,9 +251,12 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
           scp -i ~/.ssh/id_rsa docker-compose.api-gateway.yml ubuntu@${{ needs.load-config.outputs.api-gateway-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🌐 EC2-API-Gateway Deployment"
@@ -255,19 +265,23 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login si hay credenciales
-          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+          # Docker login con credenciales
+          DOCKER_USER="$DOCKER_USER"
+          DOCKER_PASS="$DOCKER_PASS"
+          
+          if [ -n "\$DOCKER_USER" ] && [ -n "\$DOCKER_PASS" ]; then
             echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
           fi
           
           cd /tmp
           docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.api-gateway.yml pull 2>&1 || true
           
           if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
             docker-compose -f docker-compose.api-gateway.yml build
@@ -302,9 +316,12 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
           scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/docker-compose.reportes.yml
           
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "📄 EC2-Reportes Deployment"
@@ -313,19 +330,23 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login si hay credenciales
-          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+          # Docker login con credenciales
+          DOCKER_USER="$DOCKER_USER"
+          DOCKER_PASS="$DOCKER_PASS"
+          
+          if [ -n "\$DOCKER_USER" ] && [ -n "\$DOCKER_PASS" ]; then
             echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
           fi
           
           cd /tmp
           docker-compose -f docker-compose.reportes.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.reportes.yml pull 2>&1 || true
           
           if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
             docker-compose -f docker-compose.reportes.yml build
@@ -360,9 +381,12 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
           scp -i ~/.ssh/id_rsa docker-compose.ec2-notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/docker-compose.notificaciones.yml
           
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🔔 EC2-Notificaciones Deployment"
@@ -371,19 +395,23 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login si hay credenciales
-          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+          # Docker login con credenciales
+          DOCKER_USER="$DOCKER_USER"
+          DOCKER_PASS="$DOCKER_PASS"
+          
+          if [ -n "\$DOCKER_USER" ] && [ -n "\$DOCKER_PASS" ]; then
             echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
           fi
           
           cd /tmp
           docker-compose -f docker-compose.notificaciones.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.notificaciones.yml pull 2>&1 || true
           
           if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
             docker-compose -f docker-compose.notificaciones.yml build
@@ -418,9 +446,12 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
           scp -i ~/.ssh/id_rsa docker-compose.ec2-analytics.yml ubuntu@${{ needs.load-config.outputs.analytics-public }}:/tmp/docker-compose.analytics.yml
           
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "📊 EC2-Analytics Deployment"
@@ -429,19 +460,23 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login si hay credenciales
-          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+          # Docker login con credenciales
+          DOCKER_USER="$DOCKER_USER"
+          DOCKER_PASS="$DOCKER_PASS"
+          
+          if [ -n "\$DOCKER_USER" ] && [ -n "\$DOCKER_PASS" ]; then
             echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
           fi
           
           cd /tmp
           docker-compose -f docker-compose.analytics.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.analytics.yml pull 2>&1 || true
           
           if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
             docker-compose -f docker-compose.analytics.yml build
@@ -476,9 +511,12 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
           scp -i ~/.ssh/id_rsa docker-compose.ec2-monitoring.yml ubuntu@${{ needs.load-config.outputs.monitoring-public }}:/tmp/docker-compose.monitoring.yml
           
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "📈 EC2-Monitoring Deployment"
@@ -487,13 +525,28 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
+          # Docker login con credenciales
+          DOCKER_USER="$DOCKER_USER"
+          DOCKER_PASS="$DOCKER_PASS"
+          
+          if [ -n "\$DOCKER_USER" ] && [ -n "\$DOCKER_PASS" ]; then
+            echo "🔐 Autenticando en Docker Registry..."
+            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
+          fi
+          
           cd /tmp
           docker-compose -f docker-compose.monitoring.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.monitoring.yml pull 2>&1 || true
+          
+          if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
+            docker-compose -f docker-compose.monitoring.yml build
+          fi
+          
           docker-compose -f docker-compose.monitoring.yml up -d
           
           sleep 10
@@ -523,9 +576,12 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
           scp -i ~/.ssh/id_rsa docker-compose.frontend.yml ubuntu@${{ needs.load-config.outputs.frontend-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.frontend-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.frontend-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🎨 EC2-Frontend Deployment"
@@ -534,19 +590,23 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login si hay credenciales
-          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+          # Docker login con credenciales
+          DOCKER_USER="$DOCKER_USER"
+          DOCKER_PASS="$DOCKER_PASS"
+          
+          if [ -n "\$DOCKER_USER" ] && [ -n "\$DOCKER_PASS" ]; then
             echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
           fi
           
           cd /tmp
           docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.frontend.yml pull 2>&1 || true
           
           if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
             docker-compose -f docker-compose.frontend.yml build
@@ -581,9 +641,12 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
           scp -i ~/.ssh/id_rsa docker-compose.ec2-bastion.yml ubuntu@${{ needs.load-config.outputs.bastion-public }}:/tmp/docker-compose.bastion.yml
           
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🛡️  EC-Bastion Deployment"
@@ -592,13 +655,23 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
+          # Docker login con credenciales
+          DOCKER_USER="$DOCKER_USER"
+          DOCKER_PASS="$DOCKER_PASS"
+          
+          if [ -n "\$DOCKER_USER" ] && [ -n "\$DOCKER_PASS" ]; then
+            echo "🔐 Autenticando en Docker Registry..."
+            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
+          fi
+          
           cd /tmp
           docker-compose -f docker-compose.bastion.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.bastion.yml pull 2>&1 || true
           
           if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
             docker-compose -f docker-compose.bastion.yml build
