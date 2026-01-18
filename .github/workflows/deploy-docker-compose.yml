@@ -325,7 +325,8 @@ jobs:
       - name: Deploy with Docker Compose
         run: |
           scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/docker-compose.reportes.yml
-          scp -r -i ~/.ssh/id_rsa micro-reportes-estudiantes micro-reportes-maestros ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/
+          tar czf /tmp/reportes-context.tar.gz micro-reportes-estudiantes micro-reportes-maestros
+          scp -i ~/.ssh/id_rsa /tmp/reportes-context.tar.gz ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
@@ -358,6 +359,7 @@ jobs:
           DOCKER_CONFIG
           
           cd /tmp
+          tar xzf reportes-context.tar.gz
           docker-compose -f docker-compose.reportes.yml down 2>/dev/null || true
           docker-compose -f docker-compose.reportes.yml pull 2>&1 || true
           docker-compose -f docker-compose.reportes.yml build
@@ -391,7 +393,8 @@ jobs:
       - name: Deploy with Docker Compose
         run: |
           scp -i ~/.ssh/id_rsa docker-compose.ec2-notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/docker-compose.notificaciones.yml
-          scp -r -i ~/.ssh/id_rsa micro-notificaciones ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/
+          tar czf /tmp/notificaciones-context.tar.gz micro-notificaciones
+          scp -i ~/.ssh/id_rsa /tmp/notificaciones-context.tar.gz ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
@@ -424,6 +427,7 @@ jobs:
           DOCKER_CONFIG
           
           cd /tmp
+          tar xzf notificaciones-context.tar.gz
           docker-compose -f docker-compose.notificaciones.yml down 2>/dev/null || true
           docker-compose -f docker-compose.notificaciones.yml pull 2>&1 || true
           docker-compose -f docker-compose.notificaciones.yml build
