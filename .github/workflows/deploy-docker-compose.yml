@@ -137,7 +137,7 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.db.yml ubuntu@${{ needs.load-config.outputs.db-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-db.yml ubuntu@${{ needs.load-config.outputs.db-public }}:/tmp/docker-compose.db.yml
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.db-public }} << 'DEPLOY'
           set -e
@@ -184,7 +184,7 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.core.yml ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-core.yml ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/docker-compose.core.yml
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} << 'DEPLOY'
           set -e
@@ -288,7 +288,7 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/docker-compose.reportes.yml
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} << 'DEPLOY'
           set -e
@@ -340,7 +340,7 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/docker-compose.notificaciones.yml
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} << 'DEPLOY'
           set -e
@@ -392,7 +392,7 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.analytics.yml ubuntu@${{ needs.load-config.outputs.analytics-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-analytics.yml ubuntu@${{ needs.load-config.outputs.analytics-public }}:/tmp/docker-compose.analytics.yml
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-public }} << 'DEPLOY'
           set -e
@@ -444,7 +444,7 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.monitoring.yml ubuntu@${{ needs.load-config.outputs.monitoring-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-monitoring.yml ubuntu@${{ needs.load-config.outputs.monitoring-public }}:/tmp/docker-compose.monitoring.yml
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-public }} << 'DEPLOY'
           set -e
@@ -543,7 +543,7 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.bastion.yml ubuntu@${{ needs.load-config.outputs.bastion-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-bastion.yml ubuntu@${{ needs.load-config.outputs.bastion-public }}:/tmp/docker-compose.bastion.yml
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-public }} << 'DEPLOY'
           set -e
