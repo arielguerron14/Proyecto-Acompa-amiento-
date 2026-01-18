@@ -20,32 +20,38 @@ jobs:
         run: |
           pip install pyyaml boto3 -q
 
-      - name: Fetch and update instance IPs from AWS
-        continue-on-error: true
+      - name: Configure AWS credentials and fetch instance IPs
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          echo "🔄 Fetching instance IPs from AWS..."
+          echo "🔄 Fetching instance IPs from AWS using credentials..."
           python3 << 'EOF'
           import json
-          import subprocess
+          import boto3
+          import os
           import sys
 
           try:
-              result = subprocess.run([
-                  'aws', 'ec2', 'describe-instances',
-                  '--filters', 'Name=instance-state-name,Values=running',
-                  '--region', 'us-east-1',
-                  '--output', 'json'
-              ], capture_output=True, text=True, timeout=30)
+              # Usar credenciales de entorno
+              session = boto3.Session(
+                  aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+                  aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
+                  aws_session_token=os.environ.get('AWS_SESSION_TOKEN'),
+                  region_name=os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
+              )
               
-              if result.returncode != 0:
-                  print(f"⚠️  AWS CLI error: {result.stderr}")
-                  sys.exit(0)  # Don't fail, continue with existing data
+              ec2 = session.client('ec2')
+              response = ec2.describe_instances(
+                  Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]
+              )
               
-              data = json.loads(result.stdout)
               instances = {}
               
               print("📋 Found instances from AWS:")
-              for reservation in data.get('Reservations', []):
+              for reservation in response.get('Reservations', []):
                   for instance in reservation.get('Instances', []):
                       instance_id = instance['InstanceId']
                       instance_name = None
@@ -84,8 +90,10 @@ jobs:
                   print("⚠️  No instances found, skipping update")
                   
           except Exception as e:
-              print(f"⚠️  Error: {e}")
-              sys.exit(0)  # Don't fail the workflow
+              print(f"❌ Error: {e}")
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)  # Fail the workflow if credentials are missing
           EOF
 
       - name: Sync IPs to configuration files
