@@ -16,7 +16,7 @@ env:
   AWS_REGION: us-east-1
   DOCKER_REGISTRY: docker.io
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_TOKEN }}
 
 jobs:
   # =========================================================================
