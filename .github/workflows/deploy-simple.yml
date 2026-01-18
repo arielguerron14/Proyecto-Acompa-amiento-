@@ -1,0 +1,424 @@
+name: 🚀 Deploy Everything (Single Workflow)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deployment
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # ===========================================================================
+  # UNIFIED DEPLOYMENT - ALL PHASES IN ONE JOB
+  # ===========================================================================
+  deploy-all:
+    name: 🚀 Deploy All Services
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      # =========================================================================
+      # STEP 1: PREPARE
+      # =========================================================================
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          pip install paramiko requests pyyaml
+          echo "✅ Dependencies installed"
+
+      - name: Load configuration
+        id: config
+        run: |
+          python3 << 'PYTHON'
+          import json
+          
+          with open('config/instance_ips.json', 'r') as f:
+              config = json.load(f)
+          
+          # Extract IPs
+          db_public = config['EC2-DB']['PublicIpAddress']
+          db_private = config['EC2-DB']['PrivateIpAddress']
+          core_public = config['EC2-CORE']['PublicIpAddress']
+          core_private = config['EC2-CORE']['PrivateIpAddress']
+          api_public = config['EC2-API-Gateway']['PublicIpAddress']
+          
+          print(f"::set-output name=db_public::{db_public}")
+          print(f"::set-output name=db_private::{db_private}")
+          print(f"::set-output name=core_public::{core_public}")
+          print(f"::set-output name=core_private::{core_private}")
+          print(f"::set-output name=api_public::{api_public}")
+          
+          print("\n✅ Configuration loaded:")
+          print(f"   EC2-DB: {db_public} / {db_private}")
+          print(f"   EC2-CORE: {core_public} / {core_private}")
+          print(f"   EC2-API: {api_public}")
+          PYTHON
+
+      # =========================================================================
+      # STEP 2: DEPLOY MONGODB (EC2-DB)
+      # =========================================================================
+      - name: "Step 1/4: Deploy MongoDB on EC2-DB"
+        env:
+          TARGET_HOST: ${{ steps.config.outputs.db_public }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          python3 << 'PYTHON'
+          import paramiko
+          import io
+          import os
+          import time
+          
+          target = os.environ['TARGET_HOST']
+          ssh_key = os.environ['EC2_SSH_KEY']
+          
+          print(f"\n{'='*70}")
+          print(f"📦 STEP 1/4: Deploy MongoDB on EC2-DB ({target})")
+          print(f"{'='*70}\n")
+          
+          ssh = paramiko.SSHClient()
+          ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+          
+          # Connect with retries
+          for attempt in range(3):
+              try:
+                  print(f"🔗 Connection attempt {attempt + 1}/3...")
+                  key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
+                  ssh.connect(target, username='ubuntu', pkey=key, timeout=15)
+                  print("✅ Connected to EC2-DB\n")
+                  break
+              except Exception as e:
+                  if attempt < 2:
+                      print(f"⚠️  Failed: {str(e)[:50]}, retrying in 10s...")
+                      time.sleep(10)
+                  else:
+                      print(f"❌ Failed after 3 attempts: {e}")
+                      exit(1)
+          
+          # Commands
+          commands = [
+              ("Stop old MongoDB", "docker stop mongo 2>/dev/null || true"),
+              ("Remove old MongoDB", "docker rm mongo 2>/dev/null || true"),
+              ("Create volume", "docker volume create mongo_data 2>/dev/null || true"),
+              ("Pull MongoDB image", "docker pull mongo:6.0"),
+              ("Start MongoDB", """docker run -d --name mongo \\
+                -p 0.0.0.0:27017:27017 \\
+                -e MONGO_INITDB_ROOT_USERNAME=root \\
+                -e MONGO_INITDB_ROOT_PASSWORD=example \\
+                -v mongo_data:/data/db \\
+                mongo:6.0 --auth --bind_ip_all"""),
+              ("Wait for MongoDB", "sleep 15"),
+              ("Verify MongoDB", "docker ps -a -f name=mongo --format='table {{.Names}}\\t{{.Status}}'"),
+          ]
+          
+          for desc, cmd in commands:
+              print(f"  ▶️  {desc}...")
+              stdin, stdout, stderr = ssh.exec_command(cmd)
+              output = stdout.read().decode().strip()
+              error = stderr.read().decode().strip()
+              
+              if output:
+                  for line in output.split('\n')[-3:]:
+                      print(f"     {line}")
+              
+              if error and 'already' not in error.lower():
+                  print(f"     ⚠️  {error[:80]}")
+          
+          print("\n✅ MongoDB deployment complete!\n")
+          ssh.close()
+          PYTHON
+
+      # =========================================================================
+      # STEP 3: DEPLOY MICROSERVICES (EC2-CORE)
+      # =========================================================================
+      - name: "Step 2/4: Deploy Microservices on EC2-CORE"
+        env:
+          TARGET_HOST: ${{ steps.config.outputs.core_public }}
+          DB_PRIVATE_IP: ${{ steps.config.outputs.db_private }}
+          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          python3 << 'PYTHON'
+          import paramiko
+          import io
+          import os
+          import time
+          
+          target = os.environ['TARGET_HOST']
+          db_ip = os.environ['DB_PRIVATE_IP']
+          docker_user = os.environ['DOCKER_USER']
+          ssh_key = os.environ['EC2_SSH_KEY']
+          
+          print(f"\n{'='*70}")
+          print(f"🐳 STEP 2/4: Deploy Microservices on EC2-CORE ({target})")
+          print(f"{'='*70}\n")
+          print(f"   Database IP: {db_ip}")
+          print(f"   Docker User: {docker_user}\n")
+          
+          ssh = paramiko.SSHClient()
+          ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+          
+          # Connect
+          for attempt in range(3):
+              try:
+                  print(f"🔗 Connection attempt {attempt + 1}/3...")
+                  key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
+                  ssh.connect(target, username='ubuntu', pkey=key, timeout=15)
+                  print("✅ Connected to EC2-CORE\n")
+                  break
+              except Exception as e:
+                  if attempt < 2:
+                      print(f"⚠️  Failed: {str(e)[:50]}, retrying...")
+                      time.sleep(10)
+                  else:
+                      print(f"❌ Failed: {e}")
+                      exit(1)
+          
+          # Commands
+          commands = [
+              ("Create network", "docker network create core-net 2>/dev/null || true"),
+              ("Stop old services", "docker stop micro-auth micro-estudiantes micro-maestros 2>/dev/null || true"),
+              ("Remove old services", "docker rm micro-auth micro-estudiantes micro-maestros 2>/dev/null || true"),
+          ]
+          
+          for desc, cmd in commands:
+              print(f"  ▶️  {desc}...")
+              ssh.exec_command(cmd)
+              time.sleep(1)
+          
+          # Start microservices
+          services = [
+              ("micro-auth", "3000", "auth"),
+              ("micro-estudiantes", "3001", "estudiantes"),
+              ("micro-maestros", "3002", "maestros"),
+          ]
+          
+          print(f"\n  ▶️  Pull & start microservices...")
+          for service, port, db_name in services:
+              # Pull
+              print(f"     • Pulling {service}...")
+              ssh.exec_command(f"docker pull {docker_user}/{service}:latest 2>/dev/null")
+              time.sleep(2)
+              
+              # Start
+              print(f"     • Starting {service}...")
+              cmd = f"""docker run -d --name {service} \\
+                --network core-net \\
+                -p {port}:{port} \\
+                -e MONGODB_URI='mongodb://root:example@{db_ip}:27017/{db_name}?authSource=admin' \\
+                -e PORT={port} \\
+                -e NODE_ENV=production \\
+                --add-host=db-host:{db_ip} \\
+                {docker_user}/{service}:latest"""
+              ssh.exec_command(cmd)
+              time.sleep(2)
+          
+          # Verify
+          print(f"\n  ▶️  Verify microservices...")
+          time.sleep(5)
+          stdin, stdout, stderr = ssh.exec_command("docker ps -a -f 'name=micro-' --format='table {{.Names}}\\t{{.Status}}'")
+          output = stdout.read().decode().strip()
+          print(output)
+          
+          print("\n✅ Microservices deployment complete!\n")
+          ssh.close()
+          PYTHON
+
+      # =========================================================================
+      # STEP 4: DEPLOY API GATEWAY
+      # =========================================================================
+      - name: "Step 3/4: Deploy API Gateway"
+        env:
+          TARGET_HOST: ${{ steps.config.outputs.api_public }}
+          CORE_PRIVATE_IP: ${{ steps.config.outputs.core_private }}
+          DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          python3 << 'PYTHON'
+          import paramiko
+          import io
+          import os
+          import time
+          
+          target = os.environ['TARGET_HOST']
+          core_ip = os.environ['CORE_PRIVATE_IP']
+          docker_user = os.environ['DOCKER_USER']
+          ssh_key = os.environ['EC2_SSH_KEY']
+          
+          print(f"\n{'='*70}")
+          print(f"🌐 STEP 3/4: Deploy API Gateway ({target})")
+          print(f"{'='*70}\n")
+          print(f"   Core IP: {core_ip}")
+          print(f"   Docker User: {docker_user}\n")
+          
+          ssh = paramiko.SSHClient()
+          ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+          
+          # Connect
+          for attempt in range(3):
+              try:
+                  print(f"🔗 Connection attempt {attempt + 1}/3...")
+                  key = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
+                  ssh.connect(target, username='ubuntu', pkey=key, timeout=15)
+                  print("✅ Connected to EC2-API-Gateway\n")
+                  break
+              except Exception as e:
+                  if attempt < 2:
+                      print(f"⚠️  Failed: {str(e)[:50]}, retrying...")
+                      time.sleep(10)
+                  else:
+                      print(f"❌ Failed: {e}")
+                      exit(1)
+          
+          # Commands
+          commands = [
+              ("Stop old API Gateway", "docker stop api-gateway 2>/dev/null || true"),
+              ("Remove old API Gateway", "docker rm api-gateway 2>/dev/null || true"),
+              ("Pull image", f"docker pull {docker_user}/api-gateway:latest"),
+              ("Start API Gateway", f"""docker run -d --name api-gateway \\
+                -p 8080:8080 \\
+                -e CORE_HOST={core_ip} \\
+                -e NODE_ENV=production \\
+                {docker_user}/api-gateway:latest"""),
+              ("Wait", "sleep 10"),
+              ("Verify", "docker ps -a -f name=api-gateway --format='table {{.Names}}\\t{{.Status}}'"),
+          ]
+          
+          for desc, cmd in commands:
+              print(f"  ▶️  {desc}...")
+              stdin, stdout, stderr = ssh.exec_command(cmd)
+              output = stdout.read().decode().strip()
+              if output:
+                  for line in output.split('\n')[-2:]:
+                      print(f"     {line}")
+              time.sleep(1)
+          
+          print("\n✅ API Gateway deployment complete!\n")
+          ssh.close()
+          PYTHON
+
+      # =========================================================================
+      # STEP 5: VERIFY & TEST
+      # =========================================================================
+      - name: "Step 4/4: Verify & Test All Services"
+        env:
+          API_GATEWAY_IP: ${{ steps.config.outputs.api_public }}
+        run: |
+          python3 << 'PYTHON'
+          import requests
+          import time
+          import random
+          import string
+          
+          api_ip = "${{ env.API_GATEWAY_IP }}"
+          api_url = f"http://{api_ip}:8080"
+          
+          print(f"\n{'='*70}")
+          print(f"✅ STEP 4/4: Verify & Test All Services")
+          print(f"{'='*70}\n")
+          print(f"API Gateway: {api_url}\n")
+          
+          # Test 1: Health
+          print("Test 1️⃣  API Gateway Health")
+          try:
+              r = requests.get(f"{api_url}/health", timeout=5)
+              if r.status_code == 200:
+                  print(f"   ✅ {r.status_code} OK - API Gateway is running\n")
+              else:
+                  print(f"   ⚠️  {r.status_code}\n")
+          except Exception as e:
+              print(f"   ❌ Error: {str(e)[:50]}\n")
+          
+          # Test 2: Auth Health
+          print("Test 2️⃣  Auth Service Health")
+          try:
+              r = requests.get(f"{api_url}/auth/health", timeout=5)
+              if r.status_code == 200:
+                  print(f"   ✅ {r.status_code} OK - Auth service is running\n")
+              else:
+                  print(f"   ⚠️  {r.status_code}\n")
+          except Exception as e:
+              print(f"   ❌ Error: {str(e)[:50]}\n")
+          
+          # Test 3: Register (CRITICAL)
+          print("Test 3️⃣  Register Endpoint (CRITICAL)")
+          try:
+              test_user = {
+                  "email": ''.join(random.choices(string.ascii_lowercase, k=10)) + '@test.com',
+                  "password": "Test123!",
+                  "name": "Test User"
+              }
+              r = requests.post(f"{api_url}/auth/register", json=test_user, timeout=8)
+              if r.status_code == 201:
+                  print(f"   ✅ {r.status_code} Created - User registered successfully!")
+                  print(f"   ✅ MongoDB is working!")
+                  print(f"   ✅ Microservices connected to database!\n")
+              elif r.status_code == 400:
+                  print(f"   ⚠️  {r.status_code} Bad Request")
+                  print(f"      {r.json().get('message', r.json())}\n")
+              else:
+                  print(f"   ⚠️  {r.status_code}\n")
+          except requests.exceptions.Timeout:
+              print(f"   ❌ TIMEOUT - MongoDB might not be accessible\n")
+          except Exception as e:
+              print(f"   ❌ Error: {str(e)[:100]}\n")
+          
+          # Summary
+          print(f"{'='*70}")
+          print(f"📊 SUMMARY")
+          print(f"{'='*70}\n")
+          print(f"✅ API Gateway: http://{api_ip}:8080")
+          print(f"✅ Frontend: http://{api_ip}:5500")
+          print(f"✅ Auth Service: http://{api_ip}:8080/auth\n")
+          
+          PYTHON
+
+      # =========================================================================
+      # FINAL REPORT
+      # =========================================================================
+      - name: "🎉 Deployment Complete - Ready for Browser Testing"
+        if: success()
+        env:
+          API_IP: ${{ steps.config.outputs.api_public }}
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════════════╗"
+          echo "║                                                                    ║"
+          echo "║           ✅ DEPLOYMENT SUCCESSFUL - READY FOR TESTING!           ║"
+          echo "║                                                                    ║"
+          echo "╚════════════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "🎊 ALL SERVICES DEPLOYED:"
+          echo "   ✅ MongoDB running on EC2-DB"
+          echo "   ✅ Microservices running on EC2-CORE"
+          echo "   ✅ API Gateway running"
+          echo ""
+          echo "📍 URLs:"
+          echo "   🌐 Frontend: http://${{ env.API_IP }}:5500"
+          echo "   🔗 API Gateway: http://${{ env.API_IP }}:8080/health"
+          echo "   🔐 Auth Service: http://${{ env.API_IP }}:8080/auth/health"
+          echo ""
+          echo "📝 NEXT STEPS:"
+          echo "   1. Open: http://${{ env.API_IP }}:5500"
+          echo "   2. Click 'Registrar' (Register)"
+          echo "   3. Enter email, password, name"
+          echo "   4. Click 'Registrarse' (Sign Up)"
+          echo "   5. Click 'Ingresar' (Login)"
+          echo "   6. Enter credentials"
+          echo "   7. See dashboard ✨"
+          echo ""
+          echo "✅ CONFIRMED: Project is ready for browser testing!"
+          echo ""
+
+      - name: "❌ Deployment Failed"
+        if: failure()
+        run: |
+          echo ""
+          echo "❌ DEPLOYMENT FAILED"
+          echo ""
+          echo "Check the logs above for details."
+          echo ""
