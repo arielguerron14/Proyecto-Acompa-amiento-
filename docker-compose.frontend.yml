@@ -7,8 +7,8 @@ services:
       - "5500:5500"
     environment:
       NODE_ENV: production
-      API_GATEWAY_URL: http://35.168.216.132:8080
-      API_GATEWAY_HOST: 35.168.216.132
+      API_GATEWAY_URL: http://98.86.94.92:8080
+      API_GATEWAY_HOST: 98.86.94.92
       API_GATEWAY_PORT: 8080
     restart: unless-stopped
     networks:
