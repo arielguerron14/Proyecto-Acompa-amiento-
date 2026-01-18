@@ -325,7 +325,7 @@ jobs:
       - name: Deploy with Docker Compose
         run: |
           scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/docker-compose.reportes.yml
-          scp -r -i ~/.ssh/id_rsa micro-reportes-* ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/ 2>/dev/null || true
+          scp -r -i ~/.ssh/id_rsa micro-reportes-estudiantes micro-reportes-maestros ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
@@ -391,7 +391,7 @@ jobs:
       - name: Deploy with Docker Compose
         run: |
           scp -i ~/.ssh/id_rsa docker-compose.ec2-notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/docker-compose.notificaciones.yml
-          scp -r -i ~/.ssh/id_rsa micro-notificaciones ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/ 2>/dev/null || true
+          scp -r -i ~/.ssh/id_rsa micro-notificaciones ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
