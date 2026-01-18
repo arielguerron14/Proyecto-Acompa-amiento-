@@ -8,13 +8,9 @@ COPY micro-auth/package*.json ./
 COPY micro-auth/src ./src
 
 # Copy shared modules to parent directory level
-# So npm can find them via file:// references
+# So npm can find them via file:// references in package.json
 COPY shared-auth ../shared-auth
 COPY shared-monitoring ../shared-monitoring
-COPY message-broker ../message-broker
-
-# Create fallback config
-COPY shared-config.js ../shared-config.js
 
 # Install dependencies
 RUN npm install --production

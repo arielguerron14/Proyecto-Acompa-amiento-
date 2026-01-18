@@ -11,10 +11,7 @@ COPY micro-maestros/src ./src
 # So npm can find them via file:// references
 COPY shared-auth ../shared-auth
 COPY shared-monitoring ../shared-monitoring
-COPY message-broker ../message-broker
 
-# Create fallback config
-COPY shared-config.js ../shared-config.js
 
 # Install dependencies
 RUN npm install --production
