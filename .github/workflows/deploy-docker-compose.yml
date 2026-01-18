@@ -190,9 +190,9 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          export DOCKER_USER DOCKER_PASS
+          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
-          ssh -o SendEnv=DOCKER_USER -o SendEnv=DOCKER_PASS -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} bash << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🐳 EC2-CORE Deployment"
@@ -201,16 +201,22 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login con credenciales enviadas vía SendEnv
-          if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASS" ]; then
-            echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
-          fi
+          # Crear ~/.docker/config.json con credenciales
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
+          {
+            "auths": {
+              "docker.io": {
+                "auth": "$DOCKER_AUTH"
+              }
+            }
+          }
+          DOCKER_CONFIG
           
           cd /tmp
           docker-compose -f docker-compose.core.yml down 2>/dev/null || true
@@ -253,9 +259,9 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          export DOCKER_USER DOCKER_PASS
+          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
-          ssh -o SendEnv=DOCKER_USER -o SendEnv=DOCKER_PASS -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-public }} bash << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🌐 EC2-API-Gateway Deployment"
@@ -264,16 +270,22 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login con credenciales
-          if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASS" ]; then
-            echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
-          fi
+          # Crear ~/.docker/config.json con credenciales
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
+          {
+            "auths": {
+              "docker.io": {
+                "auth": "$DOCKER_AUTH"
+              }
+            }
+          }
+          DOCKER_CONFIG
           
           cd /tmp
           docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
@@ -316,9 +328,9 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          export DOCKER_USER DOCKER_PASS
+          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
-          ssh -o SendEnv=DOCKER_USER -o SendEnv=DOCKER_PASS -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} bash << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "📄 EC2-Reportes Deployment"
@@ -327,16 +339,22 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login con credenciales
-          if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASS" ]; then
-            echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
-          fi
+          # Crear ~/.docker/config.json con credenciales
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
+          {
+            "auths": {
+              "docker.io": {
+                "auth": "$DOCKER_AUTH"
+              }
+            }
+          }
+          DOCKER_CONFIG
           
           cd /tmp
           docker-compose -f docker-compose.reportes.yml down 2>/dev/null || true
@@ -379,9 +397,9 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          export DOCKER_USER DOCKER_PASS
+          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
-          ssh -o SendEnv=DOCKER_USER -o SendEnv=DOCKER_PASS -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} bash << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🔔 EC2-Notificaciones Deployment"
@@ -390,16 +408,22 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login con credenciales
-          if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASS" ]; then
-            echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
-          fi
+          # Crear ~/.docker/config.json con credenciales
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
+          {
+            "auths": {
+              "docker.io": {
+                "auth": "$DOCKER_AUTH"
+              }
+            }
+          }
+          DOCKER_CONFIG
           
           cd /tmp
           docker-compose -f docker-compose.notificaciones.yml down 2>/dev/null || true
@@ -442,9 +466,9 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          export DOCKER_USER DOCKER_PASS
+          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
-          ssh -o SendEnv=DOCKER_USER -o SendEnv=DOCKER_PASS -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-public }} bash << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "📊 EC2-Analytics Deployment"
@@ -453,16 +477,22 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login con credenciales
-          if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASS" ]; then
-            echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
-          fi
+          # Crear ~/.docker/config.json con credenciales
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
+          {
+            "auths": {
+              "docker.io": {
+                "auth": "$DOCKER_AUTH"
+              }
+            }
+          }
+          DOCKER_CONFIG
           
           cd /tmp
           docker-compose -f docker-compose.analytics.yml down 2>/dev/null || true
@@ -505,9 +535,9 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          export DOCKER_USER DOCKER_PASS
+          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
-          ssh -o SendEnv=DOCKER_USER -o SendEnv=DOCKER_PASS -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-public }} bash << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "📈 EC2-Monitoring Deployment"
@@ -516,16 +546,22 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login con credenciales
-          if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASS" ]; then
-            echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
-          fi
+          # Crear ~/.docker/config.json con credenciales
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
+          {
+            "auths": {
+              "docker.io": {
+                "auth": "$DOCKER_AUTH"
+              }
+            }
+          }
+          DOCKER_CONFIG
           
           cd /tmp
           docker-compose -f docker-compose.monitoring.yml down 2>/dev/null || true
@@ -568,9 +604,9 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          export DOCKER_USER DOCKER_PASS
+          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
-          ssh -o SendEnv=DOCKER_USER -o SendEnv=DOCKER_PASS -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.frontend-public }} bash << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.frontend-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🎨 EC2-Frontend Deployment"
@@ -579,16 +615,22 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login con credenciales
-          if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASS" ]; then
-            echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
-          fi
+          # Crear ~/.docker/config.json con credenciales
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
+          {
+            "auths": {
+              "docker.io": {
+                "auth": "$DOCKER_AUTH"
+              }
+            }
+          }
+          DOCKER_CONFIG
           
           cd /tmp
           docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
@@ -631,9 +673,9 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          export DOCKER_USER DOCKER_PASS
+          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
-          ssh -o SendEnv=DOCKER_USER -o SendEnv=DOCKER_PASS -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-public }} bash << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-public }} bash << DEPLOY
           set -e
           echo "================================"
           echo "🛡️  EC-Bastion Deployment"
@@ -642,16 +684,22 @@ jobs:
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
           fi
           
-          # Docker login con credenciales
-          if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASS" ]; then
-            echo "🔐 Autenticando en Docker Registry..."
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin 2>&1 | grep -i "Login"
-          fi
+          # Crear ~/.docker/config.json con credenciales
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
+          {
+            "auths": {
+              "docker.io": {
+                "auth": "$DOCKER_AUTH"
+              }
+            }
+          }
+          DOCKER_CONFIG
           
           cd /tmp
           docker-compose -f docker-compose.bastion.yml down 2>/dev/null || true
