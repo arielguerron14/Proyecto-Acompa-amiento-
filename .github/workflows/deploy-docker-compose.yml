@@ -90,9 +90,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.messaging.yml ec2-user@${{ needs.load-config.outputs.messaging-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.messaging.yml ubuntu@${{ needs.load-config.outputs.messaging-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.messaging-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.messaging-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "⏱️  EC2-Messaging Deployment"
@@ -129,9 +129,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.db.yml ec2-user@${{ needs.load-config.outputs.db-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.db.yml ubuntu@${{ needs.load-config.outputs.db-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.db-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.db-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "🗄️  EC2-DB Deployment"
@@ -168,9 +168,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.core.yml ec2-user@${{ needs.load-config.outputs.core-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.core.yml ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.core-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "🐳 EC2-CORE Deployment"
@@ -212,9 +212,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.api-gateway.yml ec2-user@${{ needs.load-config.outputs.api-gateway-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.api-gateway.yml ubuntu@${{ needs.load-config.outputs.api-gateway-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.api-gateway-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "🌐 EC2-API-Gateway Deployment"
@@ -256,9 +256,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.reportes.yml ec2-user@${{ needs.load-config.outputs.reportes-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.reportes-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "📄 EC2-Reportes Deployment"
@@ -300,9 +300,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.notificaciones.yml ec2-user@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.notificaciones-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "🔔 EC2-Notificaciones Deployment"
@@ -344,9 +344,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.analytics.yml ec2-user@${{ needs.load-config.outputs.analytics-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.analytics.yml ubuntu@${{ needs.load-config.outputs.analytics-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.analytics-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "📊 EC2-Analytics Deployment"
@@ -388,9 +388,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.monitoring.yml ec2-user@${{ needs.load-config.outputs.monitoring-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.monitoring.yml ubuntu@${{ needs.load-config.outputs.monitoring-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.monitoring-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "📈 EC2-Monitoring Deployment"
@@ -427,9 +427,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.frontend.yml ec2-user@${{ needs.load-config.outputs.frontend-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.frontend.yml ubuntu@${{ needs.load-config.outputs.frontend-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.frontend-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.frontend-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "🎨 EC2-Frontend Deployment"
@@ -471,9 +471,9 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          scp -i ~/.ssh/id_rsa docker-compose.bastion.yml ec2-user@${{ needs.load-config.outputs.bastion-public }}:/tmp/
+          scp -i ~/.ssh/id_rsa docker-compose.bastion.yml ubuntu@${{ needs.load-config.outputs.bastion-public }}:/tmp/
           
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ needs.load-config.outputs.bastion-public }} << 'DEPLOY'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-public }} << 'DEPLOY'
           set -e
           echo "================================"
           echo "🛡️  EC-Bastion Deployment"
