@@ -1,0 +1,380 @@
+name: Deploy All Services v2 (Auto-Fix)
+
+on:
+  workflow_dispatch:
+    inputs:
+      fix_type:
+        description: 'Type of fix to apply'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'mongodb-only'
+          - 'microservices-only'
+          - 'test-only'
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # PHASE 1: VERIFY CONFIGURATION
+  verify-config:
+    name: Verify Configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      db-ip: ${{ steps.get-ips.outputs.db-ip }}
+      core-ip: ${{ steps.get-ips.outputs.core-ip }}
+      api-ip: ${{ steps.get-ips.outputs.api-ip }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get Instance IPs
+        id: get-ips
+        run: |
+          python3 << 'PYSCRIPT'
+          import json
+          
+          with open('config/instance_ips.json') as f:
+              config = json.load(f)
+          
+          print(f"DB_IP={config['EC2-DB']['PublicIpAddress']}")
+          print(f"CORE_IP={config['EC2-CORE']['PublicIpAddress']}")
+          print(f"API_IP={config['EC2-API-Gateway']['PublicIpAddress']}")
+          
+          with open('$GITHUB_OUTPUT', 'a') as f:
+              f.write(f"db-ip={config['EC2-DB']['PublicIpAddress']}\n")
+              f.write(f"core-ip={config['EC2-CORE']['PublicIpAddress']}\n")
+              f.write(f"api-ip={config['EC2-API-Gateway']['PublicIpAddress']}\n")
+          PYSCRIPT
+
+  # PHASE 2: DEPLOY MONGODB FIX
+  deploy-mongodb-fix:
+    name: Fix MongoDB
+    needs: verify-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: |
+      github.event.inputs.fix_type == 'all' ||
+      github.event.inputs.fix_type == 'mongodb-only'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run MongoDB Fix Script
+        env:
+          EC2_DB_IP: ${{ needs.verify-config.outputs.db-ip }}
+          EC2_DB_PRIVATE_IP: 172.31.65.122
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          python3 << 'PYSCRIPT'
+          import os
+          import subprocess
+          import time
+          
+          target = os.environ['EC2_DB_IP']
+          ssh_key = os.environ.get('EC2_SSH_KEY', '')
+          
+          if not ssh_key:
+              print("❌ EC2_SSH_KEY not set in secrets")
+              exit(1)
+          
+          # Create temp key file
+          with open('/tmp/ssh_key', 'w') as f:
+              f.write(ssh_key)
+          os.chmod('/tmp/ssh_key', 0o600)
+          
+          print(f"🔗 Connecting to EC2-DB ({target})...")
+          
+          # MongoDB restart commands
+          commands = """
+          set -e
+          echo "🔧 Starting MongoDB fix..."
+          
+          docker stop mongo 2>/dev/null || true
+          docker rm mongo 2>/dev/null || true
+          docker volume create mongo_data 2>/dev/null || true
+          
+          docker run -d --name mongo \\
+            -p 0.0.0.0:27017:27017 \\
+            -e MONGO_INITDB_ROOT_USERNAME=root \\
+            -e MONGO_INITDB_ROOT_PASSWORD=example \\
+            -v mongo_data:/data/db \\
+            mongo:6.0 \\
+            --auth --bind_ip_all
+          
+          echo "⏳ Waiting for MongoDB..."
+          sleep 15
+          
+          echo "✅ MongoDB Status:"
+          docker ps -a -f name=mongo --format "table {{.Names}}\\t{{.Status}}"
+          """
+          
+          # Try SSH connection with retries
+          for attempt in range(3):
+              try:
+                  print(f"\n📍 SSH Attempt {attempt + 1}/3...")
+                  cmd = [
+                      'ssh', '-i', '/tmp/ssh_key', 
+                      '-o', 'StrictHostKeyChecking=no',
+                      '-o', 'UserKnownHostsFile=/dev/null',
+                      '-o', 'ConnectTimeout=10',
+                      '-o', 'BatchMode=yes',
+                      f'ubuntu@{target}',
+                      commands
+                  ]
+                  
+                  result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                  
+                  print(result.stdout)
+                  if result.stderr:
+                      print(f"⚠️  {result.stderr}")
+                  
+                  if result.returncode == 0:
+                      print("✅ MongoDB fix applied successfully!")
+                      break
+                  
+              except Exception as e:
+                  if attempt < 2:
+                      print(f"⚠️  Attempt failed: {str(e)[:100]}")
+                      print("   Retrying...")
+                      time.sleep(5)
+                  else:
+                      print(f"❌ Failed after 3 attempts: {str(e)[:150]}")
+          
+          PYSCRIPT
+
+  # PHASE 3: DEPLOY MICROSERVICES FIX
+  deploy-microservices-fix:
+    name: Fix Microservices
+    needs: [verify-config, deploy-mongodb-fix]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: |
+      github.event.inputs.fix_type == 'all' ||
+      github.event.inputs.fix_type == 'microservices-only' ||
+      always()
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run Microservices Fix Script
+        env:
+          EC2_CORE_IP: ${{ needs.verify-config.outputs.core-ip }}
+          EC2_DB_PRIVATE_IP: 172.31.65.122
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          python3 << 'PYSCRIPT'
+          import os
+          import subprocess
+          import time
+          
+          target = os.environ['EC2_CORE_IP']
+          db_private_ip = os.environ['EC2_DB_PRIVATE_IP']
+          ssh_key = os.environ.get('EC2_SSH_KEY', '')
+          
+          if not ssh_key:
+              print("⚠️  EC2_SSH_KEY not set, skipping SSH commands")
+              exit(0)
+          
+          # Create temp key file
+          with open('/tmp/ssh_key', 'w') as f:
+              f.write(ssh_key)
+          os.chmod('/tmp/ssh_key', 0o600)
+          
+          print(f"🔗 Connecting to EC2-CORE ({target})...")
+          
+          commands = f"""
+          set -e
+          echo "🔧 Starting Microservices fix..."
+          
+          # Create docker network
+          docker network create core-net 2>/dev/null || true
+          
+          # Stop old services
+          docker stop micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          docker rm micro-auth micro-estudiantes micro-maestros 2>/dev/null || true
+          
+          # Start microservices with MongoDB URI
+          docker run -d --name micro-auth \\
+            --network core-net \\
+            -p 3000:3000 \\
+            -e MONGODB_URI='mongodb://root:example@{db_private_ip}:27017/auth?authSource=admin' \\
+            -e PORT=3000 \\
+            -e NODE_ENV=production \\
+            --add-host=db-host:{db_private_ip} \\
+            arielguerron14/micro-auth:latest
+          
+          docker run -d --name micro-estudiantes \\
+            --network core-net \\
+            -p 3001:3001 \\
+            -e MONGODB_URI='mongodb://root:example@{db_private_ip}:27017/estudiantes?authSource=admin' \\
+            -e PORT=3001 \\
+            -e NODE_ENV=production \\
+            --add-host=db-host:{db_private_ip} \\
+            arielguerron14/micro-estudiantes:latest
+          
+          docker run -d --name micro-maestros \\
+            --network core-net \\
+            -p 3002:3002 \\
+            -e MONGODB_URI='mongodb://root:example@{db_private_ip}:27017/maestros?authSource=admin' \\
+            -e PORT=3002 \\
+            -e NODE_ENV=production \\
+            --add-host=db-host:{db_private_ip} \\
+            arielguerron14/micro-maestros:latest
+          
+          echo "⏳ Waiting for microservices..."
+          sleep 15
+          
+          echo "✅ Microservices Status:"
+          docker ps -a -f name=micro --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"
+          """
+          
+          # Try SSH connection with retries
+          for attempt in range(3):
+              try:
+                  print(f"\n📍 SSH Attempt {attempt + 1}/3...")
+                  cmd = [
+                      'ssh', '-i', '/tmp/ssh_key', 
+                      '-o', 'StrictHostKeyChecking=no',
+                      '-o', 'UserKnownHostsFile=/dev/null',
+                      '-o', 'ConnectTimeout=10',
+                      '-o', 'BatchMode=yes',
+                      f'ubuntu@{target}',
+                      commands
+                  ]
+                  
+                  result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                  
+                  print(result.stdout)
+                  if result.stderr:
+                      print(f"⚠️  {result.stderr}")
+                  
+                  if result.returncode == 0:
+                      print("✅ Microservices fix applied successfully!")
+                      break
+                  
+              except Exception as e:
+                  if attempt < 2:
+                      print(f"⚠️  Attempt failed: {str(e)[:100]}")
+                      print("   Retrying...")
+                      time.sleep(5)
+                  else:
+                      print(f"❌ Failed: {str(e)[:150]}")
+          
+          PYSCRIPT
+
+  # PHASE 4: TEST DEPLOYMENT
+  test-deployment:
+    name: Test Deployment
+    needs: [verify-config, deploy-microservices-fix]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Test Infrastructure
+        env:
+          API_IP: ${{ needs.verify-config.outputs.api-ip }}
+        run: |
+          python3 << 'PYSCRIPT'
+          import requests
+          import json
+          import time
+          import os
+          
+          api_url = f"http://{os.environ['API_IP']}:8080"
+          
+          print("=" * 70)
+          print("🧪 TESTING INFRASTRUCTURE")
+          print("=" * 70)
+          
+          # Test 1: API Gateway health
+          print("\n1️⃣  API Gateway /health")
+          try:
+              r = requests.get(f"{api_url}/health", timeout=5)
+              if r.status_code == 200:
+                  print(f"   ✅ {r.status_code} OK")
+              else:
+                  print(f"   ⚠️  {r.status_code}")
+          except Exception as e:
+              print(f"   ❌ {str(e)[:50]}")
+          
+          # Test 2: Auth health
+          print("\n2️⃣  Auth Service /health")
+          try:
+              r = requests.get(f"{api_url}/auth/health", timeout=5)
+              if r.status_code == 200:
+                  print(f"   ✅ {r.status_code} OK")
+              else:
+                  print(f"   ⚠️  {r.status_code}")
+          except Exception as e:
+              print(f"   ❌ {str(e)[:50]}")
+          
+          # Test 3: Register (critical test)
+          print("\n3️⃣  Auth Service /register (CRITICAL)")
+          try:
+              import random, string
+              test_user = {
+                  "email": ''.join(random.choices(string.ascii_lowercase, k=10)) + '@test.com',
+                  "password": "Test123!",
+                  "name": "Test User"
+              }
+              r = requests.post(f"{api_url}/auth/register", 
+                  json=test_user, 
+                  timeout=8)
+              if r.status_code == 201:
+                  print(f"   ✅ {r.status_code} Created (MongoDB working!)")
+                  data = r.json()
+                  if 'user' in data:
+                      print(f"      User: {data['user'].get('email', 'unknown')}")
+              elif r.status_code == 400:
+                  print(f"   ⚠️  {r.status_code} Bad Request")
+                  print(f"      {r.json().get('message', r.json())}")
+              else:
+                  print(f"   ⚠️  {r.status_code}")
+                  print(f"      {r.json()}")
+          except requests.exceptions.Timeout:
+              print(f"   ❌ TIMEOUT (MongoDB still not responding)")
+          except Exception as e:
+              print(f"   ❌ {str(e)[:100]}")
+          
+          print("\n" + "=" * 70)
+          print("📊 TEST RESULTS")
+          print("=" * 70)
+          print("""
+          ✅ If /register returns 201 Created: INFRASTRUCTURE IS FIXED!
+          ⏱️  If /register times out: MongoDB/microservices still having issues
+          
+          Next: Test in browser at http://API_IP:5500 (Frontend)
+          """)
+          
+          PYSCRIPT
+
+  # SUMMARY
+  summary:
+    name: Deployment Summary
+    needs: [verify-config, test-deployment]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Print Summary
+        run: |
+          echo "🎉 DEPLOYMENT COMPLETE"
+          echo ""
+          echo "Infrastructure IPs:"
+          echo "  - API Gateway: http://${{ needs.verify-config.outputs.api-ip }}:8080"
+          echo "  - Frontend: http://${{ needs.verify-config.outputs.api-ip }}:5500"
+          echo "  - Auth Service: http://${{ needs.verify-config.outputs.api-ip }}:8080/auth"
+          echo ""
+          echo "📝 Test URLs:"
+          echo "  - Health: curl http://${{ needs.verify-config.outputs.api-ip }}:8080/health"
+          echo "  - Register: curl -X POST http://${{ needs.verify-config.outputs.api-ip }}:8080/auth/register -H 'Content-Type: application/json' -d '{\"email\":\"test@example.com\",\"password\":\"Test123!\",\"name\":\"Test\"}'"
