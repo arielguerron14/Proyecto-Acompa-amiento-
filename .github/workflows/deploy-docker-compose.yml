@@ -325,6 +325,7 @@ jobs:
       - name: Deploy with Docker Compose
         run: |
           scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/docker-compose.reportes.yml
+          scp -r -i ~/.ssh/id_rsa micro-reportes-* ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/ 2>/dev/null || true
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
@@ -359,11 +360,7 @@ jobs:
           cd /tmp
           docker-compose -f docker-compose.reportes.yml down 2>/dev/null || true
           docker-compose -f docker-compose.reportes.yml pull 2>&1 || true
-          
-          if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
-            docker-compose -f docker-compose.reportes.yml build
-          fi
-          
+          docker-compose -f docker-compose.reportes.yml build
           docker-compose -f docker-compose.reportes.yml up -d
           
           sleep 10
@@ -394,6 +391,7 @@ jobs:
       - name: Deploy with Docker Compose
         run: |
           scp -i ~/.ssh/id_rsa docker-compose.ec2-notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/docker-compose.notificaciones.yml
+          scp -r -i ~/.ssh/id_rsa micro-notificaciones ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/ 2>/dev/null || true
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
@@ -428,11 +426,7 @@ jobs:
           cd /tmp
           docker-compose -f docker-compose.notificaciones.yml down 2>/dev/null || true
           docker-compose -f docker-compose.notificaciones.yml pull 2>&1 || true
-          
-          if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
-            docker-compose -f docker-compose.notificaciones.yml build
-          fi
-          
+          docker-compose -f docker-compose.notificaciones.yml build
           docker-compose -f docker-compose.notificaciones.yml up -d
           
           sleep 10
