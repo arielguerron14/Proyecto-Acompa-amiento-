@@ -98,6 +98,14 @@ jobs:
           echo "⏱️  EC2-Messaging Deployment"
           echo "================================"
           
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
+          
           cd /tmp
           docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true
           docker-compose -f docker-compose.messaging.yml up -d
@@ -137,6 +145,14 @@ jobs:
           echo "🗄️  EC2-DB Deployment"
           echo "================================"
           
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
+          
           cd /tmp
           docker-compose -f docker-compose.db.yml down 2>/dev/null || true
           docker-compose -f docker-compose.db.yml up -d
@@ -175,6 +191,14 @@ jobs:
           echo "================================"
           echo "🐳 EC2-CORE Deployment"
           echo "================================"
+          
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
           
           cd /tmp
           docker-compose -f docker-compose.core.yml down 2>/dev/null || true
@@ -220,6 +244,14 @@ jobs:
           echo "🌐 EC2-API-Gateway Deployment"
           echo "================================"
           
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
+          
           cd /tmp
           docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
           
@@ -263,6 +295,14 @@ jobs:
           echo "================================"
           echo "📄 EC2-Reportes Deployment"
           echo "================================"
+          
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
           
           cd /tmp
           docker-compose -f docker-compose.reportes.yml down 2>/dev/null || true
@@ -308,6 +348,14 @@ jobs:
           echo "🔔 EC2-Notificaciones Deployment"
           echo "================================"
           
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
+          
           cd /tmp
           docker-compose -f docker-compose.notificaciones.yml down 2>/dev/null || true
           
@@ -351,6 +399,14 @@ jobs:
           echo "================================"
           echo "📊 EC2-Analytics Deployment"
           echo "================================"
+          
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
           
           cd /tmp
           docker-compose -f docker-compose.analytics.yml down 2>/dev/null || true
@@ -396,6 +452,14 @@ jobs:
           echo "📈 EC2-Monitoring Deployment"
           echo "================================"
           
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
+          
           cd /tmp
           docker-compose -f docker-compose.monitoring.yml down 2>/dev/null || true
           docker-compose -f docker-compose.monitoring.yml up -d
@@ -434,6 +498,14 @@ jobs:
           echo "================================"
           echo "🎨 EC2-Frontend Deployment"
           echo "================================"
+          
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
           
           cd /tmp
           docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
@@ -478,6 +550,14 @@ jobs:
           echo "================================"
           echo "🛡️  EC-Bastion Deployment"
           echo "================================"
+          
+          # Instalar docker-compose si no existe
+          if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Instalando docker-compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          fi
           
           cd /tmp
           docker-compose -f docker-compose.bastion.yml down 2>/dev/null || true
