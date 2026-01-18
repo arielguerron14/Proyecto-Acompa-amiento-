@@ -324,9 +324,17 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          # Verify directories exist
+          echo "📁 Checking Reportes directories..."
+          [ -d micro-reportes-estudiantes ] && echo "✅ micro-reportes-estudiantes found" || echo "❌ micro-reportes-estudiantes NOT found"
+          [ -d micro-reportes-maestros ] && echo "✅ micro-reportes-maestros found" || echo "❌ micro-reportes-maestros NOT found"
+          
+          # Transfer docker-compose file
           scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/docker-compose.reportes.yml
-          tar czf /tmp/reportes-context.tar.gz micro-reportes-estudiantes micro-reportes-maestros
-          scp -i ~/.ssh/id_rsa /tmp/reportes-context.tar.gz ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/
+          
+          # Create tar and pipe directly to remote instance
+          echo "📦 Creating and transferring tar archive..."
+          tar czf - micro-reportes-estudiantes micro-reportes-maestros | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} "cat > /tmp/reportes-context.tar.gz && ls -lh /tmp/reportes-context.tar.gz"
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
@@ -392,9 +400,16 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          # Verify directory exists
+          echo "📁 Checking Notificaciones directory..."
+          [ -d micro-notificaciones ] && echo "✅ micro-notificaciones found" || echo "❌ micro-notificaciones NOT found"
+          
+          # Transfer docker-compose file
           scp -i ~/.ssh/id_rsa docker-compose.ec2-notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/docker-compose.notificaciones.yml
-          tar czf /tmp/notificaciones-context.tar.gz micro-notificaciones
-          scp -i ~/.ssh/id_rsa /tmp/notificaciones-context.tar.gz ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/
+          
+          # Create tar and pipe directly to remote instance
+          echo "📦 Creating and transferring tar archive..."
+          tar czf - micro-notificaciones | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} "cat > /tmp/notificaciones-context.tar.gz && ls -lh /tmp/notificaciones-context.tar.gz"
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
