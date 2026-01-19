@@ -228,17 +228,17 @@ jobs:
           echo "🐳 EC2-CORE Deployment"
           echo "================================"
           
-          # Extract build context
+          # Extract build context to a Docker-accessible location (not /tmp which may be snap-mounted)
           echo "📂 Extracting CORE source context..."
-          cd /tmp
+          cd /home/ubuntu
           
           # Show tar contents before extraction (first 30 files)
           echo "📋 TAR Contents (first 30 files):"
-          tar tzf core-context.tar.gz | head -30
+          tar tzf /tmp/core-context.tar.gz | head -30
           
           # Extract with verbose output for first 30 items
           echo "📂 Extracting..."
-          tar xzf core-context.tar.gz -v 2>&1 | head -30
+          tar xzf /tmp/core-context.tar.gz -v 2>&1 | head -30
           
           echo "✅ TAR extraction complete"
           
@@ -257,8 +257,8 @@ jobs:
             fi
           done
           
-          echo "📂 Listing /tmp directory structure:"
-          ls -la /tmp/ | grep -E "^d|micro-|shared-|\.tar"
+          echo "📂 Listing /home/ubuntu directory structure:"
+          ls -la /home/ubuntu | grep -E "^d|micro-|shared-|\.tar"
           
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
@@ -268,13 +268,14 @@ jobs:
             docker-compose --version
           fi
           
-          cd /tmp
-          docker-compose -f docker-compose.core.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.core.yml build --no-cache
-          docker-compose -f docker-compose.core.yml up -d
+          # Run docker-compose from home directory where sources are extracted
+          cd /home/ubuntu
+          docker-compose -f /tmp/docker-compose.core.yml down 2>/dev/null || true
+          docker-compose -f /tmp/docker-compose.core.yml build --no-cache
+          docker-compose -f /tmp/docker-compose.core.yml up -d
           
           sleep 15
-          docker-compose -f docker-compose.core.yml ps
+          docker-compose -f /tmp/docker-compose.core.yml ps
           echo "✅ EC2-CORE deployment complete"
           DEPLOY
 
@@ -408,15 +409,16 @@ jobs:
           # Login to Docker registry
           echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
-          cd /tmp
+          # Extract to home directory (Docker-accessible, not /tmp)
+          cd /home/ubuntu
           
           # Show tar contents before extraction
           echo "📋 TAR Contents (first 30 files):"
-          tar tzf reportes-context.tar.gz | head -30
+          tar tzf /tmp/reportes-context.tar.gz | head -30
           
           # Extract with verbose output
           echo "📂 Extracting Reportes context..."
-          tar xzf reportes-context.tar.gz -v 2>&1 | head -30
+          tar xzf /tmp/reportes-context.tar.gz -v 2>&1 | head -30
           
           echo "✅ TAR extraction complete"
           
@@ -435,12 +437,12 @@ jobs:
             fi
           done
           
-          docker-compose -f docker-compose.reportes.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.reportes.yml build --no-cache
-          docker-compose -f docker-compose.reportes.yml up -d
+          docker-compose -f /tmp/docker-compose.reportes.yml down 2>/dev/null || true
+          docker-compose -f /tmp/docker-compose.reportes.yml build --no-cache
+          docker-compose -f /tmp/docker-compose.reportes.yml up -d
           
           sleep 10
-          docker-compose -f docker-compose.reportes.yml ps
+          docker-compose -f /tmp/docker-compose.reportes.yml ps
           echo "✅ EC2-Reportes deployment complete"
           DEPLOY
 
