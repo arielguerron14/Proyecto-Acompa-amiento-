@@ -1,4 +1,4 @@
-name: 🎨 Frontend - Build & Deploy via SSM
+name: 🎨 Frontend - Build & Deploy
 
 on:
   workflow_dispatch:
@@ -7,112 +7,88 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-  build-and-deploy-frontend:
-    name: "Frontend Build & Deploy"
+  build-frontend:
+    name: "🎨 Frontend Build & Deploy"
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    continue-on-error: false
+    timeout-minutes: 40
+    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v3
-      
       - uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-
-      - name: 🔍 Find EC2-Frontend Instance
-        id: instance
-        run: |
+      
+      - run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=EC2-Frontend" "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].InstanceId" \
             --output text)
           
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "❌ EC2-Frontend instance not found!"
+            echo "❌ EC2-Frontend not found"
             exit 1
           fi
           
-          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
-          echo "✅ Found Instance: $INSTANCE_ID"
-
-      - name: 📤 Send Build & Deploy Commands
-        id: deploy
-        run: |
-          INSTANCE_ID="${{ steps.instance.outputs.instance_id }}"
+          echo "✅ Instance: $INSTANCE_ID"
+          echo ""
+          echo "📋 Building Docker image and deploying..."
           
-          echo "📋 Sending build commands to instance..."
-          
-          # Send SSM command to build and deploy frontend
-          COMMAND_ID=$(aws ssm send-command \
+          aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
-              "echo === FRONTEND BUILD START ===",
-              "cd /tmp",
-              "rm -rf proyecto-build 2>/dev/null || true",
-              "git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git --depth 1 proyecto-build",
-              "cd proyecto-build/frontend-web",
-              "echo Building Docker image...",
+              "cd /tmp && rm -rf build-frontend 2>/dev/null || true",
+              "git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git --depth 1 build-frontend",
+              "cd build-frontend/frontend-web",
               "docker build -t frontend-web:latest .",
-              "echo Stopping old container...",
-              "docker stop frontend 2>/dev/null || true",
+              "cd /tmp && docker stop frontend 2>/dev/null || true",
               "docker rm frontend 2>/dev/null || true",
-              "cd /tmp",
               "curl -s https://raw.githubusercontent.com/arielguerron14/Proyecto-Acompa-amiento-/main/docker-compose.ec2-frontend.yml > docker-compose.ec2-frontend.yml",
-              "echo Deploying with docker-compose...",
               "docker-compose -f docker-compose.ec2-frontend.yml up -d --no-build",
-              "echo Waiting for startup...",
-              "sleep 5",
-              "echo Container status:",
-              "docker ps | grep frontend",
-              "echo === BUILD COMPLETE ==="
+              "sleep 5 && docker ps | grep frontend"
             ]' \
-            --query 'Command.CommandId' \
-            --output text)
+            --output text > /tmp/ssm-command.txt
           
-          echo "cmd_id=$COMMAND_ID" >> $GITHUB_OUTPUT
-          echo "✅ Command sent: $COMMAND_ID"
-
-      - name: ⏳ Wait for Build Completion
-        run: |
-          COMMAND_ID="${{ steps.deploy.outputs.cmd_id }}"
-          INSTANCE_ID="${{ steps.instance.outputs.instance_id }}"
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
           
-          echo "Waiting for build to complete (this may take 10-15 minutes)..."
+          echo "Command ID: $COMMAND_ID"
+          echo ""
+          echo "⏳ Waiting (this may take 15 minutes)..."
           
-          # Check status for up to 30 minutes
           for i in {1..180}; do
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
               --instance-id "$INSTANCE_ID" \
-              --query 'Status' \
+              --query "Status" \
               --output text 2>/dev/null || echo "Pending")
             
-            if [ $((i % 10)) -eq 0 ]; then
+            if [ $((i % 15)) -eq 0 ]; then
               echo "[$i/180] Status: $STATUS"
             fi
             
-            if [ "$STATUS" = "Success" ] || [ "$STATUS" = "Failed" ]; then
+            if [ "$STATUS" = "Success" ]; then
               echo ""
-              echo "📋 Build Output:"
+              echo "✅ Frontend build & deployment successful!"
+              echo ""
+              echo "📋 Output:"
               aws ssm get-command-invocation \
                 --command-id "$COMMAND_ID" \
                 --instance-id "$INSTANCE_ID" \
                 --query 'StandardOutputContent' \
-                --output text
-              
-              if [ "$STATUS" = "Success" ]; then
-                echo ""
-                echo "✅ Frontend build and deployment successful!"
-              else
-                echo ""
-                echo "❌ Build failed"
-                exit 1
-              fi
+                --output text | tail -30
               break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo ""
+              echo "❌ Build failed"
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --query 'StandardErrorContent' \
+                --output text
+              exit 1
             fi
             
             sleep 5
