@@ -78,6 +78,7 @@ jobs:
     needs: load-config
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    continue-on-error: true
 
     steps:
       - name: Checkout repository
@@ -122,7 +123,7 @@ jobs:
   # =========================================================================
   deploy-db:
     name: "🗄️  2. Deploy EC2-DB"
-    needs: [load-config, deploy-messaging]
+    needs: load-config
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -183,6 +184,16 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ needs.load-config.outputs.core-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Check SSH Connectivity
+        run: |
+          echo "🔍 Testing SSH connection to ${{ needs.load-config.outputs.core-public }}..."
+          if timeout 10 ssh -i ~/.ssh/id_rsa -o ConnectTimeout=5 ubuntu@${{ needs.load-config.outputs.core-public }} "echo '✅ SSH OK'" 2>&1; then
+            echo "✅ SSH connection successful"
+          else
+            echo "❌ SSH connection failed - skipping deployment"
+            exit 1
+          fi
 
       - name: Deploy with Docker Compose
         run: |
@@ -451,7 +462,7 @@ jobs:
   # =========================================================================
   deploy-notificaciones:
     name: "🔔 6. Deploy EC2-Notificaciones"
-    needs: [load-config, deploy-db, deploy-messaging]
+    needs: [load-config, deploy-db]
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
