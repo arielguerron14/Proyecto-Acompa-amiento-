@@ -105,32 +105,29 @@ jobs:
       - name: Deploy EC2-CORE
         run: |
           echo "🔍 Trying direct connection to EC2-CORE..."
+          SSH_OPTS="-o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa"
           
           # Try direct connection first
-          if timeout 5 ssh -o ConnectTimeout=5 -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-ip }} "echo OK" 2>/dev/null; then
+          if timeout 10 ssh $SSH_OPTS ubuntu@${{ needs.load-config.outputs.core-ip }} "echo OK" 2>/dev/null; then
             echo "✅ Direct SSH connection successful"
-            
             echo "📦 Deploying via direct SSH..."
-            ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-ip }} << 'DEPLOY'
-            cd /tmp || cd ~
-            docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true
-            docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -20
-            sleep 5
-            docker-compose -f docker-compose.ec2-core.yml ps
-            DEPLOY
+            ssh $SSH_OPTS ubuntu@${{ needs.load-config.outputs.core-ip }} bash -s << 'EOF'
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -20
+          sleep 5
+          docker-compose -f docker-compose.ec2-core.yml ps
+          EOF
           else
             echo "⏳ Direct connection failed, trying via Bastion..."
-            
-            # Try via bastion
-            ssh -i ~/.ssh/id_rsa -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} ubuntu@${{ needs.load-config.outputs.core-private }} << 'DEPLOY'
-            cd /tmp || cd ~
-            docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true
-            docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -20
-            sleep 5
-            docker-compose -f docker-compose.ec2-core.yml ps
-            DEPLOY
+            ssh $SSH_OPTS -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} ubuntu@${{ needs.load-config.outputs.core-private }} bash -s << 'EOF'
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -20
+          sleep 5
+          docker-compose -f docker-compose.ec2-core.yml ps
+          EOF
           fi
-          
           echo "✅ EC2-CORE deployment complete"
 
   deploy-db:
@@ -148,19 +145,14 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
           
           echo "🚀 Deploying EC2-DB..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
-            -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
-            ubuntu@${{ needs.load-config.outputs.db-private }} << 'DEPLOY'
+          ssh -o ConnectTimeout=15 -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.db-ip }} bash -s << 'EOF'
           cd /tmp || cd ~
           docker-compose -f docker-compose.ec2-db.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.ec2-db.yml up -d --no-build 2>&1 | tail -10
-          sleep 5
-          docker-compose -f docker-compose.ec2-db.yml ps
-          DEPLOY
-          
+          docker-compose -f docker-compose.ec2-db.yml up -d --no-build 2>&1 | grep -E "Creating|Started|Error" | head -5
+          sleep 5 && docker-compose -f docker-compose.ec2-db.yml ps
+          EOF
           echo "✅ EC2-DB deployment complete"
 
   deploy-api-gateway:

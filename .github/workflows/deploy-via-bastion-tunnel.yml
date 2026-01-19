@@ -60,7 +60,7 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          SSH_OPTS="-o ConnectTimeout=15 -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa"
+          SSH_OPTS="-o ConnectTimeout=15 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/id_rsa"
           
           echo "🚀 Deploying EC2-CORE via Bastion..."
           ssh $SSH_OPTS -J ${{ env.BASTION_USER }}@${{ env.BASTION_IP }} ${{ env.BASTION_USER }}@${{ needs.load-config.outputs.core-private }} bash -s << 'SCRIPT'
