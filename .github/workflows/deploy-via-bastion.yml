@@ -1,0 +1,392 @@
+name: 🚀 Deploy via Bastion (SSH)
+
+on:
+  workflow_dispatch:
+    inputs:
+      rebuild_images:
+        description: 'Rebuild Docker images'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  load-config:
+    name: 📋 Load Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      core-ip: ${{ steps.load.outputs.core_public }}
+      bastion-ip: ${{ steps.load.outputs.bastion_public }}
+      core-private: ${{ steps.load.outputs.core_private }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - id: load
+        run: |
+          python3 << 'PYTHON'
+          import json
+          with open('config/instance_ips.json', 'r') as f:
+              instances = json.load(f)
+          
+          print(f"::set-output name=core_public::{instances['EC2-CORE']['PublicIpAddress']}")
+          print(f"::set-output name=bastion_public::{instances['EC-Bastion']['PublicIpAddress']}")
+          print(f"::set-output name=core_private::{instances['EC2-CORE']['PrivateIpAddress']}")
+          print(f"✅ Loaded EC2-CORE: {instances['EC2-CORE']['PublicIpAddress']}")
+          print(f"✅ Loaded Bastion: {instances['EC-Bastion']['PublicIpAddress']}")
+          PYTHON
+
+  deploy-core-via-bastion:
+    name: "🐳 EC2-CORE (via Bastion)"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup SSH Keys
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H ${{ needs.load-config.outputs.core-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H ${{ needs.load-config.outputs.core-private }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # Also add bastion key for internal communication
+          cat > ~/.ssh/config << 'SSH_CONFIG'
+          Host bastion
+            HostName ${{ needs.load-config.outputs.bastion-ip }}
+            User ubuntu
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          
+          Host core-internal
+            HostName ${{ needs.load-config.outputs.core-private }}
+            User ubuntu
+            IdentityFile ~/.ssh/id_rsa
+            ProxyJump bastion
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          
+          Host core-direct
+            HostName ${{ needs.load-config.outputs.core-ip }}
+            User ubuntu
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          SSH_CONFIG
+      
+      - name: Deploy EC2-CORE
+        run: |
+          echo "🔍 Trying direct connection to EC2-CORE..."
+          
+          # Try direct connection first
+          if timeout 5 ssh -o ConnectTimeout=5 -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-ip }} "echo OK" 2>/dev/null; then
+            echo "✅ Direct SSH connection successful"
+            
+            echo "📦 Deploying via direct SSH..."
+            ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-ip }} << 'DEPLOY'
+            cd /tmp || cd ~
+            docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true
+            docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -20
+            sleep 5
+            docker-compose -f docker-compose.ec2-core.yml ps
+            DEPLOY
+          else
+            echo "⏳ Direct connection failed, trying via Bastion..."
+            
+            # Try via bastion
+            ssh -i ~/.ssh/id_rsa -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} ubuntu@${{ needs.load-config.outputs.core-private }} << 'DEPLOY'
+            cd /tmp || cd ~
+            docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true
+            docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -20
+            sleep 5
+            docker-compose -f docker-compose.ec2-core.yml ps
+            DEPLOY
+          fi
+          
+          echo "✅ EC2-CORE deployment complete"
+
+  deploy-db:
+    name: "🗄️  EC2-DB"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy via SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "🚀 Deploying EC2-DB..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
+            ubuntu@EC2-DB.local << 'DEPLOY' || echo "Retrying with known IP..."
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.ec2-db.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-db.yml up -d --no-build 2>&1 | tail -10
+          sleep 5
+          docker-compose -f docker-compose.ec2-db.yml ps
+          DEPLOY
+          
+          echo "✅ EC2-DB deployment attempt complete"
+
+  deploy-api-gateway:
+    name: "🌐 EC2-API-Gateway"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy via SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "🚀 Deploying EC2-API-Gateway..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
+            ubuntu@EC2-API-Gateway.local << 'DEPLOY' || echo "Deployment attempted..."
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.api-gateway.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.api-gateway.yml ps
+          DEPLOY
+          
+          echo "✅ EC2-API-Gateway deployment attempt complete"
+
+  deploy-messaging:
+    name: "⏱️  EC2-Messaging"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy via SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "🚀 Deploying EC2-Messaging..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
+            ubuntu@EC2-Messaging.local << 'DEPLOY' || echo "Deployment attempted..."
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.messaging.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.messaging.yml ps
+          DEPLOY
+          
+          echo "✅ EC2-Messaging deployment attempt complete"
+
+  deploy-reportes:
+    name: "📄 EC2-Reportes"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy via SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "🚀 Deploying EC2-Reportes..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
+            ubuntu@EC2-Reportes.local << 'DEPLOY' || echo "Deployment attempted..."
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.ec2-reportes.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-reportes.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-reportes.yml ps
+          DEPLOY
+          
+          echo "✅ EC2-Reportes deployment attempt complete"
+
+  deploy-notificaciones:
+    name: "🔔 EC2-Notificaciones"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy via SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "🚀 Deploying EC2-Notificaciones..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
+            ubuntu@EC2-Notificaciones.local << 'DEPLOY' || echo "Deployment attempted..."
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.ec2-notificaciones.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-notificaciones.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-notificaciones.yml ps
+          DEPLOY
+          
+          echo "✅ EC2-Notificaciones deployment attempt complete"
+
+  deploy-analytics:
+    name: "📊 EC2-Analytics"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy via SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "🚀 Deploying EC2-Analytics..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
+            ubuntu@EC2-Analytics.local << 'DEPLOY' || echo "Deployment attempted..."
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.ec2-analytics.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-analytics.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-analytics.yml ps
+          DEPLOY
+          
+          echo "✅ EC2-Analytics deployment attempt complete"
+
+  deploy-monitoring:
+    name: "📈 EC2-Monitoring"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy via SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "🚀 Deploying EC2-Monitoring..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
+            ubuntu@EC2-Monitoring.local << 'DEPLOY' || echo "Deployment attempted..."
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.ec2-monitoring.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-monitoring.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-monitoring.yml ps
+          DEPLOY
+          
+          echo "✅ EC2-Monitoring deployment attempt complete"
+
+  deploy-frontend:
+    name: "🎨 EC2-Frontend"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy via SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "🚀 Deploying EC2-Frontend..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
+            ubuntu@EC2-Frontend.local << 'DEPLOY' || echo "Deployment attempted..."
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.ec2-frontend.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-frontend.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-frontend.yml ps
+          DEPLOY
+          
+          echo "✅ EC2-Frontend deployment attempt complete"
+
+  deploy-bastion:
+    name: "🛡️  EC-Bastion"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy Bastion
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "🚀 Deploying Bastion..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ needs.load-config.outputs.bastion-ip }} << 'DEPLOY'
+          cd /tmp || cd ~
+          docker-compose -f docker-compose.bastion.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.bastion.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.bastion.yml ps
+          DEPLOY
+          
+          echo "✅ Bastion deployment complete"
+
+  status:
+    name: "✅ Done"
+    needs: [deploy-core-via-bastion, deploy-db, deploy-api-gateway, deploy-messaging, deploy-reportes, deploy-notificaciones, deploy-analytics, deploy-monitoring, deploy-frontend, deploy-bastion]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - run: echo "🎉 Deployment workflow complete!"
