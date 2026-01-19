@@ -2,71 +2,124 @@
     "EC2-CORE": {
         "InstanceId": "i-03ce33456b5a432c7",
         "Name": "EC2-CORE",
-        "PublicIpAddress": "3.236.99.88",
+        "PublicIpAddress": "100.49.160.199",
         "PrivateIpAddress": "172.31.64.170",
-        "Type": "t3.small"
+        "Type": "t3.small",
+        "Status": "En ejecución",
+        "Containers": [
+            "micro-auth:latest",
+            "micro-estudiantes:latest",
+            "micro-maestros:latest",
+            "micro-core:latest",
+            "micro-analytics:latest"
+        ]
     },
     "EC2-Notificaciones": {
         "InstanceId": "i-0573caa61d3434773",
         "Name": "EC2-Notificaciones",
-        "PublicIpAddress": "98.92.17.165",
+        "PublicIpAddress": "3.226.74.67",
         "PrivateIpAddress": "172.31.78.71",
-        "Type": "t3.small"
+        "Type": "t3.small",
+        "Status": "En ejecución",
+        "Containers": [
+            "micro-notificaciones:latest"
+        ]
     },
     "EC2-Monitoring": {
         "InstanceId": "i-00ec97a11d97ec816",
         "Name": "EC2-Monitoring",
         "PublicIpAddress": "54.205.158.101",
         "PrivateIpAddress": "172.31.73.236",
-        "Type": "t3.small"
+        "Type": "t3.small",
+        "Status": "En ejecución",
+        "Containers": [
+            "proyecto-prometheus:1.0",
+            "proyecto-grafana:1.0"
+        ]
     },
     "EC2-API-Gateway": {
         "InstanceId": "i-051b99befe53d8653",
         "Name": "EC2-API-Gateway",
         "PublicIpAddress": "98.86.94.92",
         "PrivateIpAddress": "172.31.74.81",
-        "Type": "t3.small"
+        "Type": "t3.small",
+        "Status": "En ejecución",
+        "Containers": [
+            "api-gateway:latest"
+        ]
     },
     "EC2-Messaging": {
         "InstanceId": "i-0b0de88edecb142fb",
         "Name": "EC2-Messaging",
-        "PublicIpAddress": "35.172.111.207",
+        "PublicIpAddress": "35.174.19.29",
         "PrivateIpAddress": "172.31.75.187",
-        "Type": "t3.small"
+        "Type": "t3.small",
+        "Status": "En ejecución",
+        "Containers": [
+            "proyecto-zookeeper:1.0",
+            "proyecto-kafka:1.0",
+            "proyecto-rabbitmq:1.0"
+        ]
     },
     "EC2-Frontend": {
         "InstanceId": "i-048232c6d4879895f",
         "Name": "EC2-Frontend",
         "PublicIpAddress": "52.72.57.10",
         "PrivateIpAddress": "172.31.65.89",
-        "Type": "t3.small"
+        "Type": "t3.small",
+        "Status": "En ejecución",
+        "Containers": [
+            "frontend-web:latest"
+        ]
     },
     "EC2-DB": {
         "InstanceId": "i-018e35ab30ab78c7e",
         "Name": "EC2-DB",
-        "PublicIpAddress": "13.217.220.8",
+        "PublicIpAddress": "3.235.120.8",
         "PrivateIpAddress": "172.31.67.130",
-        "Type": "t3.small"
+        "Type": "t3.small",
+        "Status": "En ejecución",
+        "Containers": [
+            "mongo:latest",
+            "postgres:latest",
+            "redis:latest"
+        ]
     },
     "EC-Bastion": {
         "InstanceId": "i-0b03c91aaea74cfaa",
         "Name": "EC-Bastion",
         "PublicIpAddress": "52.6.170.44",
         "PrivateIpAddress": "172.31.77.22",
-        "Type": "t3.small"
+        "Type": "t3.small",
+        "Status": "En ejecución",
+        "Containers": [
+            "bastion-host:latest"
+        ]
     },
     "EC2-Reportes": {
         "InstanceId": "i-06058666e047596d4",
         "Name": "EC2-Reportes",
         "PublicIpAddress": "23.22.116.142",
         "PrivateIpAddress": "172.31.78.252",
-        "Type": "t3.small"
+        "Type": "t3.small",
+        "Status": "En ejecución",
+        "Containers": [
+            "micro-reportes-estudiantes:latest",
+            "micro-reportes-maestros:latest"
+        ]
     },
     "EC2-Analytics": {
-        "InstanceId": "i-0c8a0d2f7f4e3a1b2",
-        "Name": "EC2-Analytics",
-        "PublicIpAddress": "3.87.33.92",
-        "PrivateIpAddress": "172.31.71.100",
-        "Type": "t3.small"
+        "InstanceId": "i-03ce33456b5a432c7",
+        "Name": "EC2-Analytics (Container in EC2-CORE)",
+        "PublicIpAddress": "100.49.160.199",
+        "PrivateIpAddress": "172.31.64.170",
+        "Type": "container",
+        "Host": "EC2-CORE",
+        "Port": 3004,
+        "ServiceName": "micro-analytics",
+        "Status": "En EC2-CORE",
+        "Containers": [
+            "micro-analytics:latest"
+        ]
     }
 }
