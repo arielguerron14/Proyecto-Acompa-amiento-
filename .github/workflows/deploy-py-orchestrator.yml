@@ -1,0 +1,43 @@
+name: 🚀 Deploy All Services (Python SSH Orchestrator)
+
+on:
+  workflow_dispatch:
+    inputs:
+      bastion_ip:
+        description: 'Bastion host IP (optional, defaults to 52.6.170.44)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: "3.9"
+
+jobs:
+  deploy:
+    name: "🚀 Deploy All 10 Services"
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # 3 hours for all services
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: "Set up Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: "Setup SSH key"
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "✅ SSH key configured"
+      
+      - name: "Deploy all services"
+        run: |
+          BASTION_IP="${{ inputs.bastion_ip || '52.6.170.44' }}"
+          python3 deploy_all_services.py ~/.ssh/id_rsa "$BASTION_IP"
+      
+      - name: "Deployment Summary"
+        if: always()
+        run: echo "🎉 Deployment workflow complete!"
