@@ -186,9 +186,39 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          # Verify directories exist before tar
+          echo "📁 Checking CORE directories..."
+          for dir in micro-auth micro-estudiantes micro-maestros shared-monitoring shared-config shared-auth; do
+            if [ -d "$dir" ]; then
+              echo "✅ $dir found"
+              if [ -f "$dir/package.json" ]; then
+                echo "   ✅ $dir/package.json found"
+              fi
+            else
+              echo "❌ WARNING: $dir NOT FOUND"
+              exit 1
+            fi
+          done
+          
           # Transfer build context (source code) via tar + SSH
           echo "📦 Transferring CORE source context..."
-          tar czf - micro-auth micro-estudiantes micro-maestros shared-monitoring shared-config shared-auth | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} "cat > /tmp/core-context.tar.gz"
+          # Explicitly include source files but exclude node_modules and other artifacts
+          tar czf - \
+            --exclude='node_modules' \
+            --exclude='.git' \
+            --exclude='dist' \
+            --exclude='build' \
+            --exclude='coverage' \
+            --exclude='*.log' \
+            --exclude='__pycache__' \
+            micro-auth/Dockerfile micro-auth/package*.json micro-auth/src \
+            micro-estudiantes/Dockerfile micro-estudiantes/package*.json micro-estudiantes/src \
+            micro-maestros/Dockerfile micro-maestros/package*.json micro-maestros/src \
+            shared-monitoring/package*.json shared-monitoring/src \
+            shared-auth/package*.json shared-auth/src \
+            shared-config/package*.json shared-config/src \
+            shared-config \
+            | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} "cat > /tmp/core-context.tar.gz && echo '✅ TAR received' && ls -lh /tmp/core-context.tar.gz"
           
           # Transfer docker-compose file
           scp -i ~/.ssh/id_rsa docker-compose.ec2-core.yml ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/docker-compose.core.yml
@@ -207,7 +237,34 @@ jobs:
           # Extract build context
           echo "📂 Extracting CORE source context..."
           cd /tmp
-          tar xzf core-context.tar.gz
+          
+          # Show tar contents before extraction (first 30 files)
+          echo "📋 TAR Contents (first 30 files):"
+          tar tzf core-context.tar.gz | head -30
+          
+          # Extract with verbose output for first 30 items
+          echo "📂 Extracting..."
+          tar xzf core-context.tar.gz -v 2>&1 | head -30
+          
+          echo "✅ TAR extraction complete"
+          
+          # Verify key files are present
+          echo "🔍 Verifying extracted files..."
+          for dir in micro-auth micro-estudiantes micro-maestros shared-monitoring shared-auth shared-config; do
+            if [ -d "$dir" ]; then
+              echo "✅ Directory: $dir"
+              if [ -f "$dir/package.json" ]; then
+                echo "   ✅ $dir/package.json found"
+              elif [ -d "$dir/src" ]; then
+                echo "   ✅ $dir/src directory found"
+              fi
+            else
+              echo "❌ MISSING: $dir"
+            fi
+          done
+          
+          echo "📂 Listing /tmp directory structure:"
+          ls -la /tmp/ | grep -E "^d|micro-|shared-|\.tar"
           
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
@@ -312,15 +369,29 @@ jobs:
         run: |
           # Verify directories exist
           echo "📁 Checking Reportes directories..."
-          [ -d micro-reportes-estudiantes ] && echo "✅ micro-reportes-estudiantes found" || echo "❌ micro-reportes-estudiantes NOT found"
-          [ -d micro-reportes-maestros ] && echo "✅ micro-reportes-maestros found" || echo "❌ micro-reportes-maestros NOT found"
+          [ -d micro-reportes-estudiantes ] && echo "✅ micro-reportes-estudiantes found" || echo "❌ micro-reportes-estudiantes NOT found" && exit 1
+          [ -d micro-reportes-maestros ] && echo "✅ micro-reportes-maestros found" || echo "❌ micro-reportes-maestros NOT found" && exit 1
+          [ -d shared-monitoring ] && echo "✅ shared-monitoring found" || echo "❌ shared-monitoring NOT found" && exit 1
+          [ -d shared-config ] && echo "✅ shared-config found" || echo "❌ shared-config NOT found" && exit 1
           
           # Transfer docker-compose file
           scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/docker-compose.reportes.yml
           
           # Create tar and pipe directly to remote instance
-          echo "📦 Creating and transferring tar archive..."
-          tar czf - micro-reportes-estudiantes micro-reportes-maestros shared-monitoring shared-config | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} "cat > /tmp/reportes-context.tar.gz && ls -lh /tmp/reportes-context.tar.gz"
+          echo "📦 Creating and transferring Reportes tar archive..."
+          tar czf - \
+            --exclude='node_modules' \
+            --exclude='.git' \
+            --exclude='dist' \
+            --exclude='build' \
+            --exclude='coverage' \
+            --exclude='*.log' \
+            micro-reportes-estudiantes/Dockerfile micro-reportes-estudiantes/package*.json micro-reportes-estudiantes/src \
+            micro-reportes-maestros/Dockerfile micro-reportes-maestros/package*.json micro-reportes-maestros/src \
+            shared-monitoring/package*.json shared-monitoring/src \
+            shared-config/package*.json shared-config/src \
+            shared-config \
+            | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} "cat > /tmp/reportes-context.tar.gz && echo '✅ TAR received' && ls -lh /tmp/reportes-context.tar.gz"
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
@@ -345,7 +416,32 @@ jobs:
           echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
           cd /tmp
-          tar xzf reportes-context.tar.gz
+          
+          # Show tar contents before extraction
+          echo "📋 TAR Contents (first 30 files):"
+          tar tzf reportes-context.tar.gz | head -30
+          
+          # Extract with verbose output
+          echo "📂 Extracting Reportes context..."
+          tar xzf reportes-context.tar.gz -v 2>&1 | head -30
+          
+          echo "✅ TAR extraction complete"
+          
+          # Verify key files are present
+          echo "🔍 Verifying extracted files..."
+          for dir in micro-reportes-estudiantes micro-reportes-maestros shared-monitoring shared-config; do
+            if [ -d "$dir" ]; then
+              echo "✅ Directory: $dir"
+              if [ -f "$dir/package.json" ]; then
+                echo "   ✅ $dir/package.json found"
+              elif [ -d "$dir/src" ]; then
+                echo "   ✅ $dir/src directory found"
+              fi
+            else
+              echo "❌ MISSING: $dir"
+            fi
+          done
+          
           docker-compose -f docker-compose.reportes.yml down 2>/dev/null || true
           docker-compose -f docker-compose.reportes.yml build --no-cache
           docker-compose -f docker-compose.reportes.yml up -d
