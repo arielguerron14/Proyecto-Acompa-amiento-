@@ -23,6 +23,15 @@ jobs:
       core-ip: ${{ steps.load.outputs.core_public }}
       bastion-ip: ${{ steps.load.outputs.bastion_public }}
       core-private: ${{ steps.load.outputs.core_private }}
+      api-gateway-private: ${{ steps.load.outputs.api_gateway_private }}
+      db-private: ${{ steps.load.outputs.db_private }}
+      messaging-private: ${{ steps.load.outputs.messaging_private }}
+      reportes-private: ${{ steps.load.outputs.reportes_private }}
+      notificaciones-private: ${{ steps.load.outputs.notificaciones_private }}
+      analytics-private: ${{ steps.load.outputs.analytics_private }}
+      monitoring-private: ${{ steps.load.outputs.monitoring_private }}
+      frontend-private: ${{ steps.load.outputs.frontend_private }}
+      bastion-private: ${{ steps.load.outputs.bastion_private }}
 
     steps:
       - uses: actions/checkout@v3
@@ -33,11 +42,20 @@ jobs:
           with open('config/instance_ips.json', 'r') as f:
               instances = json.load(f)
           
-          print(f"::set-output name=core_public::{instances['EC2-CORE']['PublicIpAddress']}")
-          print(f"::set-output name=bastion_public::{instances['EC-Bastion']['PublicIpAddress']}")
-          print(f"::set-output name=core_private::{instances['EC2-CORE']['PrivateIpAddress']}")
-          print(f"✅ Loaded EC2-CORE: {instances['EC2-CORE']['PublicIpAddress']}")
-          print(f"✅ Loaded Bastion: {instances['EC-Bastion']['PublicIpAddress']}")
+          mapping = {
+              'EC2-CORE': 'core', 'EC2-API-Gateway': 'api_gateway', 'EC2-DB': 'db',
+              'EC2-Messaging': 'messaging', 'EC2-Reportes': 'reportes',
+              'EC2-Notificaciones': 'notificaciones', 'EC2-Analytics': 'analytics',
+              'EC2-Monitoring': 'monitoring', 'EC2-Frontend': 'frontend', 'EC-Bastion': 'bastion'
+          }
+          
+          for instance_name, output_name in mapping.items():
+              if instance_name in instances:
+                  public_ip = instances[instance_name].get('PublicIpAddress', '')
+                  private_ip = instances[instance_name].get('PrivateIpAddress', '')
+                  print(f"::set-output name={output_name}_public::{public_ip}")
+                  print(f"::set-output name={output_name}_private::{private_ip}")
+                  print(f"✅ {instance_name}: Public={public_ip}, Private={private_ip}")
           PYTHON
 
   deploy-core-via-bastion:
@@ -135,7 +153,7 @@ jobs:
           echo "🚀 Deploying EC2-DB..."
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
-            ubuntu@EC2-DB.local << 'DEPLOY' || echo "Retrying with known IP..."
+            ubuntu@${{ needs.load-config.outputs.db-private }} << 'DEPLOY'
           cd /tmp || cd ~
           docker-compose -f docker-compose.ec2-db.yml down 2>/dev/null || true
           docker-compose -f docker-compose.ec2-db.yml up -d --no-build 2>&1 | tail -10
@@ -143,7 +161,7 @@ jobs:
           docker-compose -f docker-compose.ec2-db.yml ps
           DEPLOY
           
-          echo "✅ EC2-DB deployment attempt complete"
+          echo "✅ EC2-DB deployment complete"
 
   deploy-api-gateway:
     name: "🌐 EC2-API-Gateway"
@@ -165,7 +183,7 @@ jobs:
           echo "🚀 Deploying EC2-API-Gateway..."
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
-            ubuntu@EC2-API-Gateway.local << 'DEPLOY' || echo "Deployment attempted..."
+            ubuntu@${{ needs.load-config.outputs.api-gateway-private }} << 'DEPLOY'
           cd /tmp || cd ~
           docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
           docker-compose -f docker-compose.api-gateway.yml up -d --no-build 2>&1 | tail -10
@@ -173,7 +191,7 @@ jobs:
           docker-compose -f docker-compose.api-gateway.yml ps
           DEPLOY
           
-          echo "✅ EC2-API-Gateway deployment attempt complete"
+          echo "✅ EC2-API-Gateway deployment complete"
 
   deploy-messaging:
     name: "⏱️  EC2-Messaging"
@@ -195,7 +213,7 @@ jobs:
           echo "🚀 Deploying EC2-Messaging..."
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
-            ubuntu@EC2-Messaging.local << 'DEPLOY' || echo "Deployment attempted..."
+            ubuntu@${{ needs.load-config.outputs.messaging-private }} << 'DEPLOY'
           cd /tmp || cd ~
           docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true
           docker-compose -f docker-compose.messaging.yml up -d --no-build 2>&1 | tail -10
@@ -203,7 +221,7 @@ jobs:
           docker-compose -f docker-compose.messaging.yml ps
           DEPLOY
           
-          echo "✅ EC2-Messaging deployment attempt complete"
+          echo "✅ EC2-Messaging deployment complete"
 
   deploy-reportes:
     name: "📄 EC2-Reportes"
@@ -225,7 +243,7 @@ jobs:
           echo "🚀 Deploying EC2-Reportes..."
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
-            ubuntu@EC2-Reportes.local << 'DEPLOY' || echo "Deployment attempted..."
+            ubuntu@${{ needs.load-config.outputs.reportes-private }} << 'DEPLOY'
           cd /tmp || cd ~
           docker-compose -f docker-compose.ec2-reportes.yml down 2>/dev/null || true
           docker-compose -f docker-compose.ec2-reportes.yml up -d --no-build 2>&1 | tail -10
@@ -233,7 +251,7 @@ jobs:
           docker-compose -f docker-compose.ec2-reportes.yml ps
           DEPLOY
           
-          echo "✅ EC2-Reportes deployment attempt complete"
+          echo "✅ EC2-Reportes deployment complete"
 
   deploy-notificaciones:
     name: "🔔 EC2-Notificaciones"
@@ -255,7 +273,7 @@ jobs:
           echo "🚀 Deploying EC2-Notificaciones..."
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
-            ubuntu@EC2-Notificaciones.local << 'DEPLOY' || echo "Deployment attempted..."
+            ubuntu@${{ needs.load-config.outputs.notificaciones-private }} << 'DEPLOY'
           cd /tmp || cd ~
           docker-compose -f docker-compose.ec2-notificaciones.yml down 2>/dev/null || true
           docker-compose -f docker-compose.ec2-notificaciones.yml up -d --no-build 2>&1 | tail -10
@@ -263,7 +281,7 @@ jobs:
           docker-compose -f docker-compose.ec2-notificaciones.yml ps
           DEPLOY
           
-          echo "✅ EC2-Notificaciones deployment attempt complete"
+          echo "✅ EC2-Notificaciones deployment complete"
 
   deploy-analytics:
     name: "📊 EC2-Analytics"
@@ -285,7 +303,7 @@ jobs:
           echo "🚀 Deploying EC2-Analytics..."
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
-            ubuntu@EC2-Analytics.local << 'DEPLOY' || echo "Deployment attempted..."
+            ubuntu@${{ needs.load-config.outputs.analytics-private }} << 'DEPLOY'
           cd /tmp || cd ~
           docker-compose -f docker-compose.ec2-analytics.yml down 2>/dev/null || true
           docker-compose -f docker-compose.ec2-analytics.yml up -d --no-build 2>&1 | tail -10
@@ -293,7 +311,7 @@ jobs:
           docker-compose -f docker-compose.ec2-analytics.yml ps
           DEPLOY
           
-          echo "✅ EC2-Analytics deployment attempt complete"
+          echo "✅ EC2-Analytics deployment complete"
 
   deploy-monitoring:
     name: "📈 EC2-Monitoring"
@@ -315,7 +333,7 @@ jobs:
           echo "🚀 Deploying EC2-Monitoring..."
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
-            ubuntu@EC2-Monitoring.local << 'DEPLOY' || echo "Deployment attempted..."
+            ubuntu@${{ needs.load-config.outputs.monitoring-private }} << 'DEPLOY'
           cd /tmp || cd ~
           docker-compose -f docker-compose.ec2-monitoring.yml down 2>/dev/null || true
           docker-compose -f docker-compose.ec2-monitoring.yml up -d --no-build 2>&1 | tail -10
@@ -323,7 +341,7 @@ jobs:
           docker-compose -f docker-compose.ec2-monitoring.yml ps
           DEPLOY
           
-          echo "✅ EC2-Monitoring deployment attempt complete"
+          echo "✅ EC2-Monitoring deployment complete"
 
   deploy-frontend:
     name: "🎨 EC2-Frontend"
@@ -345,7 +363,7 @@ jobs:
           echo "🚀 Deploying EC2-Frontend..."
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             -J ubuntu@${{ needs.load-config.outputs.bastion-ip }} \
-            ubuntu@EC2-Frontend.local << 'DEPLOY' || echo "Deployment attempted..."
+            ubuntu@${{ needs.load-config.outputs.frontend-private }} << 'DEPLOY'
           cd /tmp || cd ~
           docker-compose -f docker-compose.ec2-frontend.yml down 2>/dev/null || true
           docker-compose -f docker-compose.ec2-frontend.yml up -d --no-build 2>&1 | tail -10
@@ -353,7 +371,7 @@ jobs:
           docker-compose -f docker-compose.ec2-frontend.yml ps
           DEPLOY
           
-          echo "✅ EC2-Frontend deployment attempt complete"
+          echo "✅ EC2-Frontend deployment complete"
 
   deploy-bastion:
     name: "🛡️  EC-Bastion"
