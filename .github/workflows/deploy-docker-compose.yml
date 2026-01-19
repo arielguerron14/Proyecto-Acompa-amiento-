@@ -190,10 +190,11 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} bash << DEPLOY
           set -e
+          export DOCKER_USER="$DOCKER_USER"
+          export DOCKER_PASS="$DOCKER_PASS"
           echo "================================"
           echo "🐳 EC2-CORE Deployment"
           echo "================================"
@@ -206,17 +207,8 @@ jobs:
             docker-compose --version
           fi
           
-          # Crear ~/.docker/config.json con credenciales
-          mkdir -p ~/.docker
-          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
-          {
-            "auths": {
-              "docker.io": {
-                "auth": "$DOCKER_AUTH"
-              }
-            }
-          }
-          DOCKER_CONFIG
+          # Login to Docker registry
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
           cd /tmp
           docker-compose -f docker-compose.core.yml down 2>/dev/null || true
@@ -259,10 +251,11 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-public }} bash << DEPLOY
           set -e
+          export DOCKER_USER="$DOCKER_USER"
+          export DOCKER_PASS="$DOCKER_PASS"
           echo "================================"
           echo "🌐 EC2-API-Gateway Deployment"
           echo "================================"
@@ -275,17 +268,8 @@ jobs:
             docker-compose --version
           fi
           
-          # Crear ~/.docker/config.json con credenciales
-          mkdir -p ~/.docker
-          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
-          {
-            "auths": {
-              "docker.io": {
-                "auth": "$DOCKER_AUTH"
-              }
-            }
-          }
-          DOCKER_CONFIG
+          # Login to Docker registry
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
           cd /tmp
           docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
@@ -338,10 +322,11 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} bash << DEPLOY
           set -e
+          export DOCKER_USER="$DOCKER_USER"
+          export DOCKER_PASS="$DOCKER_PASS"
           echo "================================"
           echo "📄 EC2-Reportes Deployment"
           echo "================================"
@@ -354,17 +339,8 @@ jobs:
             docker-compose --version
           fi
           
-          # Crear ~/.docker/config.json con credenciales
-          mkdir -p ~/.docker
-          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
-          {
-            "auths": {
-              "docker.io": {
-                "auth": "$DOCKER_AUTH"
-              }
-            }
-          }
-          DOCKER_CONFIG
+          # Login to Docker registry
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
           cd /tmp
           tar xzf reportes-context.tar.gz
@@ -413,10 +389,11 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} bash << DEPLOY
           set -e
+          export DOCKER_USER="$DOCKER_USER"
+          export DOCKER_PASS="$DOCKER_PASS"
           echo "================================"
           echo "🔔 EC2-Notificaciones Deployment"
           echo "================================"
@@ -429,17 +406,8 @@ jobs:
             docker-compose --version
           fi
           
-          # Crear ~/.docker/config.json con credenciales
-          mkdir -p ~/.docker
-          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
-          {
-            "auths": {
-              "docker.io": {
-                "auth": "$DOCKER_AUTH"
-              }
-            }
-          }
-          DOCKER_CONFIG
+          # Login to Docker registry
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
           cd /tmp
           tar xzf notificaciones-context.tar.gz
@@ -479,10 +447,11 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-public }} bash << DEPLOY
           set -e
+          export DOCKER_USER="$DOCKER_USER"
+          export DOCKER_PASS="$DOCKER_PASS"
           echo "================================"
           echo "📊 EC2-Analytics Deployment"
           echo "================================"
@@ -495,17 +464,8 @@ jobs:
             docker-compose --version
           fi
           
-          # Crear ~/.docker/config.json con credenciales
-          mkdir -p ~/.docker
-          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
-          {
-            "auths": {
-              "docker.io": {
-                "auth": "$DOCKER_AUTH"
-              }
-            }
-          }
-          DOCKER_CONFIG
+          # Login to Docker registry
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
           cd /tmp
           docker-compose -f docker-compose.analytics.yml down 2>/dev/null || true
@@ -548,10 +508,11 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-public }} bash << DEPLOY
           set -e
+          export DOCKER_USER="$DOCKER_USER"
+          export DOCKER_PASS="$DOCKER_PASS"
           echo "================================"
           echo "📈 EC2-Monitoring Deployment"
           echo "================================"
@@ -564,17 +525,8 @@ jobs:
             docker-compose --version
           fi
           
-          # Crear ~/.docker/config.json con credenciales
-          mkdir -p ~/.docker
-          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
-          {
-            "auths": {
-              "docker.io": {
-                "auth": "$DOCKER_AUTH"
-              }
-            }
-          }
-          DOCKER_CONFIG
+          # Login to Docker registry
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
           cd /tmp
           docker-compose -f docker-compose.monitoring.yml down 2>/dev/null || true
@@ -617,10 +569,11 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.frontend-public }} bash << DEPLOY
           set -e
+          export DOCKER_USER="$DOCKER_USER"
+          export DOCKER_PASS="$DOCKER_PASS"
           echo "================================"
           echo "🎨 EC2-Frontend Deployment"
           echo "================================"
@@ -633,17 +586,8 @@ jobs:
             docker-compose --version
           fi
           
-          # Crear ~/.docker/config.json con credenciales
-          mkdir -p ~/.docker
-          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
-          {
-            "auths": {
-              "docker.io": {
-                "auth": "$DOCKER_AUTH"
-              }
-            }
-          }
-          DOCKER_CONFIG
+          # Login to Docker registry
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
           cd /tmp
           docker-compose -f docker-compose.frontend.yml down 2>/dev/null || true
@@ -686,10 +630,11 @@ jobs:
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          DOCKER_AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64)
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-public }} bash << DEPLOY
           set -e
+          export DOCKER_USER="$DOCKER_USER"
+          export DOCKER_PASS="$DOCKER_PASS"
           echo "================================"
           echo "🛡️  EC-Bastion Deployment"
           echo "================================"
@@ -702,17 +647,8 @@ jobs:
             docker-compose --version
           fi
           
-          # Crear ~/.docker/config.json con credenciales
-          mkdir -p ~/.docker
-          cat > ~/.docker/config.json << 'DOCKER_CONFIG'
-          {
-            "auths": {
-              "docker.io": {
-                "auth": "$DOCKER_AUTH"
-              }
-            }
-          }
-          DOCKER_CONFIG
+          # Login to Docker registry
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
           
           cd /tmp
           docker-compose -f docker-compose.bastion.yml down 2>/dev/null || true
