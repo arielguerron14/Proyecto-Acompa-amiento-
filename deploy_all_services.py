@@ -89,6 +89,10 @@ def deploy_service(service, instance_ips, ssh_key):
         print(f"❌ {service_name}: Not found in instance config")
         return False
     
+    if not Path(docker_file).exists():
+        print(f"❌ {service_name}: Docker-compose file not found: {docker_file}")
+        return False
+    
     instance = instance_ips[service_name]
     private_ip = instance["PrivateIpAddress"]
     
@@ -106,7 +110,7 @@ def deploy_service(service, instance_ips, ssh_key):
     
     if is_direct:
         # Direct SSH to Bastion
-        ssh_opts.extend([f"{SSH_USER}@{BASTION_IP}"])
+        ssh_opts.append(f"{SSH_USER}@{BASTION_IP}")
     else:
         # SSH jump through bastion - use ProxyCommand for more reliability
         ssh_opts.extend([
@@ -114,20 +118,26 @@ def deploy_service(service, instance_ips, ssh_key):
             f"{SSH_USER}@{private_ip}",
         ])
     
-    # Deployment script
-    if is_direct:
-        # For Bastion, install docker-compose if needed
-        deploy_script = f"""
-which docker-compose >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y docker-compose >/dev/null 2>&1) || true
-cd /tmp || cd ~
-docker-compose -f {docker_file} down 2>/dev/null || true
-docker-compose -f {docker_file} up -d --no-build 2>&1 | head -15
-sleep 3
-docker-compose -f {docker_file} ps
-"""
-    else:
-        deploy_script = f"""
-cd /tmp || cd ~
+    # Read docker-compose file content
+    try:
+        with open(docker_file, 'r') as f:
+            docker_compose_content = f.read()
+    except IOError as e:
+        print(f"❌ {service_name}: Could not read {docker_file}: {e}")
+        return False
+    
+    # Deployment script - write docker-compose file first, then deploy
+    deploy_script = f"""
+# Write docker-compose file
+mkdir -p /tmp/deploy
+cat > /tmp/deploy/{docker_file} << 'EOF_DOCKER_COMPOSE'
+{docker_compose_content}
+EOF_DOCKER_COMPOSE
+
+# For Bastion, install docker-compose if needed
+which docker-compose >/dev/null 2>&1 || (sudo apt-get update -qq 2>/dev/null && sudo apt-get install -y docker-compose >/dev/null 2>&1) || true
+
+cd /tmp/deploy
 docker-compose -f {docker_file} down 2>/dev/null || true
 docker-compose -f {docker_file} up -d --no-build 2>&1 | head -15
 sleep 3
