@@ -567,8 +567,10 @@ jobs:
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
-              "cd /tmp && docker-compose -f docker-compose.ec2-frontend.yml down 2>/dev/null || true",
-              "docker-compose -f docker-compose.ec2-frontend.yml up -d --no-build 2>&1 | tail -10",
+              "cd /tmp && docker stop frontend 2>/dev/null || true && docker rm frontend 2>/dev/null || true",
+              "docker rmi frontend-web:latest 2>/dev/null || true",
+              "curl -s https://raw.githubusercontent.com/arielguerron14/Proyecto-Acompa-amiento-/main/docker-compose.ec2-frontend.yml > docker-compose.ec2-frontend.yml",
+              "docker-compose -f docker-compose.ec2-frontend.yml up -d --no-build 2>&1",
               "sleep 3 && docker-compose -f docker-compose.ec2-frontend.yml ps"
             ]' \
             --output text > /tmp/ssm-command.txt
