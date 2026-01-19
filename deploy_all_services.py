@@ -98,8 +98,9 @@ def deploy_service(service, instance_ips, ssh_key):
     ssh_opts = [
         "ssh",
         "-o", "ConnectTimeout=15",
-        "-o", "StrictHostKeyChecking=accept-new",
+        "-o", "StrictHostKeyChecking=no",
         "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR",
         "-i", str(ssh_key),
     ]
     
@@ -107,14 +108,25 @@ def deploy_service(service, instance_ips, ssh_key):
         # Direct SSH to Bastion
         ssh_opts.extend([f"{SSH_USER}@{BASTION_IP}"])
     else:
-        # SSH jump through bastion
+        # SSH jump through bastion - use ProxyCommand for more reliability
         ssh_opts.extend([
-            "-J", f"{BASTION_USER}@{BASTION_IP}",
+            "-o", f"ProxyCommand=ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -i {ssh_key} -W %h:%p {BASTION_USER}@{BASTION_IP}",
             f"{SSH_USER}@{private_ip}",
         ])
     
     # Deployment script
-    deploy_script = f"""
+    if is_direct:
+        # For Bastion, install docker-compose if needed
+        deploy_script = f"""
+which docker-compose >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y docker-compose >/dev/null 2>&1) || true
+cd /tmp || cd ~
+docker-compose -f {docker_file} down 2>/dev/null || true
+docker-compose -f {docker_file} up -d --no-build 2>&1 | head -15
+sleep 3
+docker-compose -f {docker_file} ps
+"""
+    else:
+        deploy_script = f"""
 cd /tmp || cd ~
 docker-compose -f {docker_file} down 2>/dev/null || true
 docker-compose -f {docker_file} up -d --no-build 2>&1 | head -15
