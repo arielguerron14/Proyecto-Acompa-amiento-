@@ -55,36 +55,95 @@ jobs:
     name: "🐳 EC2-CORE"
     needs: load-config
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     continue-on-error: true
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.core-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "🔍 Finding EC2-CORE instance ID..."
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-CORE" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
           
-          # Create TAR locally first
-          echo "📦 Creating TAR..."
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-CORE not found or not running"
+            exit 1
+          fi
+          
+          echo "✅ Found instance: $INSTANCE_ID"
+          
+          echo "📦 Creating deployment package..."
           tar czf /tmp/core-deploy.tar.gz \
-            --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='build' --exclude='.github' --exclude='tests' \
-            micro-auth micro-estudiantes micro-maestros shared-monitoring shared-config shared-auth docker-compose.ec2-core.yml
+            --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='build' \
+            --exclude='.github' --exclude='tests' --exclude='config' \
+            micro-auth micro-estudiantes micro-maestros shared-monitoring shared-config \
+            shared-auth docker-compose.ec2-core.yml
           
-          echo "📤 Transferring TAR..."
-          scp -i ~/.ssh/id_rsa /tmp/core-deploy.tar.gz ubuntu@${{ needs.load-config.outputs.core-ip }}:/tmp/
+          echo "📤 Uploading TAR to EC2-CORE..."
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && rm -f core-deploy.tar.gz",
+              "aws s3 cp /tmp/core-deploy.tar.gz s3://${{ secrets.S3_BUCKET }}/deployments/core/ 2>/dev/null || true"
+            ]' \
+            --output text > /dev/null
           
-          echo "🚀 Deploying..."
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-ip }} << 'DEPLOY'
-          cd /tmp
-          tar xzf core-deploy.tar.gz
-          docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -15
-          sleep 5
-          docker-compose -f docker-compose.ec2-core.yml ps
-          echo "✅ CORE OK"
-          DEPLOY
+          # Alternative: Direct command via SSM
+          echo "🚀 Deploying to EC2-CORE..."
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp",
+              "docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -20",
+              "sleep 5",
+              "docker-compose -f docker-compose.ec2-core.yml ps",
+              "echo DEPLOYMENT_COMPLETE"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          echo "Command ID: $COMMAND_ID"
+          
+          # Wait for command completion
+          for i in {1..60}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ EC2-CORE deployment successful"
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --query "StandardOutputContent" \
+                --output text
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ EC2-CORE deployment failed"
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --query "StandardErrorContent" \
+                --output text
+              exit 1
+            fi
+            
+            echo "⏳ Waiting for deployment... ($i/60)"
+            sleep 2
+          done
 
   deploy-api-gateway:
     name: "🌐 EC2-API-Gateway"
@@ -95,42 +154,108 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.api-gateway-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          scp -i ~/.ssh/id_rsa docker-compose.api-gateway.yml ubuntu@${{ needs.load-config.outputs.api-gateway-ip }}:/tmp/
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-ip }} << 'DEPLOY'
-          cd /tmp
-          docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.api-gateway.yml up -d --no-build 2>&1 | tail -10
-          sleep 3
-          docker-compose -f docker-compose.api-gateway.yml ps
-          DEPLOY
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-API-Gateway" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-API-Gateway not found"
+            exit 1
+          fi
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.api-gateway.yml up -d --no-build 2>&1 | tail -10",
+              "sleep 3 && docker-compose -f docker-compose.api-gateway.yml ps"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          
+          for i in {1..45}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ API-Gateway deployed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ API-Gateway deployment failed"
+              exit 1
+            fi
+            
+            sleep 2
+          done
 
   deploy-db:
     name: "🗄️  EC2-DB"
     needs: load-config
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     continue-on-error: true
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.db-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          scp -i ~/.ssh/id_rsa docker-compose.ec2-db.yml ubuntu@${{ needs.load-config.outputs.db-ip }}:/tmp/
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.db-ip }} << 'DEPLOY'
-          cd /tmp
-          docker-compose -f docker-compose.ec2-db.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.ec2-db.yml up -d --no-build 2>&1 | tail -10
-          sleep 5
-          docker-compose -f docker-compose.ec2-db.yml ps
-          DEPLOY
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-DB" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-DB not found"
+            exit 1
+          fi
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && docker-compose -f docker-compose.ec2-db.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.ec2-db.yml up -d --no-build 2>&1 | tail -10",
+              "sleep 5 && docker-compose -f docker-compose.ec2-db.yml ps"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          
+          for i in {1..60}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ EC2-DB deployed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ EC2-DB deployment failed"
+              exit 1
+            fi
+            
+            sleep 2
+          done
 
   deploy-messaging:
     name: "⏱️  EC2-Messaging"
@@ -141,19 +266,52 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.messaging-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          scp -i ~/.ssh/id_rsa docker-compose.messaging.yml ubuntu@${{ needs.load-config.outputs.messaging-ip }}:/tmp/
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.messaging-ip }} << 'DEPLOY'
-          cd /tmp
-          docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.messaging.yml up -d --no-build 2>&1 | tail -10
-          sleep 3
-          docker-compose -f docker-compose.messaging.yml ps
-          DEPLOY
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Messaging" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-Messaging not found"
+            exit 1
+          fi
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.messaging.yml up -d --no-build 2>&1 | tail -10",
+              "sleep 3 && docker-compose -f docker-compose.messaging.yml ps"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          
+          for i in {1..45}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ EC2-Messaging deployed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ EC2-Messaging deployment failed"
+              exit 1
+            fi
+            
+            sleep 2
+          done
 
   deploy-reportes:
     name: "📄 EC2-Reportes"
@@ -164,19 +322,52 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.reportes-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-ip }}:/tmp/
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-ip }} << 'DEPLOY'
-          cd /tmp
-          docker-compose -f docker-compose.ec2-reportes.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.ec2-reportes.yml up -d --no-build 2>&1 | tail -10
-          sleep 3
-          docker-compose -f docker-compose.ec2-reportes.yml ps
-          DEPLOY
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Reportes" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-Reportes not found"
+            exit 1
+          fi
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && docker-compose -f docker-compose.ec2-reportes.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.ec2-reportes.yml up -d --no-build 2>&1 | tail -10",
+              "sleep 3 && docker-compose -f docker-compose.ec2-reportes.yml ps"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          
+          for i in {1..45}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ EC2-Reportes deployed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ EC2-Reportes deployment failed"
+              exit 1
+            fi
+            
+            sleep 2
+          done
 
   deploy-notificaciones:
     name: "🔔 EC2-Notificaciones"
@@ -187,19 +378,52 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.notificaciones-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          scp -i ~/.ssh/id_rsa docker-compose.ec2-notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-ip }}:/tmp/
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-ip }} << 'DEPLOY'
-          cd /tmp
-          docker-compose -f docker-compose.ec2-notificaciones.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.ec2-notificaciones.yml up -d --no-build 2>&1 | tail -10
-          sleep 3
-          docker-compose -f docker-compose.ec2-notificaciones.yml ps
-          DEPLOY
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Notificaciones" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-Notificaciones not found"
+            exit 1
+          fi
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && docker-compose -f docker-compose.ec2-notificaciones.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.ec2-notificaciones.yml up -d --no-build 2>&1 | tail -10",
+              "sleep 3 && docker-compose -f docker-compose.ec2-notificaciones.yml ps"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          
+          for i in {1..45}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ EC2-Notificaciones deployed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ EC2-Notificaciones deployment failed"
+              exit 1
+            fi
+            
+            sleep 2
+          done
 
   deploy-analytics:
     name: "📊 EC2-Analytics"
@@ -210,19 +434,52 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.analytics-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          scp -i ~/.ssh/id_rsa docker-compose.ec2-analytics.yml ubuntu@${{ needs.load-config.outputs.analytics-ip }}:/tmp/
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-ip }} << 'DEPLOY'
-          cd /tmp
-          docker-compose -f docker-compose.ec2-analytics.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.ec2-analytics.yml up -d --no-build 2>&1 | tail -10
-          sleep 3
-          docker-compose -f docker-compose.ec2-analytics.yml ps
-          DEPLOY
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Analytics" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-Analytics not found"
+            exit 1
+          fi
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && docker-compose -f docker-compose.ec2-analytics.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.ec2-analytics.yml up -d --no-build 2>&1 | tail -10",
+              "sleep 3 && docker-compose -f docker-compose.ec2-analytics.yml ps"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          
+          for i in {1..45}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ EC2-Analytics deployed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ EC2-Analytics deployment failed"
+              exit 1
+            fi
+            
+            sleep 2
+          done
 
   deploy-monitoring:
     name: "📈 EC2-Monitoring"
@@ -233,19 +490,52 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.monitoring-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          scp -i ~/.ssh/id_rsa docker-compose.ec2-monitoring.yml ubuntu@${{ needs.load-config.outputs.monitoring-ip }}:/tmp/
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-ip }} << 'DEPLOY'
-          cd /tmp
-          docker-compose -f docker-compose.ec2-monitoring.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.ec2-monitoring.yml up -d --no-build 2>&1 | tail -10
-          sleep 3
-          docker-compose -f docker-compose.ec2-monitoring.yml ps
-          DEPLOY
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Monitoring" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-Monitoring not found"
+            exit 1
+          fi
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && docker-compose -f docker-compose.ec2-monitoring.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.ec2-monitoring.yml up -d --no-build 2>&1 | tail -10",
+              "sleep 3 && docker-compose -f docker-compose.ec2-monitoring.yml ps"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          
+          for i in {1..45}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ EC2-Monitoring deployed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ EC2-Monitoring deployment failed"
+              exit 1
+            fi
+            
+            sleep 2
+          done
 
   deploy-frontend:
     name: "🎨 EC2-Frontend"
@@ -256,19 +546,52 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.frontend-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          scp -i ~/.ssh/id_rsa docker-compose.ec2-frontend.yml ubuntu@${{ needs.load-config.outputs.frontend-ip }}:/tmp/
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.frontend-ip }} << 'DEPLOY'
-          cd /tmp
-          docker-compose -f docker-compose.ec2-frontend.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.ec2-frontend.yml up -d --no-build 2>&1 | tail -10
-          sleep 3
-          docker-compose -f docker-compose.ec2-frontend.yml ps
-          DEPLOY
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Frontend" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-Frontend not found"
+            exit 1
+          fi
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && docker-compose -f docker-compose.ec2-frontend.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.ec2-frontend.yml up -d --no-build 2>&1 | tail -10",
+              "sleep 3 && docker-compose -f docker-compose.ec2-frontend.yml ps"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          
+          for i in {1..45}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ EC2-Frontend deployed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ EC2-Frontend deployment failed"
+              exit 1
+            fi
+            
+            sleep 2
+          done
 
   deploy-bastion:
     name: "🛡️  EC-Bastion"
@@ -279,19 +602,52 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
       - run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          scp -i ~/.ssh/id_rsa docker-compose.bastion.yml ubuntu@${{ needs.load-config.outputs.bastion-ip }}:/tmp/
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-ip }} << 'DEPLOY'
-          cd /tmp
-          docker-compose -f docker-compose.bastion.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.bastion.yml up -d --no-build 2>&1 | tail -10
-          sleep 3
-          docker-compose -f docker-compose.bastion.yml ps
-          DEPLOY
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC-Bastion" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC-Bastion not found"
+            exit 1
+          fi
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp && docker-compose -f docker-compose.bastion.yml down 2>/dev/null || true",
+              "docker-compose -f docker-compose.bastion.yml up -d --no-build 2>&1 | tail -10",
+              "sleep 3 && docker-compose -f docker-compose.bastion.yml ps"
+            ]' \
+            --output text > /tmp/ssm-command.txt
+          
+          COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
+          
+          for i in {1..45}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ EC-Bastion deployed successfully"
+              break
+            elif [ "$STATUS" = "Failed" ]; then
+              echo "❌ EC-Bastion deployment failed"
+              exit 1
+            fi
+            
+            sleep 2
+          done
 
   status:
     name: "✅ Done"

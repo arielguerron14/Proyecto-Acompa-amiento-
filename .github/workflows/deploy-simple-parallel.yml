@@ -84,27 +84,46 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ needs.load-config.outputs.core-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
           
-          tar czf - --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='build' \
-            micro-auth micro-estudiantes micro-maestros shared-monitoring shared-config shared-auth \
-            | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} \
-            "cat > /tmp/core-context.tar.gz && echo '✅ TAR OK'"
+          # Create TAR locally first
+          echo "📦 Creating TAR archive locally..."
+          tar czf /tmp/core-deploy.tar.gz \
+            --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='build' --exclude='.github' --exclude='tests' \
+            micro-auth micro-estudiantes micro-maestros shared-monitoring shared-config shared-auth docker-compose.ec2-core.yml
           
-          scp -i ~/.ssh/id_rsa docker-compose.ec2-core.yml ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/docker-compose.core.yml
+          echo "📤 Transferring TAR to EC2-CORE..."
+          scp -i ~/.ssh/id_rsa /tmp/core-deploy.tar.gz ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/
           
+          echo "📝 Executing deployment script..."
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} << 'DEPLOY'
           set -e
-          echo "🐳 EC2-CORE Deployment"
+          echo "🐳 EC2-CORE Deployment Starting"
+          
+          # Extract TAR
+          cd /tmp
+          echo "📂 Extracting deployment package..."
+          tar xzf core-deploy.tar.gz
+          
+          # Verify extraction
+          echo "🔍 Verifying extracted files..."
+          [ -f docker-compose.ec2-core.yml ] && echo "✅ docker-compose found" || (echo "❌ docker-compose missing" && exit 1)
+          [ -d micro-auth ] && echo "✅ micro-auth found" || (echo "❌ micro-auth missing" && exit 1)
+          
+          # Install docker-compose if needed
           if ! command -v docker-compose &> /dev/null; then
+            echo "📦 Installing docker-compose..."
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
           fi
-          cd /home/ubuntu && tar xzf /tmp/core-context.tar.gz
-          docker-compose -f /tmp/docker-compose.core.yml down 2>/dev/null || true
-          docker-compose -f /tmp/docker-compose.core.yml build --no-cache
-          docker-compose -f /tmp/docker-compose.core.yml up -d
-          sleep 10
-          docker-compose -f /tmp/docker-compose.core.yml ps
-          echo "✅ EC2-CORE OK"
+          
+          # Deploy with docker-compose
+          echo "🐳 Starting Docker containers..."
+          docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -20
+          
+          sleep 5
+          echo "📊 Container status:"
+          docker-compose -f docker-compose.ec2-core.yml ps
+          echo "✅ EC2-CORE Deployment Complete"
           DEPLOY
 
   deploy-api-gateway:
@@ -127,27 +146,13 @@ jobs:
           
           scp -i ~/.ssh/id_rsa docker-compose.api-gateway.yml ubuntu@${{ needs.load-config.outputs.api-gateway-public }}:/tmp/
           
-          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
-          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
-          
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-public }} << DEPLOY
-          set -e
-          echo "🌐 EC2-API-Gateway Deployment"
-          if ! command -v docker-compose &> /dev/null; then
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-          fi
-          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-public }} << 'DEPLOY'
           cd /tmp
           docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.api-gateway.yml pull 2>&1 || true
-          if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
-            docker-compose -f docker-compose.api-gateway.yml build
-          fi
-          docker-compose -f docker-compose.api-gateway.yml up -d
-          sleep 10
+          docker-compose -f docker-compose.api-gateway.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
           docker-compose -f docker-compose.api-gateway.yml ps
-          echo "✅ EC2-API-Gateway OK"
+          echo "✅ API-Gateway OK"
           DEPLOY
 
   deploy-db:
@@ -168,21 +173,15 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ needs.load-config.outputs.db-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
           
-          scp -i ~/.ssh/id_rsa docker-compose.ec2-db.yml ubuntu@${{ needs.load-config.outputs.db-public }}:/tmp/docker-compose.db.yml
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-db.yml ubuntu@${{ needs.load-config.outputs.db-public }}:/tmp/
           
           ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.db-public }} << 'DEPLOY'
-          set -e
-          echo "🗄️  EC2-DB Deployment"
-          if ! command -v docker-compose &> /dev/null; then
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-          fi
           cd /tmp
-          docker-compose -f docker-compose.db.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.db.yml up -d
-          sleep 20
-          docker-compose -f docker-compose.db.yml ps
-          echo "✅ EC2-DB OK"
+          docker-compose -f docker-compose.ec2-db.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-db.yml up -d --no-build 2>&1 | tail -10
+          sleep 5
+          docker-compose -f docker-compose.ec2-db.yml ps
+          echo "✅ DB OK"
           DEPLOY
 
   deploy-messaging:
