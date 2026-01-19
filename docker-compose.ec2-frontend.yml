@@ -2,18 +2,16 @@ version: '3.8'
 
 services:
   frontend-web:
-    container_name: frontend-web
+    container_name: frontend
     image: frontend-web:latest
     ports:
-      - "80:80"
-      - "443:443"
+      - "3000:3000"
     expose:
-      - "80"
-      - "443"
+      - "3000"
     environment:
       NODE_ENV: production
-      API_GATEWAY_URL: http://localhost:8080
-      API_GATEWAY_HOST: localhost
+      API_GATEWAY_URL: http://98.86.94.92:8080
+      API_GATEWAY_HOST: 98.86.94.92
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]

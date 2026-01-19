@@ -1,0 +1,123 @@
+name: 🔧 Fix Frontend - Redeploy
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  fix-frontend:
+    name: "🎨 Redeploy Frontend with Correct Config"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🎨 Deploy Frontend with Corrected Configuration
+        run: |
+          echo "🔍 Obteniendo Instance ID de EC2-Frontend..."
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Frontend" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "❌ EC2-Frontend not found or not running"
+            exit 1
+          fi
+          
+          echo "✅ Instance ID: $INSTANCE_ID"
+          echo ""
+          echo "📤 Enviando comando de redeploy..."
+          
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "echo Deteniendo contenedor anterior...",
+              "docker stop frontend 2>/dev/null || true",
+              "docker rm frontend 2>/dev/null || true",
+              "echo Limpiando image antigua...",
+              "docker rmi frontend-web:latest 2>/dev/null || true",
+              "echo Copiando docker-compose corregido...",
+              "cd /tmp",
+              "curl -s https://raw.githubusercontent.com/arielguerron14/Proyecto-Acompa-amiento-/main/docker-compose.ec2-frontend.yml -o docker-compose.yml",
+              "echo Verificando contenido del archivo...",
+              "cat docker-compose.yml | grep -A2 ports",
+              "echo Corriendo contenedor con docker-compose...",
+              "docker-compose up -d --no-build",
+              "echo Esperando que inicie...",
+              "sleep 3",
+              "echo Verificando estado...",
+              "docker ps | grep frontend",
+              "echo Verificando logs...",
+              "docker logs frontend 2>&1 | tail -10"
+            ]' \
+            --query 'Command.CommandId' \
+            --output text)
+          
+          echo "Command ID: $COMMAND_ID"
+          echo ""
+          echo "⏳ Esperando resultado (máximo 2 minutos)..."
+          echo ""
+          
+          # Wait for command to complete
+          for i in {1..60}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query 'Status' \
+              --output text 2>/dev/null || echo "Pending")
+            
+            printf "\r  Estado: $STATUS (Intento $i/60)"
+            
+            if [ "$STATUS" = "Success" ] || [ "$STATUS" = "Failed" ]; then
+              echo ""
+              echo ""
+              
+              # Get output
+              OUTPUT=$(aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --query 'StandardOutputContent' \
+                --output text)
+              
+              ERROR=$(aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --query 'StandardErrorContent' \
+                --output text)
+              
+              echo "📋 Output:"
+              echo "---"
+              echo "$OUTPUT"
+              echo "---"
+              
+              if [ "$STATUS" = "Success" ]; then
+                echo "✅ Frontend redeploy exitoso!"
+                echo ""
+                echo "🌐 Frontend disponible en: http://52.72.57.10:3000"
+              else
+                echo "❌ El comando falló"
+                if [ -n "$ERROR" ]; then
+                  echo ""
+                  echo "Error:"
+                  echo "$ERROR"
+                fi
+                exit 1
+              fi
+              
+              break
+            fi
+            
+            sleep 2
+          done
