@@ -1,0 +1,496 @@
+name: 🚀 Deploy - Simple Parallel
+
+on:
+  workflow_dispatch:
+    inputs:
+      rebuild_images:
+        description: 'Rebuild Docker images from source'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  load-config:
+    name: 📋 Load Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      bastion-public: ${{ steps.load.outputs.bastion_public }}
+      api-gateway-public: ${{ steps.load.outputs.api_gateway_public }}
+      core-public: ${{ steps.load.outputs.core_public }}
+      reportes-public: ${{ steps.load.outputs.reportes_public }}
+      notificaciones-public: ${{ steps.load.outputs.notificaciones_public }}
+      messaging-public: ${{ steps.load.outputs.messaging_public }}
+      db-public: ${{ steps.load.outputs.db_public }}
+      analytics-public: ${{ steps.load.outputs.analytics_public }}
+      monitoring-public: ${{ steps.load.outputs.monitoring_public }}
+      frontend-public: ${{ steps.load.outputs.frontend_public }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Load instance IPs
+        id: load
+        run: |
+          python3 << 'PYTHON'
+          import json
+          
+          with open('config/instance_ips.json', 'r') as f:
+              instances = json.load(f)
+          
+          mapping = {
+              'EC-Bastion': 'bastion',
+              'EC2-API-Gateway': 'api_gateway',
+              'EC2-CORE': 'core',
+              'EC2-Reportes': 'reportes',
+              'EC2-Notificaciones': 'notificaciones',
+              'EC2-Messaging': 'messaging',
+              'EC2-DB': 'db',
+              'EC2-Analytics': 'analytics',
+              'EC2-Monitoring': 'monitoring',
+              'EC2-Frontend': 'frontend'
+          }
+          
+          for instance_name, output_name in mapping.items():
+              if instance_name in instances:
+                  public_ip = instances[instance_name]['PublicIpAddress']
+                  print(f"::set-output name={output_name}_public::{public_ip}")
+                  print(f"✅ {instance_name}: {public_ip}")
+          PYTHON
+
+  # ============== ALL DEPLOYMENTS IN PARALLEL ==============
+  
+  deploy-core:
+    name: "🐳 EC2-CORE"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.core-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          tar czf - --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='build' \
+            micro-auth micro-estudiantes micro-maestros shared-monitoring shared-config shared-auth \
+            | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} \
+            "cat > /tmp/core-context.tar.gz && echo '✅ TAR OK'"
+          
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-core.yml ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/docker-compose.core.yml
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} << 'DEPLOY'
+          set -e
+          echo "🐳 EC2-CORE Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          cd /home/ubuntu && tar xzf /tmp/core-context.tar.gz
+          docker-compose -f /tmp/docker-compose.core.yml down 2>/dev/null || true
+          docker-compose -f /tmp/docker-compose.core.yml build --no-cache
+          docker-compose -f /tmp/docker-compose.core.yml up -d
+          sleep 10
+          docker-compose -f /tmp/docker-compose.core.yml ps
+          echo "✅ EC2-CORE OK"
+          DEPLOY
+
+  deploy-api-gateway:
+    name: "🌐 EC2-API-Gateway"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.api-gateway-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          scp -i ~/.ssh/id_rsa docker-compose.api-gateway.yml ubuntu@${{ needs.load-config.outputs.api-gateway-public }}:/tmp/
+          
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-public }} << DEPLOY
+          set -e
+          echo "🌐 EC2-API-Gateway Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+          cd /tmp
+          docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.api-gateway.yml pull 2>&1 || true
+          if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
+            docker-compose -f docker-compose.api-gateway.yml build
+          fi
+          docker-compose -f docker-compose.api-gateway.yml up -d
+          sleep 10
+          docker-compose -f docker-compose.api-gateway.yml ps
+          echo "✅ EC2-API-Gateway OK"
+          DEPLOY
+
+  deploy-db:
+    name: "🗄️  EC2-DB"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.db-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-db.yml ubuntu@${{ needs.load-config.outputs.db-public }}:/tmp/docker-compose.db.yml
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.db-public }} << 'DEPLOY'
+          set -e
+          echo "🗄️  EC2-DB Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          cd /tmp
+          docker-compose -f docker-compose.db.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.db.yml up -d
+          sleep 20
+          docker-compose -f docker-compose.db.yml ps
+          echo "✅ EC2-DB OK"
+          DEPLOY
+
+  deploy-messaging:
+    name: "⏱️  EC2-Messaging"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.messaging-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          scp -i ~/.ssh/id_rsa docker-compose.messaging.yml ubuntu@${{ needs.load-config.outputs.messaging-public }}:/tmp/
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.messaging-public }} << 'DEPLOY'
+          set -e
+          echo "⏱️  EC2-Messaging Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          cd /tmp
+          docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.messaging.yml up -d
+          sleep 15
+          docker-compose -f docker-compose.messaging.yml ps
+          echo "✅ EC2-Messaging OK"
+          DEPLOY
+
+  deploy-reportes:
+    name: "📄 EC2-Reportes"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.reportes-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          tar czf - --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='build' \
+            micro-reportes-estudiantes micro-reportes-maestros shared-monitoring shared-config \
+            | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} \
+            "cat > /tmp/reportes-context.tar.gz"
+          
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-public }}:/tmp/docker-compose.reportes.yml
+          
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} << DEPLOY
+          set -e
+          echo "📄 EC2-Reportes Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+          cd /home/ubuntu && tar xzf /tmp/reportes-context.tar.gz
+          docker-compose -f /tmp/docker-compose.reportes.yml down 2>/dev/null || true
+          docker-compose -f /tmp/docker-compose.reportes.yml build --no-cache
+          docker-compose -f /tmp/docker-compose.reportes.yml up -d
+          sleep 10
+          docker-compose -f /tmp/docker-compose.reportes.yml ps
+          echo "✅ EC2-Reportes OK"
+          DEPLOY
+
+  deploy-notificaciones:
+    name: "🔔 EC2-Notificaciones"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.notificaciones-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          tar czf - --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='build' \
+            micro-notificaciones shared-monitoring shared-auth \
+            | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} \
+            "cat > /tmp/notificaciones-context.tar.gz"
+          
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-public }}:/tmp/docker-compose.notificaciones.yml
+          
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} << DEPLOY
+          set -e
+          echo "🔔 EC2-Notificaciones Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+          cd /home/ubuntu && tar xzf /tmp/notificaciones-context.tar.gz
+          docker-compose -f /tmp/docker-compose.notificaciones.yml down 2>/dev/null || true
+          docker-compose -f /tmp/docker-compose.notificaciones.yml build --no-cache
+          docker-compose -f /tmp/docker-compose.notificaciones.yml up -d
+          sleep 10
+          docker-compose -f /tmp/docker-compose.notificaciones.yml ps
+          echo "✅ EC2-Notificaciones OK"
+          DEPLOY
+
+  deploy-analytics:
+    name: "📊 EC2-Analytics"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.analytics-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-analytics.yml ubuntu@${{ needs.load-config.outputs.analytics-public }}:/tmp/docker-compose.analytics.yml
+          
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-public }} << DEPLOY
+          set -e
+          echo "📊 EC2-Analytics Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+          cd /tmp
+          docker-compose -f docker-compose.analytics.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.analytics.yml pull 2>&1 || true
+          if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
+            docker-compose -f docker-compose.analytics.yml build
+          fi
+          docker-compose -f docker-compose.analytics.yml up -d
+          sleep 10
+          docker-compose -f docker-compose.analytics.yml ps
+          echo "✅ EC2-Analytics OK"
+          DEPLOY
+
+  deploy-monitoring:
+    name: "📈 EC2-Monitoring"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.monitoring-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-monitoring.yml ubuntu@${{ needs.load-config.outputs.monitoring-public }}:/tmp/
+          
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-public }} << DEPLOY
+          set -e
+          echo "📈 EC2-Monitoring Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+          cd /tmp
+          docker-compose -f docker-compose.ec2-monitoring.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-monitoring.yml pull 2>&1 || true
+          if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
+            docker-compose -f docker-compose.ec2-monitoring.yml build
+          fi
+          docker-compose -f docker-compose.ec2-monitoring.yml up -d
+          sleep 10
+          docker-compose -f docker-compose.ec2-monitoring.yml ps
+          echo "✅ EC2-Monitoring OK"
+          DEPLOY
+
+  deploy-frontend:
+    name: "🎨 EC2-Frontend"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.frontend-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-frontend.yml ubuntu@${{ needs.load-config.outputs.frontend-public }}:/tmp/
+          
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_PASS="{{ secrets.DOCKER_TOKEN }}"
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.frontend-public }} << DEPLOY
+          set -e
+          echo "🎨 EC2-Frontend Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+          cd /tmp
+          docker-compose -f docker-compose.ec2-frontend.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-frontend.yml pull 2>&1 || true
+          if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
+            docker-compose -f docker-compose.ec2-frontend.yml build
+          fi
+          docker-compose -f docker-compose.ec2-frontend.yml up -d
+          sleep 10
+          docker-compose -f docker-compose.ec2-frontend.yml ps
+          echo "✅ EC2-Frontend OK"
+          DEPLOY
+
+  deploy-bastion:
+    name: "🛡️  EC-Bastion"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-public }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          scp -i ~/.ssh/id_rsa docker-compose.bastion.yml ubuntu@${{ needs.load-config.outputs.bastion-public }}:/tmp/
+          
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-public }} << 'DEPLOY'
+          set -e
+          echo "🛡️  EC-Bastion Deployment"
+          if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          cd /tmp
+          docker-compose -f docker-compose.bastion.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.bastion.yml up -d
+          sleep 10
+          docker-compose -f docker-compose.bastion.yml ps
+          echo "✅ EC-Bastion OK"
+          DEPLOY
+
+  summary:
+    name: "📊 Summary"
+    needs: [deploy-core, deploy-api-gateway, deploy-db, deploy-messaging, deploy-reportes, deploy-notificaciones, deploy-analytics, deploy-monitoring, deploy-frontend, deploy-bastion]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "🚀 Deployment Summary"
+          echo "EC2-CORE: ${{ needs.deploy-core.result }}"
+          echo "EC2-API-Gateway: ${{ needs.deploy-api-gateway.result }}"
+          echo "EC2-DB: ${{ needs.deploy-db.result }}"
+          echo "EC2-Messaging: ${{ needs.deploy-messaging.result }}"
+          echo "EC2-Reportes: ${{ needs.deploy-reportes.result }}"
+          echo "EC2-Notificaciones: ${{ needs.deploy-notificaciones.result }}"
+          echo "EC2-Analytics: ${{ needs.deploy-analytics.result }}"
+          echo "EC2-Monitoring: ${{ needs.deploy-monitoring.result }}"
+          echo "EC2-Frontend: ${{ needs.deploy-frontend.result }}"
+          echo "EC-Bastion: ${{ needs.deploy-bastion.result }}"
