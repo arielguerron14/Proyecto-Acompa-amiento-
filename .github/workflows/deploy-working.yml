@@ -1,0 +1,302 @@
+name: 🚀 Deploy - Simple and Working
+
+on:
+  workflow_dispatch:
+    inputs:
+      rebuild_images:
+        description: 'Rebuild Docker images'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  load-config:
+    name: 📋 Load Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      core-ip: ${{ steps.load.outputs.core_public }}
+      api-gateway-ip: ${{ steps.load.outputs.api_gateway_public }}
+      db-ip: ${{ steps.load.outputs.db_public }}
+      messaging-ip: ${{ steps.load.outputs.messaging_public }}
+      reportes-ip: ${{ steps.load.outputs.reportes_public }}
+      notificaciones-ip: ${{ steps.load.outputs.notificaciones_public }}
+      analytics-ip: ${{ steps.load.outputs.analytics_public }}
+      monitoring-ip: ${{ steps.load.outputs.monitoring_public }}
+      frontend-ip: ${{ steps.load.outputs.frontend_public }}
+      bastion-ip: ${{ steps.load.outputs.bastion_public }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - id: load
+        run: |
+          python3 << 'PYTHON'
+          import json
+          with open('config/instance_ips.json', 'r') as f:
+              instances = json.load(f)
+          mapping = {
+              'EC2-CORE': 'core', 'EC2-API-Gateway': 'api_gateway', 'EC2-DB': 'db',
+              'EC2-Messaging': 'messaging', 'EC2-Reportes': 'reportes',
+              'EC2-Notificaciones': 'notificaciones', 'EC2-Analytics': 'analytics',
+              'EC2-Monitoring': 'monitoring', 'EC2-Frontend': 'frontend', 'EC-Bastion': 'bastion'
+          }
+          for instance_name, output_name in mapping.items():
+              if instance_name in instances:
+                  print(f"::set-output name={output_name}_public::{instances[instance_name]['PublicIpAddress']}")
+                  print(f"✅ {instance_name}: {instances[instance_name]['PublicIpAddress']}")
+          PYTHON
+
+  deploy-core:
+    name: "🐳 EC2-CORE"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.core-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # Create TAR locally first
+          echo "📦 Creating TAR..."
+          tar czf /tmp/core-deploy.tar.gz \
+            --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='build' --exclude='.github' --exclude='tests' \
+            micro-auth micro-estudiantes micro-maestros shared-monitoring shared-config shared-auth docker-compose.ec2-core.yml
+          
+          echo "📤 Transferring TAR..."
+          scp -i ~/.ssh/id_rsa /tmp/core-deploy.tar.gz ubuntu@${{ needs.load-config.outputs.core-ip }}:/tmp/
+          
+          echo "🚀 Deploying..."
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-ip }} << 'DEPLOY'
+          cd /tmp
+          tar xzf core-deploy.tar.gz
+          docker-compose -f docker-compose.ec2-core.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-core.yml up -d --no-build 2>&1 | tail -15
+          sleep 5
+          docker-compose -f docker-compose.ec2-core.yml ps
+          echo "✅ CORE OK"
+          DEPLOY
+
+  deploy-api-gateway:
+    name: "🌐 EC2-API-Gateway"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.api-gateway-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          scp -i ~/.ssh/id_rsa docker-compose.api-gateway.yml ubuntu@${{ needs.load-config.outputs.api-gateway-ip }}:/tmp/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.api-gateway-ip }} << 'DEPLOY'
+          cd /tmp
+          docker-compose -f docker-compose.api-gateway.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.api-gateway.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.api-gateway.yml ps
+          DEPLOY
+
+  deploy-db:
+    name: "🗄️  EC2-DB"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.db-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-db.yml ubuntu@${{ needs.load-config.outputs.db-ip }}:/tmp/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.db-ip }} << 'DEPLOY'
+          cd /tmp
+          docker-compose -f docker-compose.ec2-db.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-db.yml up -d --no-build 2>&1 | tail -10
+          sleep 5
+          docker-compose -f docker-compose.ec2-db.yml ps
+          DEPLOY
+
+  deploy-messaging:
+    name: "⏱️  EC2-Messaging"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.messaging-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          scp -i ~/.ssh/id_rsa docker-compose.messaging.yml ubuntu@${{ needs.load-config.outputs.messaging-ip }}:/tmp/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.messaging-ip }} << 'DEPLOY'
+          cd /tmp
+          docker-compose -f docker-compose.messaging.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.messaging.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.messaging.yml ps
+          DEPLOY
+
+  deploy-reportes:
+    name: "📄 EC2-Reportes"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.reportes-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-reportes.yml ubuntu@${{ needs.load-config.outputs.reportes-ip }}:/tmp/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-ip }} << 'DEPLOY'
+          cd /tmp
+          docker-compose -f docker-compose.ec2-reportes.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-reportes.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-reportes.yml ps
+          DEPLOY
+
+  deploy-notificaciones:
+    name: "🔔 EC2-Notificaciones"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.notificaciones-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-notificaciones.yml ubuntu@${{ needs.load-config.outputs.notificaciones-ip }}:/tmp/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-ip }} << 'DEPLOY'
+          cd /tmp
+          docker-compose -f docker-compose.ec2-notificaciones.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-notificaciones.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-notificaciones.yml ps
+          DEPLOY
+
+  deploy-analytics:
+    name: "📊 EC2-Analytics"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.analytics-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-analytics.yml ubuntu@${{ needs.load-config.outputs.analytics-ip }}:/tmp/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.analytics-ip }} << 'DEPLOY'
+          cd /tmp
+          docker-compose -f docker-compose.ec2-analytics.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-analytics.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-analytics.yml ps
+          DEPLOY
+
+  deploy-monitoring:
+    name: "📈 EC2-Monitoring"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.monitoring-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-monitoring.yml ubuntu@${{ needs.load-config.outputs.monitoring-ip }}:/tmp/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.monitoring-ip }} << 'DEPLOY'
+          cd /tmp
+          docker-compose -f docker-compose.ec2-monitoring.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-monitoring.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-monitoring.yml ps
+          DEPLOY
+
+  deploy-frontend:
+    name: "🎨 EC2-Frontend"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.frontend-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          scp -i ~/.ssh/id_rsa docker-compose.ec2-frontend.yml ubuntu@${{ needs.load-config.outputs.frontend-ip }}:/tmp/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.frontend-ip }} << 'DEPLOY'
+          cd /tmp
+          docker-compose -f docker-compose.ec2-frontend.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.ec2-frontend.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.ec2-frontend.yml ps
+          DEPLOY
+
+  deploy-bastion:
+    name: "🛡️  EC-Bastion"
+    needs: load-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.load-config.outputs.bastion-ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          scp -i ~/.ssh/id_rsa docker-compose.bastion.yml ubuntu@${{ needs.load-config.outputs.bastion-ip }}:/tmp/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.bastion-ip }} << 'DEPLOY'
+          cd /tmp
+          docker-compose -f docker-compose.bastion.yml down 2>/dev/null || true
+          docker-compose -f docker-compose.bastion.yml up -d --no-build 2>&1 | tail -10
+          sleep 3
+          docker-compose -f docker-compose.bastion.yml ps
+          DEPLOY
+
+  status:
+    name: "✅ Done"
+    needs: [deploy-core, deploy-api-gateway, deploy-db, deploy-messaging, deploy-reportes, deploy-notificaciones, deploy-analytics, deploy-monitoring, deploy-frontend, deploy-bastion]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - run: echo "🎉 Deployment workflow complete!"
