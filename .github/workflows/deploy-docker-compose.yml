@@ -188,7 +188,7 @@ jobs:
         run: |
           # Transfer build context (source code) via tar + SSH
           echo "📦 Transferring CORE source context..."
-          tar czf - micro-auth micro-estudiantes micro-maestros | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} "cat > /tmp/core-context.tar.gz"
+          tar czf - micro-auth micro-estudiantes micro-maestros shared-monitoring shared-config shared-auth | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} "cat > /tmp/core-context.tar.gz"
           
           # Transfer docker-compose file
           scp -i ~/.ssh/id_rsa docker-compose.ec2-core.yml ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/docker-compose.core.yml
@@ -320,7 +320,7 @@ jobs:
           
           # Create tar and pipe directly to remote instance
           echo "📦 Creating and transferring tar archive..."
-          tar czf - micro-reportes-estudiantes micro-reportes-maestros | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} "cat > /tmp/reportes-context.tar.gz && ls -lh /tmp/reportes-context.tar.gz"
+          tar czf - micro-reportes-estudiantes micro-reportes-maestros shared-monitoring shared-config | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.reportes-public }} "cat > /tmp/reportes-context.tar.gz && ls -lh /tmp/reportes-context.tar.gz"
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
@@ -386,7 +386,7 @@ jobs:
           
           # Create tar and pipe directly to remote instance
           echo "📦 Creating and transferring tar archive..."
-          tar czf - micro-notificaciones | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} "cat > /tmp/notificaciones-context.tar.gz && ls -lh /tmp/notificaciones-context.tar.gz"
+          tar czf - micro-notificaciones shared-monitoring shared-auth docker-entrypoint.sh | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.notificaciones-public }} "cat > /tmp/notificaciones-context.tar.gz && ls -lh /tmp/notificaciones-context.tar.gz"
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
           DOCKER_PASS="${{ secrets.DOCKER_TOKEN }}"
@@ -413,8 +413,7 @@ jobs:
           cd /tmp
           tar xzf notificaciones-context.tar.gz
           docker-compose -f docker-compose.notificaciones.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.notificaciones.yml pull 2>&1 || true
-          docker-compose -f docker-compose.notificaciones.yml build
+          docker-compose -f docker-compose.notificaciones.yml build --no-cache
           docker-compose -f docker-compose.notificaciones.yml up -d
           
           sleep 10
