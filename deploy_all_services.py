@@ -62,8 +62,14 @@ SERVICES = [
         "timeout": 15,
     },
     {
+        "name": "EC2-Analytics",
+        "docker_file": "docker-compose.ec2-analytics.yml",
+        "timeout": 15,
+        "public_ip_fallback": "3.87.33.92",  # Use public IP if bastion routing fails
+    },
+    {
         "name": "EC-Bastion",
-        "docker_file": "docker-compose.bastion.yml",
+        "docker_file": "docker-compose.ec2-bastion.yml",
         "timeout": 15,
         "direct": True,  # Deploy directly to bastion, not via jump
     },
@@ -95,6 +101,7 @@ def deploy_service(service, instance_ips, ssh_key):
     
     instance = instance_ips[service_name]
     private_ip = instance["PrivateIpAddress"]
+    public_ip_fallback = service.get("public_ip_fallback")
     
     print(f"\n🚀 Deploying {service_name}...")
     
@@ -111,6 +118,10 @@ def deploy_service(service, instance_ips, ssh_key):
     if is_direct:
         # Direct SSH to Bastion
         ssh_opts.append(f"{SSH_USER}@{BASTION_IP}")
+    elif public_ip_fallback:
+        # Try public IP directly if available (for services with routing issues through bastion)
+        ssh_opts.append(f"{SSH_USER}@{public_ip_fallback}")
+        print(f"  ℹ️  Using public IP fallback: {public_ip_fallback}")
     else:
         # SSH jump through bastion - use ProxyCommand for more reliability
         ssh_opts.extend([
