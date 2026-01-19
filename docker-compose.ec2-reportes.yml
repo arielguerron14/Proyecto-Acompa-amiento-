@@ -18,8 +18,8 @@ services:
   # Reportes Microservices
   micro-reportes-estudiantes:
     build:
-      context: ./micro-reportes-estudiantes
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: micro-reportes-estudiantes/Dockerfile
     image: micro-reportes-estudiantes:latest
     container_name: micro-reportes-estudiantes
     restart: unless-stopped
@@ -36,8 +36,8 @@ services:
 
   micro-reportes-maestros:
     build:
-      context: ./micro-reportes-maestros
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: micro-reportes-maestros/Dockerfile
     image: micro-reportes-maestros:latest
     container_name: micro-reportes-maestros
     restart: unless-stopped
