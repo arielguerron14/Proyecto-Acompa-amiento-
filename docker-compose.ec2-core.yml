@@ -14,9 +14,12 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
 
-  # Core Microservices ONLY
+  # Core Microservices - built from source
   micro-auth:
-    image: caguerronp/micro-auth:latest
+    build:
+      context: ./micro-auth
+      dockerfile: Dockerfile
+    image: micro-auth:latest
     container_name: micro-auth
     restart: unless-stopped
     expose:
@@ -33,7 +36,10 @@ services:
       MONGODB_URI: mongodb://root:example@mongo:27017/auth?authSource=admin
 
   micro-estudiantes:
-    image: caguerronp/micro-estudiantes:latest
+    build:
+      context: ./micro-estudiantes
+      dockerfile: Dockerfile
+    image: micro-estudiantes:latest
     container_name: micro-estudiantes
     restart: unless-stopped
     expose:
@@ -50,7 +56,10 @@ services:
       MONGODB_URI: mongodb://root:example@mongo:27017/estudiantes?authSource=admin
 
   micro-maestros:
-    image: caguerronp/micro-maestros:latest
+    build:
+      context: ./micro-maestros
+      dockerfile: Dockerfile
+    image: micro-maestros:latest
     container_name: micro-maestros
     restart: unless-stopped
     expose:
@@ -65,27 +74,6 @@ services:
       NODE_ENV: production
       PORT: 3002
       MONGODB_URI: mongodb://root:example@mongo:27017/maestros?authSource=admin
-
-  # Core Service (aggregator/orchestrator) - if exists
-  micro-core:
-    image: caguerronp/micro-core:latest
-    container_name: micro-core
-    restart: unless-stopped
-    expose:
-      - "5000"
-    ports:
-      - "5000:5000"
-    depends_on:
-      - mongo
-      - micro-auth
-      - micro-estudiantes
-      - micro-maestros
-    networks:
-      - core-net
-    environment:
-      NODE_ENV: production
-      PORT: 5000
-      MONGODB_URI: mongodb://root:example@mongo:27017/core?authSource=admin
 
 networks:
   core-net:

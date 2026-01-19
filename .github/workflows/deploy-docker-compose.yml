@@ -186,6 +186,11 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          # Transfer build context (source code) via tar + SSH
+          echo "📦 Transferring CORE source context..."
+          tar czf - micro-auth micro-estudiantes micro-maestros | ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.load-config.outputs.core-public }} "cat > /tmp/core-context.tar.gz"
+          
+          # Transfer docker-compose file
           scp -i ~/.ssh/id_rsa docker-compose.ec2-core.yml ubuntu@${{ needs.load-config.outputs.core-public }}:/tmp/docker-compose.core.yml
           
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
@@ -199,6 +204,11 @@ jobs:
           echo "🐳 EC2-CORE Deployment"
           echo "================================"
           
+          # Extract build context
+          echo "📂 Extracting CORE source context..."
+          cd /tmp
+          tar xzf core-context.tar.gz
+          
           # Instalar docker-compose si no existe
           if ! command -v docker-compose &> /dev/null; then
             echo "📦 Instalando docker-compose..."
@@ -207,17 +217,9 @@ jobs:
             docker-compose --version
           fi
           
-          # Login to Docker registry
-          echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
-          
           cd /tmp
           docker-compose -f docker-compose.core.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.core.yml pull 2>&1 || true
-          
-          if [ "${{ github.event.inputs.rebuild_images }}" = "true" ]; then
-            docker-compose -f docker-compose.core.yml build
-          fi
-          
+          docker-compose -f docker-compose.core.yml build --no-cache
           docker-compose -f docker-compose.core.yml up -d
           
           sleep 15
@@ -345,8 +347,7 @@ jobs:
           cd /tmp
           tar xzf reportes-context.tar.gz
           docker-compose -f docker-compose.reportes.yml down 2>/dev/null || true
-          docker-compose -f docker-compose.reportes.yml pull 2>&1 || true
-          docker-compose -f docker-compose.reportes.yml build
+          docker-compose -f docker-compose.reportes.yml build --no-cache
           docker-compose -f docker-compose.reportes.yml up -d
           
           sleep 10
