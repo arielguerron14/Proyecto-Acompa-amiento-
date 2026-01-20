@@ -1,7 +1,17 @@
 name: Deploy Project to AWS EC2 Instances
 
 on:
+         echo "📦 Installing system dependencies..."
+         sudo apt-get update -qq
+         sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+         sudo usermod -aG docker $USER 2>/dev/null || true
+         
   workflow_dispatch:
+         echo "📦 Installing system dependencies..."
+         sudo apt-get update -qq
+         sudo apt-get install -y -qq nodejs npm git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+         
+         echo "🔄 Pulling latest code..."
     inputs:
       environment:
         description: 'Environment to deploy (staging or prod)'
@@ -11,12 +21,11 @@ on:
         options:
           - staging
           - prod
-      deploy_services:
-        description: 'Services to deploy (all or specific)'
-        required: true
-        default: 'all'
         type: choice
         options:
+         # Start Docker service if not running
+         sudo systemctl start docker 2>/dev/null || true
+         
           - all
           - microservices-only
           - databases-only
@@ -103,6 +112,11 @@ jobs:
           set -e
           
           echo "🔄 Pulling latest code..."
+           echo "📦 Installing system dependencies..."
+           sudo apt-get update -qq
+           sudo apt-get install -y -qq nodejs npm git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+         
+           echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
             cd /home/ubuntu/Proyecto-Acompa-amiento-
             git pull origin main
@@ -239,6 +253,11 @@ jobs:
           
           set -e
           
+           echo "📦 Installing system dependencies..."
+           sudo apt-get update -qq
+           sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+           sudo usermod -aG docker $USER 2>/dev/null || true
+         
           echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
             cd /home/ubuntu/Proyecto-Acompa-amiento-
@@ -253,6 +272,9 @@ jobs:
           sudo mkdir -p /data/postgres /data/mongo /data/redis
           sudo chown -R $USER:$USER /data
           
+           # Start Docker service if not running
+           sudo systemctl start docker 2>/dev/null || true
+         
           echo "🐳 Starting databases with Docker Compose..."
           docker-compose -f docker-compose.databases.yml down -v 2>/dev/null || true
           docker-compose -f docker-compose.databases.yml up -d
