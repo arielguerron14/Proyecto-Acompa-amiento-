@@ -151,17 +151,6 @@ function setupEventListeners() {
   if (horarioForm) horarioForm.addEventListener('input', validarFormulario);
 }
 
-// Cambiar pestaña
-function switchTab(tabName) {
-  currentTab = tabName;
-
-  tabButtons.forEach(btn => btn.classList.remove('active'));
-  tabContents.forEach(content => content.classList.remove('active'));
-
-  document.querySelector(`[data-module="${tabName}"]`).classList.add('active');
-  document.getElementById(tabName).classList.add('active');
-}
-
 // Cargar horarios del backend
 async function loadHorarios() {
   try {
