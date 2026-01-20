@@ -12,7 +12,7 @@ try {
 
 let infraConfig = null;
 try {
-  infraConfig = require('../../../infrastructure.config.js');
+  infraConfig = require('../../../config/infrastructure.config.js');
 } catch (err) {
   console.warn('⚠️  No se pudo cargar infrastructure.config.js, usando fallbacks');
   infraConfig = null;

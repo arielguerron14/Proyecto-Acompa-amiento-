@@ -12,7 +12,7 @@ dotenv.config();
 // Cargar configuración centralizada de infraestructura
 let infraConfig;
 try {
-  infraConfig = require('../../../infrastructure.config.js');
+  infraConfig = require('../../../config/infrastructure.config.js');
 } catch (err) {
   console.warn('⚠️  No se pudo cargar infrastructure.config.js, usando fallbacks');
   infraConfig = null;

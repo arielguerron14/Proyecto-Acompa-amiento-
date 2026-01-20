@@ -20,7 +20,7 @@ function loadInfraConfig() {
   if (infraConfig) return infraConfig;
 
   try {
-    const infraPath = path.join(__dirname, '../../infrastructure.config.js');
+    const infraPath = path.join(__dirname, '../../config/infrastructure.config.js');
     infraConfig = require(infraPath);
     
     // Validar configuración

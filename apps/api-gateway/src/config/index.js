@@ -3,7 +3,7 @@ let infraConfig = null;
 try {
   const fs = require('fs');
   const path = require('path');
-  const infraPath = path.join(__dirname, '../../../infrastructure.config.js');
+  const infraPath = path.join(__dirname, '../../../config/infrastructure.config.js');
   if (fs.existsSync(infraPath)) {
     infraConfig = require(infraPath);
   }
