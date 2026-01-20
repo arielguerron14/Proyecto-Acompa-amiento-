@@ -199,6 +199,21 @@ Una vez todo esté configurado:
 **Normal en GitHub Actions** - No afecta el deployment
 Si necesitas PTY, agregar `-t` a ssh (pero puede causar problemas)
 
+### Error: "npm: command not found"
+**Causa:** Node.js/npm no están instalados en la instancia EC2
+**Solución:** ✅ **Automática**
+
+El workflow instala automáticamente en cada deploy:
+- **Frontend/API Gateway:** Node.js, npm, git, curl
+- **Microservices:** Node.js, npm, git, docker.io, docker-compose
+- **Databases:** Node.js, npm, git, docker.io, docker-compose
+
+Si aún ocurre este error:
+1. Verifica que la instancia tenga acceso a internet
+2. Verifica que el usuario `ubuntu` tiene permisos de sudo
+3. Intenta manualmente: `ssh -i key.pem ubuntu@instance-ip "sudo apt-get update"`
+4. Revisa logs: `docker-compose logs`
+
 ### Error: "Connection refused" o timeout
 **Causa:** Bastion/instancias no corren o security group bloqueado
 **Solución:**
