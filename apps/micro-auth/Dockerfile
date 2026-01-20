@@ -12,8 +12,8 @@ COPY apps/micro-auth/src ./src
 COPY packages/shared-auth ../shared-auth
 COPY packages/shared-monitoring ../shared-monitoring
 
-# Install dependencies
-RUN npm install --production
+# Install dependencies with legacy peer deps
+RUN npm install --legacy-peer-deps --production || npm install --legacy-peer-deps
 
 ENV NODE_ENV=production
 EXPOSE 3000

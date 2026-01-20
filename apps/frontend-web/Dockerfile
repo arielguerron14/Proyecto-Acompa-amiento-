@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY apps/frontend-web/package*.json ./
 
-# Install dependencies
-RUN npm install --production
+# Install dependencies with legacy peer deps
+RUN npm install --legacy-peer-deps --production || npm install --legacy-peer-deps
 
 # Copy application files
 COPY apps/frontend-web .

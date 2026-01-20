@@ -16,8 +16,8 @@ COPY apps/micro-maestros/ /app/apps/micro-maestros/
 # Set working directory to the service
 WORKDIR /app/apps/micro-maestros
 
-# Install dependencies
-RUN npm install --production
+# Install dependencies with legacy peer deps
+RUN npm install --legacy-peer-deps --production || npm install --legacy-peer-deps
 
 ENV NODE_ENV=production
 EXPOSE 3002

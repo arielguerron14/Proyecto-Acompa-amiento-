@@ -16,8 +16,8 @@ COPY apps/micro-estudiantes/ /app/apps/micro-estudiantes/
 # Set working directory to the service
 WORKDIR /app/apps/micro-estudiantes
 
-# Install dependencies
-RUN npm install --production
+# Install dependencies with legacy peer deps to handle workspace packages
+RUN npm install --legacy-peer-deps --production || npm install --legacy-peer-deps
 
 ENV NODE_ENV=production
 EXPOSE 3001
