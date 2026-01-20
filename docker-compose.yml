@@ -1,6 +1,94 @@
 version: '3.8'
 
 services:
+  # Zookeeper - Required for Kafka coordination
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    restart: unless-stopped
+    ports:
+      - "2181:2181"
+    networks:
+      - core-net
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_INIT_LIMIT: 5
+
+  # Kafka - Message broker for microservices
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    networks:
+      - core-net
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_NODE_ID: 1
+      CLUSTER_ID: MkwNYQ4lT7e-6BrE5gVHZg
+
+  # RabbitMQ - Message queue for service communication
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - core-net
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    networks:
+      - core-net
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # Grafana - Visualization and monitoring
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    networks:
+      - core-net
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+
   # MongoDB Database
   mongo:
     image: mongo:6
@@ -52,12 +140,15 @@ services:
       - "3000"
     depends_on:
       - mongo
+      - kafka
     networks:
       - core-net
     environment:
       NODE_ENV: production
       PORT: 3000
       MONGODB_URI: mongodb://root:example@mongo:27017/auth?authSource=admin
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
 
   # Students Microservice (NO external port)
   micro-estudiantes:
@@ -71,12 +162,15 @@ services:
       - "3001"
     depends_on:
       - mongo
+      - kafka
     networks:
       - core-net
     environment:
       NODE_ENV: production
       PORT: 3001
       MONGODB_URI: mongodb://root:example@mongo:27017/estudiantes?authSource=admin
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
 
   # Teachers/Schedule Microservice (NO external port)
   micro-maestros:
@@ -90,12 +184,15 @@ services:
       - "3002"
     depends_on:
       - mongo
+      - kafka
     networks:
       - core-net
     environment:
       NODE_ENV: production
       PORT: 3002
       MONGODB_URI: mongodb://root:example@mongo:27017/maestros?authSource=admin
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
 
   # Student Reports Microservice (NO external port)
   micro-reportes-estudiantes:
@@ -109,12 +206,15 @@ services:
       - "5003"
     depends_on:
       - mongo
+      - kafka
     networks:
       - core-net
     environment:
       NODE_ENV: production
       PORT: 5003
       MONGODB_URI: mongodb://root:example@mongo:27017/reportes-estudiantes?authSource=admin
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
 
   # Teacher Reports Microservice (NO external port)
   micro-reportes-maestros:
@@ -128,36 +228,80 @@ services:
       - "5004"
     depends_on:
       - mongo
+      - kafka
     networks:
       - core-net
     environment:
       NODE_ENV: production
       PORT: 5004
       MONGODB_URI: mongodb://root:example@mongo:27017/reportes-maestros?authSource=admin
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
 
-  # Core Service (aggregator/orchestrator) - COMMENTED: No Dockerfile
-  # core:
-  #   image: core:latest
-  #   container_name: core
-  #   restart: unless-stopped
-  #   expose:
-  #     - "5000"
-  #   depends_on:
-  #     - mongo
-  #     - micro-auth
-  #     - micro-estudiantes
-  #     - micro-maestros
-  #   networks:
-  #     - core-net
-  #   environment:
-  #     NODE_ENV: production
-  #     PORT: 5000
-  #     MONGODB_URI: mongodb://root:example@mongo:27017/core?authSource=admin
-  #     AUTH_SERVICE_URL: http://micro-auth:3000
-  #     ESTUDIANTES_SERVICE_URL: http://micro-estudiantes:3001
-  #     MAESTROS_SERVICE_URL: http://micro-maestros:3002
-  #     REPORTES_ESTUDIANTES_URL: http://micro-reportes-estudiantes:5003
-  #     REPORTES_MAESTROS_URL: http://micro-reportes-maestros:5004
+  # Notifications Microservice (NO external port)
+  micro-notificaciones:
+    build:
+      context: .
+      dockerfile: apps/micro-notificaciones/Dockerfile
+    image: micro-notificaciones:latest
+    container_name: micro-notificaciones
+    restart: unless-stopped
+    expose:
+      - "5006"
+    depends_on:
+      - mongo
+      - kafka
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 5006
+      MONGODB_URI: mongodb://root:example@mongo:27017/notificaciones?authSource=admin
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+
+  # Analytics Microservice (NO external port)
+  micro-analytics:
+    build:
+      context: .
+      dockerfile: apps/micro-analytics/Dockerfile
+    image: micro-analytics:latest
+    container_name: micro-analytics
+    restart: unless-stopped
+    expose:
+      - "5007"
+    depends_on:
+      - mongo
+      - kafka
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 5007
+      MONGODB_URI: mongodb://root:example@mongo:27017/analytics?authSource=admin
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+
+  # SOAP Bridge Microservice (NO external port)
+  micro-soap-bridge:
+    build:
+      context: .
+      dockerfile: apps/micro-soap-bridge/Dockerfile
+    image: micro-soap-bridge:latest
+    container_name: micro-soap-bridge
+    restart: unless-stopped
+    expose:
+      - "5008"
+    depends_on:
+      - mongo
+      - kafka
+    networks:
+      - core-net
+    environment:
+      NODE_ENV: production
+      PORT: 5008
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
 
 networks:
   core-net:
@@ -165,3 +309,6 @@ networks:
 
 volumes:
   mongo_data:
+  prometheus_data:
+  grafana_data:
+  rabbitmq_data:

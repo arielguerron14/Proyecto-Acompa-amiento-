@@ -17,8 +17,11 @@ RUN mkdir -p node_modules && \
     ln -sf /usr/src/shared-monitoring node_modules/shared-monitoring
 
 # Copy entrypoint script (from repo root)
-COPY ./docker-entrypoint.sh /usr/src/app/entrypoint.sh
-RUN chmod +x /usr/src/app/entrypoint.sh
+RUN echo '#!/bin/bash' > /usr/src/app/entrypoint.sh && \
+    echo 'set -e' >> /usr/src/app/entrypoint.sh && \
+    echo 'echo "🚀 Starting micro-notificaciones..."' >> /usr/src/app/entrypoint.sh && \
+    echo 'exec "$@"' >> /usr/src/app/entrypoint.sh && \
+    chmod +x /usr/src/app/entrypoint.sh
 
 ENV NODE_ENV=production
 EXPOSE 5006
