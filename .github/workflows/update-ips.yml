@@ -330,12 +330,12 @@ jobs:
             else
               git add config/instance_ips.json config/api_routes.json
             fi
-            git commit -m "chore: Auto-update IPs and routes for $ENVIRONMENT environment
-
-- Updated instance_ips.json with current AWS resources
-- Updated api_routes.json with complete service endpoints
-- Generated environment-specific configuration
-- Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+                        git commit \
+                            -m "chore: Auto-update IPs and routes for $ENVIRONMENT environment" \
+                            -m "Updated instance_ips.json with current AWS resources" \
+                            -m "Updated api_routes.json with complete service endpoints" \
+                            -m "Generated environment-specific configuration" \
+                            -m "Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             git push origin main
             echo "✅ Configuration changes pushed to main"
           fi
