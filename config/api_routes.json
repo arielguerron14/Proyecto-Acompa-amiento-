@@ -1,6 +1,6 @@
 {
     "environment": "local",
-    "updated_at": "2026-01-20T20:33:54.800887",
+    "updated_at": "2026-01-20T20:37:24.866785",
     "services": {
         "api-gateway": {
             "baseUrl": "http://localhost:8080",
