@@ -1,76 +1,110 @@
-const Reporte = require('../models/ReporteMaestro');
+const RegistrarAtencionCommand = require('../application/commands/RegistrarAtencionCommand');
+const GetReportesByMaestroQuery = require('../application/queries/GetReportesByMaestroQuery');
+const GetReporteByIdQuery = require('../application/queries/GetReporteByIdQuery');
+
+let logger;
+try {
+  ({ logger } = require('@proyecto/shared-auth/src/middlewares/logger'));
+} catch (err) {
+  logger = {
+    info: console.log,
+    error: console.error,
+    warn: console.warn
+  };
+}
+
+/**
+ * ReportesMaestroController: Maneja reportes de maestros
+ * MIGRADO A CQRS: Usa CommandBus y QueryBus en lugar de llamadas directas a servicios
+ */
 
 module.exports = {
-  registrarAtencion: async (req, res) => {
+  /**
+   * POST /reportes/maestros/registrar o /registrar
+   * Registra asistencia usando CQRS CommandBus
+   */
+  registrarAtencion: async (req, res, next, commandBus) => {
     try {
       const { 
         maestroId, maestroName, dia, inicio, fin, 
         estudianteId, estudianteName,
         materia, semestre, paralelo, modalidad, lugarAtencion
       } = req.body;
-      if (!maestroId || !dia || !inicio || !estudianteId) return res.status(400).json({ message: 'Missing fields' });
-
-      let reporte = await Reporte.findOne({ maestroId });
-      if (!reporte) {
-        reporte = await Reporte.create({
-          maestroId,
-          maestroName,
-          horas: [{ 
-            dia, inicio, fin, 
-            materia, semestre, paralelo, modalidad, lugarAtencion,
-            alumnosAtendidos: 1, 
-            alumnos: [{ estudianteId, estudianteName }] 
-          }]
-        });
-        return res.status(201).json(reporte);
+      
+      if (!maestroId || !dia || !inicio || !estudianteId) {
+        return res.status(400).json({ message: 'Missing fields' });
       }
 
-      // buscar la hora
-      const horaIdx = reporte.horas.findIndex(h => h.dia === dia && h.inicio === inicio);
-      if (horaIdx === -1) {
-        reporte.horas.push({ 
-          dia, inicio, fin, 
-          materia, semestre, paralelo, modalidad, lugarAtencion,
-          alumnosAtendidos: 1, 
-          alumnos: [{ estudianteId, estudianteName }] 
-        });
-      } else {
-        const hora = reporte.horas[horaIdx];
-        // prevenir duplicados
-        if (!hora.alumnos.some(a => a.estudianteId === estudianteId)) {
-          hora.alumnos.push({ estudianteId, estudianteName });
-          hora.alumnosAtendidos = hora.alumnos.length;
-        }
-        // Actualizar campos adicionales si cambieron
-        if (materia) hora.materia = materia;
-        if (semestre) hora.semestre = semestre;
-        if (paralelo) hora.paralelo = paralelo;
-        if (modalidad) hora.modalidad = modalidad;
-        if (lugarAtencion) hora.lugarAtencion = lugarAtencion;
-      }
-      reporte.updatedAt = new Date();
-      await reporte.save();
-      res.status(200).json(reporte);
-    } catch(err){ console.error(err); res.status(500).json({ message: 'Server error' }); }
+      // Crear comando
+      const command = new RegistrarAtencionCommand(
+        maestroId,
+        maestroName,
+        dia,
+        inicio,
+        fin,
+        estudianteId,
+        estudianteName,
+        materia,
+        semestre,
+        paralelo,
+        modalidad,
+        lugarAtencion
+      );
+
+      // Ejecutar comando a través del CQRS Bus
+      logger.info('[reportesMaestroController.registrarAtencion] Executing RegistrarAtencionCommand');
+      const result = await commandBus.execute(command);
+
+      return res.status(result.status || 200).json(result.reporte);
+    } catch (err) {
+      logger.error('Error en registrarAtencion:', err.message);
+      res.status(err.status || 500).json({ message: err.message || 'Server error' });
+    }
   },
 
-  getReportesByMaestro: async (req, res) => {
+  /**
+   * GET /reportes/maestros/reportes/:maestroId o /reportes/:maestroId
+   * Obtiene reporte por maestroId usando CQRS QueryBus
+   */
+  getReportesByMaestro: async (req, res, next, queryBus) => {
     try {
       const maestroId = req.params.maestroId;
-      const reportes = await Reporte.findOne({ maestroId });
-      if (!reportes) return res.status(404).json({ message: 'No reportes found' });
-      res.json(reportes);
-    } catch(err){ console.error(err); res.status(500).json({ message: 'Server error' }); }
-  }
-,
+      
+      // Crear query
+      const query = new GetReportesByMaestroQuery(maestroId);
 
-  // Get a single reporte by its id
-  getReporteByMaestro: async (req, res) => {
+      // Ejecutar query a través del CQRS Bus
+      logger.info(`[reportesMaestroController.getReportesByMaestro] Executing GetReportesByMaestroQuery for ${maestroId}`);
+      const result = await queryBus.execute(query);
+
+      return res.status(result.status || 200).json(result.reporte);
+    } catch (err) {
+      logger.error('Error en getReportesByMaestro:', err.message);
+      const statusCode = err.status || 500;
+      res.status(statusCode).json({ message: err.message });
+    }
+  },
+
+  /**
+   * GET /reportes/maestros/reporte/:id o /reporte/:id
+   * Obtiene reporte por ID usando CQRS QueryBus
+   */
+  getReporteByMaestro: async (req, res, next, queryBus) => {
     try {
       const id = req.params.id;
-      const reporte = await Reporte.findById(id);
-      if (!reporte) return res.status(404).json({ message: 'Reporte no encontrado' });
-      res.json(reporte);
-    } catch (err) { console.error(err); res.status(500).json({ message: 'Server error' }); }
+      
+      // Crear query
+      const query = new GetReporteByIdQuery(id);
+
+      // Ejecutar query a través del CQRS Bus
+      logger.info(`[reportesMaestroController.getReporteByMaestro] Executing GetReporteByIdQuery for ${id}`);
+      const result = await queryBus.execute(query);
+
+      return res.status(result.status || 200).json(result.reporte);
+    } catch (err) {
+      logger.error('Error en getReporteByMaestro:', err.message);
+      const statusCode = err.status || 500;
+      res.status(statusCode).json({ message: err.message });
+    }
   }
 };
