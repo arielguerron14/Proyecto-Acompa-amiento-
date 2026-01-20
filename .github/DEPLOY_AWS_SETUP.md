@@ -113,19 +113,56 @@ Valor: 172.31.x.x  (IP privada de EC2-Frontend)
 ### Secret 4: AWS_APIGW_PRIVATE_IP
 ```
 Nombre: AWS_APIGW_PRIVATE_IP
-Valor: 172.31.x.x  (IP privada de EC2-APIGateway)
+Valor: 172.31.x.x  (IP privada de EC2-API-Gateway)
 ```
 
 ### Secret 5: AWS_CORE_PRIVATE_IP
 ```
 Nombre: AWS_CORE_PRIVATE_IP
-Valor: 172.31.x.x  (IP privada de EC2-CORE/Microservicios)
+Valor: 172.31.x.x  (IP privada de EC2-CORE - Auth, Estudiantes, Maestros)
 ```
 
-### Secret 6: AWS_DB_PRIVATE_IP
+### Secret 6: AWS_REPORTES_PRIVATE_IP
+```
+Nombre: AWS_REPORTES_PRIVATE_IP
+Valor: 172.31.x.x  (IP privada de EC2-Reportes)
+```
+
+### Secret 7: AWS_NOTIFICACIONES_PRIVATE_IP
+```
+Nombre: AWS_NOTIFICACIONES_PRIVATE_IP
+Valor: 172.31.x.x  (IP privada de EC2-Notificaciones)
+```
+
+### Secret 8: AWS_MESSAGING_PRIVATE_IP
+```
+Nombre: AWS_MESSAGING_PRIVATE_IP
+Valor: 172.31.x.x  (IP privada de EC2-Messaging - Kafka, RabbitMQ, MQTT)
+```
+
+### Secret 9: AWS_MONITORING_PRIVATE_IP
+```
+Nombre: AWS_MONITORING_PRIVATE_IP
+Valor: 172.31.x.x  (IP privada de EC2-Monitoring - Prometheus, Grafana)
+```
+
+### Secret 10: AWS_DB_PRIVATE_IP
 ```
 Nombre: AWS_DB_PRIVATE_IP
-Valor: 172.31.x.x  (IP privada de EC2-DB)
+Valor: 172.31.x.x  (IP privada de EC2-DB - PostgreSQL, MongoDB, Redis)
+```
+
+**📊 Distribución de Servicios:**
+```
+EC2-Bastion          → Solo SSH gateway
+EC2-Frontend         → Frontend Web (Puerto 5500)
+EC2-API-Gateway      → API Gateway (Puerto 8080)
+EC2-CORE             → micro-auth, micro-estudiantes, micro-maestros, micro-core
+EC2-Reportes         → micro-reportes-estudiantes, micro-reportes-maestros
+EC2-Notificaciones   → micro-notificaciones
+EC2-Messaging        → Kafka, Zookeeper, RabbitMQ, MQTT
+EC2-Monitoring       → Prometheus, Grafana
+EC2-DB               → PostgreSQL, MongoDB, Redis
 ```
 
 ---

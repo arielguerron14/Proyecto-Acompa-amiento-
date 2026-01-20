@@ -175,10 +175,10 @@ jobs:
           
           DEPLOY_APIGW
 
-      - name: 🚀 Deploy Microservices
+      - name: 🚀 Deploy Core Microservices (Auth, Estudiantes, Maestros)
         if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'microservices-only' }}
         run: |
-          echo "📦 Deploying Microservices to EC2-CORE..."
+          echo "📦 Deploying Core Microservices to EC2-CORE..."
           CORE_IP="${{ secrets.AWS_CORE_PRIVATE_IP }}"
           BASTION_IP="${{ secrets.AWS_BASTION_PUBLIC_IP }}"
           
@@ -191,17 +191,17 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=10 \
             -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
-            ${{ env.SERVICES_USER }}@${CORE_IP} << 'DEPLOY_MICROSERVICES'
+            ${{ env.SERVICES_USER }}@${CORE_IP} << 'DEPLOY_CORE'
           
           set -e
           
-            echo "📦 Installing system dependencies..."
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
-            sudo usermod -aG docker $USER 2>/dev/null || true
-            sudo systemctl start docker 2>/dev/null || true
+          echo "📦 Installing system dependencies..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          sudo usermod -aG docker $USER 2>/dev/null || true
+          sudo systemctl start docker 2>/dev/null || true
 
-            echo "🔄 Pulling latest code..."
+          echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
             cd /home/ubuntu/Proyecto-Acompa-amiento-
             git pull origin main
@@ -214,23 +214,240 @@ jobs:
           echo "📥 Installing dependencies..."
           npm install --legacy-peer-deps
           
-          echo "🐳 Starting microservices with Docker Compose..."
+          echo "🐳 Starting core microservices (Auth, Estudiantes, Maestros)..."
           export ENVIRONMENT=prod
-          export COMPOSE_PROJECT_NAME=acompanamiento
+          export COMPOSE_PROJECT_NAME=acompanamiento-core
           
-          docker-compose down -v 2>/dev/null || true
-          docker-compose build --no-cache
-          docker-compose up -d
+          # Only start core services
+          docker-compose up -d micro-auth micro-estudiantes micro-maestros micro-core
           
           echo "⏳ Waiting for services to stabilize..."
           sleep 10
           
           echo "📊 Service status:"
-          docker-compose ps
+          docker-compose ps micro-auth micro-estudiantes micro-maestros micro-core
           
-          echo "✅ Microservices deployment complete"
+          echo "✅ Core microservices deployment complete"
           
-          DEPLOY_MICROSERVICES
+          DEPLOY_CORE
+
+      - name: 🚀 Deploy Reportes Microservices
+        if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'microservices-only' }}
+        run: |
+          echo "📦 Deploying Reportes to EC2-Reportes..."
+          REPORTES_IP="${{ secrets.AWS_REPORTES_PRIVATE_IP }}"
+          BASTION_IP="${{ secrets.AWS_BASTION_PUBLIC_IP }}"
+          
+          if [ -z "$REPORTES_IP" ] || [ -z "$BASTION_IP" ]; then
+            echo "❌ ERROR: Missing AWS secrets (AWS_REPORTES_PRIVATE_IP)"
+            echo "⚠️  Skipping reportes deployment"
+            exit 0
+          fi
+          
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            ${{ env.SERVICES_USER }}@${REPORTES_IP} << 'DEPLOY_REPORTES'
+          
+          set -e
+          
+          echo "📦 Installing system dependencies..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          sudo usermod -aG docker $USER 2>/dev/null || true
+          sudo systemctl start docker 2>/dev/null || true
+
+          echo "🔄 Pulling latest code..."
+          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+            cd /home/ubuntu/Proyecto-Acompa-amiento-
+            git pull origin main
+          else
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          
+          echo "📥 Installing dependencies..."
+          npm install --legacy-peer-deps
+          
+          echo "🐳 Starting reportes microservices..."
+          export ENVIRONMENT=prod
+          export COMPOSE_PROJECT_NAME=acompanamiento-reportes
+          
+          docker-compose up -d micro-reportes-estudiantes micro-reportes-maestros
+          
+          echo "⏳ Waiting for services to stabilize..."
+          sleep 10
+          
+          echo "📊 Service status:"
+          docker-compose ps micro-reportes-estudiantes micro-reportes-maestros
+          
+          echo "✅ Reportes deployment complete"
+          
+          DEPLOY_REPORTES
+
+      - name: 🚀 Deploy Notificaciones
+        if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'microservices-only' }}
+        run: |
+          echo "📦 Deploying Notificaciones to EC2-Notificaciones..."
+          NOTIF_IP="${{ secrets.AWS_NOTIFICACIONES_PRIVATE_IP }}"
+          BASTION_IP="${{ secrets.AWS_BASTION_PUBLIC_IP }}"
+          
+          if [ -z "$NOTIF_IP" ] || [ -z "$BASTION_IP" ]; then
+            echo "❌ ERROR: Missing AWS secrets (AWS_NOTIFICACIONES_PRIVATE_IP)"
+            echo "⚠️  Skipping notificaciones deployment"
+            exit 0
+          fi
+          
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            ${{ env.SERVICES_USER }}@${NOTIF_IP} << 'DEPLOY_NOTIF'
+          
+          set -e
+          
+          echo "📦 Installing system dependencies..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          sudo usermod -aG docker $USER 2>/dev/null || true
+          sudo systemctl start docker 2>/dev/null || true
+
+          echo "🔄 Pulling latest code..."
+          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+            cd /home/ubuntu/Proyecto-Acompa-amiento-
+            git pull origin main
+          else
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          
+          echo "📥 Installing dependencies..."
+          npm install --legacy-peer-deps
+          
+          echo "🐳 Starting notificaciones microservice..."
+          export ENVIRONMENT=prod
+          export COMPOSE_PROJECT_NAME=acompanamiento-notif
+          
+          docker-compose up -d micro-notificaciones
+          
+          echo "⏳ Waiting for service to stabilize..."
+          sleep 10
+          
+          echo "📊 Service status:"
+          docker-compose ps micro-notificaciones
+          
+          echo "✅ Notificaciones deployment complete"
+          
+          DEPLOY_NOTIF
+
+      - name: 🚀 Deploy Messaging (Kafka, RabbitMQ, MQTT)
+        if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'databases-only' }}
+        run: |
+          echo "📦 Deploying Messaging to EC2-Messaging..."
+          MESSAGING_IP="${{ secrets.AWS_MESSAGING_PRIVATE_IP }}"
+          BASTION_IP="${{ secrets.AWS_BASTION_PUBLIC_IP }}"
+          
+          if [ -z "$MESSAGING_IP" ] || [ -z "$BASTION_IP" ]; then
+            echo "❌ ERROR: Missing AWS secrets (AWS_MESSAGING_PRIVATE_IP)"
+            echo "⚠️  Skipping messaging deployment"
+            exit 0
+          fi
+          
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            ${{ env.SERVICES_USER }}@${MESSAGING_IP} << 'DEPLOY_MESSAGING'
+          
+          set -e
+          
+          echo "📦 Installing system dependencies..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq docker.io docker-compose git > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          sudo usermod -aG docker $USER 2>/dev/null || true
+          sudo systemctl start docker 2>/dev/null || true
+
+          echo "🔄 Pulling latest code..."
+          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+            cd /home/ubuntu/Proyecto-Acompa-amiento-
+            git pull origin main
+          else
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          
+          echo "🐳 Starting messaging services (Kafka, RabbitMQ, MQTT)..."
+          export ENVIRONMENT=prod
+          export COMPOSE_PROJECT_NAME=acompanamiento-messaging
+          
+          docker-compose up -d kafka zookeeper rabbitmq mqtt-broker
+          
+          echo "⏳ Waiting for services to stabilize..."
+          sleep 15
+          
+          echo "📊 Service status:"
+          docker-compose ps kafka zookeeper rabbitmq mqtt-broker
+          
+          echo "✅ Messaging services deployment complete"
+          
+          DEPLOY_MESSAGING
+
+      - name: 🚀 Deploy Monitoring (Prometheus, Grafana)
+        if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'microservices-only' }}
+        run: |
+          echo "📦 Deploying Monitoring to EC2-Monitoring..."
+          MONITORING_IP="${{ secrets.AWS_MONITORING_PRIVATE_IP }}"
+          BASTION_IP="${{ secrets.AWS_BASTION_PUBLIC_IP }}"
+          
+          if [ -z "$MONITORING_IP" ] || [ -z "$BASTION_IP" ]; then
+            echo "❌ ERROR: Missing AWS secrets (AWS_MONITORING_PRIVATE_IP)"
+            echo "⚠️  Skipping monitoring deployment"
+            exit 0
+          fi
+          
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            ${{ env.SERVICES_USER }}@${MONITORING_IP} << 'DEPLOY_MONITORING'
+          
+          set -e
+          
+          echo "📦 Installing system dependencies..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq docker.io docker-compose git > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          sudo usermod -aG docker $USER 2>/dev/null || true
+          sudo systemctl start docker 2>/dev/null || true
+
+          echo "🔄 Pulling latest code..."
+          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+            cd /home/ubuntu/Proyecto-Acompa-amiento-
+            git pull origin main
+          else
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          
+          echo "🐳 Starting monitoring services (Prometheus, Grafana)..."
+          export ENVIRONMENT=prod
+          export COMPOSE_PROJECT_NAME=acompanamiento-monitoring
+          
+          docker-compose up -d prometheus grafana
+          
+          echo "⏳ Waiting for services to stabilize..."
+          sleep 15
+          
+          echo "📊 Service status:"
+          docker-compose ps prometheus grafana
+          
+          echo "✅ Monitoring services deployment complete"
+          
+          DEPLOY_MONITORING
 
       - name: 🚀 Deploy Databases
         if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'databases-only' }}
