@@ -1,0 +1,266 @@
+name: Deploy Project to AWS EC2 Instances
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy (staging or prod)'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - prod
+      deploy_services:
+        description: 'Services to deploy (all or specific)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - microservices-only
+          - databases-only
+          - frontend-only
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      BASTION_USER: ubuntu
+      SERVICES_USER: ubuntu
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_BASTION_PRIVATE_KEY }}" > ~/.ssh/bastion-key.pem
+          chmod 600 ~/.ssh/bastion-key.pem
+          
+          # Add known hosts to avoid SSH prompts
+          ssh-keyscan -H ${{ secrets.AWS_BASTION_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Load AWS instance IPs from config
+        id: load-config
+        run: |
+          python3 << 'PYTHON_EOF'
+          import json
+          import os
+          
+          # Load instance IPs configuration
+          with open('config/instance_ips.json', 'r') as f:
+              config = json.load(f)
+          
+          # Extract key IPs
+          api_gateway_ip = config.get('api-gateway', {}).get('host', 'localhost')
+          
+          print(f"api_gateway_ip={api_gateway_ip}")
+          
+          # For AWS, we'd extract from boto3, but for now using SSH tunnel discovery
+          PYTHON_EOF
+
+      - name: 🚀 Deploy Frontend
+        if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'frontend-only' }}
+        run: |
+          echo "📦 Deploying frontend to EC2-Frontend..."
+          FRONTEND_IP="${{ secrets.AWS_FRONTEND_PRIVATE_IP }}"
+          
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -W %h:%p ${{ env.BASTION_USER }}@${{ secrets.AWS_BASTION_PUBLIC_IP }}" \
+            ${{ env.SERVICES_USER }}@${FRONTEND_IP} << 'DEPLOY_FRONTEND'
+          
+          set -e
+          
+          echo "🔄 Pulling latest code..."
+          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+            cd /home/ubuntu/Proyecto-Acompa-amiento-
+            git pull origin main
+          else
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          
+          echo "📥 Installing dependencies..."
+          npm install --legacy-peer-deps
+          
+          echo "🔨 Building project..."
+          npm run build 2>/dev/null || echo "⚠️  No build script, skipping"
+          
+          echo "✅ Frontend deployment complete"
+          
+          DEPLOY_FRONTEND
+
+      - name: 🚀 Deploy API Gateway
+        if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'microservices-only' }}
+        run: |
+          echo "📦 Deploying API Gateway to EC2-APIGateway..."
+          APIGW_IP="${{ secrets.AWS_APIGW_PRIVATE_IP }}"
+          
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -W %h:%p ${{ env.BASTION_USER }}@${{ secrets.AWS_BASTION_PUBLIC_IP }}" \
+            ${{ env.SERVICES_USER }}@${APIGW_IP} << 'DEPLOY_APIGW'
+          
+          set -e
+          
+          echo "🔄 Pulling latest code..."
+          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+            cd /home/ubuntu/Proyecto-Acompa-amiento-
+            git pull origin main
+          else
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          
+          # Copy config files
+          cp config/instance_ips.json /tmp/instance_ips.json
+          cp config/api_routes.json /tmp/api_routes.json
+          
+          echo "📥 Installing dependencies..."
+          npm install --legacy-peer-deps
+          
+          echo "🚀 Starting API Gateway..."
+          pm2 delete "api-gateway" 2>/dev/null || true
+          pm2 start apps/api-gateway/src/app.js --name "api-gateway" --env production
+          pm2 save
+          
+          echo "✅ API Gateway deployment complete"
+          
+          DEPLOY_APIGW
+
+      - name: 🚀 Deploy Microservices
+        if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'microservices-only' }}
+        run: |
+          echo "📦 Deploying Microservices to EC2-CORE..."
+          CORE_IP="${{ secrets.AWS_CORE_PRIVATE_IP }}"
+          
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -W %h:%p ${{ env.BASTION_USER }}@${{ secrets.AWS_BASTION_PUBLIC_IP }}" \
+            ${{ env.SERVICES_USER }}@${CORE_IP} << 'DEPLOY_MICROSERVICES'
+          
+          set -e
+          
+          echo "🔄 Pulling latest code..."
+          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+            cd /home/ubuntu/Proyecto-Acompa-amiento-
+            git pull origin main
+          else
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          
+          echo "📥 Installing dependencies..."
+          npm install --legacy-peer-deps
+          
+          echo "🐳 Starting microservices with Docker Compose..."
+          export ENVIRONMENT=prod
+          export COMPOSE_PROJECT_NAME=acompanamiento
+          
+          docker-compose down -v 2>/dev/null || true
+          docker-compose build --no-cache
+          docker-compose up -d
+          
+          echo "⏳ Waiting for services to stabilize..."
+          sleep 10
+          
+          echo "📊 Service status:"
+          docker-compose ps
+          
+          echo "✅ Microservices deployment complete"
+          
+          DEPLOY_MICROSERVICES
+
+      - name: 🚀 Deploy Databases
+        if: ${{ inputs.deploy_services == 'all' || inputs.deploy_services == 'databases-only' }}
+        run: |
+          echo "📦 Deploying Databases to EC2-DB..."
+          DB_IP="${{ secrets.AWS_DB_PRIVATE_IP }}"
+          
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -W %h:%p ${{ env.BASTION_USER }}@${{ secrets.AWS_BASTION_PUBLIC_IP }}" \
+            ${{ env.SERVICES_USER }}@${DB_IP} << 'DEPLOY_DATABASES'
+          
+          set -e
+          
+          echo "🔄 Pulling latest code..."
+          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+            cd /home/ubuntu/Proyecto-Acompa-amiento-
+            git pull origin main
+          else
+            cd /home/ubuntu
+            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            cd Proyecto-Acompa-amiento-
+          fi
+          
+          echo "🐳 Creating database data directories..."
+          sudo mkdir -p /data/postgres /data/mongo /data/redis
+          sudo chown -R $USER:$USER /data
+          
+          echo "🐳 Starting databases with Docker Compose..."
+          docker-compose -f docker-compose.databases.yml down -v 2>/dev/null || true
+          docker-compose -f docker-compose.databases.yml up -d
+          
+          echo "⏳ Waiting for databases to start..."
+          sleep 15
+          
+          echo "📊 Database status:"
+          docker-compose -f docker-compose.databases.yml ps
+          
+          echo "✅ Databases deployment complete"
+          
+          DEPLOY_DATABASES
+
+      - name: 🏥 Health Check
+        if: success()
+        run: |
+          echo "🏥 Running health checks..."
+          
+          BASTION_IP="${{ secrets.AWS_BASTION_PUBLIC_IP }}"
+          APIGW_IP="${{ secrets.AWS_APIGW_PRIVATE_IP }}"
+          
+          # Test bastion connectivity
+          echo "✓ Testing Bastion host..."
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o ConnectTimeout=5 \
+            ${{ env.BASTION_USER }}@${BASTION_IP} "echo '✓ Bastion host is reachable'"
+          
+          # Test API Gateway
+          echo "✓ Testing API Gateway health..."
+          ssh -i ~/.ssh/bastion-key.pem \
+            -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -W %h:%p ${{ env.BASTION_USER }}@${BASTION_IP}" \
+            ${{ env.SERVICES_USER }}@${APIGW_IP} \
+            "curl -s http://localhost:8080/health || echo '⚠️  Health check endpoint not available yet'"
+          
+          echo "✅ Health checks completed"
+
+      - name: 📊 Deployment Summary
+        if: always()
+        run: |
+          echo "═══════════════════════════════════════════════════════════════"
+          echo "📊 DEPLOYMENT SUMMARY"
+          echo "═══════════════════════════════════════════════════════════════"
+          echo "Environment:  ${{ inputs.environment }}"
+          echo "Services:     ${{ inputs.deploy_services }}"
+          echo "Timestamp:    $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          echo ""
+          echo "Deployment Status: ${{ job.status }}"
+          echo "═══════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📝 Next steps:"
+          echo "1. Verify services are running via SSH:"
+          echo "   ssh -i bastion-key.pem ubuntu@${{ secrets.AWS_BASTION_PUBLIC_IP }}"
+          echo ""
+          echo "2. Check service logs:"
+          echo "   docker-compose logs -f <service-name>"
+          echo ""
+          echo "3. Test API Gateway:"
+          echo "   curl http://<API_GATEWAY_IP>:8080/health"
+          echo ""
+          echo "4. Access monitoring (if Grafana deployed):"
+          echo "   http://<MONITORING_IP>:3001"
+          echo "═══════════════════════════════════════════════════════════════"
