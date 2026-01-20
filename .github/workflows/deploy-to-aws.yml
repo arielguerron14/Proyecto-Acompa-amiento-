@@ -102,12 +102,12 @@ jobs:
           
           set -e
           
-          echo "🔄 Pulling latest code..."
-           echo "📦 Installing system dependencies..."
-           sudo apt-get update -qq
-           sudo apt-get install -y -qq nodejs npm git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
-         
-           echo "🔄 Pulling latest code..."
+            echo "📦 Installing system dependencies..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq nodejs npm git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+            sudo npm install -g pm2 > /dev/null 2>&1 || true
+
+            echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
             cd /home/ubuntu/Proyecto-Acompa-amiento-
             git pull origin main
@@ -147,7 +147,12 @@ jobs:
           
           set -e
           
-          echo "🔄 Pulling latest code..."
+            echo "📦 Installing system dependencies..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq nodejs npm git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+            sudo npm install -g pm2 > /dev/null 2>&1 || true
+
+            echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
             cd /home/ubuntu/Proyecto-Acompa-amiento-
             git pull origin main
@@ -193,7 +198,13 @@ jobs:
           
           set -e
           
-          echo "🔄 Pulling latest code..."
+            echo "📦 Installing system dependencies..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+            sudo usermod -aG docker $USER 2>/dev/null || true
+            sudo systemctl start docker 2>/dev/null || true
+
+            echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
             cd /home/ubuntu/Proyecto-Acompa-amiento-
             git pull origin main
@@ -244,11 +255,12 @@ jobs:
           
           set -e
           
-           echo "📦 Installing system dependencies..."
-           sudo apt-get update -qq
-           sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
-           sudo usermod -aG docker $USER 2>/dev/null || true
-         
+          echo "📦 Installing system dependencies..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          sudo usermod -aG docker $USER 2>/dev/null || true
+          sudo systemctl start docker 2>/dev/null || true
+          
           echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
             cd /home/ubuntu/Proyecto-Acompa-amiento-
