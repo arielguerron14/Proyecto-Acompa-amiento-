@@ -1,0 +1,7 @@
+{
+  "name": "shared-monitoring",
+  "version": "1.0.0",
+  "description": "Shared monitoring and logging utilities",
+  "main": "src/index.js",
+  "license": "MIT"
+}

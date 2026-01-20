@@ -1,4 +1,4 @@
-name: 🎨 Frontend - Build & Deploy
+name: 🚀 Deploy EC2-DB Only
 
 on:
   workflow_dispatch:
@@ -7,12 +7,10 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-  build-frontend:
-    name: "🎨 Frontend Build & Deploy"
+  deploy-db:
+    name: "🚀 Deploy EC2-DB (mongo, postgres, redis)"
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    continue-on-error: true
-
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v3
       - uses: aws-actions/configure-aws-credentials@v1
@@ -21,60 +19,60 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
-      
-      - run: |
+      - name: Deploy containers on EC2-DB
+        run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=EC2-Frontend" "Name=instance-state-name,Values=running" \
+            --filters "Name=tag:Name,Values=EC2-DB" "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].InstanceId" \
             --output text)
-          
+
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "❌ EC2-Frontend not found"
+            echo "❌ EC2-DB not found"
             exit 1
           fi
-          
+
           echo "✅ Instance: $INSTANCE_ID"
-          echo ""
-          echo "📋 Building Docker image and deploying..."
-          
+          echo "📋 Deploying mongo, postgres, redis..."
+
           aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
-              "cd /tmp && rm -rf build-frontend 2>/dev/null || true",
-              "git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git --depth 1 build-frontend",
-              "cd build-frontend/frontend-web",
-              "docker build -t frontend-web:latest .",
-              "cd /tmp && docker stop frontend 2>/dev/null || true",
-              "docker rm frontend 2>/dev/null || true",
-              "curl -s https://raw.githubusercontent.com/arielguerron14/Proyecto-Acompa-amiento-/main/docker-compose.ec2-frontend.yml > docker-compose.ec2-frontend.yml",
-              "docker-compose -f docker-compose.ec2-frontend.yml up -d --no-build",
-              "sleep 5 && docker ps | grep frontend"
+              "docker pull mongo:latest",
+              "docker pull postgres:latest",
+              "docker pull redis:latest",
+              "docker stop mongo 2>/dev/null || true",
+              "docker stop postgres 2>/dev/null || true",
+              "docker stop redis 2>/dev/null || true",
+              "docker rm mongo 2>/dev/null || true",
+              "docker rm postgres 2>/dev/null || true",
+              "docker rm redis 2>/dev/null || true",
+              "docker run -d --name mongo --restart unless-stopped -p 27017:27017 mongo:latest",
+              "docker run -d --name postgres --restart unless-stopped -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:latest",
+              "docker run -d --name redis --restart unless-stopped -p 6379:6379 redis:latest",
+              "sleep 5",
+              "docker ps | grep -E 'mongo|postgres|redis'"
             ]' \
             --output text > /tmp/ssm-command.txt
-          
+
           COMMAND_ID=$(cat /tmp/ssm-command.txt | awk '{print $NF}')
-          
+
           echo "Command ID: $COMMAND_ID"
-          echo ""
-          echo "⏳ Waiting (this may take 15 minutes)..."
-          
-          for i in {1..180}; do
+          echo "⏳ Waiting for containers to be up..."
+
+          for i in {1..60}; do
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
               --instance-id "$INSTANCE_ID" \
               --query "Status" \
               --output text 2>/dev/null || echo "Pending")
-            
-            if [ $((i % 15)) -eq 0 ]; then
-              echo "[$i/180] Status: $STATUS"
+
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "[$i/60] Status: $STATUS"
             fi
-            
+
             if [ "$STATUS" = "Success" ]; then
-              echo ""
-              echo "✅ Frontend build & deployment successful!"
-              echo ""
-              echo "📋 Output:"
+              echo "\n✅ DB containers running!"
               aws ssm get-command-invocation \
                 --command-id "$COMMAND_ID" \
                 --instance-id "$INSTANCE_ID" \
@@ -82,8 +80,7 @@ jobs:
                 --output text | tail -30
               break
             elif [ "$STATUS" = "Failed" ]; then
-              echo ""
-              echo "❌ Build failed"
+              echo "\n❌ DB deploy failed"
               aws ssm get-command-invocation \
                 --command-id "$COMMAND_ID" \
                 --instance-id "$INSTANCE_ID" \
@@ -91,6 +88,5 @@ jobs:
                 --output text
               exit 1
             fi
-            
             sleep 5
           done

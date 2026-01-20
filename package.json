@@ -1,17 +1,27 @@
 {
   "name": "proyecto-acompanamiento",
   "version": "1.0.0",
-  "description": "Sistema de Acompañamiento Educativo - Microservicios",
+  "description": "Sistema de Acompañamiento Educativo - Microservicios (Monorepo Turborepo)",
   "main": "index.js",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
+    "build": "turbo run build",
     "build:infrastructure": "node scripts/build-infrastructure.js",
     "validate:infrastructure": "node scripts/validate-infrastructure.js",
     "build:all": "npm run build:infrastructure && docker-compose build",
     "rebuild:services": "npm run build:infrastructure && docker-compose up -d --build",
+    "dev": "turbo run dev --parallel",
     "start": "docker-compose up -d",
     "stop": "docker-compose down",
     "logs": "docker-compose logs -f",
-    "ps": "docker-compose ps"
+    "ps": "docker-compose ps",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "turbo": "turbo"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -19,5 +29,9 @@
     "express": "^5.2.1",
     "mongoose": "^9.0.2",
     "node-fetch": "^3.3.2"
-  }
+  },
+  "devDependencies": {
+    "turbo": "^2.7.5"
+  },
+  "packageManager": "npm@10.9.2"
 }
