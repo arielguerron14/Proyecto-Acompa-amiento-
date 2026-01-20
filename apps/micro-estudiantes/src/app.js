@@ -6,7 +6,37 @@ const { requestLogger, logger } = require('./middlewares/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 const reservasRoutes = require('./routes/reservasRoutes');
 
+// CQRS
+const { CommandBus, QueryBus } = require('./infrastructure/config/cqrs-bus');
+const CreateReservaCommandHandler = require('./application/command-handlers/CreateReservaCommandHandler');
+const CancelReservaCommandHandler = require('./application/command-handlers/CancelReservaCommandHandler');
+const GetReservasByEstudianteQueryHandler = require('./application/query-handlers/GetReservasByEstudianteQueryHandler');
+const GetReservasByMaestroQueryHandler = require('./application/query-handlers/GetReservasByMaestroQueryHandler');
+const CheckAvailabilityQueryHandler = require('./application/query-handlers/CheckAvailabilityQueryHandler');
+const CreateReservaCommand = require('./application/commands/CreateReservaCommand');
+const CancelReservaCommand = require('./application/commands/CancelReservaCommand');
+const GetReservasByEstudianteQuery = require('./application/queries/GetReservasByEstudianteQuery');
+const GetReservasByMaestroQuery = require('./application/queries/GetReservasByMaestroQuery');
+const CheckAvailabilityQuery = require('./application/queries/CheckAvailabilityQuery');
+const ReservaRepository = require('./infrastructure/persistence-write/ReservaRepository');
+
 const app = express();
+
+// Initialize CQRS Buses
+const commandBus = new CommandBus();
+const queryBus = new QueryBus();
+
+// Register handlers
+const reservaRepository = new ReservaRepository();
+commandBus.register(CreateReservaCommand, new CreateReservaCommandHandler(reservaRepository));
+commandBus.register(CancelReservaCommand, new CancelReservaCommandHandler(reservaRepository));
+queryBus.register(GetReservasByEstudianteQuery, new GetReservasByEstudianteQueryHandler(reservaRepository));
+queryBus.register(GetReservasByMaestroQuery, new GetReservasByMaestroQueryHandler(reservaRepository));
+queryBus.register(CheckAvailabilityQuery, new CheckAvailabilityQueryHandler(reservaRepository));
+
+// Make buses available to controllers
+app.locals.commandBus = commandBus;
+app.locals.queryBus = queryBus;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

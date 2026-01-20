@@ -1,14 +1,36 @@
-const reservasService = require('../services/reservasService');
+const CreateReservaCommand = require('../application/commands/CreateReservaCommand');
+const CancelReservaCommand = require('../application/commands/CancelReservaCommand');
+const GetReservasByEstudianteQuery = require('../application/queries/GetReservasByEstudianteQuery');
+const GetReservasByMaestroQuery = require('../application/queries/GetReservasByMaestroQuery');
+const CheckAvailabilityQuery = require('../application/queries/CheckAvailabilityQuery');
+
+let logger;
+try {
+  ({ logger } = require('@proyecto/shared-auth/src/middlewares/logger'));
+} catch (err) {
+  logger = {
+    info: console.log,
+    error: console.error,
+    warn: console.warn
+  };
+}
+
+/**
+ * ReservasController: Maneja reservas
+ * MIGRADO A CQRS: Usa CommandBus y QueryBus en lugar de llamadas directas a servicios
+ */
 
 module.exports = {
-  createReserva: async (req, res) => {
+  /**
+   * POST /reservas o /reservar
+   * Crea una nueva reserva usando CQRS CommandBus
+   */
+  createReserva: async (req, res, next, commandBus) => {
     try {
-      console.log('🔹 BODY RECIBIDO:', JSON.stringify(req.body, null, 2));
-      console.log('🔹 KEYS:', Object.keys(req.body));
+      logger.info('🔹 BODY RECIBIDO:', JSON.stringify(req.body, null, 2));
       
-      // Validar campos requeridos
-      // Accept either (fecha + hora) OR (dia + inicio) to support both frontends
-      const { estudianteId, maestroId, fecha, hora, dia, inicio } = req.body;
+      // Extraer datos del body
+      const { estudianteId, maestroId, fecha, hora, dia, inicio, fin, asunto, descripcion, materia, semestre, paralelo, modalidad, lugarAtencion } = req.body;
 
       if (!estudianteId || !maestroId) {
         return res.status(400).json({ 
@@ -17,99 +39,145 @@ module.exports = {
         });
       }
 
-      const hasDate = !!(fecha && hora);
-      const hasHorario = !!(dia && inicio);
-      if (!hasDate && !hasHorario) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Se requiere fecha+hora o dia+inicio para crear la reserva' 
-        });
-      }
-      
-      const result = await reservasService.create(req.body);
-      res.status(201).json(result);
+      // Crear comando
+      const command = new CreateReservaCommand(
+        estudianteId,
+        maestroId,
+        fecha,
+        hora,
+        dia,
+        inicio,
+        fin,
+        asunto,
+        descripcion,
+        materia,
+        semestre,
+        paralelo,
+        modalidad,
+        lugarAtencion
+      );
+
+      // Ejecutar comando a través del CQRS Bus
+      logger.info(`[reservasController.createReserva] Executing CreateReservaCommand`);
+      const result = await commandBus.execute(command);
+
+      return res.status(201).json(result);
     } catch (err) {
-      console.log('❌ createReserva error:', err.message);
-      res.status(err.status || 500).json({ success: false, message: err.message });
+      logger.error('❌ createReserva error:', err.message);
+      const statusCode = err.status || 500;
+      res.status(statusCode).json({ success: false, message: err.message });
     }
   },
 
-  getReservasByEstudiante: async (req, res) => {
+  /**
+   * GET /reservas/estudiante/:id
+   * Obtiene reservas de un estudiante usando CQRS QueryBus
+   */
+  getReservasByEstudiante: async (req, res, next, queryBus) => {
     try {
-      console.log('🔹 USER DEL TOKEN:', JSON.stringify(req.user, null, 2));
-      console.log('🔹 PARAMS:', req.params);
-      
-      const estudianteId = req.params.id; // From URL parameter
+      const estudianteId = req.params.id;
       
       if (!estudianteId) {
-        console.log('❌ No estudianteId provided');
-        // Keep API simple for clients: always return an array for list endpoints
         return res.status(200).json([]);
       }
 
-      // Validate basic format
-      if (typeof estudianteId !== 'string' || estudianteId.trim() === '') {
-        console.warn('getReservasByEstudiante: invalid estudianteId param');
-        return res.status(400).json({ success: false, message: 'ID de estudiante inválido', data: [] });
-      }
+      // Crear query
+      const query = new GetReservasByEstudianteQuery(estudianteId);
 
-      console.log('🔍 Buscando reservas para estudiante:', estudianteId);
-      const list = await reservasService.getByEstudiante(estudianteId);
-      // Respond with a plain array to match frontend expectations (array or empty array)
-      res.status(200).json(Array.isArray(list) ? list : []);
+      // Ejecutar query a través del CQRS Bus
+      logger.info(`[reservasController.getReservasByEstudiante] Executing GetReservasByEstudianteQuery for ${estudianteId}`);
+      const list = await queryBus.execute(query);
+
+      return res.status(200).json(Array.isArray(list) ? list : []);
     } catch (err) {
-      console.error('❌ getReservasByEstudiante error:', err && err.stack ? err.stack : err);
+      logger.error('❌ getReservasByEstudiante error:', err.message);
       res.status(err.status || 500).json({ success: false, message: err.message || 'Error al obtener reservas' });
     }
   },
 
-  // Check availability for a given maestro+dia+inicio
-  checkAvailability: async (req, res) => {
+  /**
+   * GET /reservas/check
+   * Verifica disponibilidad de horario usando CQRS QueryBus
+   */
+  checkAvailability: async (req, res, next, queryBus) => {
     try {
       const { maestroId, dia, inicio } = req.query;
+      
       if (!maestroId || !dia || !inicio) {
         return res.status(400).json({ available: false, message: 'maestroId, dia y inicio son requeridos' });
       }
 
-      const available = await reservasService.isAvailable(maestroId, dia, inicio);
-      return res.status(200).json({ available });
+      // Crear query
+      const query = new CheckAvailabilityQuery(maestroId, dia, inicio);
+
+      // Ejecutar query a través del CQRS Bus
+      logger.info(`[reservasController.checkAvailability] Executing CheckAvailabilityQuery`);
+      const result = await queryBus.execute(query);
+
+      return res.status(200).json(result);
     } catch (err) {
-      console.error('checkAvailability error:', err && err.stack ? err.stack : err);
+      logger.error('checkAvailability error:', err.message);
       return res.status(err.status || 500).json({ available: false, message: err.message || 'Error verificando disponibilidad' });
     }
   },
 
-  getReservasByMaestro: async (req, res) => {
+  /**
+   * GET /reservas/maestro/:id
+   * Obtiene reservas de un maestro usando CQRS QueryBus
+   */
+  getReservasByMaestro: async (req, res, next, queryBus) => {
     try {
-      const maestroId = req.params.id; // Keep as string
-      const list = await reservasService.getByMaestro(maestroId);
-      // Nunca retornar 304, solo 200 si hay datos o array vacío si error
+      const maestroId = req.params.id;
+
+      // Crear query
+      const query = new GetReservasByMaestroQuery(maestroId);
+
+      // Ejecutar query a través del CQRS Bus
+      logger.info(`[reservasController.getReservasByMaestro] Executing GetReservasByMaestroQuery for ${maestroId}`);
+      const list = await queryBus.execute(query);
+
       if (Array.isArray(list)) {
         res.status(200).json(list);
       } else {
         res.status(200).json([]);
       }
     } catch (err) {
+      logger.error('getReservasByMaestro error:', err.message);
       res.status(500).json({ error: err.message || 'Error interno' });
     }
   },
 
-  cancelReservasByHorario: async (req, res) => {
+  /**
+   * POST /reservas/cancel-by-horario
+   * Cancela reservas por horario (placeholder)
+   */
+  cancelReservasByHorario: async (req, res, next, commandBus) => {
     try {
-      const { maestroId, dia, inicio, fin } = req.body;
-      const count = await reservasService.cancelByHorario(maestroId, dia, inicio, fin);
-      res.json({ message: `${count} reservas canceladas` });
+      // Placeholder: Implement if needed
+      res.status(501).json({ message: 'Not yet implemented via CQRS' });
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   },
 
-  cancelReserva: async (req, res) => {
+  /**
+   * PUT /reservas/:id/cancel
+   * Cancela una reserva usando CQRS CommandBus
+   */
+  cancelReserva: async (req, res, next, commandBus) => {
     try {
       const { id } = req.params;
-      const reserva = await reservasService.cancelById(id);
-      res.json(reserva);
+
+      // Crear comando
+      const command = new CancelReservaCommand(id);
+
+      // Ejecutar comando a través del CQRS Bus
+      logger.info(`[reservasController.cancelReserva] Executing CancelReservaCommand for ${id}`);
+      const result = await commandBus.execute(command);
+
+      return res.status(200).json(result);
     } catch (err) {
+      logger.error('cancelReserva error:', err.message);
       res.status(err.status || 500).json({ message: err.message });
     }
   },
