@@ -21,7 +21,13 @@
     "ps": "docker-compose ps",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "turbo": "turbo"
+    "turbo": "turbo",
+    "cqrs:generate": "node scripts/generate-cqrs.js",
+    "cqrs:regenerate": "node scripts/generate-cqrs.js --force",
+    "cqrs:validate": "node scripts/validate-cqrs.js",
+    "workflow:update-ips": "gh workflow run update-ips.yml -f environment=local",
+    "workflow:auto-fix": "gh workflow run auto-fix-endpoints.yml",
+    "workflow:maintain-cqrs": "gh workflow run maintain-cqrs.yml"
   },
   "dependencies": {
     "cors": "^2.8.5",

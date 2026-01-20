@@ -9,12 +9,18 @@ async function connectDB() {
       useUnifiedTopology: true,
       authSource: 'admin',
       retryWrites: false,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 30000,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
       maxPoolSize: 10,
-      minPoolSize: 5
+      minPoolSize: 2,
+      maxIdleTimeMS: 30000
     });
-    console.log('🟢 MongoDB connected successfully');
+    
+    // Wait a bit for connection pool to be ready
+    console.log('🟢 MongoDB connected, waiting for pool to stabilize...');
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    console.log('🟢 MongoDB ready for queries');
     return mongoose.connection;
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);

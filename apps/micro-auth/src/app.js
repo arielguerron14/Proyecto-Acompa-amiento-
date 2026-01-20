@@ -5,6 +5,16 @@ const { initRedis } = require('./services/redisClient');
 const mongoose = require('mongoose');
 const { MONGO_URI } = require('./config');
 
+// CQRS
+const { CommandBus, QueryBus } = require('./infrastructure/config/cqrs-bus');
+const CreateUserCommandHandler = require('./application/command-handlers/CreateUserCommandHandler');
+const LoginUserCommandHandler = require('./application/command-handlers/LoginUserCommandHandler');
+const GetUserByIdQueryHandler = require('./application/query-handlers/GetUserByIdQueryHandler');
+const CreateUserCommand = require('./application/commands/CreateUserCommand');
+const LoginUserCommand = require('./application/commands/LoginUserCommand');
+const GetUserByIdQuery = require('./application/queries/GetUserByIdQuery');
+const UserRepository = require('./infrastructure/persistence-write/UserRepository');
+
 let requestLogger, logger, errorHandler, notFound;
 try {
   ({ requestLogger, logger } = require('@proyecto/shared-auth/src/middlewares/logger'));
@@ -25,6 +35,20 @@ try {
 }
 
 const app = express();
+
+// Initialize CQRS Buses
+const commandBus = new CommandBus();
+const queryBus = new QueryBus();
+
+// Register handlers
+const userRepository = new UserRepository();
+commandBus.register(CreateUserCommand, new CreateUserCommandHandler(userRepository));
+commandBus.register(LoginUserCommand, new LoginUserCommandHandler(userRepository));
+queryBus.register(GetUserByIdQuery, new GetUserByIdQueryHandler(userRepository));
+
+// Make buses available to controllers
+app.locals.commandBus = commandBus;
+app.locals.queryBus = queryBus;
 
 // Global state for database connection
 let mongoConnected = false;

@@ -8,6 +8,26 @@ module.exports = {
     return jwt.sign(payload, JWT_SECRET, { expiresIn });
   },
 
+  generateAccessToken: (payload) => {
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '15m' });
+  },
+
+  generateAccessTokenWithVersion: (userId, roles, tokenVersion = 0) => {
+    return jwt.sign(
+      {
+        userId,
+        roles: Array.isArray(roles) ? roles : [roles],
+        tokenVersion
+      },
+      JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+  },
+
+  generateRefreshToken: (payload) => {
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  },
+
   verifyToken: (token) => {
     try {
       return jwt.verify(token, JWT_SECRET);

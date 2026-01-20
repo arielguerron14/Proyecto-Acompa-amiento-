@@ -1,16 +1,20 @@
 FROM node:18-alpine
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Build context is repo root, so paths are relative to that
-# Copy microservice files
-COPY apps/micro-estudiantes/package*.json ./
-COPY apps/micro-estudiantes/src ./src
+# Create directory structure that matches monorepo
+RUN mkdir -p /app/apps/micro-estudiantes /app/packages/shared-auth /app/packages/shared-config /app/packages/shared-monitoring
 
-# Copy shared modules to parent directory level
-# So npm can find them via file:// references in package.json
-COPY packages/shared-auth ../shared-auth
-COPY packages/shared-monitoring ../shared-monitoring
+# Copy packages
+COPY packages/shared-auth/ /app/packages/shared-auth/
+COPY packages/shared-config/ /app/packages/shared-config/
+COPY packages/shared-monitoring/ /app/packages/shared-monitoring/
+
+# Copy this service
+COPY apps/micro-estudiantes/ /app/apps/micro-estudiantes/
+
+# Set working directory to the service
+WORKDIR /app/apps/micro-estudiantes
 
 # Install dependencies
 RUN npm install --production

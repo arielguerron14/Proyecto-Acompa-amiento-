@@ -19,20 +19,39 @@ try {
 }
 
 const getMongoUri = () => {
-  if (process.env.MONGO_URI) return process.env.MONGO_URI;
-  if (process.env.MONGODB_URI) return process.env.MONGODB_URI;
+  console.log('🔍 DEBUG getMongoUri():');
+  console.log('  - MONGO_URI env:', process.env.MONGO_URI ? '✓ SET' : '✗ NOT SET');
+  console.log('  - MONGODB_URI env:', process.env.MONGODB_URI ? '✓ SET' : '✗ NOT SET');
+  
+  if (process.env.MONGO_URI) {
+    console.log('  → Using MONGO_URI:', process.env.MONGO_URI);
+    return process.env.MONGO_URI;
+  }
+  if (process.env.MONGODB_URI) {
+    console.log('  → Using MONGODB_URI:', process.env.MONGODB_URI);
+    return process.env.MONGODB_URI;
+  }
   
   try {
-    return sharedConfig.getMongoUrl();
+    const url = sharedConfig.getMongoUrl();
+    console.log('  → Using sharedConfig.getMongoUrl():', url);
+    return url;
   } catch (err) {
     console.warn('⚠️  sharedConfig no disponible:', err.message);
   }
   
-  if (infraConfig && infraConfig.PRIVATE.MONGO_URL) return infraConfig.PRIVATE.MONGO_URL();
+  if (infraConfig && infraConfig.PRIVATE.MONGO_URL) {
+    const url = infraConfig.PRIVATE.MONGO_URL();
+    console.log('  → Using infraConfig MONGO_URL:', url);
+    return url;
+  }
+  
   const host = process.env.DB_HOST || 'mongo';
   const port = process.env.DB_PORT || 27017;
   const db = process.env.DB_NAME || 'estudiantesdb';
-  return `mongodb://${host}:${port}/${db}`;
+  const fallbackUrl = `mongodb://${host}:${port}/${db}`;
+  console.log('  → Using fallback:', fallbackUrl);
+  return fallbackUrl;
 };
 
 module.exports = {

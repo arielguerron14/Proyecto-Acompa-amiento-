@@ -7,6 +7,9 @@ try {
 
 const SessionService = require('../services/sessionService');
 const User = require('../models/User');
+const CreateUserCommand = require('../application/commands/CreateUserCommand');
+const LoginUserCommand = require('../application/commands/LoginUserCommand');
+const GetUserByIdQuery = require('../application/queries/GetUserByIdQuery');
 
 let logger;
 try {
@@ -17,13 +20,14 @@ try {
 
 /**
  * UserController: Maneja login, register, logout
+ * MIGRADO A CQRS: Usa CommandBus y QueryBus en lugar de llamadas directas a servicios
  */
 
 /**
  * POST /auth/register
- * Registra un nuevo usuario
+ * Registra un nuevo usuario usando CQRS CommandBus
  */
-exports.register = async (req, res) => {
+exports.register = async (req, res, next, commandBus) => {
   try {
     const { email, password, name, role } = req.body;
 
@@ -35,49 +39,23 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Verificar si el usuario ya existe
-    logger.info(`[userController.register] Checking if user exists: ${email}`);
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        error: 'El email ya está registrado'
-      });
-    }
+    // Crear comando
+    const command = new CreateUserCommand(email, password, name, role || 'estudiante');
 
-    // Crear nuevo usuario
-    const user = new User({
-      email: email.toLowerCase(),
-      password,
-      name,
-      role: role || 'estudiante'
-    });
-
-    logger.info(`[userController.register] Attempting to save user: ${email}`);
-    await user.save();
-    logger.info(`[userController.register] User saved successfully: ${user._id}`);
+    // Ejecutar comando a través del CQRS Bus
+    logger.info(`[userController.register] Executing CreateUserCommand for ${email}`);
+    const result = await commandBus.execute(command);
 
     // Inicializar sesión con tokenVersion = 0
-    await SessionService.setTokenVersion(user._id.toString(), 0);
+    await SessionService.setTokenVersion(result.user.userId, 0);
 
-    // NO generar token aquí, solo confirmar registro
-    return res.status(201).json({
-      success: true,
-      message: 'Usuario creado exitosamente',
-      user: {
-        userId: user._id.toString(),
-        email: user.email,
-        name: user.name,
-        role: user.role
-      }
-    });
+    return res.status(201).json(result);
   } catch (error) {
     logger.error(`[userController.register] Error: ${error.message}`);
-    logger.error(`[userController.register] Stack: ${error.stack}`);
-    logger.error(`[userController.register] Error code: ${error.code}`);
-    return res.status(500).json({
+    const statusCode = error.status || 500;
+    return res.status(statusCode).json({
       success: false,
-      error: 'Error al registrar usuario',
+      error: error.message || 'Error al registrar usuario',
       debug: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -85,9 +63,9 @@ exports.register = async (req, res) => {
 
 /**
  * POST /auth/login
- * Autentica usuario y genera JWT
+ * Autentica usuario usando CQRS CommandBus
  */
-exports.login = async (req, res) => {
+exports.login = async (req, res, next, commandBus) => {
   try {
     const { email, password } = req.body;
 
@@ -98,63 +76,20 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Buscar usuario en la base de datos
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Credenciales inválidas'
-      });
-    }
+    // Crear comando
+    const command = new LoginUserCommand(email, password);
 
-    // Verificar si el usuario está activo
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        error: 'Cuenta desactivada'
-      });
-    }
+    // Ejecutar comando a través del CQRS Bus
+    logger.info(`[userController.login] Executing LoginUserCommand for ${email}`);
+    const result = await commandBus.execute(command);
 
-    // Verificar contraseña
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        error: 'Credenciales inválidas'
-      });
-    }
-
-    // Obtener o inicializar tokenVersion en Redis
-    const userId = user._id.toString();
-    let tokenVersion = await SessionService.getTokenVersion(userId);
-    if (tokenVersion === null) {
-      tokenVersion = 0;
-      await SessionService.setTokenVersion(userId, tokenVersion);
-    }
-
-    // Generar JWT con tokenVersion incluido
-    const token = AuthService.generateAccessTokenWithVersion(userId, [user.role], tokenVersion);
-
-    // Generar refresh token
-    const refreshToken = AuthService.generateRefreshToken({ userId, role: user.role, email: user.email });
-
-    return res.status(200).json({
-      success: true,
-      message: 'Login exitoso',
-      token,
-      refreshToken,
-      user: {
-        userId,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      }
-    });
+    return res.status(200).json(result);
   } catch (error) {
-    logger.error(`[userController.login] ${error.message}`);
-    return res.status(500).json({
+    logger.error(`[userController.login] Error: ${error.message}`);
+    const statusCode = error.status || 500;
+    return res.status(statusCode).json({
       success: false,
-      error: 'Error al autenticar usuario'
+      error: error.message || 'Error al autenticar usuario'
     });
   }
 };
@@ -200,9 +135,9 @@ exports.logout = async (req, res) => {
 
 /**
  * GET /auth/me
- * Retorna los datos del usuario actual
+ * Retorna los datos del usuario actual usando CQRS QueryBus
  */
-exports.me = async (req, res) => {
+exports.me = async (req, res, next, queryBus) => {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -211,31 +146,21 @@ exports.me = async (req, res) => {
       });
     }
 
-    // Obtener datos completos del usuario desde BD
-    const user = await User.findById(req.user.userId).select('-password');
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Usuario no encontrado'
-      });
-    }
+    // Crear query
+    const query = new GetUserByIdQuery(req.user.userId);
 
-    return res.status(200).json({
-      success: true,
-      user: {
-        userId: user._id.toString(),
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        isActive: user.isActive,
-        createdAt: user.createdAt
-      }
-    });
+    // Ejecutar query a través del CQRS Bus
+    logger.info(`[userController.me] Executing GetUserByIdQuery for ${req.user.userId}`);
+    const result = await queryBus.execute(query);
+
+    return res.status(200).json(result);
   } catch (error) {
-    logger.error(`[userController.me] ${error.message}`);
-    return res.status(500).json({
+    logger.error(`[userController.me] Error: ${error.message}`);
+    const statusCode = error.status || 500;
+    return res.status(statusCode).json({
       success: false,
-      error: 'Error al obtener datos del usuario'
+      error: error.message || 'Error al obtener datos del usuario'
     });
   }
 };
+

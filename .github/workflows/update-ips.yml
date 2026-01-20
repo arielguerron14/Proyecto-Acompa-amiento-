@@ -99,6 +99,53 @@ jobs:
           PYTHON_EOF
           fi
 
+      - name: Update API Routes Configuration
+        run: |
+          python3 << 'PYTHON_EOF'
+          import json
+          
+          # Routes configuration for all environments
+          routes_config = {
+              "routes": {
+                  "auth": {
+                      "register": "/auth/register",
+                      "login": "/auth/login",
+                      "verify": "/auth/verify-token",
+                      "me": "/auth/me"
+                  },
+                  "estudiantes": {
+                      "create": "/estudiantes/create",
+                      "get": "/estudiantes/:id",
+                      "list": "/estudiantes",
+                      "update": "/estudiantes/:id",
+                      "delete": "/estudiantes/:id",
+                      "reservas": {
+                          "create": "/estudiantes/reservas/create",
+                          "list": "/estudiantes/reservas",
+                          "get": "/estudiantes/reservas/:id",
+                          "confirm": "/estudiantes/reservas/:id/confirmar"
+                      }
+                  },
+                  "maestros": {
+                      "create": "/maestros/create",
+                      "get": "/maestros/:id",
+                      "list": "/maestros",
+                      "update": "/maestros/:id",
+                      "delete": "/maestros/:id",
+                      "horarios": "/maestros/horarios"
+                  },
+                  "reportes": {
+                      "estudiantes": "/reportes/estudiantes/:id",
+                      "maestros": "/reportes/maestros/:id"
+                  }
+              }
+          }
+          
+          with open('config/api_routes.json', 'w') as f:
+              json.dump(routes_config, f, indent=4)
+          print("✅ API Routes configuration updated")
+          PYTHON_EOF
+
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
@@ -107,8 +154,8 @@ jobs:
           if [ -z "$(git status --porcelain)" ]; then
             echo "✅ No changes to commit"
           else
-            git add config/instance_ips.json
-            git commit -m "chore: Update IPs for ${{ inputs.environment }} environment [automated]"
+            git add config/instance_ips.json config/api_routes.json
+            git commit -m "chore: Update configuration for ${{ inputs.environment }} environment [automated]"
             git push origin main
-            echo "✅ Changes pushed to main"
+            echo "✅ Configuration changes pushed to main"
           fi

@@ -18,6 +18,9 @@ services:
 
   # API Gateway - Main entry point (ONLY exposed port)
   api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
     image: api-gateway:latest
     container_name: api-gateway
     restart: unless-stopped
@@ -39,6 +42,9 @@ services:
 
   # Authentication Microservice (NO external port)
   micro-auth:
+    build:
+      context: .
+      dockerfile: apps/micro-auth/Dockerfile
     image: micro-auth:latest
     container_name: micro-auth
     restart: unless-stopped
@@ -55,6 +61,9 @@ services:
 
   # Students Microservice (NO external port)
   micro-estudiantes:
+    build:
+      context: .
+      dockerfile: apps/micro-estudiantes/Dockerfile
     image: micro-estudiantes:latest
     container_name: micro-estudiantes
     restart: unless-stopped
@@ -71,6 +80,9 @@ services:
 
   # Teachers/Schedule Microservice (NO external port)
   micro-maestros:
+    build:
+      context: .
+      dockerfile: apps/micro-maestros/Dockerfile
     image: micro-maestros:latest
     container_name: micro-maestros
     restart: unless-stopped
@@ -87,6 +99,9 @@ services:
 
   # Student Reports Microservice (NO external port)
   micro-reportes-estudiantes:
+    build:
+      context: .
+      dockerfile: apps/micro-reportes-estudiantes/Dockerfile
     image: micro-reportes-estudiantes:latest
     container_name: micro-reportes-estudiantes
     restart: unless-stopped
@@ -103,6 +118,9 @@ services:
 
   # Teacher Reports Microservice (NO external port)
   micro-reportes-maestros:
+    build:
+      context: .
+      dockerfile: apps/micro-reportes-maestros/Dockerfile
     image: micro-reportes-maestros:latest
     container_name: micro-reportes-maestros
     restart: unless-stopped

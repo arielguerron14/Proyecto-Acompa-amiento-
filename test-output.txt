@@ -1,0 +1,38 @@
+
+🚀 Starting automated tests for all flows
+📍 API Gateway: http://localhost:8080
+⏱️  Timeout: 5000ms per request
+
+📋 Test 1: Health Check
+  Raw response: status=500, type=object, body={"error":"Internal server error","message":"Unexpected token n in JSON at position 0"}
+  ❌ Status 500
+     Message: Unexpected token n in JSON at position 0
+
+📋 Test 2: Register User
+  Endpoint: POST /auth/register
+  ✅ 201 OK
+
+📋 Test 3: Login User
+  Endpoint: POST /auth/login
+  ❌ Status 500
+     Error: "Error al autenticar usuario"
+
+📋 Test 4: Create Reservation
+  Endpoint: POST /estudiantes/reservas/create
+  ❌ Status 404
+
+📋 Test 5: Confirm Reservation
+  ⚠️  Skipped (no reservation ID from test 4)
+
+============================================================
+📊 TEST SUMMARY
+============================================================
+1. ❌ Health Check (GET /health)
+   Status: 500
+
+📈 Results:
+   ✅ Passed: 1/5
+   ❌ Failed: 3/5
+   ⚠️  Skipped: 1/5
+
+⚠️  3 test(s) failed. Check the output above.

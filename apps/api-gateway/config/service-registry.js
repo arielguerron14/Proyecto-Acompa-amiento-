@@ -10,7 +10,15 @@
 // In Docker: leave empty or use container names
 // In production: use IP or DNS name
 const getCoreHost = () => {
-  return process.env.CORE_HOST || '';
+  const host = process.env.CORE_HOST || '';
+  // Remove protocol if present (it will be added when constructing URLs)
+  if (host.startsWith('http://')) {
+    return host.replace('http://', '');
+  }
+  if (host.startsWith('https://')) {
+    return host.replace('https://', '');
+  }
+  return host;
 };
 
 // Determine if we're in Docker or not
@@ -32,7 +40,7 @@ const SERVICE_REGISTRY = {
     
     // Usar CORE_HOST si está disponible (producción en AWS)
     // Fallback a nombres de contenedor (desarrollo local)
-    const baseUrls = coreHost ? {
+    const baseUrls = coreHost && coreHost !== 'localhost' ? {
       auth: `http://${coreHost}:3000`,
       estudiantes: `http://${coreHost}:3001`,
       maestros: `http://${coreHost}:3002`,
@@ -114,31 +122,44 @@ const SERVICE_REGISTRY = {
   },
   
   // Gateway routes mapping - Qué servicio maneja cada ruta
-  // NOTA: Estas rutas son evaluadas DESPUÉS de que Express elimina el prefijo
-  // Ej: POST /auth/register llega a la middleware como /register
-  routes: {
-    // Auth routes (handled by /auth middleware)
-    '/register': 'auth',
-    '/login': 'auth',
-    '/verify': 'auth',
-    '/health': 'auth',
-    '/auth/*': 'auth',
-    '/': 'auth',
-    '/*': 'auth',
-    
-    // Students routes
-    '/estudiantes': 'estudiantes',
-    '/estudiantes/*': 'estudiantes',
-    '/horarios': 'maestros',
-    '/horarios/*': 'maestros',
+  // ⚠️ IMPORTANT: Order matters! More specific routes must come BEFORE general wildcards
+  // Using array to guarantee evaluation order (most specific first)
+  routesArray: [
+    // Students routes (MUST come before /* wildcard)
+    ['/estudiantes', 'estudiantes'],
+    ['/estudiantes/*', 'estudiantes'],
+    ['/reservas', 'estudiantes'],
+    ['/reservas/*', 'estudiantes'],
     
     // Teachers routes
-    '/maestros': 'maestros',
-    '/maestros/*': 'maestros',
+    ['/maestros', 'maestros'],
+    ['/maestros/*', 'maestros'],
+    ['/horarios', 'maestros'],
+    ['/horarios/*', 'maestros'],
     
     // Reports routes
-    '/reportes': 'reportesEstudiantes',
-    '/reportes/*': 'reportesEstudiantes'
+    ['/reportes', 'reportesEstudiantes'],
+    ['/reportes/*', 'reportesEstudiantes'],
+    
+    // Auth routes (including fallback for /auth/*)
+    ['/auth/*', 'auth'],
+    ['/login', 'auth'],
+    ['/register', 'auth'],
+    ['/verify', 'auth'],
+    ['/health', 'auth'],
+    
+    // Last resort fallback
+    ['/', 'auth'],
+    ['/*', 'auth']
+  ],
+  
+  // Deprecated - kept for backwards compatibility
+  get routes() {
+    const obj = {};
+    this.routesArray.forEach(([pattern, service]) => {
+      obj[pattern] = service;
+    });
+    return obj;
   },
   
   // Get service by name
@@ -148,7 +169,8 @@ const SERVICE_REGISTRY = {
   
   // Get service for route
   getServiceByRoute(route) {
-    for (const [pattern, serviceName] of Object.entries(this.routes)) {
+    // Use the ordered array to evaluate routes from most specific to least specific
+    for (const [pattern, serviceName] of this.routesArray) {
       const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
       if (regex.test(route)) {
         return this.getService(serviceName);

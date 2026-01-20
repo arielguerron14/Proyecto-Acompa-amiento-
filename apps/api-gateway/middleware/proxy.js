@@ -71,6 +71,7 @@ const proxyMiddleware = async (req, res, next) => {
 
     // Incluir body si existe (para POST, PUT, PATCH)
     if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
+      console.log(`[PROXY_BODY] Sending body: ${JSON.stringify(req.body)}`);
       axiosConfig.data = req.body;
     }
 
@@ -81,6 +82,9 @@ const proxyMiddleware = async (req, res, next) => {
 
     // Hacer la solicitud al microservicio
     const response = await axios(axiosConfig);
+
+    // Log response for debugging
+    console.log(`[PROXY_RESPONSE] Status: ${response.status}, Data length: ${JSON.stringify(response.data).length}, Type: ${typeof response.data}`);
 
     // Retornar la respuesta
     res.status(response.status);

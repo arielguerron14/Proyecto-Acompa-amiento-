@@ -1,0 +1,35 @@
+{
+  "routes": {
+    "auth": {
+      "register": "/auth/register",
+      "login": "/auth/login",
+      "verify": "/auth/verify-token",
+      "me": "/auth/me"
+    },
+    "estudiantes": {
+      "create": "/estudiantes/create",
+      "get": "/estudiantes/:id",
+      "list": "/estudiantes",
+      "update": "/estudiantes/:id",
+      "delete": "/estudiantes/:id",
+      "reservas": {
+        "create": "/estudiantes/reservas/create",
+        "list": "/estudiantes/reservas",
+        "get": "/estudiantes/reservas/:id",
+        "confirm": "/estudiantes/reservas/:id/confirmar"
+      }
+    },
+    "maestros": {
+      "create": "/maestros/create",
+      "get": "/maestros/:id",
+      "list": "/maestros",
+      "update": "/maestros/:id",
+      "delete": "/maestros/:id",
+      "horarios": "/maestros/horarios"
+    },
+    "reportes": {
+      "estudiantes": "/reportes/estudiantes/:id",
+      "maestros": "/reportes/maestros/:id"
+    }
+  }
+}
