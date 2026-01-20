@@ -1,53 +1,105 @@
 # Proyecto Acompañamiento - Sistema de Gestión Educativa
 
-Sistema moderno de microservicios para la gestión de estudiantes, maestros, horarios y reportes de acompañamiento educativo. Implementado con Node.js, Express, MongoDB y principios SOLID.
+Sistema moderno de **microservicios con Turborepo Monorepo** para la gestión de estudiantes, maestros, horarios y reportes de acompañamiento educativo. Implementado con Node.js, Express, MongoDB y principios SOLID.
 
-**🔗 [📚 Ver índice completo de documentación](./INDEX.md)**
+**📚 [Ver documentación de Turborepo](./TURBOREPO_MIGRATION.md)**
 
-## 🚀 Inicio Rápido
+## 🚀 Inicio Rápido (Docker)
 
-### Requisitos
-- Node.js 18+
-- npm 9+
+### Requisitos Mínimos
 - Docker & Docker Compose
+- (Opcional) Node.js 18+ para desarrollo local
 
-### Instalación Local
+### Instalación y Ejecución
 ```bash
-# 1. Clonar y navegar
+# 1. Clonar el proyecto
 git clone <repo-url>
 cd Proyecto-Acompa-amiento-
 
-# 2. Instalar dependencias
-npm install
-
-# 3. Configurar variables de entorno
-cp .env.example .env
-
-# 4. Iniciar servicios
+# 2. Levantar todos los servicios con Docker
 docker-compose up -d
+
+# 3. Verificar servicios
+docker-compose ps
+
+# Para parar
+docker-compose down
 ```
 
-### Acceso a la Aplicación
-- **Frontend**: http://localhost:5500
-- **API Gateway**: http://localhost:8080
-- **Auth Service**: http://localhost:5005
+### Acceso a Servicios
+- **API Gateway** (Punto de entrada): http://localhost:8080
+- **MongoDB**: mongodb://localhost:27017
+- **Documentación**: [Ver QUICK_START.md](./QUICK_START.md)
 
-## 📋 Servicios
+## 🎯 Estructura de Proyecto - Turborepo Monorepo
 
-| Servicio | Puerto | Descripción |
-|----------|--------|-------------|
-| **API Gateway** | 8080 | Punto de entrada único |
-| **micro-auth** | 5005 | Autenticación y RBAC |
-| **micro-estudiantes** | 5002 | Gestión de estudiantes |
-| **micro-maestros** | 5001 | Gestión de maestros |
-| **micro-notificaciones** | 5006 | Notificaciones |
-| **micro-reportes-estudiantes** | 5003 | Reportes de estudiantes |
-| **micro-reportes-maestros** | 5004 | Reportes de maestros |
-| **micro-analytics** | 5007 | Analytics |
-| **micro-soap-bridge** | 5008 | Integración SOAP |
-| **Frontend Web** | 5500 | Interfaz web |
+```
+Proyecto-Acompañamiento/
+├── apps/
+│   ├── api-gateway/           # Puerta de entrada única (puerto 8080)
+│   ├── frontend-web/          # Interfaz web
+│   ├── micro-auth/            # Autenticación (puerto 3000)
+│   ├── micro-estudiantes/     # Gestión de estudiantes (puerto 3001)
+│   ├── micro-maestros/        # Gestión de maestros (puerto 3002)
+│   ├── micro-notificaciones/  # Notificaciones
+│   ├── micro-reportes-estudiantes/
+│   ├── micro-reportes-maestros/
+│   ├── micro-analytics/       # Analytics
+│   └── micro-soap-bridge/     # Integración SOAP
+│
+├── packages/
+│   ├── shared-auth/           # Middleware y utilitarios de autenticación
+│   ├── shared-config/         # Configuración centralizada
+│   └── shared-monitoring/     # Logging y métricas
+│
+├── turbo.json                 # Configuración de Turborepo
+├── package.json               # Root con npm workspaces
+└── docker-compose.yml         # Orquestación de contenedores
+```
 
-## 🏗️ Arquitectura
+## 📦 Comandos Disponibles
+
+### Desarrollo Local
+```bash
+# Instalar dependencias (desde raíz)
+npm install
+
+# Iniciar todos los servicios en paralelo
+npm run dev
+
+# Build de todos los workspaces
+npm run build
+
+# Lint en todos los workspaces
+npm run lint
+
+# Tests en todos los workspaces
+npm run test
+```
+
+### Docker
+```bash
+# Levantar todos los servicios
+docker-compose up -d
+
+# Ver logs
+docker-compose logs -f
+
+# Parar servicios
+docker-compose down
+
+# Parar y eliminar volúmenes
+docker-compose down -v
+```
+
+### Turborepo Específico
+```bash
+# Ejecutar build solo en dependencias de api-gateway
+npm run turbo run build -- --scope api-gateway --include-dependencies
+
+# Ver dependencias del monorepo
+npm run turbo run build -- --graph
+```
 
 Arquitectura de microservicios con:
 - ✅ API Gateway centralizado
