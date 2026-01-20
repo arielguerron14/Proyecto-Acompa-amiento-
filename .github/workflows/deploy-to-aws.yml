@@ -104,7 +104,12 @@ jobs:
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
-          
+
+          # Remove old Node.js to avoid dpkg overwrite conflicts
+          sudo apt-get purge -y nodejs libnode-dev npm 2>/dev/null || true
+          sudo rm -rf /usr/lib/node_modules /usr/include/node /usr/share/doc/nodejs /usr/share/doc/libnode* 2>/dev/null || true
+          sudo apt-get autoremove -y 2>/dev/null || true
+
           # Install Node.js 18.x
           curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
           sudo apt-get install -y -qq nodejs git curl
@@ -159,7 +164,12 @@ jobs:
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
-          
+
+          # Remove old Node.js to avoid dpkg overwrite conflicts
+          sudo apt-get purge -y nodejs libnode-dev npm 2>/dev/null || true
+          sudo rm -rf /usr/lib/node_modules /usr/include/node /usr/share/doc/nodejs /usr/share/doc/libnode* 2>/dev/null || true
+          sudo apt-get autoremove -y 2>/dev/null || true
+
           # Install Node.js 18.x
           curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
           sudo apt-get install -y -qq nodejs git curl
@@ -217,7 +227,12 @@ jobs:
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
-          
+
+          # Remove old Node.js to avoid dpkg overwrite conflicts
+          sudo apt-get purge -y nodejs libnode-dev npm 2>/dev/null || true
+          sudo rm -rf /usr/lib/node_modules /usr/include/node /usr/share/doc/nodejs /usr/share/doc/libnode* 2>/dev/null || true
+          sudo apt-get autoremove -y 2>/dev/null || true
+
           # Install Node.js 18.x (required by microservices)
           curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
           sudo apt-get install -y -qq nodejs git docker.io docker-compose
