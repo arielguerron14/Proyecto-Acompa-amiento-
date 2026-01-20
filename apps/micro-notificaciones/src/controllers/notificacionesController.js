@@ -1,41 +1,42 @@
-const NotificacionesService = require('../services/notificacionesService');
+const SendEmailCommand = require('../application/commands/SendEmailCommand');
+const SendSMSCommand = require('../application/commands/SendSMSCommand');
+const SendPushCommand = require('../application/commands/SendPushCommand');
+const GetTemplatesQuery = require('../application/queries/GetTemplatesQuery');
 
 /**
  * Envía una notificación por email
  */
-exports.sendEmail = async (req, res) => {
+exports.sendEmail = async (req, res, commandBus) => {
   try {
     const { to, subject, body, templateId, data } = req.body;
 
     if (!to || (!body && !templateId)) {
       return res.status(400).json({
-        error: 'to, subject, and (body or templateId) are required',
+        error: 'to and (body or templateId) are required',
       });
     }
 
-    const result = await NotificacionesService.sendEmail({
-      to,
-      subject,
-      body,
-      templateId,
-      data,
-    });
+    const command = new SendEmailCommand(to, subject, body, templateId, data);
+    const result = await commandBus.execute(command);
 
-    res.status(200).json({
+    res.status(result.status || 200).json({
       success: true,
-      message: 'Email sent successfully',
-      result,
+      message: result.message,
+      data: result.result,
     });
   } catch (error) {
     console.error('[notificacionesController.sendEmail]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
   }
 };
 
 /**
  * Envía una notificación por SMS
  */
-exports.sendSMS = async (req, res) => {
+exports.sendSMS = async (req, res, commandBus) => {
   try {
     const { phoneNumber, message } = req.body;
 
@@ -45,26 +46,27 @@ exports.sendSMS = async (req, res) => {
       });
     }
 
-    const result = await NotificacionesService.sendSMS({
-      phoneNumber,
-      message,
-    });
+    const command = new SendSMSCommand(phoneNumber, message);
+    const result = await commandBus.execute(command);
 
-    res.status(200).json({
+    res.status(result.status || 200).json({
       success: true,
-      message: 'SMS sent successfully',
-      result,
+      message: result.message,
+      data: result.result,
     });
   } catch (error) {
     console.error('[notificacionesController.sendSMS]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
   }
 };
 
 /**
  * Envía una notificación push
  */
-exports.sendPush = async (req, res) => {
+exports.sendPush = async (req, res, commandBus) => {
   try {
     const { userId, title, body, data } = req.body;
 
@@ -74,56 +76,39 @@ exports.sendPush = async (req, res) => {
       });
     }
 
-    const result = await NotificacionesService.sendPush({
-      userId,
-      title,
-      body,
-      data,
-    });
+    const command = new SendPushCommand(userId, title, body, data);
+    const result = await commandBus.execute(command);
 
-    res.status(200).json({
+    res.status(result.status || 200).json({
       success: true,
-      message: 'Push notification sent successfully',
-      result,
+      message: result.message,
+      data: result.result,
     });
   } catch (error) {
     console.error('[notificacionesController.sendPush]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
   }
 };
 
 /**
  * Retorna los templates disponibles
  */
-exports.getTemplates = (req, res) => {
-  const templates = [
-    {
-      id: 'WELCOME',
-      name: 'Bienvenida',
-      subject: 'Bienvenido a {{appName}}',
-      description: 'Email de bienvenida para nuevos usuarios',
-    },
-    {
-      id: 'PASSWORD_RESET',
-      name: 'Reseteo de Contraseña',
-      subject: 'Resetea tu contraseña',
-      description: 'Email para resetear contraseña',
-    },
-    {
-      id: 'BOOKING_CONFIRMATION',
-      name: 'Confirmación de Reserva',
-      subject: 'Tu reserva ha sido confirmada',
-      description: 'Email de confirmación de reserva',
-    },
-    {
-      id: 'REMINDER',
-      name: 'Recordatorio',
-      subject: 'Recordatorio: {{eventName}} en {{eventTime}}',
-      description: 'Recordatorio de evento próximo',
-    },
-  ];
+exports.getTemplates = async (req, res, queryBus) => {
+  try {
+    const query = new GetTemplatesQuery();
+    const result = await queryBus.execute(query);
 
-  res.status(200).json({
-    templates,
-  });
+    res.status(result.status || 200).json({
+      templates: result.data || [],
+    });
+  } catch (error) {
+    console.error('[notificacionesController.getTemplates]', error);
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
+  }
 };
