@@ -4,13 +4,13 @@ WORKDIR /usr/src/app
 
 # Build context is repo root, so paths are relative to that
 # Copy microservice files
-COPY micro-maestros/package*.json ./
-COPY micro-maestros/src ./src
+COPY apps/micro-maestros/package*.json ./
+COPY apps/micro-maestros/src ./src
 
 # Copy shared modules to parent directory level
-# So npm can find them via file:// references
-COPY shared-auth ../shared-auth
-COPY shared-monitoring ../shared-monitoring
+# So npm can find them via file:// references in package.json
+COPY packages/shared-auth ../shared-auth
+COPY packages/shared-monitoring ../shared-monitoring
 
 
 # Install dependencies

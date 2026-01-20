@@ -117,29 +117,29 @@ services:
       PORT: 5004
       MONGODB_URI: mongodb://root:example@mongo:27017/reportes-maestros?authSource=admin
 
-  # Core Service (aggregator/orchestrator)
-  core:
-    image: core:latest
-    container_name: core
-    restart: unless-stopped
-    expose:
-      - "5000"
-    depends_on:
-      - mongo
-      - micro-auth
-      - micro-estudiantes
-      - micro-maestros
-    networks:
-      - core-net
-    environment:
-      NODE_ENV: production
-      PORT: 5000
-      MONGODB_URI: mongodb://root:example@mongo:27017/core?authSource=admin
-      AUTH_SERVICE_URL: http://micro-auth:3000
-      ESTUDIANTES_SERVICE_URL: http://micro-estudiantes:3001
-      MAESTROS_SERVICE_URL: http://micro-maestros:3002
-      REPORTES_ESTUDIANTES_URL: http://micro-reportes-estudiantes:5003
-      REPORTES_MAESTROS_URL: http://micro-reportes-maestros:5004
+  # Core Service (aggregator/orchestrator) - COMMENTED: No Dockerfile
+  # core:
+  #   image: core:latest
+  #   container_name: core
+  #   restart: unless-stopped
+  #   expose:
+  #     - "5000"
+  #   depends_on:
+  #     - mongo
+  #     - micro-auth
+  #     - micro-estudiantes
+  #     - micro-maestros
+  #   networks:
+  #     - core-net
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 5000
+  #     MONGODB_URI: mongodb://root:example@mongo:27017/core?authSource=admin
+  #     AUTH_SERVICE_URL: http://micro-auth:3000
+  #     ESTUDIANTES_SERVICE_URL: http://micro-estudiantes:3001
+  #     MAESTROS_SERVICE_URL: http://micro-maestros:3002
+  #     REPORTES_ESTUDIANTES_URL: http://micro-reportes-estudiantes:5003
+  #     REPORTES_MAESTROS_URL: http://micro-reportes-maestros:5004
 
 networks:
   core-net:

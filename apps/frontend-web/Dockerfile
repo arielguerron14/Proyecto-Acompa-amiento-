@@ -4,13 +4,13 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY apps/frontend-web/package*.json ./
 
 # Install dependencies
 RUN npm install --production
 
 # Copy application files
-COPY . .
+COPY apps/frontend-web .
 
 # Build Vite/React application if needed
 RUN npm run build 2>/dev/null || true

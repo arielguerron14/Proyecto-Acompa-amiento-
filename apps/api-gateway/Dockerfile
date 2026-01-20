@@ -8,7 +8,9 @@ RUN apt-get update \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Copy application code
-COPY . .
+COPY apps/api-gateway .
+COPY packages/shared-auth ../shared-auth
+COPY packages/shared-monitoring ../shared-monitoring
 RUN npm ci --only=production --silent || npm install --production --silent
 
 # Verify required files and dependencies

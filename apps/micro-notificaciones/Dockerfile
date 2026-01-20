@@ -3,7 +3,10 @@ FROM node:18-alpine
 WORKDIR /usr/src/app
 
 # Copy application code
-COPY . .
+COPY apps/micro-notificaciones .
+
+# Copy shared modules
+COPY packages/shared-monitoring ../shared-monitoring
 
 # copy package manifests and install (production)
 RUN npm ci --only=production --silent || npm install --production --silent

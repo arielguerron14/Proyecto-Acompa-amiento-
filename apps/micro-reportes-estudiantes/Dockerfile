@@ -3,8 +3,8 @@ FROM node:18-alpine
 WORKDIR /usr/src/app
 
 # Copy shared modules and this service
-COPY shared-monitoring ../shared-monitoring/
-COPY micro-reportes-estudiantes .
+COPY packages/shared-monitoring ../shared-monitoring/
+COPY apps/micro-reportes-estudiantes .
 
 # Install dependencies
 RUN npm ci --only=production --silent || npm install --production --silent
