@@ -1,88 +1,201 @@
-const horariosService = require('../services/horariosService');
+const CreateHorarioCommand = require('../application/commands/CreateHorarioCommand');
+const UpdateHorarioCommand = require('../application/commands/UpdateHorarioCommand');
+const DeleteHorarioCommand = require('../application/commands/DeleteHorarioCommand');
+const GetHorariosByMaestroQuery = require('../application/queries/GetHorariosByMaestroQuery');
+const GetAllHorariosQuery = require('../application/queries/GetAllHorariosQuery');
+const GetHorariosReportesQuery = require('../application/queries/GetHorariosReportesQuery');
+
+let logger;
+try {
+  ({ logger } = require('@proyecto/shared-auth/src/middlewares/logger'));
+} catch (err) {
+  logger = {
+    info: console.log,
+    error: console.error,
+    warn: console.warn
+  };
+}
+
+/**
+ * HorariosController: Maneja horarios de maestros
+ * MIGRADO A CQRS: Usa CommandBus y QueryBus en lugar de llamadas directas a servicios
+ */
 
 module.exports = {
-  createHorario: async (req, res) => {
+  /**
+   * POST /horarios
+   * Crea un nuevo horario usando CQRS CommandBus
+   */
+  createHorario: async (req, res, next, commandBus) => {
     try {
-      console.log('🟢 [micro-maestros] POST /horarios recibido. req.body:', req.body, '| typeof:', typeof req.body);
-      const horario = await horariosService.create(req.body);
-      if (!horario) {
-        return res.status(500).json({ error: 'No se pudo crear el horario' });
+      logger.info('🟢 [micro-maestros] POST /horarios recibido. req.body:', req.body);
+      
+      const { maestroId, maestroName, semestre, materia, paralelo, dia, inicio, fin, modalidad, lugarAtencion, cupoMaximo, observaciones } = req.body;
+
+      if (!maestroId || !maestroName) {
+        return res.status(400).json({ 
+          error: 'maestroId y maestroName son requeridos' 
+        });
       }
-      res.status(201).json(horario);
+
+      // Crear comando
+      const command = new CreateHorarioCommand(
+        maestroId,
+        maestroName,
+        semestre,
+        materia,
+        paralelo,
+        dia,
+        inicio,
+        fin,
+        modalidad,
+        lugarAtencion,
+        cupoMaximo,
+        observaciones
+      );
+
+      // Ejecutar comando a través del CQRS Bus
+      logger.info('[horariosController.createHorario] Executing CreateHorarioCommand');
+      const result = await commandBus.execute(command);
+
+      return res.status(result.status || 201).json(result);
     } catch (err) {
-      console.error('Error en createHorario:', err.message, err.stack || '');
-      res.status(500).json({ error: err.message || 'Error interno' });
-    }
-  },
-  updateHorario: async (req, res) => {
-    try {
-      console.log('🟡 [micro-maestros] PUT /horarios/:id recibido. req.body:', req.body, '| typeof:', typeof req.body);
-      // Aquí iría la lógica de actualización real
-      res.status(200).json({ success: true, message: 'Update dummy OK' });
-    } catch (err) {
-      console.error('Error en updateHorario:', err.message, err.stack || '');
-      res.status(500).json({ error: err.message || 'Error interno' });
+      logger.error('❌ createHorario error:', err.message);
+      const statusCode = err.status || 500;
+      res.status(statusCode).json({ error: err.message || 'Error interno' });
     }
   },
 
-  getHorariosByMaestro: async (req, res) => {
+  /**
+   * PUT /horarios/:id
+   * Actualiza un horario usando CQRS CommandBus
+   */
+  updateHorario: async (req, res, next, commandBus) => {
+    try {
+      logger.info('🟡 [micro-maestros] PUT /horarios/:id recibido. req.body:', req.body);
+      
+      const { maestroId, maestroName, semestre, materia, paralelo, dia, inicio, fin, modalidad, lugarAtencion, cupoMaximo, observaciones } = req.body;
+      const { id } = req.params;
+
+      if (!maestroId) {
+        return res.status(400).json({ error: 'maestroId es requerido' });
+      }
+
+      // Crear comando
+      const command = new UpdateHorarioCommand(
+        id,
+        maestroId,
+        maestroName,
+        semestre,
+        materia,
+        paralelo,
+        dia,
+        inicio,
+        fin,
+        modalidad,
+        lugarAtencion,
+        cupoMaximo,
+        observaciones
+      );
+
+      // Ejecutar comando a través del CQRS Bus
+      logger.info('[horariosController.updateHorario] Executing UpdateHorarioCommand');
+      const result = await commandBus.execute(command);
+
+      return res.status(result.status || 200).json(result);
+    } catch (err) {
+      logger.error('❌ updateHorario error:', err.message);
+      const statusCode = err.status || 500;
+      res.status(statusCode).json({ error: err.message || 'Error interno' });
+    }
+  },
+
+  /**
+   * GET /horarios/maestro/:id
+   * Obtiene horarios de un maestro usando CQRS QueryBus
+   */
+  getHorariosByMaestro: async (req, res, next, queryBus) => {
     try {
       const maestroId = req.params.id;
-      const list = await horariosService.getByMaestro(maestroId);
-      // Nunca retornar 304, siempre 200 con array (vacío si no hay)
-      res.status(200).json({ success: true, horarios: list || [] });
+
+      // Crear query
+      const query = new GetHorariosByMaestroQuery(maestroId);
+
+      // Ejecutar query a través del CQRS Bus
+      logger.info(`[horariosController.getHorariosByMaestro] Executing GetHorariosByMaestroQuery for ${maestroId}`);
+      const result = await queryBus.execute(query);
+
+      return res.status(200).json(result);
     } catch (err) {
-      console.error('Error in getHorariosByMaestro:', err.message, err.stack || '');
-      res.status(err.status === 304 ? 500 : (err.status || 500)).json({ success: false, error: err.message });
+      logger.error('❌ getHorariosByMaestro error:', err.message);
+      res.status(err.status || 500).json({ error: err.message });
     }
   },
 
-  getHorariosReportes: async (req, res) => {
+  /**
+   * GET /horarios/reportes/:maestroId
+   * Obtiene reportes de horarios usando CQRS QueryBus
+   */
+  getHorariosReportes: async (req, res, next, queryBus) => {
     try {
       const maestroId = req.params.maestroId;
-      const reportes = await horariosService.getReportesByMaestro(maestroId);
-      // Responder con estructura consistente { success, reportes }
-      res.status(200).json({ success: true, reportes: reportes || {} });
+
+      // Crear query
+      const query = new GetHorariosReportesQuery(maestroId);
+
+      // Ejecutar query a través del CQRS Bus
+      logger.info(`[horariosController.getHorariosReportes] Executing GetHorariosReportesQuery for ${maestroId}`);
+      const result = await queryBus.execute(query);
+
+      return res.status(200).json(result);
     } catch (err) {
-      console.error('Error in getHorariosReportes:', err.message, err.stack || '');
-      // Si ocurre un error inesperado, responder 200 con objeto vacío y campo error
-      res.status(200).json({ success: false, reportes: {
-        totalHorasSemana: 0,
-        horasPorMateria: {},
-        horariosPorDia: {},
-        horariosPorModalidad: {},
-        cuposDisponibles: 0,
-        materiasDemanda: {},
-        error: err.message || 'Error interno'
-      }});
+      logger.error('❌ getHorariosReportes error:', err.message);
+      res.status(200).json({ success: false, reportes: {}, error: err.message });
     }
   },
 
-  getAllHorarios: async (req, res) => {
+  /**
+   * GET /horarios
+   * Obtiene todos los horarios usando CQRS QueryBus
+   */
+  getAllHorarios: async (req, res, next, queryBus) => {
     try {
-      const list = await horariosService.getAll(req.query);
-      // Nunca retornar 304, siempre 200 con array (vacío si no hay)
-      res.status(200).json(list || []);
-    } catch (err) {
-      res.status(err.status === 304 ? 500 : (err.status || 500)).json({ message: err.message });
-    }
-  },
+      const filters = req.query;
 
-  deleteHorario: async (req, res) => {
-    try {
-      await horariosService.delete(req.params.id);
-      res.json({ message: 'Horario eliminado', id: req.params.id });
+      // Crear query
+      const query = new GetAllHorariosQuery(filters);
+
+      // Ejecutar query a través del CQRS Bus
+      logger.info('[horariosController.getAllHorarios] Executing GetAllHorariosQuery');
+      const result = await queryBus.execute(query);
+
+      return res.status(200).json(result);
     } catch (err) {
+      logger.error('❌ getAllHorarios error:', err.message);
       res.status(err.status || 500).json({ message: err.message });
     }
   },
 
-  updateHorario: async (req, res) => {
+  /**
+   * DELETE /horarios/:id
+   * Elimina un horario usando CQRS CommandBus
+   */
+  deleteHorario: async (req, res, next, commandBus) => {
     try {
-      const horario = await horariosService.update(req.params.id, req.body);
-      res.json({ success: true, horario });
+      const { id } = req.params;
+
+      // Crear comando
+      const command = new DeleteHorarioCommand(id);
+
+      // Ejecutar comando a través del CQRS Bus
+      logger.info(`[horariosController.deleteHorario] Executing DeleteHorarioCommand for ${id}`);
+      const result = await commandBus.execute(command);
+
+      return res.status(200).json(result);
     } catch (err) {
-      res.status(err.status || 500).json({ success: false, error: err.message });
+      logger.error('❌ deleteHorario error:', err.message);
+      const statusCode = err.status || 500;
+      res.status(statusCode).json({ message: err.message });
     }
-  },
+  }
 };

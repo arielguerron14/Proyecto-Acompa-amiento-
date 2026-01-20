@@ -13,15 +13,36 @@ try {
   console.warn('⚠️  shared-auth not found, optionalAuth is passthrough');
 }
 
+// CQRS Infrastructure
+const { CommandBus, QueryBus } = require('./infrastructure/config/cqrs-bus');
+
+// Commands
+const CreateHorarioCommand = require('./application/commands/CreateHorarioCommand');
+const UpdateHorarioCommand = require('./application/commands/UpdateHorarioCommand');
+const DeleteHorarioCommand = require('./application/commands/DeleteHorarioCommand');
+
+// Queries
+const GetHorariosByMaestroQuery = require('./application/queries/GetHorariosByMaestroQuery');
+const GetAllHorariosQuery = require('./application/queries/GetAllHorariosQuery');
+const GetHorariosReportesQuery = require('./application/queries/GetHorariosReportesQuery');
+
+// Handlers
+const CreateHorarioCommandHandler = require('./application/command-handlers/CreateHorarioCommandHandler');
+const UpdateHorarioCommandHandler = require('./application/command-handlers/UpdateHorarioCommandHandler');
+const DeleteHorarioCommandHandler = require('./application/command-handlers/DeleteHorarioCommandHandler');
+const GetHorariosByMaestroQueryHandler = require('./application/query-handlers/GetHorariosByMaestroQueryHandler');
+const GetAllHorariosQueryHandler = require('./application/query-handlers/GetAllHorariosQueryHandler');
+const GetHorariosReportesQueryHandler = require('./application/query-handlers/GetHorariosReportesQueryHandler');
+
+// Repository
+const HorarioRepository = require('./infrastructure/persistence-write/HorarioRepository');
+
 const horariosRoutes = require('./routes/horariosRoutes');
 
 const app = express();
 
 // Health check endpoint (doesn't require DB)
 app.get('/health', (req, res) => res.json({ service: 'micro-maestros', status: 'ok' }));
-
-
-
 
 // Use express.json globally for all routes (including /horarios)
 app.use(express.json({ limit: '1mb' }));
@@ -41,6 +62,25 @@ connectDB()
     // Don't exit - let the app run anyway and try to reconnect later
     // process.exit(1);
   });
+
+// Initialize CQRS buses
+const commandBus = new CommandBus();
+const queryBus = new QueryBus();
+const horarioRepository = new HorarioRepository();
+
+// Register command handlers
+commandBus.register(CreateHorarioCommand, new CreateHorarioCommandHandler(horarioRepository));
+commandBus.register(UpdateHorarioCommand, new UpdateHorarioCommandHandler(horarioRepository));
+commandBus.register(DeleteHorarioCommand, new DeleteHorarioCommandHandler(horarioRepository));
+
+// Register query handlers
+queryBus.register(GetHorariosByMaestroQuery, new GetHorariosByMaestroQueryHandler(horarioRepository));
+queryBus.register(GetAllHorariosQuery, new GetAllHorariosQueryHandler(horarioRepository));
+queryBus.register(GetHorariosReportesQuery, new GetHorariosReportesQueryHandler(horarioRepository));
+
+// Make buses available to controllers
+app.locals.commandBus = commandBus;
+app.locals.queryBus = queryBus;
 
 // Routes
 app.use('/', horariosRoutes);
