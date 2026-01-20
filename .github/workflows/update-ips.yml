@@ -1,4 +1,4 @@
-name: Update Instance IPs and Routes
+name: Update Instance IPs and Routes for AWS
 
 on:
   workflow_dispatch:
@@ -27,9 +27,9 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install pyyaml boto3 -q
+        run: pip install pyyaml boto3 jinja2 -q
 
-      - name: Update configuration for ${{ inputs.environment }}
+      - name: Fetch AWS Instance IPs and Update All Configurations
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -38,112 +38,281 @@ jobs:
           ENVIRONMENT="${{ inputs.environment }}"
           echo "🔄 Updating configuration for: $ENVIRONMENT"
           
-          if [ "$ENVIRONMENT" = "local" ]; then
-            echo "📍 Setting up LOCAL configuration"
-            python3 << 'PYTHON_EOF'
-          import json
-          local_config = {
-              "api-gateway": {"host": "localhost", "port": 8080},
-              "auth": {"host": "localhost", "port": 3000},
-              "estudiantes": {"host": "localhost", "port": 3001},
-              "maestros": {"host": "localhost", "port": 3002},
-              "reportes-estudiantes": {"host": "localhost", "port": 5003},
-              "reportes-maestros": {"host": "localhost", "port": 5004},
-              "mongo": {"host": "localhost", "port": 27017}
-          }
-          with open('config/instance_ips.json', 'w') as f:
-              json.dump(local_config, f, indent=4)
-          print("✅ Local configuration updated")
-          PYTHON_EOF
-          else
-            echo "📍 Fetching PRODUCTION configuration from AWS"
-            python3 << 'PYTHON_EOF'
+          python3 << 'PYTHON_EOF'
           import json
           import boto3
           import os
           import sys
-          try:
-              session = boto3.Session(
-                  aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-                  aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
-                  aws_session_token=os.environ.get('AWS_SESSION_TOKEN'),
-                  region_name='us-east-1'
-              )
-              ec2 = session.client('ec2')
-              response = ec2.describe_instances(
-                  Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]
-              )
-              instances = {}
-              for reservation in response.get('Reservations', []):
-                  for instance in reservation.get('Instances', []):
-                      instance_id = instance['InstanceId']
-                      instance_name = None
-                      for tag in instance.get('Tags', []):
-                          if tag['Key'] == 'Name':
-                              instance_name = tag['Value']
-                              break
-                      if instance_name:
-                          instances[instance_name] = {
-                              'InstanceId': instance_id,
-                              'Name': instance_name,
-                              'PublicIpAddress': instance.get('PublicIpAddress', 'N/A'),
-                              'PrivateIpAddress': instance.get('PrivateIpAddress', 'N/A'),
-                              'Type': instance.get('InstanceType', 'unknown')
-                          }
-              with open('config/instance_ips.json', 'w') as f:
-                  json.dump(instances, f, indent=4)
-              print(f"✅ Updated {len(instances)} instances from AWS")
-          except Exception as e:
-              print(f"❌ Error: {e}")
-              sys.exit(1)
-          PYTHON_EOF
-          fi
+          from datetime import datetime
 
-      - name: Update API Routes Configuration
-        run: |
-          python3 << 'PYTHON_EOF'
-          import json
+          ENVIRONMENT = os.environ.get('ENVIRONMENT', 'local')
+
+          # Mapeo de nombres EC2 a servicios
+          SERVICE_MAPPING = {
+              'EC2-APIGateway': {'service': 'api-gateway', 'port': 8080, 'protocol': 'http'},
+              'EC2-Auth': {'service': 'micro-auth', 'port': 3000, 'protocol': 'http'},
+              'EC2-Estudiantes': {'service': 'micro-estudiantes', 'port': 3001, 'protocol': 'http'},
+              'EC2-Maestros': {'service': 'micro-maestros', 'port': 3002, 'protocol': 'http'},
+              'EC2-Analytics': {'service': 'micro-analytics', 'port': 5007, 'protocol': 'http'},
+              'EC2-Notificaciones': {'service': 'micro-notificaciones', 'port': 5006, 'protocol': 'http'},
+              'EC2-ReportesEstudiantes': {'service': 'micro-reportes-estudiantes', 'port': 5003, 'protocol': 'http'},
+              'EC2-ReportesMaestros': {'service': 'micro-reportes-maestros', 'port': 5004, 'protocol': 'http'},
+              'EC2-SoapBridge': {'service': 'micro-soap-bridge', 'port': 5008, 'protocol': 'http'},
+              'EC2-MongoDB': {'service': 'mongo', 'port': 27017, 'protocol': 'mongodb'},
+              'EC2-PostgreSQL': {'service': 'postgres', 'port': 5432, 'protocol': 'postgresql'},
+              'EC2-Redis': {'service': 'redis', 'port': 6379, 'protocol': 'redis'},
+          }
+
+          if ENVIRONMENT == 'local':
+              print("📍 Configurando LOCAL...")
+              
+              # Configuración local
+              local_config = {
+                  "api-gateway": {"host": "localhost", "port": 8080, "protocol": "http", "url": "http://localhost:8080"},
+                  "micro-auth": {"host": "localhost", "port": 3000, "protocol": "http", "url": "http://localhost:3000"},
+                  "micro-estudiantes": {"host": "localhost", "port": 3001, "protocol": "http", "url": "http://localhost:3001"},
+                  "micro-maestros": {"host": "localhost", "port": 3002, "protocol": "http", "url": "http://localhost:3002"},
+                  "micro-analytics": {"host": "localhost", "port": 5007, "protocol": "http", "url": "http://localhost:5007"},
+                  "micro-notificaciones": {"host": "localhost", "port": 5006, "protocol": "http", "url": "http://localhost:5006"},
+                  "micro-reportes-estudiantes": {"host": "localhost", "port": 5003, "protocol": "http", "url": "http://localhost:5003"},
+                  "micro-reportes-maestros": {"host": "localhost", "port": 5004, "protocol": "http", "url": "http://localhost:5004"},
+                  "micro-soap-bridge": {"host": "localhost", "port": 5008, "protocol": "http", "url": "http://localhost:5008"},
+                  "mongo": {"host": "localhost", "port": 27017, "protocol": "mongodb", "url": "mongodb://localhost:27017"},
+                  "postgres": {"host": "localhost", "port": 5432, "protocol": "postgresql", "url": "postgresql://localhost:5432"},
+                  "redis": {"host": "localhost", "port": 6379, "protocol": "redis", "url": "redis://localhost:6379"},
+              }
+              
+              with open('config/instance_ips.json', 'w') as f:
+                  json.dump(local_config, f, indent=4)
+              print("✅ Configuración LOCAL actualizada")
+              
+          else:
+              print("📍 Obteniendo configuración de AWS...")
+              try:
+                  session = boto3.Session(
+                      aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+                      aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
+                      aws_session_token=os.environ.get('AWS_SESSION_TOKEN'),
+                      region_name='us-east-1'
+                  )
+                  
+                  ec2 = session.client('ec2')
+                  
+                  # Obtener todas las instancias corriendo
+                  response = ec2.describe_instances(
+                      Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]
+                  )
+                  
+                  aws_config = {}
+                  instances_found = {}
+                  
+                  for reservation in response.get('Reservations', []):
+                      for instance in reservation.get('Instances', []):
+                          instance_name = None
+                          for tag in instance.get('Tags', []):
+                              if tag['Key'] == 'Name':
+                                  instance_name = tag['Value']
+                                  break
+                          
+                          if instance_name and instance_name in SERVICE_MAPPING:
+                              service_info = SERVICE_MAPPING[instance_name]
+                              service_name = service_info['service']
+                              port = service_info['port']
+                              protocol = service_info['protocol']
+                              
+                              # Usar IP pública para acceso externo
+                              public_ip = instance.get('PublicIpAddress', 'N/A')
+                              private_ip = instance.get('PrivateIpAddress', 'N/A')
+                              
+                              if public_ip and public_ip != 'N/A':
+                                  url = f"{protocol}://{public_ip}:{port}"
+                              else:
+                                  url = f"{protocol}://{private_ip}:{port}"
+                              
+                              aws_config[service_name] = {
+                                  "host": public_ip if (public_ip and public_ip != 'N/A') else private_ip,
+                                  "private_ip": private_ip,
+                                  "port": port,
+                                  "protocol": protocol,
+                                  "url": url,
+                                  "instance_id": instance['InstanceId'],
+                                  "instance_type": instance.get('InstanceType', 'unknown')
+                              }
+                              
+                              instances_found[service_name] = instance_name
+                  
+                  with open('config/instance_ips.json', 'w') as f:
+                      json.dump(aws_config, f, indent=4)
+                  
+                  print(f"✅ Actualizado {len(instances_found)} instancias desde AWS")
+                  print(f"   Instancias encontradas: {', '.join(instances_found.values())}")
+                  
+                  if len(instances_found) < len(SERVICE_MAPPING):
+                      missing = set(SERVICE_MAPPING.keys()) - set(instances_found.values())
+                      print(f"⚠️  Instancias no encontradas: {', '.join(missing)}")
+                  
+              except Exception as e:
+                  print(f"❌ Error fetching AWS data: {e}")
+                  sys.exit(1)
+
+          # Ahora actualizar las rutas con los hosts correctos
+          print("\n🔄 Actualizando rutas de API...")
           
-          # Routes configuration for all environments
+          try:
+              with open('config/instance_ips.json', 'r') as f:
+                  ips_config = json.load(f)
+          except:
+              print("❌ No se pudo leer config/instance_ips.json")
+              sys.exit(1)
+
+          # Construir URLs completas para las rutas
           routes_config = {
-              "routes": {
+              "environment": ENVIRONMENT,
+              "updated_at": datetime.now().isoformat(),
+              "services": {
+                  "api-gateway": {
+                      "baseUrl": ips_config.get("api-gateway", {}).get("url", "http://localhost:8080"),
+                      "routes": {
+                          "health": "/health",
+                          "metrics": "/metrics"
+                      }
+                  },
                   "auth": {
-                      "register": "/auth/register",
-                      "login": "/auth/login",
-                      "verify": "/auth/verify-token",
-                      "me": "/auth/me"
+                      "baseUrl": ips_config.get("micro-auth", {}).get("url", "http://localhost:3000"),
+                      "routes": {
+                          "register": "/auth/register",
+                          "login": "/auth/login",
+                          "logout": "/auth/logout",
+                          "verify": "/auth/verify-token",
+                          "refresh": "/auth/refresh",
+                          "me": "/auth/me",
+                          "profile": "/auth/profile"
+                      }
                   },
                   "estudiantes": {
-                      "create": "/estudiantes/create",
-                      "get": "/estudiantes/:id",
-                      "list": "/estudiantes",
-                      "update": "/estudiantes/:id",
-                      "delete": "/estudiantes/:id",
-                      "reservas": {
-                          "create": "/estudiantes/reservas/create",
-                          "list": "/estudiantes/reservas",
-                          "get": "/estudiantes/reservas/:id",
-                          "confirm": "/estudiantes/reservas/:id/confirmar"
+                      "baseUrl": ips_config.get("micro-estudiantes", {}).get("url", "http://localhost:3001"),
+                      "routes": {
+                          "create": "/estudiantes/create",
+                          "get": "/estudiantes/:id",
+                          "list": "/estudiantes",
+                          "update": "/estudiantes/:id",
+                          "delete": "/estudiantes/:id",
+                          "search": "/estudiantes/search",
+                          "reservas": {
+                              "create": "/estudiantes/reservas/create",
+                              "list": "/estudiantes/reservas",
+                              "get": "/estudiantes/reservas/:id",
+                              "confirm": "/estudiantes/reservas/:id/confirmar",
+                              "cancel": "/estudiantes/reservas/:id/cancelar"
+                          },
+                          "calificaciones": "/estudiantes/calificaciones/:id",
+                          "historial": "/estudiantes/historial/:id"
                       }
                   },
                   "maestros": {
-                      "create": "/maestros/create",
-                      "get": "/maestros/:id",
-                      "list": "/maestros",
-                      "update": "/maestros/:id",
-                      "delete": "/maestros/:id",
-                      "horarios": "/maestros/horarios"
+                      "baseUrl": ips_config.get("micro-maestros", {}).get("url", "http://localhost:3002"),
+                      "routes": {
+                          "create": "/maestros/create",
+                          "get": "/maestros/:id",
+                          "list": "/maestros",
+                          "update": "/maestros/:id",
+                          "delete": "/maestros/:id",
+                          "search": "/maestros/search",
+                          "horarios": "/maestros/horarios/:id",
+                          "asignaciones": "/maestros/asignaciones/:id",
+                          "calificaciones": "/maestros/calificaciones"
+                      }
                   },
-                  "reportes": {
-                      "estudiantes": "/reportes/estudiantes/:id",
-                      "maestros": "/reportes/maestros/:id"
+                  "analytics": {
+                      "baseUrl": ips_config.get("micro-analytics", {}).get("url", "http://localhost:5007"),
+                      "routes": {
+                          "metrics": "/analytics/metrics",
+                          "events": "/analytics/events",
+                          "dashboard": "/analytics/dashboard",
+                          "reports": "/analytics/reports"
+                      }
+                  },
+                  "notificaciones": {
+                      "baseUrl": ips_config.get("micro-notificaciones", {}).get("url", "http://localhost:5006"),
+                      "routes": {
+                          "send": "/notificaciones/send",
+                          "list": "/notificaciones/list/:id",
+                          "mark-read": "/notificaciones/:id/read",
+                          "delete": "/notificaciones/:id/delete"
+                      }
+                  },
+                  "reportes-estudiantes": {
+                      "baseUrl": ips_config.get("micro-reportes-estudiantes", {}).get("url", "http://localhost:5003"),
+                      "routes": {
+                          "generate": "/reportes/generar",
+                          "get": "/reportes/:id",
+                          "list": "/reportes/estudiante/:id",
+                          "export": "/reportes/:id/export"
+                      }
+                  },
+                  "reportes-maestros": {
+                      "baseUrl": ips_config.get("micro-reportes-maestros", {}).get("url", "http://localhost:5004"),
+                      "routes": {
+                          "generate": "/reportes/generar",
+                          "get": "/reportes/:id",
+                          "list": "/reportes/maestro/:id",
+                          "export": "/reportes/:id/export"
+                      }
                   }
+              },
+              "databases": {
+                  "mongodb": ips_config.get("mongo", {}),
+                  "postgresql": ips_config.get("postgres", {}),
+                  "redis": ips_config.get("redis", {})
               }
           }
           
           with open('config/api_routes.json', 'w') as f:
               json.dump(routes_config, f, indent=4)
-          print("✅ API Routes configuration updated")
+          print("✅ Rutas de API actualizadas con hosts correctos")
+
+          # Generar archivo .env actualizado para AWS si es producción
+          if ENVIRONMENT == 'prod':
+              print("\n🔄 Generando .env para AWS...")
+              env_content = "# Auto-generated AWS Configuration\n"
+              env_content += f"# Generated at: {datetime.now().isoformat()}\n\n"
+              env_content += "# Environment\n"
+              env_content += "NODE_ENV=production\n"
+              env_content += "ENVIRONMENT=prod\n\n"
+              
+              env_content += "# API Gateway\n"
+              if "api-gateway" in ips_config:
+                  env_content += f"API_GATEWAY_URL={ips_config['api-gateway'].get('url', '')}\n"
+                  env_content += f"API_GATEWAY_HOST={ips_config['api-gateway'].get('host', '')}\n"
+                  env_content += f"API_GATEWAY_PORT={ips_config['api-gateway'].get('port', '')}\n"
+              
+              env_content += "\n# Microservices\n"
+              env_content += f"MICRO_AUTH_URL={ips_config.get('micro-auth', {}).get('url', '')}\n"
+              env_content += f"MICRO_ESTUDIANTES_URL={ips_config.get('micro-estudiantes', {}).get('url', '')}\n"
+              env_content += f"MICRO_MAESTROS_URL={ips_config.get('micro-maestros', {}).get('url', '')}\n"
+              env_content += f"MICRO_ANALYTICS_URL={ips_config.get('micro-analytics', {}).get('url', '')}\n"
+              env_content += f"MICRO_NOTIFICACIONES_URL={ips_config.get('micro-notificaciones', {}).get('url', '')}\n"
+              
+              env_content += "\n# Databases\n"
+              if "mongo" in ips_config:
+                  env_content += f"MONGODB_HOST={ips_config['mongo'].get('host', '')}\n"
+                  env_content += f"MONGODB_PORT={ips_config['mongo'].get('port', '')}\n"
+                  env_content += f"MONGODB_URL=mongodb://{ips_config['mongo'].get('host', '')}:{ips_config['mongo'].get('port', '')}/acompanamiento\n"
+              
+              if "postgres" in ips_config:
+                  env_content += f"POSTGRES_HOST={ips_config['postgres'].get('host', '')}\n"
+                  env_content += f"POSTGRES_PORT={ips_config['postgres'].get('port', '')}\n"
+              
+              if "redis" in ips_config:
+                  env_content += f"REDIS_HOST={ips_config['redis'].get('host', '')}\n"
+                  env_content += f"REDIS_PORT={ips_config['redis'].get('port', '')}\n"
+              
+              with open('.env.aws', 'w') as f:
+                  f.write(env_content)
+              print("✅ Archivo .env.aws generado")
+          
+          print("\n✅ Todas las configuraciones fueron actualizadas correctamente")
+
           PYTHON_EOF
 
       - name: Commit and push changes
@@ -151,11 +320,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
+          ENVIRONMENT="${{ inputs.environment }}"
+          
           if [ -z "$(git status --porcelain)" ]; then
             echo "✅ No changes to commit"
           else
-            git add config/instance_ips.json config/api_routes.json
-            git commit -m "chore: Update configuration for ${{ inputs.environment }} environment [automated]"
+            if [ "$ENVIRONMENT" = "prod" ]; then
+              git add config/instance_ips.json config/api_routes.json .env.aws
+            else
+              git add config/instance_ips.json config/api_routes.json
+            fi
+            git commit -m "chore: Auto-update IPs and routes for $ENVIRONMENT environment
+
+- Updated instance_ips.json with current AWS resources
+- Updated api_routes.json with complete service endpoints
+- Generated environment-specific configuration
+- Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             git push origin main
             echo "✅ Configuration changes pushed to main"
           fi
