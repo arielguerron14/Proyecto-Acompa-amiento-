@@ -1,53 +1,61 @@
-const AnalyticsService = require('../services/analyticsService');
+const TrackEventCommand = require('../application/commands/TrackEventCommand');
+const GetEventsQuery = require('../application/queries/GetEventsQuery');
+const GetStatsQuery = require('../application/queries/GetStatsQuery');
+const GenerateReportQuery = require('../application/queries/GenerateReportQuery');
 
 /**
  * Retorna los eventos registrados
  */
-exports.getEvents = async (req, res) => {
+exports.getEvents = async (req, res, queryBus) => {
   try {
     const { limit = 50, offset = 0, type } = req.query;
 
-    const events = await AnalyticsService.getEvents({
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      type,
-    });
+    const query = new GetEventsQuery(limit, offset, type);
+    const result = await queryBus.execute(query);
 
-    res.status(200).json({
+    res.status(result.status || 200).json({
       success: true,
-      count: events.length,
-      events,
+      count: result.data.length,
+      events: result.data,
     });
   } catch (error) {
     console.error('[analyticsController.getEvents]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
   }
 };
 
 /**
  * Retorna estadísticas agregadas
  */
-exports.getStats = async (req, res) => {
+exports.getStats = async (req, res, queryBus) => {
   try {
     const { period = '7d' } = req.query;
 
-    const stats = await AnalyticsService.getStats(period);
+    const query = new GetStatsQuery(period);
+    const result = await queryBus.execute(query);
 
-    res.status(200).json({
+    res.status(result.status || 200).json({
       success: true,
-      period,
-      stats,
+      period: result.data.period,
+      stats: result.data.stats,
+      total: result.data.total,
     });
   } catch (error) {
     console.error('[analyticsController.getStats]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
   }
 };
 
 /**
  * Registra un evento manualmente
  */
-exports.trackEvent = async (req, res) => {
+exports.trackEvent = async (req, res, commandBus) => {
   try {
     const { eventType, userId, metadata } = req.body;
 
@@ -55,48 +63,48 @@ exports.trackEvent = async (req, res) => {
       return res.status(400).json({ error: 'eventType is required' });
     }
 
-    const event = await AnalyticsService.trackEvent({
-      eventType,
-      userId,
-      metadata,
-    });
+    const command = new TrackEventCommand(eventType, userId, metadata);
+    const result = await commandBus.execute(command);
 
-    res.status(201).json({
+    res.status(result.status || 201).json({
       success: true,
-      message: 'Event tracked successfully',
-      event,
+      message: result.message,
+      event: result.result,
     });
   } catch (error) {
     console.error('[analyticsController.trackEvent]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
   }
 };
 
 /**
  * Genera un reporte de analytics
  */
-exports.generateReport = async (req, res) => {
+exports.generateReport = async (req, res, queryBus) => {
   try {
     const { startDate, endDate, format = 'json' } = req.query;
 
-    const report = await AnalyticsService.generateReport({
-      startDate,
-      endDate,
-      format,
-    });
+    const query = new GenerateReportQuery(startDate, endDate, format);
+    const result = await queryBus.execute(query);
 
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="analytics-report.csv"');
-      res.send(report);
+      res.send(result.data);
     } else {
-      res.status(200).json({
+      res.status(result.status || 200).json({
         success: true,
-        report,
+        report: result.data,
       });
     }
   } catch (error) {
     console.error('[analyticsController.generateReport]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
   }
 };

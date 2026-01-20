@@ -19,24 +19,36 @@ const router = express.Router();
  * GET /analytics/events
  * Retorna los eventos registrados
  */
-router.get('/events', authenticateToken, analyticsController.getEvents);
+router.get('/events', authenticateToken, (req, res) => {
+  const { queryBus } = req.app.locals;
+  analyticsController.getEvents(req, res, queryBus);
+});
 
 /**
  * GET /analytics/stats
  * Retorna estadísticas agregadas
  */
-router.get('/stats', authenticateToken, analyticsController.getStats);
+router.get('/stats', authenticateToken, (req, res) => {
+  const { queryBus } = req.app.locals;
+  analyticsController.getStats(req, res, queryBus);
+});
 
 /**
  * POST /analytics/events
  * Registra un evento manualmente
  */
-router.post('/events', authenticateToken, analyticsController.trackEvent);
+router.post('/events', authenticateToken, (req, res) => {
+  const { commandBus } = req.app.locals;
+  analyticsController.trackEvent(req, res, commandBus);
+});
 
 /**
  * GET /analytics/report
  * Genera un reporte de analytics
  */
-router.get('/report', authenticateToken, requireRole('admin'), analyticsController.generateReport);
+router.get('/report', authenticateToken, requireRole('admin'), (req, res) => {
+  const { queryBus } = req.app.locals;
+  analyticsController.generateReport(req, res, queryBus);
+});
 
 module.exports = router;
