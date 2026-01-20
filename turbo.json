@@ -1,14 +1,20 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "**/package.json",
+    "**/.env",
+    "**/.env.local"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "build/**", ".next/**"],
+      "outputs": [],
       "cache": true
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "interactive": true
     },
     "lint": {
       "dependsOn": ["^lint"],
@@ -17,8 +23,29 @@
     "test": {
       "dependsOn": ["^build"],
       "cache": true,
-      "inputs": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx", "tests/**/*", "jest.config.js", "vitest.config.ts"]
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.js",
+        "src/**/*.jsx",
+        "src/**/*.test.*",
+        "src/**/*.spec.*",
+        "tests/**/*",
+        "jest.config.js",
+        "vitest.config.ts"
+      ]
+    },
+    "start": {
+      "cache": false,
+      "persistent": true,
+      "interactive": true
+    },
+    "docker:build": {
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "clean": {
+      "cache": false
     }
-  },
-  "globalDependencies": ["**/.env", "**/.env.local"]
+  }
 }

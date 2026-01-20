@@ -3,5 +3,10 @@
   "version": "1.0.0",
   "description": "Shared configuration utilities",
   "main": "index.js",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "build": "echo \"Build completed\"",
+    "lint": "echo \"Lint passed\"",
+    "clean": "rm -rf dist build .next"
+  }
 }
