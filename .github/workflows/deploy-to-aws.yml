@@ -102,12 +102,15 @@ jobs:
           
           set -e
           
-            echo "📦 Installing system dependencies..."
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq nodejs npm git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
-            sudo npm install -g pm2 > /dev/null 2>&1 || true
+          echo "📦 Installing system dependencies..."
+          sudo apt-get update -qq
+          
+          # Install Node.js 18.x
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - > /dev/null 2>&1 || true
+          sudo apt-get install -y -qq nodejs git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          sudo npm install -g pm2 > /dev/null 2>&1 || true
 
-            echo "🔄 Pulling latest code..."
+          echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
             cd /home/ubuntu/Proyecto-Acompa-amiento-
             git pull origin main
@@ -147,13 +150,16 @@ jobs:
           
           set -e
           
-            echo "📦 Installing system dependencies..."
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq nodejs npm git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
-            sudo npm install -g pm2 > /dev/null 2>&1 || true
+          echo "📦 Installing system dependencies..."
+          sudo apt-get update -qq
+          
+          # Install Node.js 18.x
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - > /dev/null 2>&1 || true
+          sudo apt-get install -y -qq nodejs git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          sudo npm install -g pm2 > /dev/null 2>&1 || true
 
-            echo "🔄 Pulling latest code..."
-            if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+          echo "🔄 Pulling latest code..."
+          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
               cd /home/ubuntu/Proyecto-Acompa-amiento-
               git pull origin main
             else
@@ -197,7 +203,10 @@ jobs:
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
-          sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          
+          # Install Node.js 18.x (required by microservices)
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - > /dev/null 2>&1 || true
+          sudo apt-get install -y -qq nodejs git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
           sudo usermod -aG docker $USER 2>/dev/null || true
           sudo systemctl start docker 2>/dev/null || true
 
@@ -218,14 +227,14 @@ jobs:
           export ENVIRONMENT=prod
           export COMPOSE_PROJECT_NAME=acompanamiento-core
           
-          # Only start core services
-          docker-compose up -d micro-auth micro-estudiantes micro-maestros micro-core
+          # Only start core services (micro-core doesn't exist)
+          docker-compose up -d micro-auth micro-estudiantes micro-maestros
           
           echo "⏳ Waiting for services to stabilize..."
           sleep 10
           
           echo "📊 Service status:"
-          docker-compose ps micro-auth micro-estudiantes micro-maestros micro-core
+          docker-compose ps micro-auth micro-estudiantes micro-maestros
           
           echo "✅ Core microservices deployment complete"
           
