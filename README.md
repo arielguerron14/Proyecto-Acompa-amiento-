@@ -2,7 +2,10 @@
 
 Sistema moderno de **microservicios con Turborepo Monorepo** para la gestión de estudiantes, maestros, horarios y reportes de acompañamiento educativo. Implementado con Node.js, Express, MongoDB y principios SOLID.
 
-**📚 [Ver documentación de Turborepo](./TURBOREPO_MIGRATION.md)**
+### 📚 Documentación Principal
+- **[📐 Arquitectura CQRS](./ARCHITECTURE_CQRS.md)** - Patrón CQRS completo, flujos, ejemplos
+- **[🚀 Turborepo Monorepo](./TURBOREPO_DOCUMENTATION.md)** - Setup, comandos, performance
+- **[⚙️ Configuración de Ambiente](./env.template)** - Template para variables de entorno
 
 ## 🚀 Inicio Rápido (Docker)
 
@@ -108,7 +111,7 @@ Arquitectura de microservicios con:
 - ✅ Servicios independientes y escalables
 - ✅ Monitoreo y logging centralizado
 
-Ver [ARCHITECTURE_DIAGRAMS.md](./ARCHITECTURE_DIAGRAMS.md) para detalles completos.
+Ver [ARCHITECTURE_DIAGRAMS.md](./ARCHITECTURE_DIAGRAMS.md) para más detalles o consulta [📐 ARCHITECTURE_CQRS.md](./ARCHITECTURE_CQRS.md) para implementación CQRS detallada.
 
 ## 🔐 Autenticación
 
