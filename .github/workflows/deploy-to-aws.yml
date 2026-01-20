@@ -1,17 +1,7 @@
 name: Deploy Project to AWS EC2 Instances
 
 on:
-         echo "📦 Installing system dependencies..."
-         sudo apt-get update -qq
-         sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
-         sudo usermod -aG docker $USER 2>/dev/null || true
-         
   workflow_dispatch:
-         echo "📦 Installing system dependencies..."
-         sudo apt-get update -qq
-         sudo apt-get install -y -qq nodejs npm git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
-         
-         echo "🔄 Pulling latest code..."
     inputs:
       environment:
         description: 'Environment to deploy (staging or prod)'
@@ -21,11 +11,12 @@ on:
         options:
           - staging
           - prod
+      deploy_services:
+        description: 'Services to deploy (all or specific)'
+        required: true
+        default: 'all'
         type: choice
         options:
-         # Start Docker service if not running
-         sudo systemctl start docker 2>/dev/null || true
-         
           - all
           - microservices-only
           - databases-only
