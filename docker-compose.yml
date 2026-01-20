@@ -104,6 +104,22 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
 
+  # PostgreSQL Database - For reports microservices
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    restart: unless-stopped
+    expose:
+      - "5432"
+    networks:
+      - core-net
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: acompanamiento
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   # API Gateway - Main entry point (ONLY exposed port)
   api-gateway:
     build:
@@ -206,6 +222,7 @@ services:
       - "5003"
     depends_on:
       - mongo
+      - postgres
       - kafka
     networks:
       - core-net
@@ -213,6 +230,11 @@ services:
       NODE_ENV: production
       PORT: 5003
       MONGODB_URI: mongodb://root:example@mongo:27017/reportes-estudiantes?authSource=admin
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: acompanamiento
       KAFKA_BROKERS: kafka:9092
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
 
@@ -228,6 +250,7 @@ services:
       - "5004"
     depends_on:
       - mongo
+      - postgres
       - kafka
     networks:
       - core-net
@@ -235,6 +258,11 @@ services:
       NODE_ENV: production
       PORT: 5004
       MONGODB_URI: mongodb://root:example@mongo:27017/reportes-maestros?authSource=admin
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: acompanamiento
       KAFKA_BROKERS: kafka:9092
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
 
@@ -309,6 +337,7 @@ networks:
 
 volumes:
   mongo_data:
+  postgres_data:
   prometheus_data:
   grafana_data:
   rabbitmq_data:

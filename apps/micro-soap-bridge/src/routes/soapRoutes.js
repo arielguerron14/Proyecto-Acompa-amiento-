@@ -1,7 +1,7 @@
 const express = require('express');
 const soapController = require('../handlers/soapHandler');
 // Use the distributed shared-auth package so code works both locally and in containers
-const { authenticateToken } = require('shared-auth');
+const { authenticateToken } = require('@proyecto/shared-auth');
 
 const router = express.Router();
 

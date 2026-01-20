@@ -7,6 +7,8 @@ module.exports = {
 
   // Middleware & decorators
   ...require('./middlewares/authMiddleware'),
+  ...require('./middlewares/logger'),
+  ...require('./middlewares/errorHandler'),
 
   // Constants
   ROLES: require('./constants/roles').ROLES,

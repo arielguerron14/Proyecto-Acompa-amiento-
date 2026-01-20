@@ -1,12 +1,10 @@
 const express = require('express');
 require('dotenv').config();
 const soapRoutes = require('./routes/soapRoutes');
-const { requestLogger, logger } = require('@proyecto/shared-auth/src/middlewares/logger');
-const { errorHandler, notFound } = require('@proyecto/shared-auth/src/middlewares/errorHandler');
+const { requestLogger, logger, errorHandler, notFound } = require('@proyecto/shared-auth');
 
 // CQRS imports
-const CommandBus = require('shared-cqrs/src/buses/CommandBus');
-const QueryBus = require('shared-cqrs/src/buses/QueryBus');
+const { CommandBus, QueryBus } = require('./infrastructure/config/cqrs-bus');
 const CallSOAPServiceCommand = require('./application/commands/CallSOAPServiceCommand');
 const TransformDataCommand = require('./application/commands/TransformDataCommand');
 const ListServicesQuery = require('./application/queries/ListServicesQuery');

@@ -105,5 +105,3 @@ exports.getWSDL = async (req, res, queryBus) => {
     });
   }
 };
-  }
-};
