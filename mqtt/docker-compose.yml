@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  mqtt:
+    image: eclipse-mosquitto:latest
+    container_name: mqtt
+    restart: always
+    ports:
+      - "1883:1883"  # MQTT Protocol
+      - "9001:9001"  # WebSocket
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./acl.acl:/mqtt/acl/acl.acl:ro
+      - ./passwords.txt:/mqtt/acl/passwords.txt:ro
+      - mqtt_data:/mqtt/data
+      - mqtt_logs:/mqtt/logs
+    networks:
+      - services_network
+    environment:
+      - MOSQUITTO_HOME=/mosquitto
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$SYS/broker/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    profiles:
+      - full
+      - mqtt-only
+
+volumes:
+  mqtt_data:
+    driver: local
+  mqtt_logs:
+    driver: local
+
+networks:
+  services_network:
+    external: true

@@ -1,0 +1,188 @@
+# .gitignore - Explicación Detallada
+
+Este archivo especifica qué archivos NO se deben versionar en Git. Aquí está la lógica detrás de cada sección.
+
+---
+
+## 🔴 NUNCA en Git
+
+### Dependencies (Node.js)
+```gitignore
+node_modules/          # Gigantesco (~300-500 MB), se regenera con npm install
+package-lock.json      # Generado automáticamente
+yarn.lock              # Generado automáticamente
+```
+**Razón:** `package.json` + npm install es suficiente. El lock se regenera automáticamente.
+
+### Logs
+```gitignore
+*.log                  # Cualquier archivo .log
+*.log.*                # Rotación de logs
+logs/                  # Directorio de logs
+lerna-debug.log*       # Logs específicos de Lerna/Turborepo
+```
+**Razón:** Los logs son datos en tiempo de ejecución, no código.
+
+### Environment Variables
+```gitignore
+.env                   # Variables locales (secretos, IPs)
+.env.local             # Overrides locales
+.env.*.local           # Ambientes específicos
+.env.generated         # Auto-generado desde Terraform
+.env.aws.local         # Configuración local de AWS
+```
+**Razón:** Nunca versionar secretos, credenciales o configuración local.
+
+### Build Outputs
+```gitignore
+dist/                  # Código compilado/transpilado
+build/                 # Artefactos de build
+coverage/              # Reportes de coverage de tests
+```
+**Razón:** Son salidas de herramientas, no código fuente.
+
+### Terraform
+```gitignore
+.terraform/            # Cache de Terraform (gigantesco)
+*.tfstate              # Estado de Terraform (CRÍTICO: contiene secretos)
+*.tfstate.*            # Backups de estado
+terraform.tfvars       # Variables de Terraform (puede contener secretos)
+.terraformrc           # Configuración local de Terraform
+terraform_plan.tfplan  # Plan generado
+.terraform.lock.hcl    # Lock de versiones (se regenera)
+```
+**Razón:** `.tfstate` contiene el estado actual incluyendo secretos. Debe estar en remote backend (S3, Terraform Cloud).
+
+### Python
+```gitignore
+.venv/                 # Virtual environment (grande, local)
+__pycache__/           # Cache de Python compilado
+*.py[cod]              # Archivos compilados (.pyc, .pyo, .pyd)
+*$py.class             # Archivos de clase compilados
+*.so                   # Extensiones compiladas
+venv/                  # Alternativa a .venv/
+ENV/                   # Otra alternativa
+```
+**Razón:** Se regenera con `python -m venv` y `pip install`.
+
+### AWS
+```gitignore
+.aws/                  # Directorio de config AWS local
+.aws_credentials       # Credenciales AWS (CRÍTICO)
+aws_credentials        # Más credenciales
+```
+**Razón:** Credenciales nunca en git. Usar AWS SSO o IAM roles.
+
+### IDE & Editores
+```gitignore
+.vscode/               # Settings específicos de VS Code
+.idea/                 # Settings específicos de JetBrains
+*.swp                  # Archivos swap de Vim
+*.swo                  # Más swap de Vim
+*.swn                  # Más swap de Vim
+*~                     # Backup de Emacs
+.DS_Store              # Metadatos de macOS
+```
+**Razón:** Configuración personal del editor, no proyecto.
+
+### Operating System
+```gitignore
+Thumbs.db              # Thumbnails de Windows
+.DS_Store              # Metadatos de macOS
+```
+**Razón:** Metadatos del SO, no código.
+
+### Temporary Files
+```gitignore
+tmp/                   # Directorio temporal
+```
+**Razón:** Archivos temporales de desarrollo.
+
+---
+
+## 🟡 CONDICIONALMENTE en Git
+
+### Local Artifacts (Auto-generated)
+```gitignore
+artifacts/             # Cache local de AWS (IPs, instancias)
+*.bak.json             # Backups de configuración
+```
+**Razón:** Se regeneran con scripts de sync automático.
+
+**Cuándo incluir en git:** Nunca (son auto-generados)
+**Cuándo regenerar:** `npm run sync-ips-to-config`
+
+---
+
+## 🟢 EN Git (Código Fuente)
+
+Estos archivos/carpetas SÍ deben estar en git:
+
+```
+✅ .ssh/config         # Configuración SSH
+✅ config/             # Configuración centralizada
+✅ scripts/            # Scripts de automatización
+✅ test/               # Tests
+✅ apps/               # Código fuente
+✅ packages/           # Librerías compartidas
+✅ .github/workflows/  # CI/CD workflows
+✅ package.json        # Definición de paquetes
+✅ turbo.json          # Configuración Turborepo
+✅ docker-compose.yml  # Orquestación de servicios
+✅ README.md           # Documentación
+```
+
+---
+
+## 📋 Checklist de Seguridad
+
+Antes de hacer commit, verificar:
+
+```bash
+# ❌ NO comitear
+git grep -l "AWS_SECRET"      # Secretos AWS
+git grep -l "PASSWORD"         # Contraseñas
+git grep -l "PRIVATE KEY"      # Claves privadas
+find . -name "*.pem"          # Archivos de claves
+
+# ✅ SÍ comitear
+git grep -l "config"           # Configuración
+git grep -l "package.json"     # Dependencias
+git grep -l "script"           # Scripts
+```
+
+---
+
+## 🔧 Mantener .gitignore Actualizado
+
+1. **Cuando agregues una herramienta nueva:**
+   - Agregar carpeta de output a .gitignore
+   - Ejemplo: Agregaste Webpack → agregar `dist/`
+
+2. **Cuando cambies IDE:**
+   - Agregar configuración del nuevo IDE
+   - Ejemplo: Cambio de VS Code a JetBrains → agregar `.idea/`
+
+3. **Cuando agregues ambiente local:**
+   - Agregar variables/archivos específicos
+   - Ejemplo: Agregaste env local → agregar `.env.local`
+
+---
+
+## 📖 Referencia Rápida
+
+| Categoría | Ejemplo | Versionado |
+|-----------|---------|-----------|
+| Código fuente | `apps/`, `src/` | ✅ Sí |
+| Dependencias | `node_modules/` | ❌ No |
+| Build output | `dist/`, `build/` | ❌ No |
+| Configuración local | `.env`, `.vscode/` | ❌ No |
+| Configuración proyecto | `config/`, `package.json` | ✅ Sí |
+| Credenciales | `.aws/`, `*.pem` | ❌ No |
+| Tests | `test/` | ✅ Sí |
+| Logs | `*.log`, `logs/` | ❌ No |
+| Terraform state | `.tfstate` | ❌ No |
+
+---
+
+**Última actualización:** 20 Enero 2026

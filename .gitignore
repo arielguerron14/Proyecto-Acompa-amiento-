@@ -30,6 +30,10 @@ terraform.tfvars
 terraform_plan.tfplan
 .terraform.lock.hcl
 
+# Local artifacts (AWS inventory cache - auto-generated)
+artifacts/
+*.bak.json
+
 # Python
 .venv/
 __pycache__/
@@ -60,3 +64,8 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# MQTT
+mqtt/passwords.txt
+mqtt/data/
+mqtt/logs/
