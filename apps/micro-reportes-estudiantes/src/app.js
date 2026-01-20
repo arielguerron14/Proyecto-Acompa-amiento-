@@ -5,6 +5,23 @@ const { applySecurity } = require('./middlewares/security');
 const { requestLogger, logger } = require('./middlewares/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 const { optionalAuth } = require('shared-auth');
+
+// CQRS Infrastructure
+const { CommandBus, QueryBus } = require('./infrastructure/config/cqrs-bus');
+
+// Commands
+const RegistrarEventoCommand = require('./application/commands/RegistrarEventoCommand');
+
+// Queries
+const GetReporteByEstudianteQuery = require('./application/queries/GetReporteByEstudianteQuery');
+
+// Handlers
+const RegistrarEventoCommandHandler = require('./application/command-handlers/RegistrarEventoCommandHandler');
+const GetReporteByEstudianteQueryHandler = require('./application/query-handlers/GetReporteByEstudianteQueryHandler');
+
+// Repository
+const ReporteEstudianteRepository = require('./infrastructure/persistence-write/ReporteEstudianteRepository');
+
 const reportesRoutes = require('./routes/reportesEstRoutes');
 
 const app = express();
@@ -20,6 +37,21 @@ connectDB()
     logger.error(e);
     process.exit(1);
   });
+
+// Initialize CQRS buses
+const commandBus = new CommandBus();
+const queryBus = new QueryBus();
+const reporteRepository = new ReporteEstudianteRepository();
+
+// Register command handlers
+commandBus.register(RegistrarEventoCommand, new RegistrarEventoCommandHandler(reporteRepository));
+
+// Register query handlers
+queryBus.register(GetReporteByEstudianteQuery, new GetReporteByEstudianteQueryHandler(reporteRepository));
+
+// Make buses available to controllers
+app.locals.commandBus = commandBus;
+app.locals.queryBus = queryBus;
 
 app.use('/reportes', reportesRoutes);
 app.get('/health', (req, res) => res.json({ service: 'micro-reportes-estudiantes', status: 'ok' }));
