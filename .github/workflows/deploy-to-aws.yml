@@ -435,17 +435,17 @@ jobs:
             cd Proyecto-Acompa-amiento-
           fi
           
-          echo "🐳 Starting messaging services (Kafka, RabbitMQ, MQTT)..."
+          echo "🐳 Starting messaging services (Kafka, RabbitMQ)..."
           export ENVIRONMENT=prod
           export COMPOSE_PROJECT_NAME=acompanamiento-messaging
           
-          docker-compose up -d kafka zookeeper rabbitmq mqtt-broker
+          docker-compose up -d kafka zookeeper rabbitmq
           
           echo "⏳ Waiting for services to stabilize..."
           sleep 15
           
           echo "📊 Service status:"
-          docker-compose ps kafka zookeeper rabbitmq mqtt-broker
+          docker-compose ps kafka zookeeper rabbitmq
           
           echo "✅ Messaging services deployment complete"
           
