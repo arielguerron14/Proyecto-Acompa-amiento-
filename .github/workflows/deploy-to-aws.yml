@@ -106,9 +106,16 @@ jobs:
           sudo apt-get update -qq
           
           # Install Node.js 18.x
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - > /dev/null 2>&1 || true
-          sudo apt-get install -y -qq nodejs git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
-          sudo npm install -g pm2 > /dev/null 2>&1 || true
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          sudo apt-get install -y -qq nodejs git curl
+          
+          # Verify npm is installed
+          if ! command -v npm &> /dev/null; then
+            echo "⚠️  npm not found, installing separately..."
+            sudo apt-get install -y npm
+          fi
+          
+          sudo npm install -g pm2
 
           echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
@@ -154,9 +161,16 @@ jobs:
           sudo apt-get update -qq
           
           # Install Node.js 18.x
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - > /dev/null 2>&1 || true
-          sudo apt-get install -y -qq nodejs git curl > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
-          sudo npm install -g pm2 > /dev/null 2>&1 || true
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          sudo apt-get install -y -qq nodejs git curl
+          
+          # Verify npm is installed
+          if ! command -v npm &> /dev/null; then
+            echo "⚠️  npm not found, installing separately..."
+            sudo apt-get install -y npm
+          fi
+          
+          sudo npm install -g pm2
 
           echo "🔄 Pulling latest code..."
           if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
@@ -205,8 +219,15 @@ jobs:
           sudo apt-get update -qq
           
           # Install Node.js 18.x (required by microservices)
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - > /dev/null 2>&1 || true
-          sudo apt-get install -y -qq nodejs git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          sudo apt-get install -y -qq nodejs git docker.io docker-compose
+          
+          # Verify npm is installed
+          if ! command -v npm &> /dev/null; then
+            echo "⚠️  npm not found, installing separately..."
+            sudo apt-get install -y npm
+          fi
+          
           sudo usermod -aG docker $USER 2>/dev/null || true
           sudo systemctl start docker 2>/dev/null || true
 
