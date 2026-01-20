@@ -16,15 +16,7 @@ RUN mkdir -p node_modules && \
     ln -sf /usr/src/shared-auth node_modules/shared-auth && \
     ln -sf /usr/src/shared-monitoring node_modules/shared-monitoring
 
-# Copy entrypoint script (from repo root)
-RUN echo '#!/bin/bash' > /usr/src/app/entrypoint.sh && \
-    echo 'set -e' >> /usr/src/app/entrypoint.sh && \
-    echo 'echo "🚀 Starting micro-notificaciones..."' >> /usr/src/app/entrypoint.sh && \
-    echo 'exec "$@"' >> /usr/src/app/entrypoint.sh && \
-    chmod +x /usr/src/app/entrypoint.sh
-
 ENV NODE_ENV=production
 EXPOSE 5006
 
-ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
 CMD ["node", "src/app.js"]
