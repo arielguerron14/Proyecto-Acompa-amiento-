@@ -35,9 +35,6 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_PROCESS_ROLES: broker
-      KAFKA_NODE_ID: 1
-      CLUSTER_ID: MkwNYQ4lT7e-6BrE5gVHZg
 
   # RabbitMQ - Message queue for service communication
   rabbitmq:
