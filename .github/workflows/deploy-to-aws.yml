@@ -110,8 +110,8 @@ jobs:
           sudo rm -rf /usr/lib/node_modules /usr/include/node /usr/share/doc/nodejs /usr/share/doc/libnode* 2>/dev/null || true
           sudo apt-get autoremove -y 2>/dev/null || true
 
-          # Install Node.js 18.x
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          # Install Node.js 20.x
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
           sudo apt-get install -y -qq nodejs git curl
           
           # Verify npm is installed
@@ -170,8 +170,8 @@ jobs:
           sudo rm -rf /usr/lib/node_modules /usr/include/node /usr/share/doc/nodejs /usr/share/doc/libnode* 2>/dev/null || true
           sudo apt-get autoremove -y 2>/dev/null || true
 
-          # Install Node.js 18.x
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          # Install Node.js 20.x
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
           sudo apt-get install -y -qq nodejs git curl
           
           # Verify npm is installed
@@ -233,8 +233,8 @@ jobs:
           sudo rm -rf /usr/lib/node_modules /usr/include/node /usr/share/doc/nodejs /usr/share/doc/libnode* 2>/dev/null || true
           sudo apt-get autoremove -y 2>/dev/null || true
 
-          # Install Node.js 18.x (required by microservices)
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          # Install Node.js 20.x (required by microservices)
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
           sudo apt-get install -y -qq nodejs git docker.io docker-compose
           
           # Verify npm is installed
@@ -258,7 +258,17 @@ jobs:
           
           echo "📥 Installing dependencies..."
           npm install --legacy-peer-deps
-          
+
+          echo "🧹 Cleaning disk and Docker cache to free space..."
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          sudo journalctl --vacuum-size=200M || true
+          sudo docker system prune -af || true
+          sudo docker builder prune -af || true
+          sudo docker volume prune -f || true
+          sudo rm -rf /var/lib/docker/tmp/* || true
+          df -h
+
           echo "🐳 Starting core microservices (Auth, Estudiantes, Maestros)..."
           export ENVIRONMENT=prod
           export COMPOSE_PROJECT_NAME=acompanamiento-core
