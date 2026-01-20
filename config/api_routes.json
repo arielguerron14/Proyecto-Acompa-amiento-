@@ -1,35 +1,115 @@
 {
-  "routes": {
-    "auth": {
-      "register": "/auth/register",
-      "login": "/auth/login",
-      "verify": "/auth/verify-token",
-      "me": "/auth/me"
+    "environment": "local",
+    "updated_at": "2026-01-20T20:33:54.800887",
+    "services": {
+        "api-gateway": {
+            "baseUrl": "http://localhost:8080",
+            "routes": {
+                "health": "/health",
+                "metrics": "/metrics"
+            }
+        },
+        "auth": {
+            "baseUrl": "http://localhost:3000",
+            "routes": {
+                "register": "/auth/register",
+                "login": "/auth/login",
+                "logout": "/auth/logout",
+                "verify": "/auth/verify-token",
+                "refresh": "/auth/refresh",
+                "me": "/auth/me",
+                "profile": "/auth/profile"
+            }
+        },
+        "estudiantes": {
+            "baseUrl": "http://localhost:3001",
+            "routes": {
+                "create": "/estudiantes/create",
+                "get": "/estudiantes/:id",
+                "list": "/estudiantes",
+                "update": "/estudiantes/:id",
+                "delete": "/estudiantes/:id",
+                "search": "/estudiantes/search",
+                "reservas": {
+                    "create": "/estudiantes/reservas/create",
+                    "list": "/estudiantes/reservas",
+                    "get": "/estudiantes/reservas/:id",
+                    "confirm": "/estudiantes/reservas/:id/confirmar",
+                    "cancel": "/estudiantes/reservas/:id/cancelar"
+                },
+                "calificaciones": "/estudiantes/calificaciones/:id",
+                "historial": "/estudiantes/historial/:id"
+            }
+        },
+        "maestros": {
+            "baseUrl": "http://localhost:3002",
+            "routes": {
+                "create": "/maestros/create",
+                "get": "/maestros/:id",
+                "list": "/maestros",
+                "update": "/maestros/:id",
+                "delete": "/maestros/:id",
+                "search": "/maestros/search",
+                "horarios": "/maestros/horarios/:id",
+                "asignaciones": "/maestros/asignaciones/:id",
+                "calificaciones": "/maestros/calificaciones"
+            }
+        },
+        "analytics": {
+            "baseUrl": "http://localhost:5007",
+            "routes": {
+                "metrics": "/analytics/metrics",
+                "events": "/analytics/events",
+                "dashboard": "/analytics/dashboard",
+                "reports": "/analytics/reports"
+            }
+        },
+        "notificaciones": {
+            "baseUrl": "http://localhost:5006",
+            "routes": {
+                "send": "/notificaciones/send",
+                "list": "/notificaciones/list/:id",
+                "mark-read": "/notificaciones/:id/read",
+                "delete": "/notificaciones/:id/delete"
+            }
+        },
+        "reportes-estudiantes": {
+            "baseUrl": "http://localhost:5003",
+            "routes": {
+                "generate": "/reportes/generar",
+                "get": "/reportes/:id",
+                "list": "/reportes/estudiante/:id",
+                "export": "/reportes/:id/export"
+            }
+        },
+        "reportes-maestros": {
+            "baseUrl": "http://localhost:5004",
+            "routes": {
+                "generate": "/reportes/generar",
+                "get": "/reportes/:id",
+                "list": "/reportes/maestro/:id",
+                "export": "/reportes/:id/export"
+            }
+        }
     },
-    "estudiantes": {
-      "create": "/estudiantes/create",
-      "get": "/estudiantes/:id",
-      "list": "/estudiantes",
-      "update": "/estudiantes/:id",
-      "delete": "/estudiantes/:id",
-      "reservas": {
-        "create": "/estudiantes/reservas/create",
-        "list": "/estudiantes/reservas",
-        "get": "/estudiantes/reservas/:id",
-        "confirm": "/estudiantes/reservas/:id/confirmar"
-      }
-    },
-    "maestros": {
-      "create": "/maestros/create",
-      "get": "/maestros/:id",
-      "list": "/maestros",
-      "update": "/maestros/:id",
-      "delete": "/maestros/:id",
-      "horarios": "/maestros/horarios"
-    },
-    "reportes": {
-      "estudiantes": "/reportes/estudiantes/:id",
-      "maestros": "/reportes/maestros/:id"
+    "databases": {
+        "mongodb": {
+            "host": "localhost",
+            "port": 27017,
+            "protocol": "mongodb",
+            "url": "mongodb://localhost:27017"
+        },
+        "postgresql": {
+            "host": "localhost",
+            "port": 5432,
+            "protocol": "postgresql",
+            "url": "postgresql://localhost:5432"
+        },
+        "redis": {
+            "host": "localhost",
+            "port": 6379,
+            "protocol": "redis",
+            "url": "redis://localhost:6379"
+        }
     }
-  }
 }
