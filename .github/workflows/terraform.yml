@@ -161,20 +161,30 @@ jobs:
           echo "No unassociated EIPs found"
         fi
         
-        # Delete security group by name (works across all VPCs)
-        SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=web-sg --query 'SecurityGroups[0].GroupId' --output text || true)
-        if [ ! -z "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
-          echo "Found existing security group: $SG_ID"
-          # Revoke all rules
-          aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true
-          aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 80 --cidr 0.0.0.0/0 2>/dev/null || true
-          aws ec2 revoke-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 0.0.0.0/0 2>/dev/null || true
-          # Try to delete with retries
-          for attempt in 1 2 3; do
-            aws ec2 delete-security-group --group-id $SG_ID 2>/dev/null && echo "Deleted existing security group" && break || echo "Attempt $attempt: Could not delete security group yet..."
-            if [ $attempt -lt 3 ]; then sleep 5; fi
-          done
-        fi
+        # Delete all security groups created by this project
+        echo "Deleting security groups..."
+        SG_NAMES=("web-sg" "bastion-sg" "api-gateway-sg" "microservices-sg" "database-sg" "messaging-sg" "monitoring-sg")
+        for SG_NAME in "${SG_NAMES[@]}"; do
+          SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=$SG_NAME --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
+          if [ ! -z "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
+            echo "Found security group $SG_NAME: $SG_ID"
+            # Revoke all ingress rules
+            aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].IpPermissions' --output json > /tmp/ingress_rules.json 2>/dev/null || true
+            if [ -s /tmp/ingress_rules.json ] && [ "$(cat /tmp/ingress_rules.json)" != "[]" ]; then
+              aws ec2 revoke-security-group-ingress --group-id $SG_ID --ip-permissions file:///tmp/ingress_rules.json 2>/dev/null || true
+            fi
+            # Revoke all egress rules
+            aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].IpPermissionsEgress' --output json > /tmp/egress_rules.json 2>/dev/null || true
+            if [ -s /tmp/egress_rules.json ] && [ "$(cat /tmp/egress_rules.json)" != "[]" ]; then
+              aws ec2 revoke-security-group-egress --group-id $SG_ID --ip-permissions file:///tmp/egress_rules.json 2>/dev/null || true
+            fi
+            # Try to delete with retries
+            for attempt in 1 2 3; do
+              aws ec2 delete-security-group --group-id $SG_ID 2>/dev/null && echo "Deleted $SG_NAME" && break || echo "Attempt $attempt: Could not delete $SG_NAME yet..."
+              if [ $attempt -lt 3 ]; then sleep 5; fi
+            done
+          fi
+        done
 
     - name: Debug - show runner paths and terraform folder
       run: |

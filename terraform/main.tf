@@ -92,36 +92,18 @@ resource "aws_route_table_association" "public_assoc" {
   route_table_id = aws_route_table.public[0].id
 }
 
-# Security Group
-resource "aws_security_group" "web_sg" {
-  count = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
-  name   = "web-sg"
+# Security Groups
+
+# 1. Bastion Security Group - Solo SSH desde cualquier lugar
+resource "aws_security_group" "bastion_sg" {
+  count  = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
+  name   = "bastion-sg"
   vpc_id = local.vpc_id
 
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
+    description = "SSH from anywhere"
     from_port   = 22
     to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 0
-    to_port     = 65535
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -131,6 +113,372 @@ resource "aws_security_group" "web_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "bastion-sg"
+    Project = "lab-8-ec2"
+  }
+}
+
+# 2. Web/Frontend Security Group - HTTP, HTTPS y SSH desde bastion
+resource "aws_security_group" "web_sg" {
+  count  = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
+  name   = "web-sg"
+  vpc_id = local.vpc_id
+
+  ingress {
+    description = "HTTP from anywhere"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS from anywhere"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description     = "SSH from bastion"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "web-sg"
+    Project = "lab-8-ec2"
+  }
+}
+
+# 3. API Gateway Security Group - Puertos API + SSH desde bastion
+resource "aws_security_group" "api_gateway_sg" {
+  count  = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
+  name   = "api-gateway-sg"
+  vpc_id = local.vpc_id
+
+  ingress {
+    description = "API Gateway HTTP"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "API Gateway from Web/Frontend"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    source_security_group_id = length(aws_security_group.web_sg) > 0 ? aws_security_group.web_sg[0].id : null
+  }
+
+  ingress {
+    description     = "SSH from bastion"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "api-gateway-sg"
+    Project = "lab-8-ec2"
+  }
+}
+
+# 4. Microservices Security Group - Puertos 3000-5010 + SSH desde bastion
+resource "aws_security_group" "microservices_sg" {
+  count  = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
+  name   = "microservices-sg"
+  vpc_id = local.vpc_id
+
+  ingress {
+    description = "Microservices ports from VPC"
+    from_port   = 3000
+    to_port     = 5010
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    description = "Microservices ports from API Gateway"
+    from_port   = 3000
+    to_port     = 5010
+    protocol    = "tcp"
+    source_security_group_id = length(aws_security_group.api_gateway_sg) > 0 ? aws_security_group.api_gateway_sg[0].id : null
+  }
+
+  ingress {
+    description     = "SSH from bastion"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "microservices-sg"
+    Project = "lab-8-ec2"
+  }
+}
+
+# 5. Database Security Group - MongoDB, PostgreSQL, Redis
+resource "aws_security_group" "database_sg" {
+  count  = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
+  name   = "database-sg"
+  vpc_id = local.vpc_id
+
+  ingress {
+    description = "MongoDB from VPC"
+    from_port   = 27017
+    to_port     = 27017
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    description = "MongoDB from microservices"
+    from_port   = 27017
+    to_port     = 27017
+    protocol    = "tcp"
+    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+  }
+
+  ingress {
+    description = "PostgreSQL from VPC"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    description = "PostgreSQL from microservices"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+  }
+
+  ingress {
+    description = "Redis from VPC"
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    description = "Redis from microservices"
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+  }
+
+  ingress {
+    description     = "SSH from bastion"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "database-sg"
+    Project = "lab-8-ec2"
+  }
+}
+
+# 6. Messaging Security Group - Kafka, RabbitMQ, MQTT
+resource "aws_security_group" "messaging_sg" {
+  count  = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
+  name   = "messaging-sg"
+  vpc_id = local.vpc_id
+
+  ingress {
+    description = "Kafka from VPC"
+    from_port   = 9092
+    to_port     = 9092
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    description = "Kafka from microservices"
+    from_port   = 9092
+    to_port     = 9092
+    protocol    = "tcp"
+    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+  }
+
+  ingress {
+    description = "RabbitMQ from VPC"
+    from_port   = 5672
+    to_port     = 5672
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    description = "RabbitMQ from microservices"
+    from_port   = 5672
+    to_port     = 5672
+    protocol    = "tcp"
+    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+  }
+
+  ingress {
+    description = "RabbitMQ Management"
+    from_port   = 15672
+    to_port     = 15672
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Acceso web management
+  }
+
+  ingress {
+    description = "MQTT from VPC"
+    from_port   = 1883
+    to_port     = 1883
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    description = "MQTT from microservices"
+    from_port   = 1883
+    to_port     = 1883
+    protocol    = "tcp"
+    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+  }
+
+  ingress {
+    description = "MQTT WebSocket"
+    from_port   = 9001
+    to_port     = 9001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description     = "SSH from bastion"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "messaging-sg"
+    Project = "lab-8-ec2"
+  }
+}
+
+# 7. Monitoring Security Group - Prometheus, Grafana
+resource "aws_security_group" "monitoring_sg" {
+  count  = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
+  name   = "monitoring-sg"
+  vpc_id = local.vpc_id
+
+  ingress {
+    description = "Prometheus"
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Acceso web
+  }
+
+  ingress {
+    description = "Grafana"
+    from_port   = 3001
+    to_port     = 3001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Acceso web
+  }
+
+  ingress {
+    description = "Prometheus scraping from VPC"
+    from_port   = 9090
+    to_port     = 9100
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    description     = "SSH from bastion"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "monitoring-sg"
+    Project = "lab-8-ec2"
+  }
+}
+
+# Local: mapeo de instancias a security groups
+locals {
+  instance_sg_mapping = {
+    "EC-Bastion"           = length(aws_security_group.bastion_sg) > 0 ? [aws_security_group.bastion_sg[0].id] : []
+    "EC2-Frontend"         = length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : []
+    "EC2-API-Gateway"      = length(aws_security_group.api_gateway_sg) > 0 ? [aws_security_group.api_gateway_sg[0].id] : []
+    "EC2-Reportes"         = length(aws_security_group.microservices_sg) > 0 ? [aws_security_group.microservices_sg[0].id] : []
+    "EC2-CORE"             = length(aws_security_group.microservices_sg) > 0 ? [aws_security_group.microservices_sg[0].id] : []
+    "EC2-Monitoring"       = length(aws_security_group.monitoring_sg) > 0 ? [aws_security_group.monitoring_sg[0].id] : []
+    "EC2-Messaging"        = length(aws_security_group.messaging_sg) > 0 ? [aws_security_group.messaging_sg[0].id] : []
+    "EC2-Notificaciones"   = length(aws_security_group.microservices_sg) > 0 ? [aws_security_group.microservices_sg[0].id] : []
+    "EC2-DB"               = length(aws_security_group.database_sg) > 0 ? [aws_security_group.database_sg[0].id] : []
   }
 }
 
@@ -168,7 +516,10 @@ resource "aws_instance" "fixed" {
   instance_type = var.instance_type
   subnet_id     = length(local.subnet_ids) > 0 ? local.subnet_ids[0] : ""
   key_name      = var.ssh_key_name != "" ? var.ssh_key_name : null
-  vpc_security_group_ids = var.existing_security_group_id != "" ? [var.existing_security_group_id] : (length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : [])
+  vpc_security_group_ids = var.existing_security_group_id != "" ? [var.existing_security_group_id] : (
+    length(local.instance_sg_mapping[each.key]) > 0 ? local.instance_sg_mapping[each.key] : 
+    (length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : [])
+  )
   associate_public_ip_address = true
   user_data = local.user_data
   tags = {
@@ -201,7 +552,10 @@ resource "aws_lb" "main" {
   name               = "lab-alb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : []
+  security_groups    = concat(
+    length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : [],
+    length(aws_security_group.api_gateway_sg) > 0 ? [aws_security_group.api_gateway_sg[0].id] : []
+  )
   subnets            = local.alb_subnet_ids
   tags = {
     Name = "lab-alb"
