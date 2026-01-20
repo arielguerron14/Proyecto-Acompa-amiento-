@@ -541,21 +541,23 @@ jobs:
           fi
           
           echo "🐳 Creating database data directories..."
-          sudo mkdir -p /data/postgres /data/mongo /data/redis
+          sudo mkdir -p /data/postgres /data/mongo
           sudo chown -R $USER:$USER /data
           
            # Start Docker service if not running
            sudo systemctl start docker 2>/dev/null || true
          
           echo "🐳 Starting databases with Docker Compose..."
-          docker-compose -f docker-compose.databases.yml down -v 2>/dev/null || true
-          docker-compose -f docker-compose.databases.yml up -d
+          export ENVIRONMENT=prod
+          export COMPOSE_PROJECT_NAME=acompanamiento-db
+          
+          docker-compose up -d mongo postgres
           
           echo "⏳ Waiting for databases to start..."
           sleep 15
           
           echo "📊 Database status:"
-          docker-compose -f docker-compose.databases.yml ps
+          docker-compose ps mongo postgres
           
           echo "✅ Databases deployment complete"
           
