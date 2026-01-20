@@ -153,28 +153,25 @@ jobs:
             sudo npm install -g pm2 > /dev/null 2>&1 || true
 
             echo "🔄 Pulling latest code..."
-          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
-            cd /home/ubuntu/Proyecto-Acompa-amiento-
-            git pull origin main
-          else
-            cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
-            cd Proyecto-Acompa-amiento-
-          fi
+            if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
+              cd /home/ubuntu/Proyecto-Acompa-amiento-
+              git pull origin main
+            else
+              cd /home/ubuntu
+              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+              cd Proyecto-Acompa-amiento-
+            fi
           
-          # Copy config files
-          cp config/instance_ips.json /tmp/instance_ips.json
-          cp config/api_routes.json /tmp/api_routes.json
+            echo "📥 Installing dependencies (API Gateway)..."
+            cd /home/ubuntu/Proyecto-Acompa-amiento-/apps/api-gateway
+            npm install --legacy-peer-deps
           
-          echo "📥 Installing dependencies..."
-          npm install --legacy-peer-deps
+            echo "🚀 Starting API Gateway..."
+            pm2 delete "api-gateway" 2>/dev/null || true
+            pm2 start server.js --name "api-gateway" --env production
+            pm2 save
           
-          echo "🚀 Starting API Gateway..."
-          pm2 delete "api-gateway" 2>/dev/null || true
-          pm2 start apps/api-gateway/src/app.js --name "api-gateway" --env production
-          pm2 save
-          
-          echo "✅ API Gateway deployment complete"
+            echo "✅ API Gateway deployment complete"
           
           DEPLOY_APIGW
 
