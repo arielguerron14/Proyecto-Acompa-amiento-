@@ -1,9 +1,12 @@
-const SoapService = require('../services/soapService');
+const CallSOAPServiceCommand = require('../application/commands/CallSOAPServiceCommand');
+const TransformDataCommand = require('../application/commands/TransformDataCommand');
+const ListServicesQuery = require('../application/queries/ListServicesQuery');
+const GetWSDLQuery = require('../application/queries/GetWSDLQuery');
 
 /**
  * Realiza una llamada a un servicio SOAP legacy
  */
-exports.callSOAPService = async (req, res) => {
+exports.callSOAPService = async (req, res, commandBus) => {
   try {
     const { serviceName, method, args } = req.body;
 
@@ -13,37 +16,50 @@ exports.callSOAPService = async (req, res) => {
       });
     }
 
-    const result = await SoapService.callService(serviceName, method, args || {});
+    const command = new CallSOAPServiceCommand(serviceName, method, args);
+    const result = await commandBus.execute(command);
 
-    res.status(200).json({
+    res.status(result.status || 200).json({
       success: true,
-      service: serviceName,
-      method,
-      result,
+      service: result.result.service,
+      method: result.result.method,
+      result: result.result.result,
     });
   } catch (error) {
     console.error('[soapHandler.callSOAPService]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
   }
 };
 
 /**
  * Retorna la lista de servicios SOAP disponibles
  */
-exports.listServices = (req, res) => {
-  const services = SoapService.getAvailableServices();
+exports.listServices = async (req, res, queryBus) => {
+  try {
+    const query = new ListServicesQuery();
+    const result = await queryBus.execute(query);
 
-  res.status(200).json({
-    success: true,
-    count: services.length,
-    services,
-  });
+    res.status(result.status || 200).json({
+      success: true,
+      count: result.data.count,
+      services: result.data.services,
+    });
+  } catch (error) {
+    console.error('[soapHandler.listServices]', error);
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
+  }
 };
 
 /**
  * Transforma datos de REST a SOAP
  */
-exports.transformData = (req, res) => {
+exports.transformData = async (req, res, commandBus) => {
   try {
     const { data, format = 'json' } = req.body;
 
@@ -51,32 +67,43 @@ exports.transformData = (req, res) => {
       return res.status(400).json({ error: 'data is required' });
     }
 
-    const transformed = SoapService.transformData(data, format);
+    const command = new TransformDataCommand(data, format);
+    const result = await commandBus.execute(command);
 
-    res.status(200).json({
+    res.status(result.status || 200).json({
       success: true,
-      original: data,
-      transformed,
+      original: result.result.original,
+      transformed: result.result.transformed,
+      format: result.result.format,
     });
   } catch (error) {
     console.error('[soapHandler.transformData]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
   }
 };
 
 /**
  * Obtiene el WSDL de un servicio
  */
-exports.getWSDL = async (req, res) => {
+exports.getWSDL = async (req, res, queryBus) => {
   try {
     const { serviceName } = req.params;
 
-    const wsdl = await SoapService.getWSDL(serviceName);
+    const query = new GetWSDLQuery(serviceName);
+    const result = await queryBus.execute(query);
 
     res.setHeader('Content-Type', 'application/xml');
-    res.send(wsdl);
+    res.send(result.data);
   } catch (error) {
     console.error('[soapHandler.getWSDL]', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message || 'Internal Server Error' 
+    });
+  }
+};
   }
 };
