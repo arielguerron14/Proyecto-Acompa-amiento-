@@ -148,7 +148,7 @@ resource "aws_security_group" "web_sg" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+    security_groups = length(aws_security_group.bastion_sg) > 0 ? [aws_security_group.bastion_sg[0].id] : []
   }
 
   egress {
@@ -183,7 +183,7 @@ resource "aws_security_group" "api_gateway_sg" {
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    source_security_group_id = length(aws_security_group.web_sg) > 0 ? aws_security_group.web_sg[0].id : null
+    security_groups = length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : []
   }
 
   ingress {
@@ -191,7 +191,7 @@ resource "aws_security_group" "api_gateway_sg" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+    security_groups = length(aws_security_group.bastion_sg) > 0 ? [aws_security_group.bastion_sg[0].id] : []
   }
 
   egress {
@@ -226,7 +226,7 @@ resource "aws_security_group" "microservices_sg" {
     from_port   = 3000
     to_port     = 5010
     protocol    = "tcp"
-    source_security_group_id = length(aws_security_group.api_gateway_sg) > 0 ? aws_security_group.api_gateway_sg[0].id : null
+    security_groups = length(aws_security_group.api_gateway_sg) > 0 ? [aws_security_group.api_gateway_sg[0].id] : []
   }
 
   ingress {
@@ -234,7 +234,7 @@ resource "aws_security_group" "microservices_sg" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+    security_groups = length(aws_security_group.bastion_sg) > 0 ? [aws_security_group.bastion_sg[0].id] : []
   }
 
   egress {
@@ -269,7 +269,7 @@ resource "aws_security_group" "database_sg" {
     from_port   = 27017
     to_port     = 27017
     protocol    = "tcp"
-    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+    security_groups = length(aws_security_group.microservices_sg) > 0 ? [aws_security_group.microservices_sg[0].id] : []
   }
 
   ingress {
@@ -285,7 +285,7 @@ resource "aws_security_group" "database_sg" {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+    security_groups = length(aws_security_group.microservices_sg) > 0 ? [aws_security_group.microservices_sg[0].id] : []
   }
 
   ingress {
@@ -301,7 +301,7 @@ resource "aws_security_group" "database_sg" {
     from_port   = 6379
     to_port     = 6379
     protocol    = "tcp"
-    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+    security_groups = length(aws_security_group.microservices_sg) > 0 ? [aws_security_group.microservices_sg[0].id] : []
   }
 
   ingress {
@@ -309,7 +309,7 @@ resource "aws_security_group" "database_sg" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+    security_groups = length(aws_security_group.bastion_sg) > 0 ? [aws_security_group.bastion_sg[0].id] : []
   }
 
   egress {
@@ -344,7 +344,7 @@ resource "aws_security_group" "messaging_sg" {
     from_port   = 9092
     to_port     = 9092
     protocol    = "tcp"
-    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+    security_groups = length(aws_security_group.microservices_sg) > 0 ? [aws_security_group.microservices_sg[0].id] : []
   }
 
   ingress {
@@ -360,7 +360,7 @@ resource "aws_security_group" "messaging_sg" {
     from_port   = 5672
     to_port     = 5672
     protocol    = "tcp"
-    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+    security_groups = length(aws_security_group.microservices_sg) > 0 ? [aws_security_group.microservices_sg[0].id] : []
   }
 
   ingress {
@@ -384,7 +384,7 @@ resource "aws_security_group" "messaging_sg" {
     from_port   = 1883
     to_port     = 1883
     protocol    = "tcp"
-    source_security_group_id = length(aws_security_group.microservices_sg) > 0 ? aws_security_group.microservices_sg[0].id : null
+    security_groups = length(aws_security_group.microservices_sg) > 0 ? [aws_security_group.microservices_sg[0].id] : []
   }
 
   ingress {
@@ -400,7 +400,7 @@ resource "aws_security_group" "messaging_sg" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+    security_groups = length(aws_security_group.bastion_sg) > 0 ? [aws_security_group.bastion_sg[0].id] : []
   }
 
   egress {
@@ -451,7 +451,7 @@ resource "aws_security_group" "monitoring_sg" {
     from_port       = 22
     to_port         = 22
     protocol        = "tcp"
-    source_security_group_id = length(aws_security_group.bastion_sg) > 0 ? aws_security_group.bastion_sg[0].id : null
+    security_groups = length(aws_security_group.bastion_sg) > 0 ? [aws_security_group.bastion_sg[0].id] : []
   }
 
   egress {
