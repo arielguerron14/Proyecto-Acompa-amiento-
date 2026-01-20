@@ -1,20 +1,22 @@
 FROM node:18-alpine
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copy only package.json and package-lock.json first for better caching
-COPY apps/micro-analytics/package*.json ./
+# Copy root package files and all packages first
+COPY package*.json ./
+COPY packages ./packages
 
-# Install dependencies
-RUN npm ci --only=production --silent || npm install --production --silent
+# Copy app directory with package.json
+COPY apps/micro-analytics ./apps/micro-analytics
 
-# Copy source code
-COPY apps/micro-analytics/src ./src
+# Install all dependencies (including workspace packages)
+RUN npm install --omit=dev
 
-# Copy shared modules
-COPY packages/shared-monitoring ../shared-monitoring
+# Copy app source
+COPY apps/micro-analytics/src ./apps/micro-analytics/src
+
+WORKDIR /app/apps/micro-analytics
 
 ENV NODE_ENV=production
-# Build version: 2025-01-17-v2
 EXPOSE 5007
 CMD ["node", "src/app.js"]

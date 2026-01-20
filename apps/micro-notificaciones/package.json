@@ -17,6 +17,9 @@
   "license": "MIT",
   "dependencies": {
     "@proyecto/message-broker": "file:../message-broker",
+    "@proyecto/shared-auth": "file:../../packages/shared-auth",
+    "@proyecto/shared-config": "file:../../packages/shared-config",
+    "@proyecto/shared-monitoring": "file:../../packages/shared-monitoring",
     "axios": "^1.6.0",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",

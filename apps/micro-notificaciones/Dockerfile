@@ -1,22 +1,22 @@
 FROM node:18-alpine
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copy application code
-COPY apps/micro-notificaciones .
+# Copy root package files and all packages first
+COPY package*.json ./
+COPY packages ./packages
 
-# Copy shared modules
-COPY packages/shared-monitoring ../shared-monitoring
+# Copy app directory with package.json
+COPY apps/micro-notificaciones ./apps/micro-notificaciones
 
-# copy package manifests and install (production)
-RUN npm ci --only=production --silent || npm install --production --silent
+# Install all dependencies (including workspace packages)
+RUN npm install --omit=dev
 
-# create symlinks for shared dependencies (point to /usr/src/shared-auth)
-RUN mkdir -p node_modules && \
-    ln -sf /usr/src/shared-auth node_modules/shared-auth && \
-    ln -sf /usr/src/shared-monitoring node_modules/shared-monitoring
+# Copy app source
+COPY apps/micro-notificaciones/src ./apps/micro-notificaciones/src
+
+WORKDIR /app/apps/micro-notificaciones
 
 ENV NODE_ENV=production
 EXPOSE 5006
-
 CMD ["node", "src/app.js"]

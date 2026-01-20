@@ -41,16 +41,7 @@ class QueryBus {
   }
 }
 
-// Singleton instances
-const commandBus = new CommandBus();
-const queryBus = new QueryBus();
-
 module.exports = {
-  CommandBus: commandBus,
-  QueryBus: queryBus,
-  CQRSConfig: {
-    initialize: () => {
-      // Initialization handled by bus instances
-    }
-  }
+  CommandBus,
+  QueryBus,
 };

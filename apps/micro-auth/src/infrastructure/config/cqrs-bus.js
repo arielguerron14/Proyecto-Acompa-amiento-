@@ -1,7 +1,6 @@
 /**
- * CQRS Bus
- * Orquesta la ejecución de Commands y Queries
- * Patrón de Bus que desacopla los controllers de los handlers
+ * CQRS Bus Configuration
+ * Centraliza la configuración de commands, queries y sus handlers
  */
 
 class CommandBus {
@@ -9,30 +8,17 @@ class CommandBus {
     this.handlers = new Map();
   }
 
-  /**
-   * Registra un handler para un comando
-   */
-  register(commandClass, handler) {
-    const commandName = commandClass.name;
+  register(commandName, handler) {
     this.handlers.set(commandName, handler);
     console.log(`✓ Registered command handler: ${commandName}`);
   }
 
-  /**
-   * Ejecuta un comando
-   */
   async execute(command) {
-    const commandName = command.constructor.name;
-    const handler = this.handlers.get(commandName);
-
+    const handler = this.handlers.get(command.constructor.name);
     if (!handler) {
-      const error = new Error(`No handler registered for command: ${commandName}`);
-      error.status = 500;
-      throw error;
+      throw new Error(`No handler registered for command: ${command.constructor.name}`);
     }
-
-    console.log(`[CommandBus] Executing: ${commandName}`);
-    return handler.handle(command);
+    return await handler.handle(command);
   }
 }
 
@@ -41,34 +27,21 @@ class QueryBus {
     this.handlers = new Map();
   }
 
-  /**
-   * Registra un handler para una query
-   */
-  register(queryClass, handler) {
-    const queryName = queryClass.name;
+  register(queryName, handler) {
     this.handlers.set(queryName, handler);
     console.log(`✓ Registered query handler: ${queryName}`);
   }
 
-  /**
-   * Ejecuta una query
-   */
   async execute(query) {
-    const queryName = query.constructor.name;
-    const handler = this.handlers.get(queryName);
-
+    const handler = this.handlers.get(query.constructor.name);
     if (!handler) {
-      const error = new Error(`No handler registered for query: ${queryName}`);
-      error.status = 500;
-      throw error;
+      throw new Error(`No handler registered for query: ${query.constructor.name}`);
     }
-
-    console.log(`[QueryBus] Executing: ${queryName}`);
-    return handler.handle(query);
+    return await handler.handle(query);
   }
 }
 
 module.exports = {
   CommandBus,
-  QueryBus
+  QueryBus,
 };
