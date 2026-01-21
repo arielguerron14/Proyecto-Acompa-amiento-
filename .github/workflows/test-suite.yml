@@ -193,11 +193,15 @@ jobs:
       - name: 🚀 Start microservices
         run: |
           mkdir -p logs
-          cd apps/micro-auth && npm start > ../../logs/auth.log 2>&1 &
-          cd ../micro-estudiantes && npm start > ../../logs/estudiantes.log 2>&1 &
-          cd ../micro-maestros && npm start > ../../logs/maestros.log 2>&1 &
-          cd ../micro-reportes-estudiantes && npm start > ../../logs/reportes.log 2>&1 &
-          cd ../..
+          # Start each service in its own subshell to avoid directory confusion
+          (cd apps/micro-auth && npm start > ../../logs/auth.log 2>&1) &
+          sleep 1
+          (cd apps/micro-estudiantes && npm start > ../../logs/estudiantes.log 2>&1) &
+          sleep 1
+          (cd apps/micro-maestros && npm start > ../../logs/maestros.log 2>&1) &
+          sleep 1
+          (cd apps/micro-reportes-estudiantes && npm start > ../../logs/reportes.log 2>&1) &
+          sleep 1
           
           # Wait for services to be ready with retries
           cat > wait-for-services.js << 'WAITEOF'
