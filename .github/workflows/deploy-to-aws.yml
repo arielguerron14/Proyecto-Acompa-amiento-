@@ -102,6 +102,10 @@ jobs:
           
           set -e
           
+          # Disable git interactive prompts in non-TTY environments
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_ASKPASS=/bin/true
+          
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
 
@@ -172,6 +176,10 @@ jobs:
           
           set -e
           
+          # Disable git interactive prompts in non-TTY environments
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_ASKPASS=/bin/true
+          
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
 
@@ -235,6 +243,10 @@ jobs:
             ${{ env.SERVICES_USER }}@${CORE_IP} << 'DEPLOY_CORE'
           
           set -e
+          
+          # Disable git interactive prompts in non-TTY environments
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_ASKPASS=/bin/true
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
@@ -319,6 +331,10 @@ jobs:
           
           set -e
           
+          # Disable git interactive prompts in non-TTY environments
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_ASKPASS=/bin/true
+          
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
           sudo apt-get install -y -qq nodejs npm git docker.io docker-compose > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
@@ -375,6 +391,10 @@ jobs:
             ${{ env.SERVICES_USER }}@${NOTIF_IP} << 'DEPLOY_NOTIF'
           
           set -e
+          
+          # Disable git interactive prompts in non-TTY environments
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_ASKPASS=/bin/true
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
@@ -433,6 +453,10 @@ jobs:
           
           set -e
           
+          # Disable git interactive prompts in non-TTY environments
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_ASKPASS=/bin/true
+          
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
           sudo apt-get install -y -qq docker.io docker-compose git > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
@@ -487,6 +511,10 @@ jobs:
           
           set -e
           
+          # Disable git interactive prompts in non-TTY environments
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_ASKPASS=/bin/true
+          
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
           sudo apt-get install -y -qq docker.io docker-compose git > /dev/null 2>&1 || echo "⚠️  Some packages already installed"
@@ -539,6 +567,10 @@ jobs:
             ${{ env.SERVICES_USER }}@${DB_IP} << 'DEPLOY_DATABASES'
           
           set -e
+          
+          # Disable git interactive prompts in non-TTY environments
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_ASKPASS=/bin/true
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
