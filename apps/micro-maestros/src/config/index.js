@@ -19,8 +19,9 @@ try {
 }
 
 const getMongoUri = () => {
-  if (process.env.MONGO_URI) return process.env.MONGO_URI;
+  // Prefer MONGODB_URI when both are present (compose sets this explicitly)
   if (process.env.MONGODB_URI) return process.env.MONGODB_URI;
+  if (process.env.MONGO_URI) return process.env.MONGO_URI;
   
   try {
     return sharedConfig.getMongoUrl();

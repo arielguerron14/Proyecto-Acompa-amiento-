@@ -1,10 +1,9 @@
 const mongoose = require('mongoose');
-const sharedConfig = require('shared-config');
+const { MONGO_URI } = require('../config');
 
 async function connectDB() {
   try {
-    const mongoUrl = process.env.MONGO_URI || sharedConfig.getMongoUrl();
-    await mongoose.connect(mongoUrl);
+    await mongoose.connect(MONGO_URI);
     console.log('MongoDB connected for micro-reportes-estudiantes');
   } catch (error) {
     console.error('MongoDB connection error:', error);

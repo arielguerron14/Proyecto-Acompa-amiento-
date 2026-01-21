@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acompañamiento Educativo - Autenticación</title>
+    <!-- Build Info: Updated via Copilot -->
+    <meta name="build-version" content="frontend-refresh-2026-01-21">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -12,6 +14,9 @@
             <div class="auth-header">
                 <h1 id="auth-title">Iniciar Sesión</h1>
                 <p id="auth-subtitle">Accede a tu cuenta</p>
+                <p id="build-banner" style="margin-top:8px;font-size:12px;color:#666;">
+                    ✅ Front actualizado (frontend-refresh-2026-01-21)
+                </p>
             </div>
 
             <div id="error-message" class="error-message hidden"></div>
@@ -54,7 +59,7 @@
         </div>
     </main>
 
-    <script src="js/extension-error-handler.js"></script>
+    <!-- Load API config before auth logic -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
 </body>

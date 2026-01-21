@@ -67,6 +67,7 @@ exports.register = async (req, res, next, commandBus) => {
  */
 exports.login = async (req, res, next, commandBus) => {
   try {
+    console.log(`[userController.login] Incoming request body:`, req.body);
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -81,11 +82,14 @@ exports.login = async (req, res, next, commandBus) => {
 
     // Ejecutar comando a través del CQRS Bus
     logger.info(`[userController.login] Executing LoginUserCommand for ${email}`);
+    console.log(`[userController.login] Executing LoginUserCommand for ${email}`);
     const result = await commandBus.execute(command);
 
+    console.log(`[userController.login] Login result:`, { status: 'ok', hasToken: !!result.token, userId: result.user?.userId });
     return res.status(200).json(result);
   } catch (error) {
     logger.error(`[userController.login] Error: ${error.message}`);
+    console.warn(`[userController.login] Error detail:`, error);
     const statusCode = error.status || 500;
     return res.status(statusCode).json({
       success: false,

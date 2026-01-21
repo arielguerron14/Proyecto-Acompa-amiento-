@@ -38,6 +38,26 @@ console.log(`  🔑 KEY: Change CORE_HOST once and all routes automatically upda
 
 const app = express();
 
+// Global static directory (optional UI)
+// Auto-detect a usable static directory:
+// 1) Respect STATIC_DIR env if it exists
+// 2) Fallback to /var/www/html
+// 3) Fallback to sibling frontend repo path: ../frontend-web/public
+let STATIC_DIR = process.env.STATIC_DIR || '/var/www/html';
+try {
+  const candidates = [
+    STATIC_DIR,
+    '/var/www/html',
+    path.resolve(__dirname, '..', 'frontend-web', 'public')
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      STATIC_DIR = candidate;
+      break;
+    }
+  }
+} catch (_) {}
+
 // Build CORS origins dynamically
 let corsOrigins = [
   'http://localhost:5500',
@@ -94,6 +114,49 @@ app.options('*', cors({
 // Middleware
 app.use(express.json({ limit: '1mb', type: 'application/json' }));
 
+// ----------------------------------------------------------------------------
+// Static UI serving (Optional): Serve frontend assets from /var/www/html at /app
+// ----------------------------------------------------------------------------
+try {
+  if (fs.existsSync(STATIC_DIR)) {
+    console.log(`🗂️  Serving static UI from ${STATIC_DIR} at /app`);
+    // Explicit index handler for /app (no trailing slash)
+    app.get('/app', (req, res) => {
+      const indexPath = path.join(STATIC_DIR, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).json({ error: 'index.html not found in static directory' });
+      }
+    });
+    // Static assets for /app/* paths
+    app.use('/app', express.static(STATIC_DIR));
+    // SPA fallback: /app/* -> index.html
+    app.get('/app/*', (req, res) => {
+      const indexPath = path.join(STATIC_DIR, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).json({ error: 'index.html not found in static directory' });
+      }
+    });
+
+    // Also serve static assets at root paths so index.html relative links work
+    app.use('/css', express.static(path.join(STATIC_DIR, 'css')));
+    app.use('/js', express.static(path.join(STATIC_DIR, 'js')));
+    app.use('/images', express.static(path.join(STATIC_DIR, 'images')));
+    app.use('/assets', express.static(path.join(STATIC_DIR, 'assets')));
+
+    // Also serve root-level static files (e.g., /estudiante.html)
+    // This will only serve if the file exists; otherwise it falls through
+    app.use(express.static(STATIC_DIR));
+  } else {
+    console.log(`ℹ️  Static dir not found (${STATIC_DIR}); skipping /app static serving`);
+  }
+} catch (e) {
+  console.warn('⚠️  Static UI setup failed:', e.message);
+}
+
 // Basic request logger
 app.use((req, res, next) => {
   req._startTime = Date.now();
@@ -119,6 +182,23 @@ app.use((req, res, next) => {
 // ============================================================================
 // DEDICATED HEALTH & CONFIG ENDPOINTS
 // ============================================================================
+
+// Root endpoint - simple response for ALB health checks
+app.get('/', (req, res) => {
+  // If static UI is available, serve index.html at root
+  try {
+    const indexPath = path.join(STATIC_DIR, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    }
+  } catch (_) {}
+  // Fallback JSON root
+  res.status(200).json({ 
+    message: 'API Gateway v1.0',
+    status: 'operational',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Health check endpoint (doesn't depend on microservices)
 app.get('/health', (req, res) => {

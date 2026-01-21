@@ -23,13 +23,14 @@ const getMongoUri = () => {
   console.log('  - MONGO_URI env:', process.env.MONGO_URI ? '✓ SET' : '✗ NOT SET');
   console.log('  - MONGODB_URI env:', process.env.MONGODB_URI ? '✓ SET' : '✗ NOT SET');
   
-  if (process.env.MONGO_URI) {
-    console.log('  → Using MONGO_URI:', process.env.MONGO_URI);
-    return process.env.MONGO_URI;
-  }
+  // Prefer MONGODB_URI when both are present (compose sets this explicitly)
   if (process.env.MONGODB_URI) {
     console.log('  → Using MONGODB_URI:', process.env.MONGODB_URI);
     return process.env.MONGODB_URI;
+  }
+  if (process.env.MONGO_URI) {
+    console.log('  → Using MONGO_URI:', process.env.MONGO_URI);
+    return process.env.MONGO_URI;
   }
   
   try {

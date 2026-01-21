@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 // API Gateway URL - uses environment variable or correct default IP
 // Environment variable should be passed as: API_GATEWAY_URL=http://184.72.179.150:8080
-const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://184.72.179.150:8080';
+const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://localhost:8080';
 
 const server = http.createServer((req, res) => {
     // Handle API proxy requests
@@ -98,4 +98,26 @@ const PORT = process.env.FRONTEND_PORT || process.env.PORT || 5500;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Frontend server running at http://0.0.0.0:${PORT}/`);
     console.log(`🔗 API Gateway proxied from: ${API_GATEWAY_URL}`);
+});
+
+// Handle graceful shutdown
+process.on('SIGINT', () => {
+    console.log('\nShutting down gracefully...');
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    console.log('\nTerminating gracefully...');
+    process.exit(0);
+});
+
+// Handle errors
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
 });

@@ -105,21 +105,17 @@ Reporte final consolidado de todos los tests.
 - Cada 4 horas (programado)
 - Manual (workflow_dispatch)
 
-**Endpoints Validados:**
+**Endpoints Validados (Nginx/ALB):**
 
 ```javascript
-Frontend:
-  - http://34.225.177.78:5500              (puerto 5500)
+ALB (Production):
+  - http://<ALB_DNS>/health   // Health check del nginx
+  - http://<ALB_DNS>/         // Root endpoint servido por nginx
 
-API Gateway (Production):
-  - http://184.72.179.150:8080/health      (puerto 8080)
-  - http://184.72.179.150:8080/status
-
-Local Services (for reference):
-  - http://localhost:3001/auth/health
-  - http://localhost:3002/estudiantes/health
-  - http://localhost:3003/maestros/health
-  - http://localhost:3004/reportes/health
+Notas:
+  - `<ALB_DNS>` puede pasarse como input del workflow (`alb_dns`).
+  - Por defecto, se usa el DNS conocido si no se provee input.
+  - La validación de servicios locales se removió aquí para enfocarse en producción.
 ```
 
 **Métricas Recolectadas:**

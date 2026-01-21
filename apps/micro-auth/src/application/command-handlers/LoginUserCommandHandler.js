@@ -21,9 +21,11 @@ class LoginUserCommandHandler {
 
   async handle(command) {
     try {
+      console.log(`[LoginUserCommandHandler] Attempt login for: ${command.email}`);
       // 1. Buscar el usuario por email
       const user = await this.userRepository.findByEmail(command.email);
       if (!user) {
+        console.warn(`[LoginUserCommandHandler] User not found for email: ${command.email}`);
         const error = new Error('Credenciales inválidas');
         error.status = 401;
         throw error;
@@ -31,6 +33,7 @@ class LoginUserCommandHandler {
 
       // 2. Verificar que el usuario esté activo
       if (!user.isActive) {
+        console.warn(`[LoginUserCommandHandler] Inactive account for userId=${user.id}`);
         const error = new Error('Cuenta desactivada');
         error.status = 401;
         throw error;
@@ -41,12 +44,15 @@ class LoginUserCommandHandler {
       if (user.password.startsWith('$2')) {
         // Password is bcrypt hashed
         isPasswordValid = await bcrypt.compare(command.password, user.password);
+        console.log(`[LoginUserCommandHandler] Password hashed=true, compare=${isPasswordValid}`);
       } else {
         // Dev mode: plain text comparison
         isPasswordValid = user.password === command.password;
+        console.log(`[LoginUserCommandHandler] Password hashed=false, compare=${isPasswordValid}`);
       }
 
       if (!isPasswordValid) {
+        console.warn(`[LoginUserCommandHandler] Invalid credentials for userId=${user.id}`);
         const error = new Error('Credenciales inválidas');
         error.status = 401;
         throw error;

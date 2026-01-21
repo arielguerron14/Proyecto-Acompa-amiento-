@@ -5,18 +5,11 @@
 
 const User = require('../../domain/entities/User');
 const UserModel = require('../../models/User');
-const bcrypt = require('bcryptjs');
 
 class UserRepositoryMongo {
   async save(user) {
     try {
       const persistenceData = user.toPersistence();
-
-      // Hash password if it's not already hashed (for new users)
-      if (persistenceData.password && !persistenceData.password.startsWith('$2')) {
-        const salt = await bcrypt.genSalt(12);
-        persistenceData.password = await bcrypt.hash(persistenceData.password, salt);
-      }
 
       // Usar findByIdAndUpdate para upsert, o crear uno nuevo
       let result;
@@ -53,7 +46,9 @@ class UserRepositoryMongo {
 
   async findByEmail(email) {
     try {
-      const document = await UserModel.findOne({ email: email.toLowerCase() });
+      const queryEmail = (email || '').toLowerCase();
+      const document = await UserModel.findOne({ email: queryEmail });
+      console.log(`[UserRepositoryMongo] findByEmail(${queryEmail}) -> ${document ? 'FOUND' : 'NOT FOUND'}`);
       if (!document) return null;
 
       return User.fromPersistence(document);

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "dev": "node server-simple.cjs",
     "lint": "eslint . --ext js --report-unused-disable-directives --max-warnings 0",
     "build": "echo \"Build completed\"",
     "clean": "rm -rf dist build .next"

@@ -9,13 +9,15 @@ COPY packages ./packages
 # Copy app directory with package.json
 COPY apps/micro-analytics ./apps/micro-analytics
 
-# Install all dependencies (including workspace packages)
-RUN npm install --omit=dev
+# Install root dependencies first
+RUN npm install
 
-# Copy app source
-COPY apps/micro-analytics/src ./apps/micro-analytics/src
-
+# Go to micro-analytics and install fresh
 WORKDIR /app/apps/micro-analytics
+RUN rm -rf node_modules package-lock.json
+RUN npm install
+
+COPY apps/micro-analytics/src ./src
 
 ENV NODE_ENV=production
 EXPOSE 5007

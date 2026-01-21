@@ -4,6 +4,8 @@ const sharedConfig = require('shared-config');
 dotenv.config();
 
 const getMongoUri = () => {
+  // Prefer MONGODB_URI used by docker-compose
+  if (process.env.MONGODB_URI) return process.env.MONGODB_URI;
   if (process.env.MONGO_URI) return process.env.MONGO_URI;
   if (process.env.MONGO_URL) return process.env.MONGO_URL;
   
@@ -13,7 +15,7 @@ const getMongoUri = () => {
     console.warn('⚠️  sharedConfig no disponible:', err.message);
   }
   
-  return `mongodb://${process.env.DB_HOST || '172.31.79.193'}:${process.env.DB_PORT || 27017}/reportesestdb`;
+  return `mongodb://${process.env.DB_HOST || 'mongo'}:${process.env.DB_PORT || 27017}/reportes-estudiantes`;
 };
 
 module.exports = {

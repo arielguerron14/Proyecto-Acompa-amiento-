@@ -57,6 +57,15 @@ locals {
   subnet_ids = var.subnet_id != "" ? [var.subnet_id] : (length(local.created_subnet_ids) > 0 ? local.created_subnet_ids : local.existing_subnet_ids)
 }
 
+# Distribute public subnets across provided AZs (one subnet per AZ)
+locals {
+  public_subnet_az_map = {
+    for idx, cidr in var.public_subnets : cidr => (
+      length(var.azs) > idx ? var.azs[idx] : (length(var.azs) > 0 ? var.azs[0] : data.aws_availability_zones.azs[0].names[0])
+    )
+  }
+}
+
 # Subnets
 resource "aws_subnet" "public" {
   for_each = var.existing_vpc_id == "" && var.create_vpc ? toset(var.public_subnets) : toset([])
@@ -64,7 +73,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = local.vpc_id
   cidr_block              = each.value
   map_public_ip_on_launch = true
-  availability_zone       = length(var.azs) > 0 ? var.azs[0] : data.aws_availability_zones.azs[0].names[0]
+  availability_zone       = lookup(local.public_subnet_az_map, each.value, (length(var.azs) > 0 ? var.azs[0] : data.aws_availability_zones.azs[0].names[0]))
   tags = { Name = "public-${each.value}" }
 }
 
@@ -169,6 +178,14 @@ resource "aws_security_group" "api_gateway_sg" {
   count  = var.create_security_group && var.existing_security_group_id == "" ? 1 : 0
   name   = "api-gateway-sg"
   vpc_id = local.vpc_id
+
+  ingress {
+    description = "HTTP for ALB/clients"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   ingress {
     description = "API Gateway HTTP"
@@ -484,13 +501,254 @@ locals {
 
 # User Data (Ubuntu + docker)
 locals {
-  user_data = <<EOF
+  # Default user data: start simple health server for general instances
+  user_data_default = <<EOF
 #!/bin/bash
+set -euxo pipefail
+
 apt update -y
-apt install -y docker.io
+apt install -y docker.io python3
 systemctl enable docker
 systemctl start docker
 usermod -aG docker ubuntu
+
+# Simple health HTTP server on port 80 for ALB checks
+cat >/opt/health_server.py <<'PY'
+import socket
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+class Handler(BaseHTTPRequestHandler):
+  def do_GET(self):
+    if self.path in ['/', '/health']:
+      self.send_response(200)
+      self.send_header('Content-Type', 'application/json')
+      self.end_headers()
+      self.wfile.write(b'{"status":"ok"}')
+    else:
+      self.send_response(404)
+      self.end_headers()
+
+def run():
+  server = HTTPServer(('0.0.0.0', 80), Handler)
+  server.serve_forever()
+
+if __name__ == '__main__':
+  run()
+PY
+
+cat >/etc/systemd/system/health-server.service <<'UNIT'
+[Unit]
+Description=Simple Health HTTP Server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/health_server.py
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now health-server
+echo "REV=20260121-default" > /opt/health_rev
+EOF
+
+  # API Gateway-specific user data: install Node, pm2, Docker, Mongo, clone repo and start services
+  user_data_gateway = <<EOF
+#!/bin/bash
+set -euxo pipefail
+
+apt update -y
+apt install -y docker.io docker-compose-plugin python3 curl ca-certificates gnupg git unzip
+systemctl enable docker
+systemctl start docker
+usermod -aG docker ubuntu
+
+# Simple health server to serve / and /health on port 80 (parallel to gateway)
+cat >/opt/health_server.py <<'PY'
+import http.client
+import socket
+import os
+import mimetypes
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# Minimal proxying health server: serves '/' and '/health' locally,
+# serves static files for '/app' from a local directory, and proxies
+# everything else to API Gateway at 127.0.0.1:8080
+STATIC_BASES = [
+  '/opt/Proyecto-Acompa-amiento-/apps/frontend-web/public',
+  '/var/www/html'
+]
+
+class Handler(BaseHTTPRequestHandler):
+  protocol_version = 'HTTP/1.1'
+
+  def _send_json(self, code, payload):
+    body = payload.encode('utf-8')
+    self.send_response(code)
+    self.send_header('Content-Type', 'application/json')
+    self.send_header('Content-Length', str(len(body)))
+    self.end_headers()
+    self.wfile.write(body)
+
+  def _serve_static(self):
+    base = next((b for b in STATIC_BASES if os.path.isdir(b)), None)
+    if not base:
+      return self._send_json(503, '{"error":"static_unavailable"}')
+
+    # Map /app(/path) to files under base
+    rel = self.path[4:] if self.path.startswith('/app') else self.path
+    rel = rel.lstrip('/')
+    if rel == '' or rel == 'app' or rel == 'app/':
+      rel = 'index.html'
+    path = os.path.join(base, rel.replace('app/', ''))
+
+    if not os.path.isfile(path):
+      # Fallback to index.html for client-side routing
+      path = os.path.join(base, 'index.html')
+
+    try:
+      with open(path, 'rb') as f:
+        data = f.read()
+      ctype = mimetypes.guess_type(path)[0] or 'text/html'
+      self.send_response(200)
+      self.send_header('Content-Type', ctype)
+      self.send_header('Content-Length', str(len(data)))
+      self.end_headers()
+      self.wfile.write(data)
+    except Exception as e:
+      return self._send_json(500, '{"error":"static_error","message":"' + str(e).replace('"','') + '"}')
+
+  def do_GET(self):
+    # Health endpoint
+    if self.path == '/health':
+      return self._send_json(200, '{"status":"ok"}')
+    # Serve frontend index.html at root
+    if self.path == '/':
+      return self._serve_static()
+    # Serve static for /app and common root-relative asset paths
+    static_prefixes = ('/app', '/css/', '/js/', '/assets/', '/static/', '/images/', '/img/', '/fonts/', '/media/')
+    static_exts = ('.css', '.js', '.mjs', '.map', '.json', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.webp', '.gif', '.ttf', '.woff', '.woff2')
+    if self.path.startswith(static_prefixes) or any(self.path.endswith(ext) for ext in static_exts):
+      return self._serve_static()
+    return self._proxy()
+
+  def do_POST(self):
+    return self._proxy()
+
+  def do_PUT(self):
+    return self._proxy()
+
+  def do_DELETE(self):
+    return self._proxy()
+
+  def do_OPTIONS(self):
+    return self._proxy()
+
+  def _proxy(self):
+    try:
+      # Read request body if any
+      content_length = int(self.headers.get('Content-Length', 0))
+      body = self.rfile.read(content_length) if content_length > 0 else None
+
+      # Forward to local API Gateway
+      conn = http.client.HTTPConnection('127.0.0.1', 8080, timeout=10)
+      path = self.path
+      headers = {k: v for k, v in self.headers.items()}
+      # Ensure Host header matches upstream
+      headers['Host'] = '127.0.0.1:8080'
+      conn.request(self.command, path, body=body, headers=headers)
+      resp = conn.getresponse()
+
+      # Relay response headers and body
+      self.send_response(resp.status)
+      for k, v in resp.getheaders():
+        # Avoid hop-by-hop headers issues
+        if k.lower() not in ['transfer-encoding', 'connection']:
+          self.send_header(k, v)
+      data = resp.read()
+      self.send_header('Content-Length', str(len(data)))
+      self.end_headers()
+      self.wfile.write(data)
+      conn.close()
+    except Exception as e:
+      return self._send_json(502, '{"error":"gateway_unavailable","message":"' + str(e).replace('"','') + '"}')
+
+def run():
+  server = HTTPServer(('0.0.0.0', 80), Handler)
+  server.serve_forever()
+
+if __name__ == '__main__':
+  run()
+PY
+
+cat >/etc/systemd/system/health-server.service <<'UNIT'
+[Unit]
+Description=Simple Health HTTP Server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/health_server.py
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now health-server
+
+# Note: iptables redirect 80→8080 removed; Python health server proxies
+
+# Minimal static UI placeholder to avoid 404 on /app while repo boots
+mkdir -p /var/www/html
+cat >/var/www/html/index.html <<'HTML'
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proyecto Acompañamiento</title>
+  <style>
+    body { font-family: system-ui, Arial; margin: 2rem; }
+    code { background:#f5f5f7; padding:2px 6px; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <h1>API Gateway operativo</h1>
+  <p>Frontend aún inicializando. Si ves esto, el ALB está alcanzando el Gateway.</p>
+  <ul>
+    <li>Health: <a href="/health">/health</a></li>
+    <li>App: <a href="/app">/app</a> (servirá assets cuando terminen de instalarse)</li>
+  </ul>
+  <script>
+    fetch('/api/auth/health').then(r=>r.json()).then(j=>console.log('auth health',j)).catch(console.warn);
+  </script>
+</body>
+</html>
+HTML
+
+# Clone application repository
+rm -rf /opt/Proyecto-Acompa-amiento-
+git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git /opt/Proyecto-Acompa-amiento-
+
+# Build and start required containers with Docker Compose
+cd /opt/Proyecto-Acompa-amiento-
+
+# Ensure compose is available
+docker compose version || true
+
+# Bring up core dependencies and microservices
+docker compose up -d zookeeper kafka rabbitmq mongo micro-auth micro-estudiantes api-gateway
+
+# Verify containers
+sleep 5
+docker ps --format '{{.Names}}\t{{.Status}}' || true
+
+echo "REV=20260121-gateway" > /opt/health_rev
 EOF
 }
 
@@ -521,7 +779,8 @@ resource "aws_instance" "fixed" {
     (length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : [])
   )
   associate_public_ip_address = true
-  user_data = local.user_data
+  user_data = each.key == "EC2-API-Gateway" ? local.user_data_gateway : local.user_data_default
+  user_data_replace_on_change = true
   tags = {
     Name = each.key
     Project = "lab-8-ec2"
@@ -556,7 +815,8 @@ resource "aws_lb" "main" {
     length(aws_security_group.web_sg) > 0 ? [aws_security_group.web_sg[0].id] : [],
     length(aws_security_group.api_gateway_sg) > 0 ? [aws_security_group.api_gateway_sg[0].id] : []
   )
-  subnets            = local.alb_subnet_ids
+  # Prefer newly created public subnets; fallback to discovered subnets
+  subnets            = length(aws_subnet.public) > 0 ? [for s in aws_subnet.public : s.id] : local.alb_subnet_ids
   tags = {
     Name = "lab-alb"
     Project = "lab-8-ec2"
@@ -588,9 +848,10 @@ resource "aws_lb_target_group" "web" {
 
 # Register web instances to target group
 resource "aws_lb_target_group_attachment" "web" {
-  for_each         = toset(["EC2-Frontend", "EC2-API-Gateway", "EC2-Reportes"])
+  # Attach only the API Gateway instance if it exists
+  for_each = { for k, v in aws_instance.fixed : k => v if k == "EC2-API-Gateway" }
   target_group_arn = aws_lb_target_group.web.arn
-  target_id        = aws_instance.fixed[each.key].id
+  target_id        = each.value.id
   port             = 80
 }
 

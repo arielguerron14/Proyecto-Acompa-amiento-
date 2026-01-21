@@ -27,10 +27,10 @@ function cargarReservas() {
 }
 
 function cargarHorariosDisponibles() {
-  if (!window.reservarManager) {
-    window.reservarManager = new ReservarManager();
+  if (!window.reservasManager) {
+    window.reservasManager = new ReservasManager();
   }
-  reservarManager.init();
+  reservasManager.init();
 }
 
 function cargarReportes() {

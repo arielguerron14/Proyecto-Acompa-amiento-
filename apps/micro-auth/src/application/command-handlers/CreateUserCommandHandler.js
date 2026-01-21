@@ -32,18 +32,18 @@ class CreateUserCommandHandler {
       // 3. Validar las reglas del dominio
       user.validate();
 
-      // 4. Persistir el usuario
-      await this.userRepository.save(user);
+      // 4. Persistir el usuario y obtener el resultado con ID asignado
+      const savedUser = await this.userRepository.save(user);
 
       // 5. Retornar resultado
       return {
         success: true,
         message: 'Usuario creado exitosamente',
         user: {
-          userId: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
+          userId: savedUser.id,
+          email: savedUser.email,
+          name: savedUser.name,
+          role: savedUser.role
         }
       };
     } catch (error) {

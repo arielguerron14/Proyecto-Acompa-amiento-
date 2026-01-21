@@ -8,15 +8,17 @@ class CommandBus {
     this.handlers = new Map();
   }
 
-  register(commandName, handler) {
-    this.handlers.set(commandName, handler);
-    console.log(`✓ Registered command handler: ${commandName}`);
+  register(commandOrName, handler) {
+    const name = typeof commandOrName === 'function' ? commandOrName.name : String(commandOrName);
+    this.handlers.set(name, handler);
+    console.log(`✓ Registered command handler: ${name}`);
   }
 
   async execute(command) {
-    const handler = this.handlers.get(command.constructor.name);
+    const name = command && command.constructor && command.constructor.name ? command.constructor.name : String(command);
+    const handler = this.handlers.get(name);
     if (!handler) {
-      throw new Error(`No handler registered for command: ${command.constructor.name}`);
+      throw new Error(`No handler registered for command: ${name}`);
     }
     return await handler.handle(command);
   }
@@ -27,15 +29,17 @@ class QueryBus {
     this.handlers = new Map();
   }
 
-  register(queryName, handler) {
-    this.handlers.set(queryName, handler);
-    console.log(`✓ Registered query handler: ${queryName}`);
+  register(queryOrName, handler) {
+    const name = typeof queryOrName === 'function' ? queryOrName.name : String(queryOrName);
+    this.handlers.set(name, handler);
+    console.log(`✓ Registered query handler: ${name}`);
   }
 
   async execute(query) {
-    const handler = this.handlers.get(query.constructor.name);
+    const name = query && query.constructor && query.constructor.name ? query.constructor.name : String(query);
+    const handler = this.handlers.get(name);
     if (!handler) {
-      throw new Error(`No handler registered for query: ${query.constructor.name}`);
+      throw new Error(`No handler registered for query: ${name}`);
     }
     return await handler.handle(query);
   }

@@ -1,4 +1,10 @@
-name: Terraform Inventory & Deploy
+name: Terraform Inventory & Deploy (Nginx Strategy)
+
+# Deployment Strategy: Nginx standalone (v9)
+# - User data deploys minimal nginx server (~30-60 seconds)
+# - Replaces docker-compose strategy that took 15+ minutes
+# - Provides /health (ALB health check) and / (root endpoint)
+# - Can be upgraded to full microservices later with ECR images
 
 on:
   push:
@@ -241,4 +247,19 @@ jobs:
     - name: Apply
       if: ${{ github.event.inputs.apply == 'true' }}
       run: cd terraform && terraform apply -auto-approve tfplan
+
+    - name: Deployment Summary
+      if: ${{ github.event.inputs.apply == 'true' }}
+      run: |
+        echo "✅ Terraform Applied Successfully"
+        echo ""
+        echo "Deployment Strategy: Nginx Standalone (v9)"
+        echo "- User data runs nginx installation (30-60 seconds)"
+        echo "- Endpoints: /health (health check) and / (root)"
+        echo "- ALB will route traffic immediately"
+        echo ""
+        echo "Next Steps:"
+        echo "1. Wait 2 minutes for instance startup"
+        echo "2. Check ALB health checks in AWS Console"
+        echo "3. Test endpoints once healthy"
 

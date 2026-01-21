@@ -131,6 +131,9 @@ services:
       - micro-maestros
     networks:
       - core-net
+    volumes:
+      # Mount frontend static assets so gateway can serve / and /app
+      - ./apps/frontend-web/public:/var/www/html:ro
     environment:
       NODE_ENV: production
       DOCKER_DEPLOYMENT: "true"

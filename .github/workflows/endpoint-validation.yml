@@ -5,6 +5,10 @@ on:
     # Ejecutar cada 4 horas
     - cron: '0 */4 * * *'
   workflow_dispatch:
+    inputs:
+      alb_dns:
+        description: 'Optional ALB DNS to validate (overrides default)'
+        required: false
   
 jobs:
   validate-endpoints:
@@ -15,53 +19,31 @@ jobs:
       - name: ⬇️ Checkout code
         uses: actions/checkout@v4
 
-      - name: 🔍 Test Production Endpoints
+      - name: 🔍 Test Production Endpoints (ALB)
         continue-on-error: true
         run: |
+          # Resolve ALB DNS from input or fallback to known default
+          ALB_DNS="${{ github.event.inputs.alb_dns }}"
+          if [ -z "$ALB_DNS" ]; then
+            ALB_DNS="lab-alb-1495517459.us-east-1.elb.amazonaws.com"
+          fi
+          echo "Testing ALB: $ALB_DNS"
+
           cat > validate-endpoints.js << 'EOF'
           const https = require('https');
           const http = require('http');
           
+          const ALB_DNS = process.env.ALB_DNS;
           const endpoints = [
             {
-              name: 'Frontend',
-              url: 'http://34.225.177.78:5500',
+              name: 'ALB - Health Check (nginx)',
+              url: `http://${ALB_DNS}/health`,
               method: 'GET',
               timeout: 10000
             },
             {
-              name: 'API Gateway - Health',
-              url: 'http://184.72.179.150:8080/health',
-              method: 'GET',
-              timeout: 10000
-            },
-            {
-              name: 'API Gateway - Status',
-              url: 'http://184.72.179.150:8080/status',
-              method: 'GET',
-              timeout: 10000
-            },
-            {
-              name: 'Auth Service',
-              url: 'http://localhost:3001/auth/health',
-              method: 'GET',
-              timeout: 10000
-            },
-            {
-              name: 'Estudiantes Service',
-              url: 'http://localhost:3002/estudiantes/health',
-              method: 'GET',
-              timeout: 10000
-            },
-            {
-              name: 'Maestros Service',
-              url: 'http://localhost:3003/maestros/health',
-              method: 'GET',
-              timeout: 10000
-            },
-            {
-              name: 'Reportes Service',
-              url: 'http://localhost:3004/reportes/health',
+              name: 'ALB - Root Endpoint (nginx)',
+              url: `http://${ALB_DNS}/`,
               method: 'GET',
               timeout: 10000
             }
@@ -176,7 +158,7 @@ jobs:
           })();
           EOF
           
-          node validate-endpoints.js
+          ALB_DNS="$ALB_DNS" node validate-endpoints.js
 
       - name: 📊 Parse Validation Results
         if: always()

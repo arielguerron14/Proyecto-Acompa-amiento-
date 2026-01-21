@@ -12,8 +12,8 @@ window.API_CONFIG = (function() {
     API_BASE = 'http://localhost:8080';
   } else {
     // Production -> prefer an explicit API_GATEWAY URL when provided (window.__API_GATEWAY_URL__)
-    // Fallback to the known API Gateway public IP to avoid silent 'null'/'undefined' fetches.
-    API_BASE = window.__API_GATEWAY_URL__ || 'http://35.168.216.132:8080';
+    // Fallback to same-origin so calls go through the ALB domain consistently.
+    API_BASE = window.__API_GATEWAY_URL__ || window.location.origin;
   }
   
   return {

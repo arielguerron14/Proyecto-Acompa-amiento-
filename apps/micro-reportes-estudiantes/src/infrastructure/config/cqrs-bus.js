@@ -9,8 +9,9 @@ class CommandBus {
   }
 
   register(commandName, handler) {
-    this.handlers.set(commandName, handler);
-    console.log(`✓ Registered command handler: ${commandName}`);
+    const key = typeof commandName === 'string' ? commandName : commandName?.name;
+    this.handlers.set(key, handler);
+    console.log(`✓ Registered command handler: ${key}`);
   }
 
   async execute(command) {
@@ -28,8 +29,9 @@ class QueryBus {
   }
 
   register(queryName, handler) {
-    this.handlers.set(queryName, handler);
-    console.log(`✓ Registered query handler: ${queryName}`);
+    const key = typeof queryName === 'string' ? queryName : queryName?.name;
+    this.handlers.set(key, handler);
+    console.log(`✓ Registered query handler: ${key}`);
   }
 
   async execute(query) {

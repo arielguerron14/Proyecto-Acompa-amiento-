@@ -28,8 +28,9 @@ const proxyMiddleware = async (req, res, next) => {
       return next();
     }
 
-    // Obtener el servicio para esta ruta
-    const service = SERVICE_REGISTRY.getServiceByRoute(req.path);
+    // Obtener el servicio usando la ruta completa (baseUrl + path)
+    const fullPath = `${req.baseUrl || ''}${req.path || ''}` || req.originalUrl || req.url;
+    const service = SERVICE_REGISTRY.getServiceByRoute(fullPath);
     
     if (!service) {
       return res.status(404).json({
@@ -46,17 +47,33 @@ const proxyMiddleware = async (req, res, next) => {
       // Auth service
       const rootLevelRoutes = ['/health', '/metrics', '/config', '/debug'];
       const isRootRoute = rootLevelRoutes.some(route => req.path === route || req.path.startsWith(route + '/'));
-      
+
+      // Normalize root-level routes accidentally requested under /auth/*
+      // Example: /auth/health → /health
+      if (fullPath === '/auth/health') targetPath = '/health';
+      else if (fullPath === '/auth/config') targetPath = '/config';
+      else if (fullPath === '/auth/metrics') targetPath = '/metrics';
+      else if (fullPath.startsWith('/auth/debug')) targetPath = fullPath.replace('/auth/', '/');
+
       if (!isRootRoute && !req.path.startsWith('/auth')) {
         // Auth routes need /auth prefix (e.g., /register → /auth/register)
         targetPath = `/auth${req.path}`;
       }
     }
     
+    // For some services we must keep the full prefix (their routers expect it)
+    // - micro-maestros (:3002) expects paths under /horarios or /maestros
+    // - reportes services (:5003, :5004) expect /reportes prefix
+    // Students service (:3001) expects paths without /estudiantes prefix
+    const keepFullPrefix = service.baseUrl.includes(':3002') || service.baseUrl.includes(':5003') || service.baseUrl.includes(':5004');
+    if (!service.baseUrl.includes(':3000') && keepFullPrefix) {
+      targetPath = fullPath;
+    }
+    
     // Construir URL del microservicio
     const targetUrl = `${service.baseUrl}${targetPath}`;
     
-    console.log(`[PROXY] ${req.method} ${req.path} → ${targetUrl} (service: ${service.name})`);
+    console.log(`[PROXY] ${req.method} ${fullPath} → ${targetUrl} (service: ${service.name})`);
 
     // Preparar opciones de la solicitud
     const axiosConfig = {

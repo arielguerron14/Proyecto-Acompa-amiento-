@@ -56,6 +56,34 @@ class ReservasManager {
                 if (e.target === modal) this.closeModal();
             });
         }
+
+        // Delegated click for reservar buttons (CSP-safe, no inline handlers)
+        const horariosList = document.getElementById('horarios-list');
+        if (horariosList) {
+            horariosList.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-reservar');
+                if (!btn) return;
+                const card = btn.closest('.horario-card');
+                const horarioId = card?.dataset?.horarioId;
+                console.debug('[reservas-combined] Click reservar detected. horarioId=', horarioId);
+                if (horarioId) this.selectHorario(horarioId);
+            });
+        }
+
+        // Delegated click for cancelar reserva buttons
+        const reservasList = document.getElementById('reservas-list');
+        if (reservasList) {
+            reservasList.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.btn-delete');
+                if (!btn) return;
+                const reservaId = btn?.dataset?.reservaId;
+                if (!reservaId) return;
+                const ok = window.confirm('¿Estás seguro de que quieres cancelar esta reserva? Esta acción no se puede deshacer.');
+                if (ok) {
+                    await this.cancelarReserva(reservaId);
+                }
+            });
+        }
     }
 
     // ==================== SECCIÓN: Cargar Horarios ====================
@@ -269,7 +297,7 @@ class ReservasManager {
                         Semestre ${horario.semestre || 'N/A'} - Paralelo ${horario.paralelo || 'N/A'}
                     </div>
                 </div>
-                <button class="btn-reservar" onclick="reservasManager.selectHorario('${horario._id}')">
+                <button class="btn-reservar" type="button">
                     Reservar Horario
                 </button>
             </div>
@@ -291,6 +319,8 @@ class ReservasManager {
         const detailsEl = document.getElementById('reserva-details');
 
         if (!modal || !detailsEl || !this.selectedHorario) return;
+
+        console.debug('[reservas-combined] Opening reserva modal for horario:', this.selectedHorario?._id);
 
         detailsEl.innerHTML = `
             <p><strong>Materia:</strong> ${this.selectedHorario.materia || 'N/A'}</p>
@@ -577,7 +607,7 @@ class ReservasManager {
                         <div class="reserva-info-value">${reserva.lugarAtencion || 'N/A'}</div>
                     </div>
                     <div class="reserva-actions">
-                        <button class="btn-delete" onclick="if(confirm('¿Estás seguro de que quieres cancelar esta reserva? Esta acción no se puede deshacer.')) reservasManager.cancelarReserva('${reserva._id}')">
+                        <button class="btn-delete" type="button" data-reserva-id="${reserva._id}">
                             🗑️ Cancelar
                         </button>
                     </div>
@@ -650,5 +680,6 @@ class ReservasManager {
     }
 }
 
-// Instancia global
-const reservasManager = new ReservasManager();
+// Exponer clase e instancia global de forma segura
+window.ReservasManager = window.ReservasManager || ReservasManager;
+window.reservasManager = window.reservasManager || new ReservasManager();
