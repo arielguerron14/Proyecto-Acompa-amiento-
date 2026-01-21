@@ -80,45 +80,57 @@ jobs:
           echo "Pinned npm version:" && npm --version
 
       - name: 📥 Install root dependencies
-        run: npm install --prefer-offline --force || true
+        shell: bash
+        run: |
+          set +e
+          npm install --prefer-offline --force
+          exit 0
 
       - name: 🧪 Run Unit Tests - micro-auth
         id: auth-tests
         continue-on-error: true
+        shell: bash
         run: |
+          set +e
           echo "🔍 Testing micro-auth..."
           cd apps/micro-auth
-          npm install --prefer-offline --force || true
+          npm install --prefer-offline --force
           npm run test 2>&1 | tee auth-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: 🧪 Run Unit Tests - micro-estudiantes
         id: estudiantes-tests
         continue-on-error: true
+        shell: bash
         run: |
+          set +e
           echo "🔍 Testing micro-estudiantes..."
           cd apps/micro-estudiantes
-          npm install --prefer-offline --force || true
+          npm install --prefer-offline --force
           npm run test 2>&1 | tee estudiantes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: 🧪 Run Unit Tests - micro-maestros
         id: maestros-tests
         continue-on-error: true
+        shell: bash
         run: |
+          set +e
           echo "🔍 Testing micro-maestros..."
           cd apps/micro-maestros
-          npm install --prefer-offline --force || true
+          npm install --prefer-offline --force
           npm run test 2>&1 | tee maestros-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: 🧪 Run Unit Tests - micro-reportes-estudiantes
         id: reportes-tests
         continue-on-error: true
+        shell: bash
         run: |
+          set +e
           echo "🔍 Testing micro-reportes-estudiantes..."
           cd apps/micro-reportes-estudiantes
-          npm install --prefer-offline --force || true
+          npm install --prefer-offline --force
           npm run test 2>&1 | tee reportes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
