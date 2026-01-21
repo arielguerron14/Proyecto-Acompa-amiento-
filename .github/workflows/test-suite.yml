@@ -135,7 +135,8 @@ jobs:
             apps/*/estudiantes-test-output.log
             apps/*/maestros-test-output.log
             apps/*/reportes-test-output.log
-            apps/*/*/coverage
+            apps/*/coverage
+          if-no-files-found: warn
 
       - name: ✅ Unit Tests Summary
         if: always()
@@ -207,10 +208,10 @@ jobs:
           const http = require('http');
           
           const endpoints = [
-            { method: 'GET', path: '/auth/health', port: 3001 },
-            { method: 'GET', path: '/auth/status', port: 3001 },
-            { method: 'POST', path: '/auth/register', port: 3001 },
-            { method: 'POST', path: '/auth/login', port: 3001 },
+            { method: 'GET', path: '/auth/health', port: 3000 },
+            { method: 'GET', path: '/auth/status', port: 3000 },
+            { method: 'POST', path: '/auth/register', port: 3000 },
+            { method: 'POST', path: '/auth/login', port: 3000 },
           ];
           
           async function testEndpoint(endpoint) {
@@ -318,6 +319,7 @@ jobs:
             apps/*/estudiantes.log
             apps/*/maestros.log
             apps/*/reportes.log
+          if-no-files-found: warn
 
   code-coverage:
     name: 📈 Code Coverage Report
