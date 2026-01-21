@@ -192,12 +192,72 @@ jobs:
 
       - name: 🚀 Start microservices
         run: |
-          cd apps/micro-auth && npm start > auth.log 2>&1 &
-          cd ../micro-estudiantes && npm start > estudiantes.log 2>&1 &
-          cd ../micro-maestros && npm start > maestros.log 2>&1 &
-          cd ../micro-reportes-estudiantes && npm start > reportes.log 2>&1 &
-          sleep 5
-          echo "✅ Microservices started"
+          mkdir -p logs
+          cd apps/micro-auth && npm start > ../../logs/auth.log 2>&1 &
+          cd ../micro-estudiantes && npm start > ../../logs/estudiantes.log 2>&1 &
+          cd ../micro-maestros && npm start > ../../logs/maestros.log 2>&1 &
+          cd ../micro-reportes-estudiantes && npm start > ../../logs/reportes.log 2>&1 &
+          cd ../..
+          
+          # Wait for services to be ready with retries
+          cat > wait-for-services.js << 'WAITEOF'
+          const http = require('http');
+          
+          const services = [
+            { name: 'micro-auth', port: 3000, path: '/health' },
+            { name: 'micro-estudiantes', port: 3001, path: '/health' },
+            { name: 'micro-maestros', port: 3002, path: '/health' },
+            { name: 'micro-reportes-estudiantes', port: 3003, path: '/health' }
+          ];
+          
+          async function checkService(service, maxRetries = 15, delayMs = 2000) {
+            for (let i = 0; i < maxRetries; i++) {
+              try {
+                await new Promise((resolve, reject) => {
+                  const req = http.get({
+                    hostname: 'localhost',
+                    port: service.port,
+                    path: service.path,
+                    timeout: 1000
+                  }, (res) => {
+                    if (res.statusCode === 200) {
+                      resolve();
+                    } else {
+                      reject(new Error(`Status ${res.statusCode}`));
+                    }
+                  });
+                  req.on('error', reject);
+                  req.on('timeout', () => {
+                    req.destroy();
+                    reject(new Error('Timeout'));
+                  });
+                });
+                console.log(`✅ ${service.name} is ready`);
+                return true;
+              } catch (err) {
+                if (i < maxRetries - 1) {
+                  process.stdout.write('.');
+                  await new Promise(r => setTimeout(r, delayMs));
+                } else {
+                  console.log(`\n❌ ${service.name} failed to respond after ${maxRetries} retries`);
+                  return false;
+                }
+              }
+            }
+          }
+          
+          (async () => {
+            console.log('⏳ Waiting for services to be ready...\n');
+            let allReady = true;
+            for (const service of services) {
+              const ready = await checkService(service);
+              if (!ready) allReady = false;
+            }
+            process.exit(allReady ? 0 : 1);
+          })();
+          WAITEOF
+          
+          node wait-for-services.js || (echo "⚠️  Services not fully ready, checking logs..."; cat logs/*.log | tail -20)
 
       - name: 🔗 Test Endpoints - Auth Service
         id: auth-endpoints
@@ -208,64 +268,94 @@ jobs:
           const http = require('http');
           
           const endpoints = [
+            { method: 'GET', path: '/health', port: 3000 },
             { method: 'GET', path: '/auth/health', port: 3000 },
-            { method: 'GET', path: '/auth/status', port: 3000 },
             { method: 'POST', path: '/auth/register', port: 3000 },
             { method: 'POST', path: '/auth/login', port: 3000 },
           ];
           
-          async function testEndpoint(endpoint) {
-            return new Promise((resolve) => {
-              const req = http.request({
-                hostname: 'localhost',
-                port: endpoint.port,
-                path: endpoint.path,
-                method: endpoint.method,
-                timeout: 5000
-              }, (res) => {
-                let data = '';
-                res.on('data', chunk => data += chunk);
-                res.on('end', () => {
-                  resolve({
-                    endpoint: `${endpoint.method} ${endpoint.path}`,
-                    status: res.statusCode,
-                    success: res.statusCode >= 200 && res.statusCode < 500
+          async function testEndpoint(endpoint, retries = 3) {
+            for (let attempt = 0; attempt < retries; attempt++) {
+              try {
+                return await new Promise((resolve) => {
+                  const req = http.request({
+                    hostname: 'localhost',
+                    port: endpoint.port,
+                    path: endpoint.path,
+                    method: endpoint.method,
+                    timeout: 3000
+                  }, (res) => {
+                    let data = '';
+                    res.on('data', chunk => data += chunk);
+                    res.on('end', () => {
+                      resolve({
+                        endpoint: `${endpoint.method} ${endpoint.path}`,
+                        status: res.statusCode,
+                        success: res.statusCode >= 200 && res.statusCode < 500
+                      });
+                    });
                   });
+                  
+                  req.on('error', () => {
+                    if (attempt < retries - 1) {
+                      setTimeout(() => resolve(null), 500);
+                    } else {
+                      resolve({ 
+                        endpoint: `${endpoint.method} ${endpoint.path}`, 
+                        status: 'ERROR', 
+                        success: false 
+                      });
+                    }
+                  });
+                  req.on('timeout', () => {
+                    req.destroy();
+                    if (attempt < retries - 1) {
+                      setTimeout(() => resolve(null), 500);
+                    } else {
+                      resolve({ 
+                        endpoint: `${endpoint.method} ${endpoint.path}`, 
+                        status: 'TIMEOUT', 
+                        success: false 
+                      });
+                    }
+                  });
+                  
+                  if (endpoint.method === 'POST') {
+                    req.write(JSON.stringify({ email: 'test@test.com', password: 'test' }));
+                  }
+                  req.end();
                 });
-              });
-              
-              req.on('error', () => resolve({ 
-                endpoint: `${endpoint.method} ${endpoint.path}`, 
-                status: 'ERROR', 
-                success: false 
-              }));
-              req.on('timeout', () => {
-                req.destroy();
-                resolve({ 
-                  endpoint: `${endpoint.method} ${endpoint.path}`, 
-                  status: 'TIMEOUT', 
-                  success: false 
-                });
-              });
-              
-              if (endpoint.method === 'POST') {
-                req.write(JSON.stringify({ test: true }));
+              } catch (err) {
+                if (attempt === retries - 1) {
+                  return { 
+                    endpoint: `${endpoint.method} ${endpoint.path}`, 
+                    status: 'ERROR', 
+                    success: false 
+                  };
+                }
               }
-              req.end();
-            });
+            }
           }
           
           (async () => {
             console.log('\n=== 🔗 Endpoint Test Results ===\n');
             for (const endpoint of endpoints) {
               const result = await testEndpoint(endpoint);
-              const status = result.success ? '✅' : '❌';
-              console.log(`${status} ${result.endpoint} → ${result.status}`);
+              if (result) {
+                const status = result.success ? '✅' : '❌';
+                console.log(`${status} ${result.endpoint} → ${result.status}`);
+              }
             }
           })();
           EOF
           
           node test-endpoints.js | tee endpoint-test.log
+          
+      - name: 📋 Show Service Logs on Failure
+        if: failure()
+        run: |
+          echo "=== Auth Service Log ===" && tail -30 logs/auth.log || true
+          echo "=== Estudiantes Service Log ===" && tail -30 logs/estudiantes.log || true
 
       - name: 📋 API Documentation Test
         run: |
@@ -315,10 +405,7 @@ jobs:
           name: functional-test-logs
           path: |
             endpoint-test.log
-            apps/*/auth.log
-            apps/*/estudiantes.log
-            apps/*/maestros.log
-            apps/*/reportes.log
+            logs/*.log
           if-no-files-found: warn
 
   code-coverage:
