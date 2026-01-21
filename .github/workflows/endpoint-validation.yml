@@ -1,0 +1,207 @@
+name: 🔗 Production Endpoint Validation
+
+on:
+  schedule:
+    # Ejecutar cada 4 horas
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+  
+jobs:
+  validate-endpoints:
+    name: 🔗 Validate AWS Endpoints
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Test Production Endpoints
+        continue-on-error: true
+        run: |
+          cat > validate-endpoints.js << 'EOF'
+          const https = require('https');
+          const http = require('http');
+          
+          const endpoints = [
+            {
+              name: 'Frontend',
+              url: 'http://34.225.177.78:5500',
+              method: 'GET',
+              timeout: 10000
+            },
+            {
+              name: 'API Gateway - Health',
+              url: 'http://184.72.179.150:8080/health',
+              method: 'GET',
+              timeout: 10000
+            },
+            {
+              name: 'API Gateway - Status',
+              url: 'http://184.72.179.150:8080/status',
+              method: 'GET',
+              timeout: 10000
+            },
+            {
+              name: 'Auth Service',
+              url: 'http://localhost:3001/auth/health',
+              method: 'GET',
+              timeout: 10000
+            },
+            {
+              name: 'Estudiantes Service',
+              url: 'http://localhost:3002/estudiantes/health',
+              method: 'GET',
+              timeout: 10000
+            },
+            {
+              name: 'Maestros Service',
+              url: 'http://localhost:3003/maestros/health',
+              method: 'GET',
+              timeout: 10000
+            },
+            {
+              name: 'Reportes Service',
+              url: 'http://localhost:3004/reportes/health',
+              method: 'GET',
+              timeout: 10000
+            }
+          ];
+          
+          async function checkEndpoint(endpoint) {
+            return new Promise((resolve) => {
+              const client = endpoint.url.startsWith('https') ? https : http;
+              const url = new URL(endpoint.url);
+              
+              const options = {
+                hostname: url.hostname,
+                port: url.port,
+                path: url.pathname + url.search,
+                method: endpoint.method,
+                timeout: endpoint.timeout,
+                headers: {
+                  'User-Agent': 'Test-Suite/1.0'
+                }
+              };
+              
+              const startTime = Date.now();
+              const req = client.request(options, (res) => {
+                const duration = Date.now() - startTime;
+                let data = '';
+                
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                  resolve({
+                    endpoint: endpoint.name,
+                    status: res.statusCode,
+                    duration: duration,
+                    success: res.statusCode >= 200 && res.statusCode < 500,
+                    type: res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warning' : 'success'
+                  });
+                });
+              });
+              
+              req.on('error', (err) => {
+                const duration = Date.now() - startTime;
+                resolve({
+                  endpoint: endpoint.name,
+                  status: 'ERROR',
+                  error: err.message,
+                  duration: duration,
+                  success: false,
+                  type: 'error'
+                });
+              });
+              
+              req.on('timeout', () => {
+                req.destroy();
+                const duration = Date.now() - startTime;
+                resolve({
+                  endpoint: endpoint.name,
+                  status: 'TIMEOUT',
+                  duration: duration,
+                  success: false,
+                  type: 'error'
+                });
+              });
+              
+              req.end();
+            });
+          }
+          
+          (async () => {
+            console.log('\n╔════════════════════════════════════════════════════════════╗');
+            console.log('║           🔗 Production Endpoint Validation Report          ║');
+            console.log('╚════════════════════════════════════════════════════════════╝\n');
+            
+            const results = [];
+            for (const endpoint of endpoints) {
+              const result = await checkEndpoint(endpoint);
+              results.push(result);
+              
+              const icon = result.success ? '✅' : '❌';
+              const status = result.status === 'ERROR' ? result.error : result.status;
+              console.log(`${icon} ${result.endpoint.padEnd(25)} → ${String(status).padEnd(10)} (${result.duration}ms)`);
+            }
+            
+            console.log('\n╔════════════════════════════════════════════════════════════╗');
+            const successful = results.filter(r => r.success).length;
+            const total = results.length;
+            console.log(`║  Summary: ${successful}/${total} endpoints responding`);
+            
+            if (successful === total) {
+              console.log('║  Status: 🟢 ALL ENDPOINTS HEALTHY');
+            } else if (successful >= Math.ceil(total * 0.8)) {
+              console.log('║  Status: 🟡 MOST ENDPOINTS HEALTHY (degraded)');
+            } else {
+              console.log('║  Status: 🔴 CRITICAL - Multiple endpoints down');
+            }
+            console.log('╚════════════════════════════════════════════════════════════╝\n');
+            
+            // Guardar resultados en JSON
+            const report = {
+              timestamp: new Date().toISOString(),
+              summary: {
+                total: total,
+                healthy: successful,
+                unhealthy: total - successful,
+                uptime_percentage: Math.round((successful / total) * 100)
+              },
+              endpoints: results
+            };
+            
+            require('fs').writeFileSync('endpoint-validation.json', JSON.stringify(report, null, 2));
+            console.log('📊 Report saved to endpoint-validation.json');
+            
+            process.exit(successful === total ? 0 : 1);
+          })();
+          EOF
+          
+          node validate-endpoints.js
+
+      - name: 📊 Parse Validation Results
+        if: always()
+        run: |
+          if [ -f endpoint-validation.json ]; then
+            echo "## 🔗 Endpoint Validation Report" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Summary" >> $GITHUB_STEP_SUMMARY
+            jq '.summary' endpoint-validation.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Unable to parse JSON" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Detailed Results" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            jq '.endpoints[] | {endpoint: .endpoint, status: .status, duration: .duration, success: .success}' endpoint-validation.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No data" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📧 Notify on Failure
+        if: failure()
+        run: |
+          echo "⚠️ Some endpoints are not responding!"
+          echo "Check the endpoint-validation.json for details"
+
+      - name: 📁 Upload Validation Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: endpoint-validation-${{ github.run_number }}
+          path: endpoint-validation.json

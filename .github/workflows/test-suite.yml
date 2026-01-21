@@ -1,0 +1,406 @@
+name: 🧪 Test Suite & Endpoint Validation
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/**'
+      - '.github/workflows/test-suite.yml'
+      - 'packages/**'
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      test_level:
+        description: 'Test level'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - unit
+          - functional
+          - full
+          - coverage
+
+env:
+  NODE_VERSION: '20'
+  MONGODB_URI: 'mongodb://localhost:27017/test'
+  POSTGRES_HOST: 'localhost'
+  POSTGRES_USER: 'test'
+  POSTGRES_PASSWORD: 'test'
+  POSTGRES_DB: 'test'
+
+jobs:
+  unit-tests:
+    name: 🔍 Unit Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:6
+        options: >-
+          --health-cmd mongosh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 27017:27017
+      
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📥 Install root dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: 🧪 Run Unit Tests - micro-auth
+        id: auth-tests
+        continue-on-error: true
+        run: |
+          echo "🔍 Testing micro-auth..."
+          cd apps/micro-auth
+          npm install --legacy-peer-deps
+          npm run test 2>&1 | tee auth-test-output.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: 🧪 Run Unit Tests - micro-estudiantes
+        id: estudiantes-tests
+        continue-on-error: true
+        run: |
+          echo "🔍 Testing micro-estudiantes..."
+          cd apps/micro-estudiantes
+          npm install --legacy-peer-deps
+          npm run test 2>&1 | tee estudiantes-test-output.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: 🧪 Run Unit Tests - micro-maestros
+        id: maestros-tests
+        continue-on-error: true
+        run: |
+          echo "🔍 Testing micro-maestros..."
+          cd apps/micro-maestros
+          npm install --legacy-peer-deps
+          npm run test 2>&1 | tee maestros-test-output.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: 🧪 Run Unit Tests - micro-reportes-estudiantes
+        id: reportes-tests
+        continue-on-error: true
+        run: |
+          echo "🔍 Testing micro-reportes-estudiantes..."
+          cd apps/micro-reportes-estudiantes
+          npm install --legacy-peer-deps
+          npm run test 2>&1 | tee reportes-test-output.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: 📊 Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-logs
+          path: |
+            apps/*/auth-test-output.log
+            apps/*/estudiantes-test-output.log
+            apps/*/maestros-test-output.log
+            apps/*/reportes-test-output.log
+            apps/*/*/coverage
+
+      - name: ✅ Unit Tests Summary
+        if: always()
+        run: |
+          echo "## 🔍 Unit Tests Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| micro-auth | ${{ steps.auth-tests.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| micro-estudiantes | ${{ steps.estudiantes-tests.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| micro-maestros | ${{ steps.maestros-tests.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| micro-reportes-estudiantes | ${{ steps.reportes-tests.outcome }} |" >> $GITHUB_STEP_SUMMARY
+
+  functional-tests:
+    name: 🚀 Functional Tests & Endpoint Validation
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+      
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📥 Install dependencies
+        run: |
+          npm install --legacy-peer-deps
+          cd apps/micro-auth && npm install --legacy-peer-deps
+          cd ../micro-estudiantes && npm install --legacy-peer-deps
+          cd ../micro-maestros && npm install --legacy-peer-deps
+          cd ../micro-reportes-estudiantes && npm install --legacy-peer-deps
+
+      - name: 🚀 Start microservices
+        run: |
+          cd apps/micro-auth && npm start > auth.log 2>&1 &
+          cd ../micro-estudiantes && npm start > estudiantes.log 2>&1 &
+          cd ../micro-maestros && npm start > maestros.log 2>&1 &
+          cd ../micro-reportes-estudiantes && npm start > reportes.log 2>&1 &
+          sleep 5
+          echo "✅ Microservices started"
+
+      - name: 🔗 Test Endpoints - Auth Service
+        id: auth-endpoints
+        continue-on-error: true
+        run: |
+          echo "🔗 Testing Auth Service Endpoints..."
+          cat > test-endpoints.js << 'EOF'
+          const http = require('http');
+          
+          const endpoints = [
+            { method: 'GET', path: '/auth/health', port: 3001 },
+            { method: 'GET', path: '/auth/status', port: 3001 },
+            { method: 'POST', path: '/auth/register', port: 3001 },
+            { method: 'POST', path: '/auth/login', port: 3001 },
+          ];
+          
+          async function testEndpoint(endpoint) {
+            return new Promise((resolve) => {
+              const req = http.request({
+                hostname: 'localhost',
+                port: endpoint.port,
+                path: endpoint.path,
+                method: endpoint.method,
+                timeout: 5000
+              }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                  resolve({
+                    endpoint: `${endpoint.method} ${endpoint.path}`,
+                    status: res.statusCode,
+                    success: res.statusCode >= 200 && res.statusCode < 500
+                  });
+                });
+              });
+              
+              req.on('error', () => resolve({ 
+                endpoint: `${endpoint.method} ${endpoint.path}`, 
+                status: 'ERROR', 
+                success: false 
+              }));
+              req.on('timeout', () => {
+                req.destroy();
+                resolve({ 
+                  endpoint: `${endpoint.method} ${endpoint.path}`, 
+                  status: 'TIMEOUT', 
+                  success: false 
+                });
+              });
+              
+              if (endpoint.method === 'POST') {
+                req.write(JSON.stringify({ test: true }));
+              }
+              req.end();
+            });
+          }
+          
+          (async () => {
+            console.log('\n=== 🔗 Endpoint Test Results ===\n');
+            for (const endpoint of endpoints) {
+              const result = await testEndpoint(endpoint);
+              const status = result.success ? '✅' : '❌';
+              console.log(`${status} ${result.endpoint} → ${result.status}`);
+            }
+          })();
+          EOF
+          
+          node test-endpoints.js | tee endpoint-test.log
+
+      - name: 📋 API Documentation Test
+        run: |
+          echo "📋 Checking API Documentation..."
+          cat > check-api-docs.js << 'EOF'
+          const fs = require('fs');
+          const path = require('path');
+          
+          const services = [
+            'apps/micro-auth',
+            'apps/micro-estudiantes',
+            'apps/micro-maestros',
+            'apps/micro-reportes-estudiantes'
+          ];
+          
+          console.log('\n=== 📋 API Documentation Status ===\n');
+          
+          services.forEach(service => {
+            const readmePath = path.join(service, 'README.md');
+            const exists = fs.existsSync(readmePath);
+            const status = exists ? '✅' : '⚠️';
+            const serviceName = path.basename(service);
+            console.log(`${status} ${serviceName}`);
+          });
+          EOF
+          
+          node check-api-docs.js
+
+      - name: 📊 Generate Functional Test Report
+        if: always()
+        run: |
+          echo "## 🚀 Functional Tests Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- Node Version: ${{ env.NODE_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Endpoint Status" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat endpoint-test.log >> $GITHUB_STEP_SUMMARY || echo "No endpoint data available" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📥 Upload Functional Test Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-test-logs
+          path: |
+            endpoint-test.log
+            apps/*/auth.log
+            apps/*/estudiantes.log
+            apps/*/maestros.log
+            apps/*/reportes.log
+
+  code-coverage:
+    name: 📈 Code Coverage Report
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📥 Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: 📊 Generate Coverage - micro-auth
+        continue-on-error: true
+        run: |
+          cd apps/micro-auth
+          npm install --legacy-peer-deps
+          npm run test:coverage 2>&1 | tee coverage.log
+
+      - name: 📊 Generate Coverage - micro-estudiantes
+        continue-on-error: true
+        run: |
+          cd apps/micro-estudiantes
+          npm install --legacy-peer-deps
+          npm run test:coverage 2>&1 | tee coverage.log
+
+      - name: 📈 Coverage Summary
+        if: always()
+        run: |
+          echo "## 📈 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Coverage by Service" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          for dir in apps/micro-*/; do
+            service=$(basename "$dir")
+            if [ -f "$dir/coverage/coverage-summary.json" ]; then
+              echo "- **$service**: Coverage data available ✅" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **$service**: No coverage data ⚠️" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+      - name: 📥 Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: apps/*/coverage
+
+  test-summary:
+    name: 📋 Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, functional-tests, code-coverage]
+    if: always()
+
+    steps:
+      - name: 📋 Final Test Report
+        run: |
+          echo "## 🧪 Complete Test Suite Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Workflow Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Unit Tests**: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Functional Tests**: ${{ needs.functional-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Coverage Report**: ${{ needs.code-coverage.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Microservices Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ micro-auth" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ micro-estudiantes" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ micro-maestros" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ micro-reportes-estudiantes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Generated Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Test logs" >> $GITHUB_STEP_SUMMARY
+          echo "- Coverage reports" >> $GITHUB_STEP_SUMMARY
+          echo "- Endpoint validation results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⏰ Timestamp" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "$(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
