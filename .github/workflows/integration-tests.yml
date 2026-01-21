@@ -48,7 +48,8 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-
+      - name: 📦 Pin npm to v8
+        run: npm install -g npm@8
       - name:  Install dependencies
         run: npm install
 

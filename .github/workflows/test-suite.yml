@@ -73,7 +73,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name:  Install root dependencies
+      - name: 📦 Pin npm to v8
+        run: npm install -g npm@8
         run: npm install
 
       - name: 🧪 Run Unit Tests - micro-auth
