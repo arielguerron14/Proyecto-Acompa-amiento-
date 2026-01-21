@@ -138,6 +138,11 @@ jobs:
           echo "🔨 Building project..."
           npm run build 2>/dev/null || echo "⚠️  No build script, skipping"
           
+          echo "🚀 Starting Frontend server with PM2..."
+          pm2 delete "frontend" 2>/dev/null || true
+          pm2 start server.js --name "frontend" --env production
+          pm2 save
+          
           echo "✅ Frontend deployment complete"
           
           DEPLOY_FRONTEND
