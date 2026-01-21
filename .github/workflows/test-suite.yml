@@ -23,7 +23,7 @@ on:
           - coverage
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '18'
   MONGODB_URI: 'mongodb://localhost:27017/test'
   POSTGRES_HOST: 'localhost'
   POSTGRES_USER: 'test'
@@ -73,64 +73,46 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: 📦 Pin npm to v9
-        run: |
-          echo "Current npm version:" && npm --version
-          npm i -g npm@9.8.1
-          echo "Pinned npm version:" && npm --version
-
-      - name: 📥 Install root dependencies
-        shell: bash
-        run: |
-          set +e
-          npm install --prefer-offline --force
-          exit 0
+      - name:  Install root dependencies
+        run: npm install
 
       - name: 🧪 Run Unit Tests - micro-auth
         id: auth-tests
         continue-on-error: true
-        shell: bash
         run: |
-          set +e
           echo "🔍 Testing micro-auth..."
           cd apps/micro-auth
-          npm install --prefer-offline --force
+          npm install
           npm run test 2>&1 | tee auth-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: 🧪 Run Unit Tests - micro-estudiantes
         id: estudiantes-tests
         continue-on-error: true
-        shell: bash
         run: |
-          set +e
           echo "🔍 Testing micro-estudiantes..."
           cd apps/micro-estudiantes
-          npm install --prefer-offline --force
+          npm install
           npm run test 2>&1 | tee estudiantes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: 🧪 Run Unit Tests - micro-maestros
         id: maestros-tests
         continue-on-error: true
-        shell: bash
         run: |
-          set +e
           echo "🔍 Testing micro-maestros..."
           cd apps/micro-maestros
-          npm install --prefer-offline --force
+          npm install
           npm run test 2>&1 | tee maestros-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: 🧪 Run Unit Tests - micro-reportes-estudiantes
         id: reportes-tests
         continue-on-error: true
-        shell: bash
         run: |
-          set +e
           echo "🔍 Testing micro-reportes-estudiantes..."
           cd apps/micro-reportes-estudiantes
-          npm install --prefer-offline --force
+          npm install
           npm run test 2>&1 | tee reportes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
