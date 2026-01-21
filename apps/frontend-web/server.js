@@ -7,8 +7,9 @@ import { URL } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Default API Gateway URL - can be overridden by environment variable
-const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://35.168.216.132:8080';
+// API Gateway URL - uses environment variable or correct default IP
+// Environment variable should be passed as: API_GATEWAY_URL=http://184.72.179.150:8080
+const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://184.72.179.150:8080';
 
 const server = http.createServer((req, res) => {
     // Handle API proxy requests

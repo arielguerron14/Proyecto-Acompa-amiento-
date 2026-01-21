@@ -140,11 +140,14 @@ jobs:
           npm run build 2>/dev/null || echo "⚠️  No build script, skipping"
           
           echo "🚀 Starting Frontend server with PM2..."
+          APIGW_PUBLIC_IP="${{ secrets.AWS_APIGW_PUBLIC_IP }}"
           pm2 delete "frontend" 2>/dev/null || true
-          pm2 start server.js --name "frontend" --env production
+          export API_GATEWAY_URL="http://184.72.179.150:8080"
+          pm2 start server.js --name "frontend" --env production --update-env
           pm2 save
+          pm2 show frontend
           
-          echo "✅ Frontend deployment complete"
+          echo "✅ Frontend deployment complete (API Gateway: http://${APIGW_PUBLIC_IP}:8080)"
           
           DEPLOY_FRONTEND
 
