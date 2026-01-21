@@ -360,32 +360,34 @@ jobs:
           rm -rf node_modules apps/**/node_modules package-lock.json
           npx -y npm@8 install --legacy-peer-deps --ignore-scripts
 
-      - name: 📊 Generate Coverage - micro-auth
+      - name: 📊 Generate Coverage Reports
         continue-on-error: true
         run: |
-          cd apps/micro-auth
-          npm run test:coverage 2>&1 | tee coverage.log
-
-      - name: 📊 Generate Coverage - micro-estudiantes
-        continue-on-error: true
-        run: |
-          cd apps/micro-estudiantes
-          npm run test:coverage 2>&1 | tee coverage.log
+          echo "🔄 Running coverage for all services..."
+          for dir in apps/micro-*/; do
+            service=$(basename "$dir")
+            echo "📊 $service..."
+            cd "$dir"
+            npm run test:coverage 2>&1 || true
+            cd ../..
+          done
 
       - name: 📈 Coverage Summary
         if: always()
         run: |
           echo "## 📈 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Coverage by Service" >> $GITHUB_STEP_SUMMARY
+          echo "### Coverage Status by Service" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Note:** Most services have basic test scripts (echo). Real Jest/test suites are only in micro-auth." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           for dir in apps/micro-*/; do
             service=$(basename "$dir")
             if [ -f "$dir/coverage/coverage-summary.json" ]; then
-              echo "- **$service**: Coverage data available ✅" >> $GITHUB_STEP_SUMMARY
+              echo "- **$service**: ✅ Coverage data available" >> $GITHUB_STEP_SUMMARY
             else
-              echo "- **$service**: No coverage data ⚠️" >> $GITHUB_STEP_SUMMARY
+              echo "- **$service**: ⚠️ No coverage (placeholder test script)" >> $GITHUB_STEP_SUMMARY
             fi
           done
 
