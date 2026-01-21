@@ -75,6 +75,8 @@ jobs:
 
       - name: 📦 Pin npm to v8
         run: npm install -g npm@8
+
+      - name: 📥 Install root dependencies
         run: npm install
 
       - name: 🧪 Run Unit Tests - micro-auth
