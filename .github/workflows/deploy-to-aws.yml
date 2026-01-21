@@ -107,7 +107,7 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
-          
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
           if [ -n "$GH_TOKEN" ]; then
             git config --global credential.helper store
@@ -192,7 +192,7 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
-          
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
           if [ -n "$GH_TOKEN" ]; then
             git config --global credential.helper store
@@ -268,7 +268,7 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
-          
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
           if [ -n "$GH_TOKEN" ]; then
             git config --global credential.helper store
@@ -363,7 +363,7 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
-          
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
           if [ -n "$GH_TOKEN" ]; then
             git config --global credential.helper store
@@ -432,7 +432,7 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
-          
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
           if [ -n "$GH_TOKEN" ]; then
             git config --global credential.helper store
@@ -501,7 +501,7 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
-          
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
           if [ -n "$GH_TOKEN" ]; then
             git config --global credential.helper store
@@ -567,7 +567,7 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
-          
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
           if [ -n "$GH_TOKEN" ]; then
             git config --global credential.helper store
@@ -632,7 +632,7 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
-          
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
           if [ -n "$GH_TOKEN" ]; then
             git config --global credential.helper store
@@ -729,4 +729,5 @@ jobs:
           echo "4. Access monitoring (if Grafana deployed):"
           echo "   http://<MONITORING_IP>:3001"
           echo "═══════════════════════════════════════════════════════════════"
+
 
