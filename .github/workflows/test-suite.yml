@@ -29,6 +29,8 @@ env:
   POSTGRES_USER: 'test'
   POSTGRES_PASSWORD: 'test'
   POSTGRES_DB: 'test'
+  NPM_CONFIG_AUDIT: 'false'
+  NPM_CONFIG_FUND: 'false'
 
 jobs:
   unit-tests:
@@ -71,7 +73,7 @@ jobs:
           cache: 'npm'
 
       - name: 📥 Install root dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps --no-audit --no-fund
 
       - name: 🧪 Run Unit Tests - micro-auth
         id: auth-tests
@@ -79,7 +81,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-auth..."
           cd apps/micro-auth
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --no-audit --no-fund
           npm run test 2>&1 | tee auth-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -89,7 +91,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-estudiantes..."
           cd apps/micro-estudiantes
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --no-audit --no-fund
           npm run test 2>&1 | tee estudiantes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -99,7 +101,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-maestros..."
           cd apps/micro-maestros
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --no-audit --no-fund
           npm run test 2>&1 | tee maestros-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -109,7 +111,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-reportes-estudiantes..."
           cd apps/micro-reportes-estudiantes
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --no-audit --no-fund
           npm run test 2>&1 | tee reportes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 

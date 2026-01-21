@@ -134,7 +134,7 @@ jobs:
                     echo "📍 Moving to frontend-web directory..."
           cd /home/ubuntu/Proyecto-Acompa-amiento-/apps/frontend-web
                     echo "📥 Installing dependencies..."
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --no-audit --no-fund
           
           echo "🔨 Building project..."
           npm run build 2>/dev/null || echo "⚠️  No build script, skipping"
