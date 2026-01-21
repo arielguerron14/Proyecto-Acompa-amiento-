@@ -131,8 +131,9 @@ jobs:
             git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
-          
-          echo "📥 Installing dependencies..."
+                    echo "📍 Moving to frontend-web directory..."
+          cd /home/ubuntu/Proyecto-Acompa-amiento-/apps/frontend-web
+                    echo "📥 Installing dependencies..."
           npm install --legacy-peer-deps
           
           echo "🔨 Building project..."
