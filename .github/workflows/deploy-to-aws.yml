@@ -29,6 +29,7 @@ jobs:
       AWS_REGION: us-east-1
       BASTION_USER: ubuntu
       SERVICES_USER: ubuntu
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -98,6 +99,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=10 \
             -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            -o SendEnv=GH_TOKEN \
             ${{ env.SERVICES_USER }}@${FRONTEND_IP} << DEPLOY_FRONTEND
           
           set -e
@@ -105,6 +107,13 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
+          
+          # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
+          if [ -n "$GH_TOKEN" ]; then
+            git config --global credential.helper store
+            echo "https://$GH_TOKEN@github.com" >> ~/.git-credentials 2>/dev/null || true
+            chmod 600 ~/.git-credentials 2>/dev/null || true
+          fi
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
@@ -172,6 +181,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=10 \
             -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            -o SendEnv=GH_TOKEN \
             ${{ env.SERVICES_USER }}@${APIGW_IP} << DEPLOY_APIGW
           
           set -e
@@ -179,6 +189,13 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
+          
+          # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
+          if [ -n "$GH_TOKEN" ]; then
+            git config --global credential.helper store
+            echo "https://$GH_TOKEN@github.com" >> ~/.git-credentials 2>/dev/null || true
+            chmod 600 ~/.git-credentials 2>/dev/null || true
+          fi
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
