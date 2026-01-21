@@ -174,13 +174,18 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: 📦 Pin npm to v8
+        run: |
+          npm install -g npm@8
+          npm cache clean --force
+
       - name: 📥 Install dependencies
         run: |
-          npm install --legacy-peer-deps
-          cd apps/micro-auth && npm install --legacy-peer-deps
-          cd ../micro-estudiantes && npm install --legacy-peer-deps
-          cd ../micro-maestros && npm install --legacy-peer-deps
-          cd ../micro-reportes-estudiantes && npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --ignore-scripts
+          cd apps/micro-auth && npm install --legacy-peer-deps --ignore-scripts
+          cd ../micro-estudiantes && npm install --legacy-peer-deps --ignore-scripts
+          cd ../micro-maestros && npm install --legacy-peer-deps --ignore-scripts
+          cd ../micro-reportes-estudiantes && npm install --legacy-peer-deps --ignore-scripts
 
       - name: 🚀 Start microservices
         run: |
@@ -340,21 +345,26 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: 📦 Pin npm to v8
+        run: |
+          npm install -g npm@8
+          npm cache clean --force
+
       - name: 📥 Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps --ignore-scripts
 
       - name: 📊 Generate Coverage - micro-auth
         continue-on-error: true
         run: |
           cd apps/micro-auth
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --ignore-scripts
           npm run test:coverage 2>&1 | tee coverage.log
 
       - name: 📊 Generate Coverage - micro-estudiantes
         continue-on-error: true
         run: |
           cd apps/micro-estudiantes
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --ignore-scripts
           npm run test:coverage 2>&1 | tee coverage.log
 
       - name: 📈 Coverage Summary
