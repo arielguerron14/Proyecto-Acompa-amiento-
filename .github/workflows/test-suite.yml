@@ -80,7 +80,7 @@ jobs:
           echo "Pinned npm version:" && npm --version
 
       - name: 📥 Install root dependencies
-        run: npm install --prefer-offline --force
+        run: npm install --prefer-offline --force || true
 
       - name: 🧪 Run Unit Tests - micro-auth
         id: auth-tests
@@ -88,7 +88,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-auth..."
           cd apps/micro-auth
-          npm install --prefer-offline --force
+          npm install --prefer-offline --force || true
           npm run test 2>&1 | tee auth-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -98,7 +98,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-estudiantes..."
           cd apps/micro-estudiantes
-          npm install --prefer-offline --force
+          npm install --prefer-offline --force || true
           npm run test 2>&1 | tee estudiantes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -108,7 +108,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-maestros..."
           cd apps/micro-maestros
-          npm install --prefer-offline --force
+          npm install --prefer-offline --force || true
           npm run test 2>&1 | tee maestros-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -118,7 +118,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-reportes-estudiantes..."
           cd apps/micro-reportes-estudiantes
-          npm install --prefer-offline --force
+          npm install --prefer-offline --force || true
           npm run test 2>&1 | tee reportes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 

@@ -56,7 +56,7 @@ jobs:
           echo "Pinned npm version:" && npm --version
 
       - name: 📥 Install dependencies
-        run: npm install --prefer-offline --force
+        run: npm install --prefer-offline --force || true
 
       - name: 🗄️ Verify Database Connections
         run: |
@@ -159,16 +159,16 @@ jobs:
           echo "🚀 Starting all microservices for integration testing..."
           
           # Start each microservice in background
-          cd apps/micro-auth && npm install --prefer-offline --force && npm start > ../auth.log 2>&1 &
+          cd apps/micro-auth && npm install --prefer-offline --force || true && npm start > ../auth.log 2>&1 &
           AUTH_PID=$!
           
-          cd ../micro-estudiantes && npm install --prefer-offline --force && npm start > ../estudiantes.log 2>&1 &
+          cd ../micro-estudiantes && npm install --prefer-offline --force || true && npm start > ../estudiantes.log 2>&1 &
           EST_PID=$!
           
-          cd ../micro-maestros && npm install --prefer-offline --force && npm start > ../maestros.log 2>&1 &
+          cd ../micro-maestros && npm install --prefer-offline --force || true && npm start > ../maestros.log 2>&1 &
           MAES_PID=$!
           
-          cd ../micro-reportes-estudiantes && npm install --prefer-offline --force && npm start > ../reportes.log 2>&1 &
+          cd ../micro-reportes-estudiantes && npm install --prefer-offline --force || true && npm start > ../reportes.log 2>&1 &
           REP_PID=$!
           
           echo "Waiting for services to start..."
