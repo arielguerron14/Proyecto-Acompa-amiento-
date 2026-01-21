@@ -9,7 +9,7 @@ module.exports = {
 
   // Mapeo de módulos para resolver rutas relativas
   moduleNameMapper: {
-    '^../../../shared-auth/(.*)$': path.resolve(__dirname, '../shared-auth/$1'),
+    '^../../../shared-auth/(.*)$': path.resolve(__dirname, '../../packages/shared-auth/$1'),
   },
 
   // Configuración de resolución de módulos
