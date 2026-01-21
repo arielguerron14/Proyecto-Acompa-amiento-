@@ -257,6 +257,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=10 \
             -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            -o SendEnv=GH_TOKEN \
             ${{ env.SERVICES_USER }}@${CORE_IP} << DEPLOY_CORE
           
           set -e
@@ -264,6 +265,13 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
+          
+          # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
+          if [ -n "$GH_TOKEN" ]; then
+            git config --global credential.helper store
+            echo "https://$GH_TOKEN@github.com" >> ~/.git-credentials 2>/dev/null || true
+            chmod 600 ~/.git-credentials 2>/dev/null || true
+          fi
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
@@ -344,6 +352,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=10 \
             -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            -o SendEnv=GH_TOKEN \
             ${{ env.SERVICES_USER }}@${REPORTES_IP} << DEPLOY_REPORTES
           
           set -e
@@ -351,6 +360,13 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
+          
+          # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
+          if [ -n "$GH_TOKEN" ]; then
+            git config --global credential.helper store
+            echo "https://$GH_TOKEN@github.com" >> ~/.git-credentials 2>/dev/null || true
+            chmod 600 ~/.git-credentials 2>/dev/null || true
+          fi
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
@@ -405,6 +421,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=10 \
             -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            -o SendEnv=GH_TOKEN \
             ${{ env.SERVICES_USER }}@${NOTIF_IP} << DEPLOY_NOTIF
           
           set -e
@@ -412,6 +429,13 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
+          
+          # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
+          if [ -n "$GH_TOKEN" ]; then
+            git config --global credential.helper store
+            echo "https://$GH_TOKEN@github.com" >> ~/.git-credentials 2>/dev/null || true
+            chmod 600 ~/.git-credentials 2>/dev/null || true
+          fi
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
@@ -466,6 +490,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=10 \
             -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            -o SendEnv=GH_TOKEN \
             ${{ env.SERVICES_USER }}@${MESSAGING_IP} << DEPLOY_MESSAGING
           
           set -e
@@ -473,6 +498,13 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
+          
+          # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
+          if [ -n "$GH_TOKEN" ]; then
+            git config --global credential.helper store
+            echo "https://$GH_TOKEN@github.com" >> ~/.git-credentials 2>/dev/null || true
+            chmod 600 ~/.git-credentials 2>/dev/null || true
+          fi
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
@@ -524,6 +556,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=10 \
             -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            -o SendEnv=GH_TOKEN \
             ${{ env.SERVICES_USER }}@${MONITORING_IP} << DEPLOY_MONITORING
           
           set -e
@@ -531,6 +564,13 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
+          
+          # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
+          if [ -n "$GH_TOKEN" ]; then
+            git config --global credential.helper store
+            echo "https://$GH_TOKEN@github.com" >> ~/.git-credentials 2>/dev/null || true
+            chmod 600 ~/.git-credentials 2>/dev/null || true
+          fi
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
@@ -581,6 +621,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=10 \
             -o ProxyCommand="ssh -i ~/.ssh/bastion-key.pem -o StrictHostKeyChecking=no -W %h:%p ${{ env.BASTION_USER }}@$BASTION_IP" \
+            -o SendEnv=GH_TOKEN \
             ${{ env.SERVICES_USER }}@${DB_IP} << DEPLOY_DATABASES
           
           set -e
@@ -588,6 +629,13 @@ jobs:
           # Disable git interactive prompts in non-TTY environments
           export GIT_TERMINAL_PROMPT=0
           export GIT_ASKPASS=/bin/true
+          
+          # Configure git to use HTTPS with token from environment (passed via GH_TOKEN)
+          if [ -n "$GH_TOKEN" ]; then
+            git config --global credential.helper store
+            echo "https://$GH_TOKEN@github.com" >> ~/.git-credentials 2>/dev/null || true
+            chmod 600 ~/.git-credentials 2>/dev/null || true
+          fi
           
           echo "📦 Installing system dependencies..."
           sudo apt-get update -qq
