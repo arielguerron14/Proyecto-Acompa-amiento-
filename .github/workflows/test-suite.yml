@@ -32,6 +32,7 @@ env:
   NPM_CONFIG_AUDIT: 'false'
   NPM_CONFIG_FUND: 'false'
   NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+  NPM_CONFIG_PACKAGE_LOCK: 'false'
 
 jobs:
   unit-tests:
@@ -79,8 +80,14 @@ jobs:
           npm cache clean --force
           npm --version
 
-      - name: 📥 Install root dependencies (npm@8)
-        run: npx -y npm@8 install --legacy-peer-deps --ignore-scripts
+      - name: 🧹 Remove lockfiles (avoid npm v8/v3 mismatch)
+        run: |
+          find . -name "package-lock.json" -delete || true
+
+      - name: 📥 Install dependencies (safe)
+        run: |
+          rm -rf node_modules apps/**/node_modules package-lock.json
+          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
 
       - name: 🧪 Run Unit Tests - micro-auth
         id: auth-tests
@@ -88,7 +95,6 @@ jobs:
         run: |
           echo "🔍 Testing micro-auth..."
           cd apps/micro-auth
-          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test 2>&1 | tee auth-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -98,7 +104,6 @@ jobs:
         run: |
           echo "🔍 Testing micro-estudiantes..."
           cd apps/micro-estudiantes
-          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test 2>&1 | tee estudiantes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -108,7 +113,6 @@ jobs:
         run: |
           echo "🔍 Testing micro-maestros..."
           cd apps/micro-maestros
-          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test 2>&1 | tee maestros-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -118,7 +122,6 @@ jobs:
         run: |
           echo "🔍 Testing micro-reportes-estudiantes..."
           cd apps/micro-reportes-estudiantes
-          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test 2>&1 | tee reportes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -181,13 +184,10 @@ jobs:
           npm cache clean --force
           npm --version
 
-      - name: 📥 Install dependencies (npm@8)
+      - name: 📥 Install dependencies (safe)
         run: |
+          rm -rf node_modules apps/**/node_modules package-lock.json
           npx -y npm@8 install --legacy-peer-deps --ignore-scripts
-          cd apps/micro-auth && npx -y npm@8 install --legacy-peer-deps --ignore-scripts
-          cd ../micro-estudiantes && npx -y npm@8 install --legacy-peer-deps --ignore-scripts
-          cd ../micro-maestros && npx -y npm@8 install --legacy-peer-deps --ignore-scripts
-          cd ../micro-reportes-estudiantes && npx -y npm@8 install --legacy-peer-deps --ignore-scripts
 
       - name: 🚀 Start microservices
         run: |
@@ -353,21 +353,21 @@ jobs:
           npm cache clean --force
           npm --version
 
-      - name: 📥 Install dependencies (npm@8)
-        run: npx -y npm@8 install --legacy-peer-deps --ignore-scripts
+      - name: 📥 Install dependencies (safe)
+        run: |
+          rm -rf node_modules apps/**/node_modules package-lock.json
+          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
 
       - name: 📊 Generate Coverage - micro-auth
         continue-on-error: true
         run: |
           cd apps/micro-auth
-          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test:coverage 2>&1 | tee coverage.log
 
       - name: 📊 Generate Coverage - micro-estudiantes
         continue-on-error: true
         run: |
           cd apps/micro-estudiantes
-          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test:coverage 2>&1 | tee coverage.log
 
       - name: 📈 Coverage Summary
