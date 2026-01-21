@@ -129,7 +129,7 @@ jobs:
             git pull origin main
           else
             cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            git clone git@github.com:arielguerron14/Proyecto-Acompa-amiento-.git 2>/dev/null || git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
                     echo "📍 Moving to frontend-web directory..."
@@ -193,13 +193,13 @@ jobs:
           sudo npm install -g pm2
 
           echo "🔄 Pulling latest code..."
-          if [ -d /home/ubuntu/Proyecto-Acompa-amiento- ]; then
-              cd /home/ubuntu/Proyecto-Acompa-amiento-
+          if [ -d /home/ubuntu/Projeto-Acompa-amiento- ]; then
+              cd /home/ubuntu/Projeto-Acompa-amiento-
               rm -f package-lock.json apps/*/package-lock.json 2>/dev/null || true
               git pull origin main
             else
               cd /home/ubuntu
-              git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+              git clone git@github.com:arielguerron14/Projeto-Acompa-amiento-.git 2>/dev/null || git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/arielguerron14/Projeto-Acompa-amiento-.git
               cd Proyecto-Acompa-amiento-
             fi
           
@@ -264,7 +264,7 @@ jobs:
             git pull origin main
           else
             cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
           
@@ -332,7 +332,7 @@ jobs:
             git pull origin main
           else
             cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
           
@@ -389,8 +389,8 @@ jobs:
             git pull origin main
           else
             cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-imiento-.git
-            cd Proyecto-Acompa-amiento-
+            git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/arielguerron14/Proyecto-Acompa-imiento-.git
+            cd Proyecto-Acompa-imiento-
           fi
           
           echo "📥 Installing dependencies..."
@@ -446,7 +446,7 @@ jobs:
             git pull origin main
           else
             cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
           
@@ -500,7 +500,7 @@ jobs:
             git pull origin main
           else
             cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
           
@@ -553,7 +553,7 @@ jobs:
             git pull origin main
           else
             cd /home/ubuntu
-            git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+            git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/arielguerron14/Proyecto-Acompa-amiento-.git
             cd Proyecto-Acompa-amiento-
           fi
           
