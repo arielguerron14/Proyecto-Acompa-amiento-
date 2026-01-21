@@ -71,6 +71,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
       - name: 📦 Pin npm to v9
         run: |
@@ -79,7 +80,7 @@ jobs:
           echo "Pinned npm version:" && npm --version
 
       - name: 📥 Install root dependencies
-        run: npm ci
+        run: npm install --prefer-offline
 
       - name: 🧪 Run Unit Tests - micro-auth
         id: auth-tests
@@ -87,7 +88,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-auth..."
           cd apps/micro-auth
-          npm ci
+          npm install --prefer-offline
           npm run test 2>&1 | tee auth-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -97,7 +98,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-estudiantes..."
           cd apps/micro-estudiantes
-          npm ci
+          npm install --prefer-offline
           npm run test 2>&1 | tee estudiantes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -107,7 +108,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-maestros..."
           cd apps/micro-maestros
-          npm ci
+          npm install --prefer-offline
           npm run test 2>&1 | tee maestros-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -117,7 +118,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-reportes-estudiantes..."
           cd apps/micro-reportes-estudiantes
-          npm ci
+          npm install --prefer-offline
           npm run test 2>&1 | tee reportes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 

@@ -47,6 +47,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: 📦 Pin npm to v9
         run: |
@@ -55,7 +56,7 @@ jobs:
           echo "Pinned npm version:" && npm --version
 
       - name: 📥 Install dependencies
-        run: npm ci
+        run: npm install --prefer-offline
 
       - name: 🗄️ Verify Database Connections
         run: |
@@ -158,16 +159,16 @@ jobs:
           echo "🚀 Starting all microservices for integration testing..."
           
           # Start each microservice in background
-          cd apps/micro-auth && npm ci && npm start > ../auth.log 2>&1 &
+          cd apps/micro-auth && npm install --prefer-offline && npm start > ../auth.log 2>&1 &
           AUTH_PID=$!
           
-          cd ../micro-estudiantes && npm ci && npm start > ../estudiantes.log 2>&1 &
+          cd ../micro-estudiantes && npm install --prefer-offline && npm start > ../estudiantes.log 2>&1 &
           EST_PID=$!
           
-          cd ../micro-maestros && npm ci && npm start > ../maestros.log 2>&1 &
+          cd ../micro-maestros && npm install --prefer-offline && npm start > ../maestros.log 2>&1 &
           MAES_PID=$!
           
-          cd ../micro-reportes-estudiantes && npm ci && npm start > ../reportes.log 2>&1 &
+          cd ../micro-reportes-estudiantes && npm install --prefer-offline && npm start > ../reportes.log 2>&1 &
           REP_PID=$!
           
           echo "Waiting for services to start..."
