@@ -77,9 +77,10 @@ jobs:
         run: |
           npm install -g npm@8
           npm cache clean --force
+          npm --version
 
-      - name: 📥 Install root dependencies
-        run: npm install --legacy-peer-deps --ignore-scripts
+      - name: 📥 Install root dependencies (npm@8)
+        run: npx -y npm@8 install --legacy-peer-deps --ignore-scripts
 
       - name: 🧪 Run Unit Tests - micro-auth
         id: auth-tests
@@ -87,7 +88,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-auth..."
           cd apps/micro-auth
-          npm install --legacy-peer-deps --ignore-scripts
+          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test 2>&1 | tee auth-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -97,7 +98,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-estudiantes..."
           cd apps/micro-estudiantes
-          npm install --legacy-peer-deps --ignore-scripts
+          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test 2>&1 | tee estudiantes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -107,7 +108,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-maestros..."
           cd apps/micro-maestros
-          npm install --legacy-peer-deps --ignore-scripts
+          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test 2>&1 | tee maestros-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -117,7 +118,7 @@ jobs:
         run: |
           echo "🔍 Testing micro-reportes-estudiantes..."
           cd apps/micro-reportes-estudiantes
-          npm install --legacy-peer-deps --ignore-scripts
+          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test 2>&1 | tee reportes-test-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -178,14 +179,15 @@ jobs:
         run: |
           npm install -g npm@8
           npm cache clean --force
+          npm --version
 
-      - name: 📥 Install dependencies
+      - name: 📥 Install dependencies (npm@8)
         run: |
-          npm install --legacy-peer-deps --ignore-scripts
-          cd apps/micro-auth && npm install --legacy-peer-deps --ignore-scripts
-          cd ../micro-estudiantes && npm install --legacy-peer-deps --ignore-scripts
-          cd ../micro-maestros && npm install --legacy-peer-deps --ignore-scripts
-          cd ../micro-reportes-estudiantes && npm install --legacy-peer-deps --ignore-scripts
+          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
+          cd apps/micro-auth && npx -y npm@8 install --legacy-peer-deps --ignore-scripts
+          cd ../micro-estudiantes && npx -y npm@8 install --legacy-peer-deps --ignore-scripts
+          cd ../micro-maestros && npx -y npm@8 install --legacy-peer-deps --ignore-scripts
+          cd ../micro-reportes-estudiantes && npx -y npm@8 install --legacy-peer-deps --ignore-scripts
 
       - name: 🚀 Start microservices
         run: |
@@ -349,22 +351,23 @@ jobs:
         run: |
           npm install -g npm@8
           npm cache clean --force
+          npm --version
 
-      - name: 📥 Install dependencies
-        run: npm install --legacy-peer-deps --ignore-scripts
+      - name: 📥 Install dependencies (npm@8)
+        run: npx -y npm@8 install --legacy-peer-deps --ignore-scripts
 
       - name: 📊 Generate Coverage - micro-auth
         continue-on-error: true
         run: |
           cd apps/micro-auth
-          npm install --legacy-peer-deps --ignore-scripts
+          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test:coverage 2>&1 | tee coverage.log
 
       - name: 📊 Generate Coverage - micro-estudiantes
         continue-on-error: true
         run: |
           cd apps/micro-estudiantes
-          npm install --legacy-peer-deps --ignore-scripts
+          npx -y npm@8 install --legacy-peer-deps --ignore-scripts
           npm run test:coverage 2>&1 | tee coverage.log
 
       - name: 📈 Coverage Summary
