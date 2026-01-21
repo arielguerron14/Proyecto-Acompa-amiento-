@@ -31,6 +31,7 @@ env:
   POSTGRES_DB: 'test'
   NPM_CONFIG_AUDIT: 'false'
   NPM_CONFIG_FUND: 'false'
+  NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
 
 jobs:
   unit-tests:
@@ -71,6 +72,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
+      - name: 📦 Pin npm to v9
+        run: |
+          echo "Current npm version:" && npm --version
+          npm i -g npm@9.8.1
+          echo "Pinned npm version:" && npm --version
 
       - name: 📥 Install root dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund

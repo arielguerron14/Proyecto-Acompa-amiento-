@@ -17,6 +17,7 @@ jobs:
     env:
       NPM_CONFIG_AUDIT: 'false'
       NPM_CONFIG_FUND: 'false'
+      NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
     
     services:
       mongodb:
@@ -47,6 +48,12 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: 📦 Pin npm to v9
+        run: |
+          echo "Current npm version:" && npm --version
+          npm i -g npm@9.8.1
+          echo "Pinned npm version:" && npm --version
 
       - name: 📥 Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
