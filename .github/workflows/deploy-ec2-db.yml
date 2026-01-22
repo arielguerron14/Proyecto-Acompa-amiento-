@@ -3,12 +3,8 @@ name: Deploy EC2-DB Services (MongoDB, PostgreSQL, Redis)
 on:
   workflow_dispatch:
     inputs:
-      instance_ip:
-        description: 'EC2-DB instance IP address'
-        required: true
-        type: string
       instance_name:
-        description: 'EC2 Instance name'
+        description: 'EC2 Instance name to deploy (EC2-DB, EC2-API, EC2-CORE, etc)'
         required: false
         default: 'EC2-DB'
       skip_verification:
@@ -17,10 +13,10 @@ on:
         default: 'false'
 
 env:
-  INSTANCE_IP: ${{ github.event.inputs.instance_ip }}
   INSTANCE_NAME: ${{ github.event.inputs.instance_name || 'EC2-DB' }}
   INSTANCE_USER: ubuntu
   REPO_URL: https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+  AWS_REGION: us-east-1
 
 jobs:
   deploy-db-services:
@@ -31,26 +27,80 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Discover EC2 instances and IPs
+      run: |
+        echo "🔍 Discovering EC2 instances..."
+        
+        # Get instance info by tag name
+        INSTANCE_INFO=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=${{ env.INSTANCE_NAME }}" \
+                    "Name=instance-state-name,Values=running" \
+          --query 'Reservations[].Instances[].[PublicIpAddress, PrivateIpAddress, InstanceId, InstanceType, Tags[?Key==`Name`].Value|[0]]' \
+          --output json)
+        
+        echo "Instance Info: $INSTANCE_INFO"
+        
+        # Extract IPs
+        PUBLIC_IP=$(echo "$INSTANCE_INFO" | jq -r '.[0][0]')
+        PRIVATE_IP=$(echo "$INSTANCE_INFO" | jq -r '.[0][1]')
+        INSTANCE_ID=$(echo "$INSTANCE_INFO" | jq -r '.[0][2]')
+        INSTANCE_TYPE=$(echo "$INSTANCE_INFO" | jq -r '.[0][3]')
+        
+        # Store as environment variables
+        echo "INSTANCE_PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
+        echo "INSTANCE_PRIVATE_IP=$PRIVATE_IP" >> $GITHUB_ENV
+        echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+        echo "INSTANCE_TYPE=$INSTANCE_TYPE" >> $GITHUB_ENV
+        
+        # Validate
+        if [ -z "$PUBLIC_IP" ] || [ "$PUBLIC_IP" == "null" ]; then
+          echo "❌ ERROR: Could not find instance with name: ${{ env.INSTANCE_NAME }}"
+          echo "Available instances:"
+          aws ec2 describe-instances \
+            --filters "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].[InstanceId, InstanceType, PublicIpAddress, Tags[?Key==`Name`].Value|[0]]' \
+            --output table
+          exit 1
+        fi
+        
+        echo "✅ Instance discovered:"
+        echo "   Name:       ${{ env.INSTANCE_NAME }}"
+        echo "   ID:         $INSTANCE_ID"
+        echo "   Type:       $INSTANCE_TYPE"
+        echo "   Public IP:  $PUBLIC_IP"
+        echo "   Private IP: $PRIVATE_IP"
+
     - name: Setup SSH
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ env.INSTANCE_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh-keyscan -H ${{ env.INSTANCE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
     - name: Verify SSH connection
       run: |
-        ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_IP }} "echo '✅ SSH connection successful'; whoami"
+        ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} "echo '✅ SSH connection successful'; whoami"
 
     - name: Detect instance and prepare environment
       run: |
-        echo "Instance Name: ${{ env.INSTANCE_NAME }}"
-        echo "Instance IP: ${{ env.INSTANCE_IP }}"
-        echo "Services: MongoDB, PostgreSQL, Redis"
+        echo "Instance Name:   ${{ env.INSTANCE_NAME }}"
+        echo "Instance ID:     ${{ env.INSTANCE_ID }}"
+        echo "Instance Type:   ${{ env.INSTANCE_TYPE }}"
+        echo "Public IP:       ${{ env.INSTANCE_PUBLIC_IP }}"
+        echo "Private IP:      ${{ env.INSTANCE_PRIVATE_IP }}"
+        echo "Services:        MongoDB, PostgreSQL, Redis"
 
     - name: Deploy and configure services
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_IP }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
         set -e
         
         echo "=== EC2-DB Deployment Started ==="
@@ -71,6 +121,24 @@ jobs:
           sudo usermod -aG docker ubuntu
         else
           echo "✅ Docker already installed"
+        
+                # Setup docker-compose - handle both v1 and v2
+                echo "🐳 Setting up Docker Compose..."
+                if docker compose version &> /dev/null 2>&1; then
+                  export DC="docker compose"
+                elif command -v docker-compose &> /dev/null; then
+                  export DC="docker-compose"
+                else
+                  echo "Installing docker-compose-plugin..."
+                  sudo apt-get install -y docker-compose-plugin 2>/dev/null || {
+                    echo "Installing standalone docker-compose..."
+                    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+                    sudo mv /tmp/docker-compose /usr/local/bin/
+                    sudo chmod +x /usr/local/bin/docker-compose
+                    export DC="docker-compose"
+                  }
+                fi
+                echo "✅ Using: $DC"
         fi
         
         # Clone or update repository
@@ -97,28 +165,28 @@ jobs:
         
         # Build database services images
         echo "🔨 Building MongoDB image..."
-        docker-compose build mongo --no-cache 2>&1 | tail -5 || true
+        $DC build mongo --no-cache 2>&1 | tail -5 || echo "⚠️ MongoDB build note"
         
         echo "🔨 Building PostgreSQL image..."
-        docker-compose build postgres --no-cache 2>&1 | tail -5 || true
+        $DC build postgres --no-cache 2>&1 | tail -5 || echo "⚠️ PostgreSQL build note"
         
         echo "🔨 Building Redis image..."
-        docker-compose build redis --no-cache 2>&1 | tail -5 || true
+        $DC build redis --no-cache 2>&1 | tail -5 || echo "⚠️ Redis build note"
         
         # Stop existing services
         echo "🛑 Stopping existing services..."
-        docker-compose down -v 2>&1 | tail -3 || true
+        $DC down -v 2>&1 | tail -3 || echo "⚠️ No services to stop"
         
         # Start database services only
         echo "🚀 Starting database services..."
-        docker-compose up -d mongo postgres redis
+        $DC up -d mongo postgres redis
         
         echo "⏳ Waiting for services to initialize (30 seconds)..."
         sleep 30
         
         # Verify services
         echo "✅ Verifying services..."
-        docker-compose ps
+        $DC ps
         
         echo "=== EC2-DB Deployment Completed Successfully ==="
         EOF
@@ -127,14 +195,14 @@ jobs:
       if: ${{ github.event.inputs.skip_verification != 'true' }}
       run: |
         echo "🔍 Checking MongoDB health..."
-        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_IP }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
         cd ~/projeto-acompanamiento
         
         # Wait for MongoDB to be ready
         for i in {1..10}; do
-          if docker-compose exec -T mongo mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
+          if $DC exec -T mongo mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
             echo "✅ MongoDB is healthy"
-            docker-compose exec -T mongo mongosh --eval "db.version()"
+            $DC exec -T mongo mongosh --eval "db.version()"
             exit 0
           fi
           echo "⏳ Waiting for MongoDB... ($i/10)"
@@ -149,14 +217,14 @@ jobs:
       if: ${{ github.event.inputs.skip_verification != 'true' }}
       run: |
         echo "🔍 Checking PostgreSQL health..."
-        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_IP }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
         cd ~/projeto-acompanamiento
         
         # Wait for PostgreSQL to be ready
         for i in {1..10}; do
-          if docker-compose exec -T postgres pg_isready -U postgres > /dev/null 2>&1; then
+          if $DC exec -T postgres pg_isready -U postgres > /dev/null 2>&1; then
             echo "✅ PostgreSQL is healthy"
-            docker-compose exec -T postgres psql -U postgres -d acompanamiento -c "SELECT version();"
+            $DC exec -T postgres psql -U postgres -d acompanamiento -c "SELECT version();"
             exit 0
           fi
           echo "⏳ Waiting for PostgreSQL... ($i/10)"
@@ -171,18 +239,18 @@ jobs:
       if: ${{ github.event.inputs.skip_verification != 'true' }}
       run: |
         echo "🔍 Checking Redis health..."
-        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_IP }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
         cd ~/projeto-acompanamiento
         
         # Wait for Redis to be ready
         for i in {1..10}; do
-          if docker-compose exec -T redis redis-cli ping | grep -q PONG; then
+          if $DC exec -T redis redis-cli ping | grep -q PONG; then
             echo "✅ Redis is healthy"
-            docker-compose exec -T redis redis-cli INFO server | grep redis_version
+            $DC exec -T redis redis-cli INFO server | grep redis_version
             exit 0
-          fi
+              if $DC exec -T redis redis-cli ping | grep -q PONG; then
           echo "⏳ Waiting for Redis... ($i/10)"
-          sleep 3
+                $DC exec -T redis redis-cli INFO server | grep redis_version
         done
         
         echo "⚠️ Redis health check incomplete, but container is running"
@@ -192,16 +260,16 @@ jobs:
     - name: Final service status
       run: |
         echo "📊 Final service status on ${{ env.INSTANCE_NAME }}:"
-        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_IP }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
         cd ~/projeto-acompanamiento
         
         echo "=== Docker Containers Status ==="
-        docker-compose ps
+        $DC ps
         
         echo -e "\n=== Service Ports ==="
-        docker-compose exec -T mongo mongosh --eval "db.version()" 2>/dev/null || echo "MongoDB: port 27017 (internal)"
-        docker-compose exec -T postgres psql -U postgres -c "SELECT 'PostgreSQL ready on port 5432';" 2>/dev/null || echo "PostgreSQL: port 5432 (internal)"
-        docker-compose exec -T redis redis-cli ping 2>/dev/null || echo "Redis: port 6380 (mapped from 6379)"
+        $DC exec -T mongo mongosh --eval "db.version()" 2>/dev/null || echo "MongoDB: port 27017 (internal)"
+        $DC exec -T postgres psql -U postgres -c "SELECT 'PostgreSQL ready on port 5432';" 2>/dev/null || echo "PostgreSQL: port 5432 (internal)"
+        $DC exec -T redis redis-cli ping 2>/dev/null || echo "Redis: port 6380 (mapped from 6379)"
         
         echo -e "\n=== Storage Status ==="
         docker volume ls | grep -E "mongo|postgres|redis" || echo "Volumes configured"

@@ -109,6 +109,24 @@ deploy_services() {
         sudo systemctl start docker
         sudo usermod -aG docker ubuntu
         newgrp docker
+    
+        # Check docker compose availability and set command
+        DOCKER_COMPOSE_CMD="docker compose"
+        if ! $DOCKER_COMPOSE_CMD version &> /dev/null; then
+            if command -v docker-compose &> /dev/null; then
+                DOCKER_COMPOSE_CMD="docker-compose"
+                echo "✅ Using docker-compose v1"
+            else
+                echo "Installing Docker Compose..."
+                sudo apt-get install -y docker-compose-plugin 2>/dev/null || {
+                    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+                    sudo mv /tmp/docker-compose /usr/local/bin/
+                    sudo chmod +x /usr/local/bin/docker-compose
+                    DOCKER_COMPOSE_CMD="docker-compose"
+                }
+            fi
+        fi
+        echo "Using Docker Compose command: $DOCKER_COMPOSE_CMD"
     fi
     
     # Clone or update repository
@@ -118,10 +136,19 @@ deploy_services() {
         cd ~/projeto-acompanimiento
         git pull origin main 2>/dev/null || true
     fi
+    echo "⚙️ Configuring environment..."
+    
+    # Ensure we're in the right directory
+    if [ ! -f docker-compose.yml ]; then
+        cd ~/projeto-acompanimento 2>/dev/null || cd ~/projeto-acompanamiento
+        if [ ! -f docker-compose.yml ]; then
+            echo "❌ docker-compose.yml not found!"
+            exit 1
+        fi
+    fi
     
     # Create environment configuration
-    echo "⚙️ Configuring environment..."
-    cat > .env.db << 'ENVEOF'
+    cat > .env << 'ENVEOF'
     MONGO_INITDB_ROOT_USERNAME=root
     MONGO_INITDB_ROOT_PASSWORD=example
     POSTGRES_USER=postgres
@@ -133,23 +160,23 @@ deploy_services() {
     
     # Build images
     echo "🔨 Building database service images..."
-    docker-compose build --no-cache mongo postgres redis 2>&1 | grep -E "Successfully|Building|ERROR" || true
+    $DOCKER_COMPOSE_CMD build --no-cache mongo postgres redis 2>&1 | grep -E "Successfully|Building|ERROR" || echo "⚠️ Build cached or skipped"
     
     # Stop existing services
     echo "🛑 Stopping existing services..."
-    docker-compose down -v 2>&1 | tail -2 || true
+    $DOCKER_COMPOSE_CMD down -v 2>&1 | tail -2 || echo "⚠️ No services running"
     sleep 5
     
     # Start services
     echo "🚀 Starting database services..."
-    docker-compose up -d mongo postgres redis
+    $DOCKER_COMPOSE_CMD up -d mongo postgres redis
     
     echo "⏳ Services starting (waiting 30 seconds for initialization)..."
     sleep 30
     
     # Show status
     echo "📊 Service status:"
-    docker-compose ps
+    $DOCKER_COMPOSE_CMD ps
     
     echo "✅ Deployment completed successfully!"
 DEPLOY_EOF
@@ -167,6 +194,10 @@ health_check() {
     for i in {1..10}; do
         if docker-compose exec -T mongo mongosh --eval "db.adminCommand('ping')" 2>/dev/null | grep -q "ok"; then
             echo "✅ MongoDB is healthy (version: $(docker-compose exec -T mongo mongosh --eval "db.version()" 2>/dev/null | tail -1))"
+                        DOCKER_COMPOSE_CMD="docker compose"
+                        ! $DOCKER_COMPOSE_CMD version &> /dev/null && command -v docker-compose &> /dev/null && DOCKER_COMPOSE_CMD="docker-compose"
+                        if $DOCKER_COMPOSE_CMD exec -T mongo mongosh --eval "db.adminCommand('ping')" 2>/dev/null | grep -q "ok"; then
+                            echo "✅ MongoDB is healthy (version: $($DOCKER_COMPOSE_CMD exec -T mongo mongosh --eval "db.version()" 2>/dev/null | tail -1))"
             exit 0
         fi
         echo "⏳ Waiting for MongoDB... ($i/10)"
