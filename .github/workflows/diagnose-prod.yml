@@ -79,46 +79,46 @@ jobs:
           CORE_IP=${{ steps.discover.outputs.core_ip }}
           REPORTES_IP=${{ steps.discover.outputs.reportes_ip }}
 
-          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@$GATEWAY <<'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@$GATEWAY bash -c "
           set -e
-          cd ~/projeto-acompanamiento || cd ~/Proyecto-Acompa-amiento- || pwd
+          cd ~/projeto-acompanamiento || cd ~/Projeto-Acompa-amiento- || pwd
 
-          echo "=== GATEWAY: .env.local ==="
-          if [ -f .env.local ]; then cat .env.local; else echo "(no .env.local)"; fi
+          echo '=== GATEWAY: .env.local ==='
+          if [ -f .env.local ]; then cat .env.local; else echo '(no .env.local)'; fi
           echo
-          echo "=== GATEWAY: docker ps ==="
+          echo '=== GATEWAY: docker ps ==='
           docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
           echo
-          echo "=== GATEWAY: /config ==="
+          echo '=== GATEWAY: /config ==='
           curl -s http://localhost:8080/config | jq '.services' || curl -s http://localhost:8080/config
           echo
-          echo "=== GATEWAY: /horarios (GET) ==="
+          echo '=== GATEWAY: /horarios (GET) ==='
           curl -i http://localhost:8080/horarios || true
           echo
-          echo "=== GATEWAY logs (last 120 lines) ==="
-          gid=$(docker ps -qf name=api-gateway)
-          if [ -n "$gid" ]; then docker logs $gid --tail 120 || true; else echo "api-gateway container not found"; fi
+          echo '=== GATEWAY logs (last 120 lines) ==='
+          gid=\$(docker ps -qf name=api-gateway)
+          if [ -n \"\$gid\" ]; then docker logs \$gid --tail 120 || true; else echo 'api-gateway container not found'; fi
 
           echo
-          echo "=== CORE (via gateway LAN) ==="
-          CORE_IP=${CORE_IP}
-          echo "Target CORE_IP=$CORE_IP"
-          echo "--- CORE: docker ps ---"
-          ssh -o StrictHostKeyChecking=no ubuntu@$CORE_IP "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'" || echo "(ssh to core failed)"
-          echo "--- CORE: health checks ---"
-          ssh -o StrictHostKeyChecking=no ubuntu@$CORE_IP "curl -s http://localhost:3000/health || true; curl -s http://localhost:3001/health || true; curl -s http://localhost:3002/health || true" || true
-          echo "--- CORE: maestros /horarios ---"
-          ssh -o StrictHostKeyChecking=no ubuntu@$CORE_IP "curl -i http://localhost:3002/horarios || true" || true
+          echo '=== CORE (via gateway LAN) ==='
+          CORE_IP=$CORE_IP
+          echo \"Target CORE_IP=\$CORE_IP\"
+          echo '--- CORE: docker ps ---'
+          ssh -o StrictHostKeyChecking=no ubuntu@\$CORE_IP 'docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\"' || echo '(ssh to core failed)'
+          echo '--- CORE: health checks ---'
+          ssh -o StrictHostKeyChecking=no ubuntu@\$CORE_IP 'curl -s http://localhost:3000/health; curl -s http://localhost:3001/health; curl -s http://localhost:3002/health' || true
+          echo '--- CORE: maestros /horarios ---'
+          ssh -o StrictHostKeyChecking=no ubuntu@\$CORE_IP 'curl -i http://localhost:3002/horarios' || true
 
           echo
-          echo "=== REPORTES (via gateway LAN) ==="
-          REPORTES_IP=${REPORTES_IP}
-          echo "Target REPORTES_IP=$REPORTES_IP"
-          echo "--- REPORTES: docker ps ---"
-          ssh -o StrictHostKeyChecking=no ubuntu@$REPORTES_IP "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'" || echo "(ssh to reportes failed)"
-          echo "--- REPORTES: health ---"
-          ssh -o StrictHostKeyChecking=no ubuntu@$REPORTES_IP "curl -s http://localhost:5003/health || true; curl -s http://localhost:5004/health || true" || true
-          EOF
+          echo '=== REPORTES (via gateway LAN) ==='
+          REPORTES_IP=$REPORTES_IP
+          echo \"Target REPORTES_IP=\$REPORTES_IP\"
+          echo '--- REPORTES: docker ps ---'
+          ssh -o StrictHostKeyChecking=no ubuntu@\$REPORTES_IP 'docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\"' || echo '(ssh to reportes failed)'
+          echo '--- REPORTES: health ---'
+          ssh -o StrictHostKeyChecking=no ubuntu@\$REPORTES_IP 'curl -s http://localhost:5003/health; curl -s http://localhost:5004/health' || true
+          "
 
       - name: Summarize next steps
         run: |

@@ -27,7 +27,13 @@ try {
 console.log('🚀 Starting API Gateway server with Service Registry...');
 
 // Initialize Service Registry with environment variables
-const CORE_HOST = process.env.CORE_HOST || process.env.EC2_CORE_IP || 'http://localhost';
+// Accept CORE_HOST as raw IP or full URL
+let CORE_HOST = process.env.CORE_HOST || process.env.EC2_CORE_IP;
+if (CORE_HOST && !CORE_HOST.startsWith('http')) {
+  CORE_HOST = `http://${CORE_HOST}`;
+}
+CORE_HOST = CORE_HOST || 'http://localhost';
+
 const PORT = process.env.API_GATEWAY_PORT || process.env.PORT || 8080;
 
 console.log('📋 Service Registry Configuration:');
