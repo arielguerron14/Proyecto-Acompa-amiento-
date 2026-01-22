@@ -109,6 +109,22 @@ jobs:
         fi
         
         echo "CORE_IP=$CORE_IP" >> $GITHUB_OUTPUT
+        echo "🔍 Discovering EC2-Frontend instance..."
+        FRONTEND_PUBLIC_IP=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=EC2-Frontend" \
+                    "Name=instance-state-name,Values=running" \
+          --query 'Reservations[0].Instances[0].PublicIpAddress' \
+          --output text)
+        
+        if [ -z "$FRONTEND_PUBLIC_IP" ] || [ "$FRONTEND_PUBLIC_IP" == "None" ]; then
+          echo "⚠️ EC2-Frontend not found, using localhost fallback"
+          FRONTEND_PUBLIC_IP="localhost"
+        else
+          echo "✅ Found EC2-Frontend at $FRONTEND_PUBLIC_IP"
+        fi
+        
+        echo "FRONTEND_PUBLIC_IP=$FRONTEND_PUBLIC_IP" >> $GITHUB_OUTPUT
+        echo "CORS_ORIGIN=http://$FRONTEND_PUBLIC_IP:5500" >> $GITHUB_OUTPUT
 
     - name: Deploy and configure api-gateway
       env:
@@ -116,6 +132,14 @@ jobs:
       run: |
         echo "🔗 Routing to EC2-CORE: ${{ env.CORE_HOST }}"
         ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << EOF
+            - name: Deploy and configure api-gateway
+              env:
+                CORE_HOST: ${{ steps.discover_deps.outputs.CORE_IP }}
+                CORS_ORIGIN: ${{ steps.discover_deps.outputs.CORS_ORIGIN }}
+              run: |
+                echo "🔗 Routing to EC2-CORE: ${{ env.CORE_HOST }}"
+                echo "🔓 CORS Origin: ${{ env.CORS_ORIGIN }}"
+                ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << EOF
         set -e
 
         echo "=== EC2-API-Gateway Deployment Started ==="
@@ -163,6 +187,17 @@ jobs:
         CORE_HOST=$CORE_HOST \$DC up -d api-gateway
         
         echo "📝 Service discovery configured: EC2-CORE at $CORE_HOST"
+  echo "🔨 Building api-gateway image..."
+  \$DC build api-gateway --no-cache 2>&1 | tail -20 || echo "⚠️ Build notes"
+
+  echo "🚀 Starting api-gateway with environment variables..."
+  echo "   CORE_HOST=$CORE_HOST"
+  echo "   CORS_ORIGIN=$CORS_ORIGIN"
+  CORE_HOST=$CORE_HOST CORS_ORIGIN=$CORS_ORIGIN \$DC up -d api-gateway
+        
+  echo "📝 Service discovery configured:"
+  echo "   - EC2-CORE routing: $CORE_HOST"
+  echo "   - CORS allowed origin: $CORS_ORIGIN"
 
         echo "⏳ Waiting for api-gateway to initialize (25 seconds)..."
         sleep 25
