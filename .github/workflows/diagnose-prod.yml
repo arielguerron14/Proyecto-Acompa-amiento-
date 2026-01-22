@@ -1,0 +1,137 @@
+name: Diagnose Production Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_gateway:
+        description: 'EC2 instance name for API Gateway'
+        required: false
+        default: 'EC2-API-Gateway'
+      instance_core:
+        description: 'EC2 instance name for Core services'
+        required: false
+        default: 'EC2-CORE'
+      instance_reportes:
+        description: 'EC2 instance name for Reportes services'
+        required: false
+        default: 'EC2-Reportes'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      INSTANCE_USER: ubuntu
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Discover instances
+        id: discover
+        run: |
+          set -e
+          echo "🔍 Discovering instances..."
+          core_ip=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ github.event.inputs.instance_core || 'EC2-CORE' }}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
+          reportes_ip=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ github.event.inputs.instance_reportes || 'EC2-Reportes' }}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
+          gateway_public_ip=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ github.event.inputs.instance_gateway || 'EC2-API-Gateway' }}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+          gateway_private_ip=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ github.event.inputs.instance_gateway || 'EC2-API-Gateway' }}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
+
+          echo "core_ip=$core_ip" >> $GITHUB_OUTPUT
+          echo "reportes_ip=$reportes_ip" >> $GITHUB_OUTPUT
+          echo "gateway_public_ip=$gateway_public_ip" >> $GITHUB_OUTPUT
+          echo "gateway_private_ip=$gateway_private_ip" >> $GITHUB_OUTPUT
+
+          echo "CORE_IP=$core_ip"
+          echo "REPORTES_IP=$reportes_ip"
+          echo "GATEWAY_PUBLIC_IP=$gateway_public_ip"
+          echo "GATEWAY_PRIVATE_IP=$gateway_private_ip"
+
+      - name: Setup SSH key
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ steps.discover.outputs.gateway_public_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H ${{ steps.discover.outputs.core_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H ${{ steps.discover.outputs.reportes_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Gateway diagnostics
+        run: |
+          set -e
+          GATEWAY=${{ steps.discover.outputs.gateway_public_ip }}
+          CORE_IP=${{ steps.discover.outputs.core_ip }}
+          REPORTES_IP=${{ steps.discover.outputs.reportes_ip }}
+          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@$GATEWAY <<'EOF'
+          set -e
+          cd ~/projeto-acompanamiento || cd ~/Proyecto-Acompa-amiento- || pwd
+          echo "=== GATEWAY: .env.local ==="
+          if [ -f .env.local ]; then cat .env.local; else echo "(no .env.local)"; fi
+          echo
+          echo "=== GATEWAY: docker ps ==="
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+          echo
+          echo "=== GATEWAY: /config ==="
+          curl -s http://localhost:8080/config | jq '.services' || curl -s http://localhost:8080/config
+          echo
+          echo "=== GATEWAY: /horarios (GET) ==="
+          curl -i http://localhost:8080/horarios || true
+          echo
+          echo "=== GATEWAY logs (last 120 lines) ==="
+          gid=$(docker ps -qf name=api-gateway)
+          if [ -n "$gid" ]; then docker logs $gid --tail 120 || true; else echo "api-gateway container not found"; fi
+          EOF
+
+      - name: Core diagnostics (maestros/estudiantes/auth)
+        run: |
+          set -e
+          CORE=${{ steps.discover.outputs.core_ip }}
+          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@$CORE <<'EOF'
+          set -e
+          cd ~/projeto-acompanamiento || cd ~/Proyecto-Acompa-amiento- || pwd
+          echo "=== CORE: docker ps ==="
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+          echo
+          echo "=== CORE: health checks ==="
+          curl -s http://localhost:3000/health || true
+          curl -s http://localhost:3001/health || true
+          curl -s http://localhost:3002/health || true
+          echo
+          echo "=== CORE: maestros /horarios ==="
+          curl -i http://localhost:3002/horarios || true
+          EOF
+
+      - name: Reportes diagnostics
+        run: |
+          set -e
+          REP=${{ steps.discover.outputs.reportes_ip }}
+          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@$REP <<'EOF'
+          set -e
+          cd ~/projeto-acompanamiento || cd ~/Proyecto-Acompa-amiento- || pwd
+          echo "=== REPORTES: docker ps ==="
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+          echo
+          echo "=== REPORTES: health ==="
+          curl -s http://localhost:5003/health || true
+          curl -s http://localhost:5004/health || true
+          EOF
+
+      - name: Summarize next steps
+        run: |
+          echo "Diagnóstico ejecutado. Revisa los logs anteriores en esta ejecución para ver .env.local, docker ps y resultados de curl en gateway, core y reportes."
