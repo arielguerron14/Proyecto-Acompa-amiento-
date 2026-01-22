@@ -231,8 +231,8 @@ services:
     image: micro-reportes-estudiantes:latest
     container_name: micro-reportes-estudiantes
     restart: unless-stopped
-    expose:
-      - "5003"
+    ports:
+      - "5003:5003"
     depends_on:
       - mongo
       - postgres
@@ -259,8 +259,8 @@ services:
     image: micro-reportes-maestros:latest
     container_name: micro-reportes-maestros
     restart: unless-stopped
-    expose:
-      - "5004"
+    ports:
+      - "5004:5004"
     depends_on:
       - mongo
       - postgres
