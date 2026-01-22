@@ -131,13 +131,16 @@ jobs:
         run: |
           CORE_HOST="${{ steps.discover_deps.outputs.CORE_IP }}"
           CORS_ORIGIN="${{ steps.discover_deps.outputs.CORS_ORIGIN }}"
+          FRONTEND_PUBLIC_IP="${{ steps.discover_deps.outputs.FRONTEND_PUBLIC_IP }}"
           
           echo "🔗 Routing to EC2-CORE: $CORE_HOST"
           echo "🔓 CORS Origin: $CORS_ORIGIN"
+          echo "🌐 Frontend Public IP: $FRONTEND_PUBLIC_IP"
           
-          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} bash -s << 'SSHEOF'
+          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} bash -s << 'SSHEOF' "$CORE_HOST" "$CORS_ORIGIN" "$FRONTEND_PUBLIC_IP"
           CORE_HOST="$1"
           CORS_ORIGIN="$2"
+          FRONTEND_PUBLIC_IP="$3"
           set -e
 
           echo "=== EC2-API-Gateway Deployment Started ==="
@@ -184,7 +187,7 @@ jobs:
           echo "🚀 Starting api-gateway with environment variables..."
           echo "   CORE_HOST=$CORE_HOST"
           echo "   CORS_ORIGIN=$CORS_ORIGIN"
-          CORE_HOST="$CORE_HOST" CORS_ORIGIN="$CORS_ORIGIN" $DC up -d api-gateway
+          CORE_HOST="$CORE_HOST" CORS_ORIGIN="$CORS_ORIGIN" FRONTEND_PUBLIC_IP="$FRONTEND_PUBLIC_IP" CORS_WHITELIST="$CORS_ORIGIN" $DC up -d api-gateway
           
           echo "📝 Service discovery configured:"
           echo "   - EC2-CORE routing: $CORE_HOST"
