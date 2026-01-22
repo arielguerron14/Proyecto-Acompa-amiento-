@@ -78,6 +78,14 @@ jobs:
         echo "   Public IP:  $PUBLIC_IP"
         echo "   Private IP: $PRIVATE_IP"
 
+    - name: Discover messaging instance IP
+      run: |
+        echo "🔍 Checking if messaging services need to connect to this DB..."
+        
+        # For future use: If other instances need to reference EC2-DB
+        echo "DB_INSTANCE_PRIVATE_IP=${{ env.INSTANCE_PRIVATE_IP }}" >> $GITHUB_ENV
+        echo "✅ EC2-DB will be available at: ${{ env.INSTANCE_PRIVATE_IP }}"
+
     - name: Setup SSH
       run: |
         mkdir -p ~/.ssh

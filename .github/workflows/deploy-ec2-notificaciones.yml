@@ -82,6 +82,40 @@ jobs:
       run: |
         ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} "echo '✅ SSH connection successful'; whoami"
 
+    - name: Discover dependent instances IPs
+      run: |
+        echo "🔍 Discovering IPs of dependency instances..."
+        
+        # Discover EC2-DB instance (for mongo)
+        DB_INSTANCE=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=EC2-DB" \
+                    "Name=instance-state-name,Values=running" \
+          --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+          --output text)
+        
+        # Discover EC2-Messaging instance (for kafka/rabbitmq)
+        MESSAGING_INSTANCE=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=EC2-Messaging" \
+                    "Name=instance-state-name,Values=running" \
+          --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+          --output text)
+        
+        if [ ! -z "$DB_INSTANCE" ] && [ "$DB_INSTANCE" != "None" ]; then
+          echo "DB_HOST=$DB_INSTANCE" >> $GITHUB_ENV
+          echo "✅ Found EC2-DB at: $DB_INSTANCE"
+        else
+          echo "⚠️  EC2-DB not found, using local mongo"
+          echo "DB_HOST=mongo" >> $GITHUB_ENV
+        fi
+        
+        if [ ! -z "$MESSAGING_INSTANCE" ] && [ "$MESSAGING_INSTANCE" != "None" ]; then
+          echo "MESSAGING_HOST=$MESSAGING_INSTANCE" >> $GITHUB_ENV
+          echo "✅ Found EC2-Messaging at: $MESSAGING_INSTANCE"
+        else
+          echo "⚠️  EC2-Messaging not found, using local kafka"
+          echo "MESSAGING_HOST=kafka" >> $GITHUB_ENV
+        fi
+
     - name: Detect instance and prepare environment
       run: |
         echo "Instance Name:   ${{ env.INSTANCE_NAME }}"
@@ -90,6 +124,8 @@ jobs:
         echo "Public IP:       ${{ env.INSTANCE_PUBLIC_IP }}"
         echo "Private IP:      ${{ env.INSTANCE_PRIVATE_IP }}"
         echo "Services:        micro-notificaciones (deps: zookeeper, kafka, rabbitmq, mongo)"
+        echo "DB Host:         ${{ env.DB_HOST }}"
+        echo "Messaging Host:  ${{ env.MESSAGING_HOST }}"
 
     - name: Deploy and configure notificaciones services
       run: |

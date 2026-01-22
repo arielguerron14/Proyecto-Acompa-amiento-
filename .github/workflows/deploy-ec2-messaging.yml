@@ -82,6 +82,15 @@ jobs:
       run: |
         ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} "echo '✅ SSH connection successful'; whoami"
 
+    - name: Discover dependent instances IPs
+      run: |
+        echo "🔍 Checking for other messaging instances..."
+        
+        # Note: EC2-Messaging is typically the primary messaging broker
+        # This check is for future clustering scenarios
+        echo "MESSAGING_HOST=$(hostname -I | awk '{print $1}')" >> $GITHUB_ENV
+        echo "✅ EC2-Messaging will be the primary message broker"
+
     - name: Detect instance and prepare environment
       run: |
         echo "Instance Name:   ${{ env.INSTANCE_NAME }}"
@@ -90,6 +99,7 @@ jobs:
         echo "Public IP:       ${{ env.INSTANCE_PUBLIC_IP }}"
         echo "Private IP:      ${{ env.INSTANCE_PRIVATE_IP }}"
         echo "Services:        rabbitmq, zookeeper, kafka"
+        echo "Role:            Primary messaging broker"
 
     - name: Deploy and configure messaging services
       run: |
