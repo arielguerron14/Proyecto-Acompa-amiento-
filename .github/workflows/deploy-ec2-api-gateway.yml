@@ -212,26 +212,26 @@ jobs:
           echo "   REPORTES_HOST=$REPORTES_HOST"
           echo "   CORS_ORIGIN=$CORS_ORIGIN"
           
-          # Create .env.local to ensure variables are loaded
-          echo "CORE_HOST=$CORE_HOST" > .env.local
-          echo "REPORTES_HOST=$REPORTES_HOST" >> .env.local
-          echo "CORS_ORIGIN=$CORS_ORIGIN" >> .env.local
-          echo "CORS_WHITELIST=$CORS_ORIGIN" >> .env.local
-          echo "FRONTEND_PUBLIC_IP=$FRONTEND_PUBLIC_IP" >> .env.local
-          echo "NODE_ENV=production" >> .env.local
-          echo "DOCKER_DEPLOYMENT=true" >> .env.local
-          echo "API_GATEWAY_PORT=8080" >> .env.local
-          echo "PORT=8080" >> .env.local
-          echo "LOG_LEVEL=debug" >> .env.local
+          # Create .env file (docker compose reads .env automatically)
+          echo "CORE_HOST=$CORE_HOST" > .env
+          echo "REPORTES_HOST=$REPORTES_HOST" >> .env
+          echo "CORS_ORIGIN=$CORS_ORIGIN" >> .env
+          echo "CORS_WHITELIST=$CORS_ORIGIN" >> .env
+          echo "FRONTEND_PUBLIC_IP=$FRONTEND_PUBLIC_IP" >> .env
+          echo "NODE_ENV=production" >> .env
+          echo "DOCKER_DEPLOYMENT=true" >> .env
+          echo "API_GATEWAY_PORT=8080" >> .env
+          echo "PORT=8080" >> .env
+          echo "LOG_LEVEL=debug" >> .env
           
-          echo "📝 Created .env.local with:"
-          cat .env.local | grep -E "CORE_HOST|REPORTES_HOST|CORS_ORIGIN" || true
+          echo "📝 Created .env with:"
+          cat .env | grep -E "CORE_HOST|REPORTES_HOST|CORS_ORIGIN" || true
           
           # Stop old container if exists
           $DC down api-gateway 2>/dev/null || true
           sleep 2
           
-          # Start with env files
+          # Start - compose automatically reads .env file
           $DC up -d api-gateway
           
           echo "📝 Service discovery configured:"
