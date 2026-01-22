@@ -152,11 +152,12 @@ services:
       API_GATEWAY_PORT: 8080
       PORT: 8080
       CORE_HOST: ${CORE_HOST:-micro-core}
+      REPORTES_HOST: ${REPORTES_HOST:-${CORE_HOST:-micro-core}}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5500}
       CORS_WHITELIST: ${CORS_WHITELIST:-${CORS_ORIGIN:-http://localhost:5500}}
       LOG_LEVEL: debug
 
-  # Authentication Microservice (NO external port)
+  # Authentication Microservice
   micro-auth:
     build:
       context: .
@@ -164,8 +165,8 @@ services:
     image: micro-auth:latest
     container_name: micro-auth
     restart: unless-stopped
-    expose:
-      - "3000"
+    ports:
+      - "3000:3000"
     depends_on:
       - mongo
       - kafka
@@ -178,7 +179,7 @@ services:
       KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
 
-  # Students Microservice (NO external port)
+  # Students Microservice
   micro-estudiantes:
     build:
       context: .
@@ -186,8 +187,8 @@ services:
     image: micro-estudiantes:latest
     container_name: micro-estudiantes
     restart: unless-stopped
-    expose:
-      - "3001"
+    ports:
+      - "3001:3001"
     depends_on:
       - mongo
       - kafka
@@ -200,7 +201,7 @@ services:
       KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
 
-  # Teachers/Schedule Microservice (NO external port)
+  # Teachers/Schedule Microservice
   micro-maestros:
     build:
       context: .
@@ -208,8 +209,8 @@ services:
     image: micro-maestros:latest
     container_name: micro-maestros
     restart: unless-stopped
-    expose:
-      - "3002"
+    ports:
+      - "3002:3002"
     depends_on:
       - mongo
       - kafka
