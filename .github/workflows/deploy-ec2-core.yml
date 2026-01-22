@@ -82,6 +82,41 @@ jobs:
       run: |
         ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} "echo '✅ SSH connection successful'; whoami"
 
+    - name: Discover dependent instances IPs
+      run: |
+        echo "🔍 Discovering IPs of dependency instances..."
+        
+        # Discover EC2-DB instance (for mongo/postgres)
+        DB_INSTANCE=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=EC2-DB" \
+                    "Name=instance-state-name,Values=running" \
+          --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+          --output text)
+        
+        # Discover EC2-Messaging instance (for kafka/zookeeper/rabbitmq)
+        MESSAGING_INSTANCE=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=EC2-Messaging" \
+                    "Name=instance-state-name,Values=running" \
+          --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+          --output text)
+        
+        # Set environment variables for dependency hosts
+        if [ ! -z "$DB_INSTANCE" ] && [ "$DB_INSTANCE" != "None" ]; then
+          echo "DB_HOST=$DB_INSTANCE" >> $GITHUB_ENV
+          echo "✅ Found EC2-DB at: $DB_INSTANCE"
+        else
+          echo "⚠️  EC2-DB not found, using local mongo"
+          echo "DB_HOST=mongo" >> $GITHUB_ENV
+        fi
+        
+        if [ ! -z "$MESSAGING_INSTANCE" ] && [ "$MESSAGING_INSTANCE" != "None" ]; then
+          echo "MESSAGING_HOST=$MESSAGING_INSTANCE" >> $GITHUB_ENV
+          echo "✅ Found EC2-Messaging at: $MESSAGING_INSTANCE"
+        else
+          echo "⚠️  EC2-Messaging not found, using local kafka"
+          echo "MESSAGING_HOST=kafka" >> $GITHUB_ENV
+        fi
+
     - name: Detect instance and prepare environment
       run: |
         echo "Instance Name:   ${{ env.INSTANCE_NAME }}"
@@ -90,6 +125,8 @@ jobs:
         echo "Public IP:       ${{ env.INSTANCE_PUBLIC_IP }}"
         echo "Private IP:      ${{ env.INSTANCE_PRIVATE_IP }}"
         echo "Services:        micro-auth, micro-estudiantes, micro-maestros, micro-soap-bridge, micro-analytics"
+        echo "DB Host:         ${{ env.DB_HOST }}"
+        echo "Messaging Host:  ${{ env.MESSAGING_HOST }}"
 
     - name: Deploy and configure core services
       run: |
@@ -137,8 +174,29 @@ jobs:
         echo "🔨 Building core microservices images..."
         $DC build micro-auth micro-estudiantes micro-maestros micro-soap-bridge micro-analytics --no-cache 2>&1 | tail -20 || echo "⚠️ Build notes"
 
-        echo "🚀 Starting core services and dependencies..."
-        $DC up -d zookeeper kafka rabbitmq mongo micro-auth micro-estudiantes micro-maestros micro-soap-bridge micro-analytics
+        echo "🚀 Starting core services with cross-instance configuration..."
+        
+        # Create environment override file if using remote instances
+        if [ "${{ env.DB_HOST }}" != "mongo" ] || [ "${{ env.MESSAGING_HOST }}" != "kafka" ]; then
+          echo "📝 Configuring remote instance connectivity..."
+          cat > ~/.env.remote << ENVEOF
+          MONGODB_URI=mongodb://root:example@${{ env.DB_HOST }}:27017/auth?authSource=admin
+          KAFKA_BROKERS=${{ env.MESSAGING_HOST }}:9092
+          RABBITMQ_URL=amqp://guest:guest@${{ env.MESSAGING_HOST }}:5672
+          ENVEOF
+          
+          # Source the environment variables
+          export $(cat ~/.env.remote | xargs)
+        fi
+        
+        # Start microservices with proper environment
+        $DC up -d micro-auth micro-estudiantes micro-maestros micro-soap-bridge micro-analytics
+
+        # If using local hosts, also start local dependencies
+        if [ "${{ env.DB_HOST }}" = "mongo" ]; then
+          echo "Starting local database and messaging services..."
+          $DC up -d zookeeper kafka rabbitmq mongo
+        fi
 
         echo "⏳ Waiting for services to initialize (40 seconds)..."
         sleep 40

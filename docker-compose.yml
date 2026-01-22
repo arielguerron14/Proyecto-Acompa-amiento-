@@ -172,9 +172,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      MONGODB_URI: mongodb://root:example@mongo:27017/auth?authSource=admin
-      KAFKA_BROKERS: kafka:9092
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      MONGODB_URI: ${MONGODB_URI:-mongodb://root:example@mongo:27017/auth?authSource=admin}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
 
   # Students Microservice (NO external port)
   micro-estudiantes:
@@ -194,9 +194,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      MONGODB_URI: mongodb://root:example@mongo:27017/estudiantes?authSource=admin
-      KAFKA_BROKERS: kafka:9092
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      MONGODB_URI: ${MONGODB_URI:-mongodb://root:example@mongo:27017/estudiantes?authSource=admin}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
 
   # Teachers/Schedule Microservice (NO external port)
   micro-maestros:
@@ -216,9 +216,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3002
-      MONGODB_URI: mongodb://root:example@mongo:27017/maestros?authSource=admin
-      KAFKA_BROKERS: kafka:9092
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      MONGODB_URI: ${MONGODB_URI:-mongodb://root:example@mongo:27017/maestros?authSource=admin}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
 
   # Student Reports Microservice (NO external port)
   micro-reportes-estudiantes:
@@ -239,14 +239,14 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5003
-      MONGODB_URI: mongodb://root:example@mongo:27017/reportes-estudiantes?authSource=admin
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      MONGODB_URI: ${MONGODB_URI:-mongodb://root:example@mongo:27017/reportes-estudiantes?authSource=admin}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: example
       POSTGRES_DB: acompanamiento
-      KAFKA_BROKERS: kafka:9092
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
 
   # Teacher Reports Microservice (NO external port)
   micro-reportes-maestros:
@@ -267,14 +267,14 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5004
-      MONGODB_URI: mongodb://root:example@mongo:27017/reportes-maestros?authSource=admin
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      MONGODB_URI: ${MONGODB_URI:-mongodb://root:example@mongo:27017/reportes-maestros?authSource=admin}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: example
       POSTGRES_DB: acompanamiento
-      KAFKA_BROKERS: kafka:9092
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
 
   # Notifications Microservice (NO external port)
   micro-notificaciones:
