@@ -19,7 +19,7 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-    deploy-api-gateway:
+  deploy-api-gateway:
     runs-on: ubuntu-latest
     name: Deploy API Gateway to EC2-API-Gateway
 
