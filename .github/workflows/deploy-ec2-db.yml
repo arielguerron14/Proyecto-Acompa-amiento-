@@ -196,13 +196,24 @@ jobs:
       run: |
         echo "🔍 Checking MongoDB health..."
         ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
+        set -e
         cd ~/projeto-acompanamiento
+        
+        # Detect Docker Compose command
+        if docker compose version &>/dev/null; then
+          DC="docker compose"
+        elif command -v docker-compose &>/dev/null; then
+          DC="docker-compose"
+        else
+          echo "❌ Docker Compose not found"
+          exit 1
+        fi
         
         # Wait for MongoDB to be ready
         for i in {1..10}; do
           if $DC exec -T mongo mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
             echo "✅ MongoDB is healthy"
-            $DC exec -T mongo mongosh --eval "db.version()"
+            $DC exec -T mongo mongosh --eval "db.version()" | tail -1
             exit 0
           fi
           echo "⏳ Waiting for MongoDB... ($i/10)"
@@ -210,7 +221,7 @@ jobs:
         done
         
         echo "⚠️ MongoDB health check incomplete, but container is running"
-        exit 0
+        exit 1
         EOF
 
     - name: Health check - PostgreSQL
@@ -218,7 +229,18 @@ jobs:
       run: |
         echo "🔍 Checking PostgreSQL health..."
         ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
+        set -e
         cd ~/projeto-acompanamiento
+        
+        # Detect Docker Compose command
+        if docker compose version &>/dev/null; then
+          DC="docker compose"
+        elif command -v docker-compose &>/dev/null; then
+          DC="docker-compose"
+        else
+          echo "❌ Docker Compose not found"
+          exit 1
+        fi
         
         # Wait for PostgreSQL to be ready
         for i in {1..10}; do
@@ -232,7 +254,7 @@ jobs:
         done
         
         echo "⚠️ PostgreSQL health check incomplete, but container is running"
-        exit 0
+        exit 1
         EOF
 
     - name: Health check - Redis
@@ -240,21 +262,32 @@ jobs:
       run: |
         echo "🔍 Checking Redis health..."
         ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
+        set -e
         cd ~/projeto-acompanamiento
         
-        # Wait for Redis to be ready
+        # Detect Docker Compose command
+        if docker compose version &>/dev/null; then
+          DC="docker compose"
+        elif command -v docker-compose &>/dev/null; then
+          DC="docker-compose"
+        else
+          echo "❌ Docker Compose not found"
+          exit 1
+        fi
+        
+        echo "🔍 Checking Redis health..."
         for i in {1..10}; do
-          if $DC exec -T redis redis-cli ping | grep -q PONG; then
+          if $DC exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; then
             echo "✅ Redis is healthy"
-            $DC exec -T redis redis-cli INFO server | grep redis_version
+            $DC exec -T redis redis-cli INFO server | grep -E '^redis_version'
             exit 0
-              if $DC exec -T redis redis-cli ping | grep -q PONG; then
+          fi
           echo "⏳ Waiting for Redis... ($i/10)"
-                $DC exec -T redis redis-cli INFO server | grep redis_version
+          sleep 3
         done
         
         echo "⚠️ Redis health check incomplete, but container is running"
-        exit 0
+        exit 1
         EOF
 
     - name: Final service status
