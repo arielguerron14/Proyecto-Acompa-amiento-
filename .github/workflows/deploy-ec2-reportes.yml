@@ -177,18 +177,16 @@ jobs:
         
         # Create .env.local with proper configuration
         echo "📝 Creating .env.local for reportes services..."
-        cat > .env.local << 'ENVEOF'
-NODE_ENV=production
-DOCKER_DEPLOYMENT=true
-MONGODB_URI=mongodb://root:example@mongo:27017/admin?authSource=admin
-KAFKA_BROKERS=kafka:9092
-RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
-POSTGRES_HOST=postgres
-POSTGRES_PORT=5432
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=example
-POSTGRES_DB=acompanamiento
-ENVEOF
+        echo "NODE_ENV=production" > .env.local
+        echo "DOCKER_DEPLOYMENT=true" >> .env.local
+        echo "MONGODB_URI=mongodb://root:example@mongo:27017/admin?authSource=admin" >> .env.local
+        echo "KAFKA_BROKERS=kafka:9092" >> .env.local
+        echo "RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672" >> .env.local
+        echo "POSTGRES_HOST=postgres" >> .env.local
+        echo "POSTGRES_PORT=5432" >> .env.local
+        echo "POSTGRES_USER=postgres" >> .env.local
+        echo "POSTGRES_PASSWORD=example" >> .env.local
+        echo "POSTGRES_DB=acompanamiento" >> .env.local
 
         # Stop old services to force recreation
         $DC down 2>/dev/null || true
