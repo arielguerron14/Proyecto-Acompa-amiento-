@@ -91,14 +91,14 @@ jobs:
         echo "Private IP:      ${{ env.INSTANCE_PRIVATE_IP }}"
         echo "Services:        frontend-web (React/Vite SPA served on port 5500)"
 
-    - name: Discover API Gateway instance IP
+    - name: Discover API Gateway instance IP (public)
       id: discover_gateway
       run: |
         echo "🔍 Discovering EC2-API-Gateway instance..."
         GATEWAY_IP=$(aws ec2 describe-instances \
           --filters "Name=tag:Name,Values=EC2-API-Gateway" \
                     "Name=instance-state-name,Values=running" \
-          --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+          --query 'Reservations[0].Instances[0].PublicIpAddress' \
           --output text)
         
         if [ -z "$GATEWAY_IP" ] || [ "$GATEWAY_IP" == "None" ]; then
