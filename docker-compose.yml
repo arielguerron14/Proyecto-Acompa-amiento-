@@ -151,7 +151,9 @@ services:
       DOCKER_DEPLOYMENT: "true"
       API_GATEWAY_PORT: 8080
       PORT: 8080
-      CORE_HOST: ""
+      CORE_HOST: ${CORE_HOST:-micro-core}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5500}
+      CORS_WHITELIST: ${CORS_WHITELIST:-${CORS_ORIGIN:-http://localhost:5500}}
       LOG_LEVEL: debug
 
   # Authentication Microservice (NO external port)
