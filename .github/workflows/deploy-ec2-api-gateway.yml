@@ -162,6 +162,10 @@ jobs:
           FRONTEND_PUBLIC_IP="$4"
           set -e
 
+          # Export so docker compose can substitute these values
+          export CORE_HOST REPORTES_HOST CORS_ORIGIN CORS_WHITELIST FRONTEND_PUBLIC_IP
+          CORS_WHITELIST="$CORS_ORIGIN"
+
           echo "=== EC2-API-Gateway Deployment Started ==="
           echo "Hostname: $(hostname)"
           echo "IP Address: $(hostname -I)"
