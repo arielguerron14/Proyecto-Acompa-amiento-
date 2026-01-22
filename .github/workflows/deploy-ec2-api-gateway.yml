@@ -209,7 +209,7 @@ jobs:
           echo "   CORS_ORIGIN=$CORS_ORIGIN"
           
           # Create .env.local to ensure variables are loaded
-          cat > .env.local << ENVEOF
+          cat > .env.local << 'ENVEOF'
 CORE_HOST=$CORE_HOST
 REPORTES_HOST=$REPORTES_HOST
 CORS_ORIGIN=$CORS_ORIGIN
