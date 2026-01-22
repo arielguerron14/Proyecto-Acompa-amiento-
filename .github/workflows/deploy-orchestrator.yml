@@ -57,7 +57,8 @@ jobs:
 
   stage-2-messaging:
     needs: stage-1-infrastructure
-    if: ${{ github.event.inputs.start_stage <= '2' || github.event.inputs.start_stage == '' }}
+    if: ${{ (github.event.inputs.start_stage <= '2' || github.event.inputs.start_stage == '')
+          && (needs.stage-1-infrastructure.result == 'success' || needs.stage-1-infrastructure.result == 'skipped') }}
     runs-on: ubuntu-latest
     name: Stage 2 - Messaging Services
 
@@ -89,7 +90,8 @@ jobs:
 
   stage-3-core-services:
     needs: stage-2-messaging
-    if: ${{ github.event.inputs.start_stage <= '3' || github.event.inputs.start_stage == '' }}
+    if: ${{ (github.event.inputs.start_stage <= '3' || github.event.inputs.start_stage == '')
+          && (needs.stage-2-messaging.result == 'success' || needs.stage-2-messaging.result == 'skipped') }}
     runs-on: ubuntu-latest
     name: Stage 3 - Core Microservices
 
@@ -139,7 +141,8 @@ jobs:
 
   stage-4-frontend-and-gateway:
     needs: stage-3-core-services
-    if: ${{ github.event.inputs.start_stage <= '4' || github.event.inputs.start_stage == '' }}
+    if: ${{ (github.event.inputs.start_stage <= '4' || github.event.inputs.start_stage == '')
+          && (needs.stage-3-core-services.result == 'success' || needs.stage-3-core-services.result == 'skipped') }}
     runs-on: ubuntu-latest
     name: Stage 4 - API Gateway & Frontend
 
