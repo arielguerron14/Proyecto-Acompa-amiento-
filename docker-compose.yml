@@ -115,6 +115,18 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # Redis - Cache and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    networks:
+      - core-net
+    volumes:
+      - redis_data:/data
+
   # API Gateway - Main entry point (ONLY exposed port)
   api-gateway:
     build:
@@ -339,3 +351,4 @@ volumes:
   prometheus_data:
   grafana_data:
   rabbitmq_data:
+  redis_data:

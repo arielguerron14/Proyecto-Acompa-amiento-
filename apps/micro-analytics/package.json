@@ -30,7 +30,8 @@
     "json2csv": "~5.0.7",
     "jsonwebtoken": "^9.0.2",
     "kafkajs": "^2.2.4",
-    "mongoose": "^7.5.0"
+    "mongoose": "^7.5.0",
+    "socks": "^2.7.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.20"
