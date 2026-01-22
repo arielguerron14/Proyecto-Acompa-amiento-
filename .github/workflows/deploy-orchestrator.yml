@@ -18,6 +18,11 @@ env:
   INSTANCE_USER: ubuntu
   AWS_REGION: us-east-1
 
+# Required so this workflow can dispatch other workflows via gh CLI
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   stage-1-infrastructure:
     if: ${{ github.event.inputs.start_stage <= '1' || github.event.inputs.start_stage == '' }}
