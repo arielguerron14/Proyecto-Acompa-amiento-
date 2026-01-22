@@ -91,9 +91,31 @@ jobs:
         echo "Private IP:      ${{ env.INSTANCE_PRIVATE_IP }}"
         echo "Services:        api-gateway"
 
-    - name: Deploy and configure api-gateway
+    - name: Discover dependent EC2 instances
+      id: discover_deps
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
+        echo "🔍 Discovering EC2-CORE instance..."
+        CORE_IP=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=EC2-CORE" \
+                    "Name=instance-state-name,Values=running" \
+          --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+          --output text)
+        
+        if [ -z "$CORE_IP" ] || [ "$CORE_IP" == "None" ]; then
+          echo "⚠️ EC2-CORE not found, using localhost fallback"
+          CORE_IP="localhost"
+        else
+          echo "✅ Found EC2-CORE at $CORE_IP"
+        fi
+        
+        echo "CORE_IP=$CORE_IP" >> $GITHUB_OUTPUT
+
+    - name: Deploy and configure api-gateway
+      env:
+        CORE_HOST: ${{ steps.discover_deps.outputs.CORE_IP }}
+      run: |
+        echo "🔗 Routing to EC2-CORE: ${{ env.CORE_HOST }}"
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << EOF
         set -e
 
         echo "=== EC2-API-Gateway Deployment Started ==="
@@ -135,10 +157,12 @@ jobs:
         cd ~/projeto-acompanamiento
 
         echo "🔨 Building api-gateway image..."
-        $DC build api-gateway --no-cache 2>&1 | tail -20 || echo "⚠️ Build notes"
+        \$DC build api-gateway --no-cache 2>&1 | tail -20 || echo "⚠️ Build notes"
 
-        echo "🚀 Starting api-gateway..."
-        $DC up -d api-gateway
+        echo "🚀 Starting api-gateway with CORE_HOST=$CORE_HOST..."
+        CORE_HOST=$CORE_HOST \$DC up -d api-gateway
+        
+        echo "📝 Service discovery configured: EC2-CORE at $CORE_HOST"
 
         echo "⏳ Waiting for api-gateway to initialize (25 seconds)..."
         sleep 25
