@@ -37,12 +37,6 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Deploy EC2-DB (MongoDB, PostgreSQL, Redis)
-      run: |
-        echo "📦 Stage 1: Deploying databases and infrastructure..."
-        gh workflow run deploy-ec2-db.yml -f instance_name=EC2-DB
-        echo "⏳ Waiting for EC2-DB deployment (120 seconds)..."
-        sleep 120
-    - name: Deploy EC2-DB (MongoDB, PostgreSQL, Redis)
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
@@ -75,18 +69,12 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Deploy EC2-Messaging (Kafka, Zookeeper, RabbitMQ)
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         echo "📦 Stage 2: Deploying messaging infrastructure..."
         gh workflow run deploy-ec2-messaging.yml -f instance_name=EC2-Messaging
         echo "⏳ Waiting for EC2-Messaging deployment (120 seconds)..."
-            - name: Deploy EC2-Messaging (Kafka, Zookeeper, RabbitMQ)
-              env:
-                GH_TOKEN: ${{ github.token }}
-              run: |
-                echo "📦 Stage 2: Deploying messaging infrastructure..."
-                gh workflow run deploy-ec2-messaging.yml -f instance_name=EC2-Messaging
-                echo "⏳ Waiting for EC2-Messaging deployment (120 seconds)..."
-                sleep 120
         sleep 120
 
     - name: Verify EC2-Messaging deployment
@@ -113,6 +101,8 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Deploy EC2-CORE (Auth, Students, Teachers, Analytics, SOAP Bridge)
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         echo "📦 Stage 3: Deploying core microservices..."
         gh workflow run deploy-ec2-core.yml -f instance_name=EC2-CORE
@@ -120,6 +110,8 @@ jobs:
         sleep 120
 
     - name: Deploy EC2-Notificaciones (Notifications)
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         echo "📦 Deploying notifications service..."
         gh workflow run deploy-ec2-notificaciones.yml -f instance_name=EC2-Notificaciones
@@ -127,36 +119,12 @@ jobs:
         sleep 90
 
     - name: Deploy EC2-Reportes (Student & Teacher Reports)
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         echo "📦 Deploying reports services..."
         gh workflow run deploy-ec2-reportes.yml -f instance_name=EC2-Reportes
         echo "⏳ Waiting for EC2-Reportes deployment (90 seconds)..."
-            - name: Deploy EC2-CORE (Auth, Students, Teachers, Analytics, SOAP Bridge)
-              env:
-                GH_TOKEN: ${{ github.token }}
-              run: |
-                echo "📦 Stage 3: Deploying core microservices..."
-                gh workflow run deploy-ec2-core.yml -f instance_name=EC2-CORE
-                echo "⏳ Waiting for EC2-CORE deployment (120 seconds)..."
-                sleep 120
-
-            - name: Deploy EC2-Notificaciones (Notifications)
-              env:
-                GH_TOKEN: ${{ github.token }}
-              run: |
-                echo "📦 Deploying notifications service..."
-                gh workflow run deploy-ec2-notificaciones.yml -f instance_name=EC2-Notificaciones
-                echo "⏳ Waiting for EC2-Notificaciones deployment (90 seconds)..."
-                sleep 90
-
-            - name: Deploy EC2-Reportes (Student & Teacher Reports)
-              env:
-                GH_TOKEN: ${{ github.token }}
-              run: |
-                echo "📦 Deploying reports services..."
-                gh workflow run deploy-ec2-reportes.yml -f instance_name=EC2-Reportes
-                echo "⏳ Waiting for EC2-Reportes deployment (90 seconds)..."
-                sleep 90
         sleep 90
 
     - name: Verify Stage 3 deployment
@@ -183,6 +151,8 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Deploy EC2-API-Gateway (Main entry point)
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         echo "📦 Stage 4: Deploying API Gateway..."
         gh workflow run deploy-ec2-api-gateway.yml -f instance_name=EC2-API-Gateway
@@ -190,6 +160,8 @@ jobs:
         sleep 90
 
     - name: Deploy EC2-Frontend (React SPA)
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         echo "📦 Deploying frontend application..."
         gh workflow run deploy-ec2-frontend.yml -f instance_name=EC2-Frontend
@@ -197,36 +169,12 @@ jobs:
         sleep 60
 
     - name: Deploy EC2-Monitoring (Prometheus & Grafana)
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         echo "📦 Deploying monitoring stack..."
         gh workflow run deploy-ec2-monitoring.yml -f instance_name=EC2-Monitoring
         echo "⏳ Waiting for EC2-Monitoring deployment (60 seconds)..."
-            - name: Deploy EC2-API-Gateway (Main entry point)
-              env:
-                GH_TOKEN: ${{ github.token }}
-              run: |
-                echo "📦 Stage 4: Deploying API Gateway..."
-                gh workflow run deploy-ec2-api-gateway.yml -f instance_name=EC2-API-Gateway
-                echo "⏳ Waiting for EC2-API-Gateway deployment (90 seconds)..."
-                sleep 90
-
-            - name: Deploy EC2-Frontend (React SPA)
-              env:
-                GH_TOKEN: ${{ github.token }}
-              run: |
-                echo "📦 Deploying frontend application..."
-                gh workflow run deploy-ec2-frontend.yml -f instance_name=EC2-Frontend
-                echo "⏳ Waiting for EC2-Frontend deployment (60 seconds)..."
-                sleep 60
-
-            - name: Deploy EC2-Monitoring (Prometheus & Grafana)
-              env:
-                GH_TOKEN: ${{ github.token }}
-              run: |
-                echo "📦 Deploying monitoring stack..."
-                gh workflow run deploy-ec2-monitoring.yml -f instance_name=EC2-Monitoring
-                echo "⏳ Waiting for EC2-Monitoring deployment (60 seconds)..."
-                sleep 60
         sleep 60
 
     - name: Verify Stage 4 deployment
