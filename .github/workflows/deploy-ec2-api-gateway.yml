@@ -209,18 +209,16 @@ jobs:
           echo "   CORS_ORIGIN=$CORS_ORIGIN"
           
           # Create .env.local to ensure variables are loaded
-          cat > .env.local <<EOF
-CORE_HOST=$CORE_HOST
-REPORTES_HOST=$REPORTES_HOST
-CORS_ORIGIN=$CORS_ORIGIN
-CORS_WHITELIST=$CORS_ORIGIN
-FRONTEND_PUBLIC_IP=$FRONTEND_PUBLIC_IP
-NODE_ENV=production
-DOCKER_DEPLOYMENT=true
-API_GATEWAY_PORT=8080
-PORT=8080
-LOG_LEVEL=debug
-EOF
+          echo "CORE_HOST=$CORE_HOST" > .env.local
+          echo "REPORTES_HOST=$REPORTES_HOST" >> .env.local
+          echo "CORS_ORIGIN=$CORS_ORIGIN" >> .env.local
+          echo "CORS_WHITELIST=$CORS_ORIGIN" >> .env.local
+          echo "FRONTEND_PUBLIC_IP=$FRONTEND_PUBLIC_IP" >> .env.local
+          echo "NODE_ENV=production" >> .env.local
+          echo "DOCKER_DEPLOYMENT=true" >> .env.local
+          echo "API_GATEWAY_PORT=8080" >> .env.local
+          echo "PORT=8080" >> .env.local
+          echo "LOG_LEVEL=debug" >> .env.local
           
           echo "📝 Created .env.local with:"
           cat .env.local | grep -E "CORE_HOST|REPORTES_HOST|CORS_ORIGIN" || true
