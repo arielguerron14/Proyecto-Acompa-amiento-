@@ -74,6 +74,13 @@ if (envOrigins) {
   corsOrigins.push(...envOrigins.split(',').map(o => o.trim()).filter(o => o));
 }
 
+// Add Frontend public IP if provided explicitly via env (from deploy workflow)
+const frontendPublicIp = process.env.FRONTEND_PUBLIC_IP || '';
+if (frontendPublicIp) {
+  corsOrigins.push(`http://${frontendPublicIp}:5500`);
+  corsOrigins.push(`https://${frontendPublicIp}:5500`);
+}
+
 // Add Frontend IP from config/instance_ips.json
 try {
   const configPath = path.join(__dirname, '..', 'config', 'instance_ips.json');
