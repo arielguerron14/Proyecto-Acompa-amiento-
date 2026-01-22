@@ -125,6 +125,13 @@ const SERVICE_REGISTRY = {
   // ⚠️ IMPORTANT: Order matters! More specific routes must come BEFORE general wildcards
   // Using array to guarantee evaluation order (most specific first)
   routesArray: [
+    // Teacher reports (must come before generic /reportes mapping)
+    ['/reportes/maestros', 'reportesMaestros'],
+    ['/reportes/maestros/*', 'reportesMaestros'],
+    // Back-compat short alias for maestros reports
+    ['/reportes-maestros', 'reportesMaestros'],
+    ['/reportes-maestros/*', 'reportesMaestros'],
+
     // Students routes (MUST come before /* wildcard)
     ['/estudiantes', 'estudiantes'],
     ['/estudiantes/*', 'estudiantes'],

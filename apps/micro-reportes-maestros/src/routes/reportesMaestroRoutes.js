@@ -18,6 +18,22 @@ router.get('/maestros/reportes/:maestroId', (req, res, next) => {
   ctrl.getReportesByMaestro(req, res, next, queryBus);
 });
 
+// Accept canonical gateway-style prefix as well: /reportes/maestros/*
+router.post('/reportes/maestros/registrar', (req, res, next) => {
+  const commandBus = req.app.locals.commandBus;
+  ctrl.registrarAtencion(req, res, next, commandBus);
+});
+
+router.get('/reportes/maestros/reportes/:maestroId', (req, res, next) => {
+  const queryBus = req.app.locals.queryBus;
+  ctrl.getReportesByMaestro(req, res, next, queryBus);
+});
+
+router.get('/reportes/maestros/reporte/:id', (req, res, next) => {
+  const queryBus = req.app.locals.queryBus;
+  ctrl.getReporteByMaestro(req, res, next, queryBus);
+});
+
 // Legacy routes without prefix (for backward compatibility)
 router.post('/registrar', (req, res, next) => {
   const commandBus = req.app.locals.commandBus;

@@ -31,7 +31,11 @@ class ReportesManager {
             if (emptyEl) emptyEl.style.display = 'none';
             if (listEl) listEl.style.display = 'none';
 
-            const response = await fetch(`${authManager.baseURL}/reportes/estudiantes/reporte/${user.id}`, {
+            const base = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+            // Align to config: reportes-estudiantes list is /reportes/estudiante/:id
+            const url = `${String(base).replace(/\/$/, '')}/reportes/estudiante/${user.id}`;
+            console.debug('[reportes.js] GET', url);
+            const response = await fetch(url, {
                 headers: authManager.getAuthHeaders()
             });
             console.log('DEBUG: Fetch response status:', response.status);

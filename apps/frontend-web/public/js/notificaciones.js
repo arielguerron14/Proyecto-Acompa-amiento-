@@ -3,6 +3,7 @@
 class NotificacionesManager {
     constructor() {
         this.notificaciones = [];
+        this._delegationSetup = false;
     }
 
     // Inicializar módulo de notificaciones
@@ -84,6 +85,9 @@ class NotificacionesManager {
 
         listEl.innerHTML = this.notificaciones.map(notif => this.createNotificacionCard(notif)).join('');
 
+        // Delegated events setup (once)
+        this.setupDelegatedEvents();
+
         // Actualizar contador en dashboard
         this.updateDashboardCount();
     }
@@ -102,9 +106,23 @@ class NotificacionesManager {
                     <div class="notificacion-message">${notificacion.mensaje}</div>
                     <div class="notificacion-time">${timeAgo}</div>
                 </div>
-                ${!notificacion.leida ? `<button class="btn-marcar-leida" onclick="notificacionesManager.marcarComoLeida('${notificacion.id}')">Marcar como leída</button>` : ''}
+                ${!notificacion.leida ? `<button class="btn-marcar-leida" data-id="${notificacion.id}">Marcar como leída</button>` : ''}
             </div>
         `;
+    }
+
+    // Configure delegated click handler once to avoid inline events
+    setupDelegatedEvents() {
+        if (this._delegationSetup) return;
+        const listEl = document.getElementById('notificaciones-list');
+        if (!listEl) return;
+        listEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-marcar-leida');
+            if (!btn) return;
+            const id = btn.getAttribute('data-id');
+            if (id) this.marcarComoLeida(id);
+        });
+        this._delegationSetup = true;
     }
 
     // Obtener icono según tipo de notificación

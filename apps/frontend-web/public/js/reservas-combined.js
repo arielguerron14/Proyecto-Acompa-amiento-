@@ -10,9 +10,18 @@ class ReservasManager {
         this.isReserving = false;
     }
 
+    getHorarioId(h) {
+        return h?._id || h?.id || h?.horarioId || '';
+    }
+
+    // Obtener ID de reserva de forma tolerante
+    getReservaId(r) {
+        return r?._id || r?.id || r?.reservaId || '';
+    }
+
     // Obtener base URL segura para las peticiones
     getApiBase() {
-        return (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
+        return (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
     }
 
     // ==================== SECCIÓN: Inicialización ====================
@@ -63,8 +72,8 @@ class ReservasManager {
             horariosList.addEventListener('click', (e) => {
                 const btn = e.target.closest('.btn-reservar');
                 if (!btn) return;
-                const card = btn.closest('.horario-card');
-                const horarioId = card?.dataset?.horarioId;
+                const containerWithId = btn.closest('[data-horario-id]');
+                const horarioId = containerWithId?.dataset?.horarioId || btn.dataset?.horarioId;
                 console.debug('[reservas-combined] Click reservar detected. horarioId=', horarioId);
                 if (horarioId) this.selectHorario(horarioId);
             });
@@ -76,11 +85,34 @@ class ReservasManager {
             reservasList.addEventListener('click', async (e) => {
                 const btn = e.target.closest('.btn-delete');
                 if (!btn) return;
-                const reservaId = btn?.dataset?.reservaId;
-                if (!reservaId) return;
+                if (btn.disabled || btn.classList.contains('busy')) return;
+                let reservaId = btn?.dataset?.reservaId || btn.getAttribute('data-reserva-id');
+                if (!reservaId) {
+                    const container = btn.closest('[data-reserva-id]');
+                    reservaId = container?.getAttribute('data-reserva-id') || '';
+                }
+                if (!reservaId) {
+                    console.warn('[reservas-combined] cancelar: reservaId no encontrado en el DOM');
+                    authManager?.showMessage && authManager.showMessage('No se pudo identificar la reserva a cancelar', 'error');
+                    return;
+                }
                 const ok = window.confirm('¿Estás seguro de que quieres cancelar esta reserva? Esta acción no se puede deshacer.');
                 if (ok) {
-                    await this.cancelarReserva(reservaId);
+                    // Set loading state to prevent duplicate clicks
+                    const originalHTML = btn.innerHTML;
+                    btn.classList.add('busy');
+                    btn.setAttribute('disabled', 'disabled');
+                    btn.innerHTML = '⏳ Cancelando...';
+                    try {
+                        await this.cancelarReserva(reservaId);
+                    } finally {
+                        // If the element still exists (DOM may have been re-rendered), restore state
+                        if (btn.isConnected) {
+                            btn.innerHTML = originalHTML;
+                            btn.classList.remove('busy');
+                            btn.removeAttribute('disabled');
+                        }
+                    }
                 }
             });
         }
@@ -277,8 +309,9 @@ class ReservasManager {
     }
 
     createHorarioCard(horario) {
+        const hid = horario._id || horario.id || horario.horarioId || '';
         return `
-            <div class="horario-card" data-horario-id="${horario._id}">
+            <div class="horario-card" data-horario-id="${hid}">
                 <div class="horario-header">
                     <div class="horario-materia">${horario.materia || 'Materia no especificada'}</div>
                     <div class="horario-maestro">${horario.maestroName || 'Maestro no especificado'}</div>
@@ -297,7 +330,7 @@ class ReservasManager {
                         Semestre ${horario.semestre || 'N/A'} - Paralelo ${horario.paralelo || 'N/A'}
                     </div>
                 </div>
-                <button class="btn-reservar" type="button">
+                <button class="btn-reservar" type="button" data-horario-id="${hid}">
                     Reservar Horario
                 </button>
             </div>
@@ -307,7 +340,7 @@ class ReservasManager {
     // ==================== SECCIÓN: Modal de Reserva ====================
     
     selectHorario(horarioId) {
-        const horario = this.horarios.find(h => h._id === horarioId);
+        const horario = this.horarios.find(h => (h._id || h.id || h.horarioId) === horarioId);
         if (!horario) return;
 
         this.selectedHorario = horario;
@@ -320,7 +353,7 @@ class ReservasManager {
 
         if (!modal || !detailsEl || !this.selectedHorario) return;
 
-        console.debug('[reservas-combined] Opening reserva modal for horario:', this.selectedHorario?._id);
+        console.debug('[reservas-combined] Opening reserva modal for horario:', this.getHorarioId(this.selectedHorario));
 
         detailsEl.innerHTML = `
             <p><strong>Materia:</strong> ${this.selectedHorario.materia || 'N/A'}</p>
@@ -344,7 +377,7 @@ class ReservasManager {
     // ==================== SECCIÓN: Crear Reserva ====================
     
     async confirmarReserva() {
-        if (!this.selectedHorario || !this.selectedHorario._id) {
+        if (!this.selectedHorario) {
             console.error('No hay horario seleccionado para reservar');
             return;
         }
@@ -401,15 +434,16 @@ class ReservasManager {
 
             // Pre-check availability
             try {
-                const checkBase = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
-                const checkUrl = `${checkBase.replace(/\/$/, '')}/estudiantes/reservas/check?maestroId=${encodeURIComponent(reservaData.maestroId)}&dia=${encodeURIComponent(reservaData.dia)}&inicio=${encodeURIComponent(reservaData.inicio)}`;
+                const checkBase = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+                const checkUrl = `${String(checkBase).replace(/\/$/, '')}/estudiantes/reservas/check?maestroId=${encodeURIComponent(reservaData.maestroId)}&dia=${encodeURIComponent(reservaData.dia)}&inicio=${encodeURIComponent(reservaData.inicio)}`;
                 const checkRes = await fetch(checkUrl, { headers: authManager.getAuthHeaders() });
                 if (checkRes.ok) {
                     const j = await checkRes.json();
                     if (!j.available) {
                         authManager.showMessage('Lo siento, este horario ya fue reservado. Se actualizará la lista.', 'error');
-                        if (this.selectedHorario && this.selectedHorario._id) {
-                            this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
+                        if (this.selectedHorario) {
+                            const selId = this.getHorarioId(this.selectedHorario);
+                            this.horarios = this.horarios.filter(h => this.getHorarioId(h) !== selId);
                             this.applyFilters();
                         }
                         this.closeModal();
@@ -420,8 +454,9 @@ class ReservasManager {
                 console.warn('Availability check failed, proceeding to reserve:', err);
             }
 
-            const reservarBase = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
-            const response = await fetch(`${reservarBase.replace(/\/$/, '')}/estudiantes/reservar`, {
+            const reservarBase = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+            // Align to config: reservas create is /estudiantes/reservas/create
+            const response = await fetch(`${String(reservarBase).replace(/\/$/, '')}/estudiantes/reservas/create`, {
                 method: 'POST',
                 headers: Object.assign({}, authManager.getAuthHeaders(), { 'Content-Type': 'application/json' }),
                 body: JSON.stringify(reservaData)
@@ -436,8 +471,9 @@ class ReservasManager {
                     this.reservas.push(newReserva);
                 }
                 
-                if (this.selectedHorario && this.selectedHorario._id) {
-                    this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
+                if (this.selectedHorario) {
+                    const selId = this.getHorarioId(this.selectedHorario);
+                    this.horarios = this.horarios.filter(h => this.getHorarioId(h) !== selId);
                     this.applyFilters();
                 }
                 this.closeModal();
@@ -451,8 +487,9 @@ class ReservasManager {
                 await dashboardManager.refresh();
             } else if (response.status === 409) {
                 authManager.showMessage('Este horario ya fue reservado por otro estudiante', 'error');
-                if (this.selectedHorario && this.selectedHorario._id) {
-                    this.horarios = this.horarios.filter(h => h._id !== this.selectedHorario._id);
+                if (this.selectedHorario) {
+                    const selId = this.getHorarioId(this.selectedHorario);
+                    this.horarios = this.horarios.filter(h => this.getHorarioId(h) !== selId);
                     this.applyFilters();
                 }
                 this.closeModal();
@@ -494,10 +531,10 @@ class ReservasManager {
             if (emptyEl) emptyEl.style.display = 'none';
             if (listEl) listEl.style.display = 'none';
 
-            const base = authManager.baseURL || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
+            const base = this.getApiBase().replace(/\/$/, '');
             const userId = user.id || user.userId;
             console.log('[reservas-combined] userId:', userId);
-            let url = `${base.replace(/\/$/, '')}/estudiantes/reservas/estudiante/${userId}`;
+            let url = `${base}/estudiantes/reservas/estudiante/${userId}`;
             if (force) url += `?_ts=${Date.now()}`;
             console.log('[reservas-combined] Fetching from URL:', url);
 
@@ -581,9 +618,10 @@ class ReservasManager {
     createReservaCard(reserva) {
         const statusClass = this.getStatusClass(reserva.estado || 'Activa');
         const statusText = this.getStatusText(reserva.estado || 'Activa');
+        const reservaId = this.getReservaId(reserva);
 
         return `
-            <div class="reserva-card">
+            <div class="reserva-card" data-reserva-id="${reservaId}">
                 <div class="reserva-status ${statusClass}">${statusText}</div>
                 <div class="reserva-header">
                     <div class="reserva-materia">${reserva.materia || 'Materia no especificada'}</div>
@@ -607,7 +645,7 @@ class ReservasManager {
                         <div class="reserva-info-value">${reserva.lugarAtencion || 'N/A'}</div>
                     </div>
                     <div class="reserva-actions">
-                        <button class="btn-delete" type="button" data-reserva-id="${reserva._id}">
+                        <button class="btn-delete" type="button" data-reserva-id="${reservaId}">
                             🗑️ Cancelar
                         </button>
                     </div>
@@ -635,22 +673,42 @@ class ReservasManager {
     // ==================== SECCIÓN: Cancelar Reserva ====================
     
     async cancelarReserva(id) {
-        if (!confirm('¿Está seguro de cancelar esta reserva?')) return;
+        if (!id) {
+            console.warn('[reservas-combined] cancelarReserva llamado sin id válido');
+            authManager?.showMessage && authManager.showMessage('ID de reserva inválido', 'error');
+            return;
+        }
 
         try {
-            const cancelBase = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
-            const response = await fetch(`${cancelBase.replace(/\/$/, '')}/estudiantes/reservas/${id}/cancel`, {
+            const cancelBase = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+            // Align to config: reservas cancel is /estudiantes/reservas/:id/cancelar
+            const response = await fetch(`${String(cancelBase).replace(/\/$/, '')}/estudiantes/reservas/${id}/cancelar`, {
                 method: 'PUT',
                 headers: authManager.getAuthHeaders()
             });
 
             if (response.ok) {
-                const updatedReserva = await response.json();
-                
-                // Optimistic update: update the reservation in the list immediately
-                const index = this.reservas.findIndex(r => r._id === id);
+                let payload = null;
+                try {
+                    const text = await response.text();
+                    if (text) payload = JSON.parse(text);
+                } catch (_) { /* empty or non-JSON response */ }
+
+                // Extract returned reserva object if present
+                const updatedReserva = payload?.reserva || null;
+
+                // Optimistic update: mark as Cancelada immediately
+                const index = this.reservas.findIndex(r => (r._id === id || r.id === id));
                 if (index !== -1) {
-                    this.reservas[index] = updatedReserva;
+                    if (updatedReserva) {
+                        // Merge minimal fields to preserve UI data
+                        this.reservas[index] = Object.assign({}, this.reservas[index], {
+                            estado: updatedReserva.estado || 'Cancelada',
+                            updatedAt: updatedReserva.updatedAt || this.reservas[index].updatedAt
+                        });
+                    } else {
+                        this.reservas[index] = Object.assign({}, this.reservas[index], { estado: 'Cancelada' });
+                    }
                 }
                 
                 authManager.showMessage('Reserva cancelada exitosamente', 'success');
@@ -661,10 +719,55 @@ class ReservasManager {
                     this.loadReservas(true).then(() => this.renderReservas());
                 }, 500);
                 
-                await dashboardManager.refresh();
+                if (window.dashboardManager?.refresh) {
+                    await dashboardManager.refresh();
+                }
             } else {
-                const error = await response.json();
-                authManager.showMessage('Error al cancelar: ' + (error.message || 'Error desconocido'), 'error');
+                let errMsg = 'Error desconocido';
+                let txt = '';
+                try {
+                    txt = await response.text();
+                    if (txt) {
+                        try {
+                            const obj = JSON.parse(txt);
+                            errMsg = obj.message || txt;
+                        } catch (_e) {
+                            errMsg = txt;
+                        }
+                    }
+                } catch (_) { /* ignore */ }
+
+                // Client-side fallbacks for empty-body errors
+                const index = this.reservas.findIndex(r => (r._id === id || r.id === id));
+                if (!txt && response.status === 400) {
+                    // Likely already canceled; mark as canceled locally
+                    if (index !== -1) {
+                        this.reservas[index] = Object.assign({}, this.reservas[index], { estado: 'Cancelada' });
+                        this.renderReservas();
+                        setTimeout(() => {
+                            this.loadReservas(true).then(() => this.renderReservas());
+                        }, 300);
+                    }
+                    authManager.showMessage('La reserva ya estaba cancelada', 'success');
+                    if (window.dashboardManager?.refresh) {
+                        await dashboardManager.refresh();
+                    }
+                    return;
+                }
+                if (!txt && response.status === 404) {
+                    // Not found, remove from UI
+                    if (index !== -1) {
+                        this.reservas.splice(index, 1);
+                        this.renderReservas();
+                    }
+                    authManager.showMessage('Reserva no encontrada (fue removida)', 'warning');
+                    if (window.dashboardManager?.refresh) {
+                        await dashboardManager.refresh();
+                    }
+                    return;
+                }
+
+                authManager.showMessage('Error al cancelar: ' + errMsg, 'error');
             }
         } catch (error) {
             console.error('Error cancelando reserva:', error);

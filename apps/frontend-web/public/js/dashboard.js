@@ -36,8 +36,8 @@ class DashboardManager {
             const user = await authManager.getUserData();
             if (!user) return;
 
-            const base = authManager.baseURL || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
-            const response = await fetch(`${base.replace(/\/$/, '')}/estudiantes/reservas/estudiante/${user.id}`, {
+            const base = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+            const response = await fetch(`${String(base).replace(/\/$/, '')}/estudiantes/reservas/estudiante/${user.id}`, {
                 headers: authManager.getAuthHeaders()
             });
 
@@ -61,8 +61,8 @@ class DashboardManager {
             const user = await authManager.getUserData();
             if (!user) return;
 
-            const base2 = authManager.baseURL || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://52.71.188.181:8080';
-            const response = await fetch(`${base2.replace(/\/$/, '')}/estudiantes/reservas/estudiante/${user.id}`, {
+            const base2 = (authManager && authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+            const response = await fetch(`${String(base2).replace(/\/$/, '')}/estudiantes/reservas/estudiante/${user.id}`, {
                 headers: authManager.getAuthHeaders()
             });
 
@@ -71,9 +71,24 @@ class DashboardManager {
                 if (Array.isArray(reservas) && reservas.length > 0) {
                     // Encontrar la reserva más próxima en el futuro
                     const ahora = new Date();
+                    const parseReservaDate = (dia, inicio) => {
+                        try {
+                            // If 'dia' is a full date string, parse it; otherwise return null
+                            const d = new Date(dia);
+                            if (!isNaN(d.getTime())) {
+                                const [h, m] = String(inicio || '').split(':').map(Number);
+                                if (!isNaN(h) && !isNaN(m)) d.setHours(h, m, 0, 0);
+                                return d;
+                            }
+                        } catch (_) { /* ignore */ }
+                        return null;
+                    };
+
                     const futuras = reservas
-                        .filter(r => new Date(`${r.dia} ${r.inicio}`) > ahora)
-                        .sort((a, b) => new Date(`${a.dia} ${a.inicio}`) - new Date(`${b.dia} ${b.inicio}`));
+                        .map(r => ({ r, dt: parseReservaDate(r.dia, r.inicio) }))
+                        .filter(x => x.dt && x.dt > ahora)
+                        .sort((a, b) => a.dt - b.dt)
+                        .map(x => x.r);
 
                     if (futuras.length > 0) {
                         const proxima = futuras[0];

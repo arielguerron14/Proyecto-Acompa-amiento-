@@ -37,4 +37,10 @@ router.put('/reservas/:id/cancel', (req, res, next) => {
   ctrl.cancelReserva(req, res, next, commandBus);
 });
 
+// Maintenance/backfill: re-enviar notificaciones a reportes para un estudiante
+router.post('/reservas/replay-reportes/:id', (req, res, next) => {
+  const queryBus = req.app.locals.queryBus;
+  ctrl.replayReportesByEstudiante(req, res, next, queryBus);
+});
+
 module.exports = router;

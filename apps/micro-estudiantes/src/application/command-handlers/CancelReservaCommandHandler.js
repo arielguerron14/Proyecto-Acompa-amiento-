@@ -21,11 +21,19 @@ class CancelReservaCommandHandler {
         throw error;
       }
 
-      // 2. Validar que pueda cancelarse
+      // 2. Idempotencia: si ya está cancelada, retornar éxito
       if (reserva.estado === 'Cancelada') {
-        const error = new Error('La reserva ya está cancelada');
-        error.status = 400;
-        throw error;
+        return {
+          success: true,
+          message: 'La reserva ya estaba cancelada',
+          reserva: {
+            id: reserva.id,
+            estudianteId: reserva.estudianteId,
+            maestroId: reserva.maestroId,
+            estado: reserva.estado,
+            updatedAt: reserva.updatedAt
+          }
+        };
       }
 
       // 3. Cancelar la reserva (lógica del dominio)

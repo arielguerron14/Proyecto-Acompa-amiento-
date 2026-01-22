@@ -3,6 +3,7 @@ const CancelReservaCommand = require('../application/commands/CancelReservaComma
 const GetReservasByEstudianteQuery = require('../application/queries/GetReservasByEstudianteQuery');
 const GetReservasByMaestroQuery = require('../application/queries/GetReservasByMaestroQuery');
 const CheckAvailabilityQuery = require('../application/queries/CheckAvailabilityQuery');
+const httpClient = require('../utils/httpClient');
 
 let logger;
 try {
@@ -179,6 +180,52 @@ module.exports = {
     } catch (err) {
       logger.error('cancelReserva error:', err.message);
       res.status(err.status || 500).json({ message: err.message });
+    }
+  },
+
+  /**
+   * POST /reservas/replay-reportes/:id
+   * Re-emite notificaciones a servicios de reportes para todas las reservas del estudiante
+   */
+  replayReportesByEstudiante: async (req, res, next, queryBus) => {
+    try {
+      const estudianteId = req.params.id;
+      if (!estudianteId) {
+        return res.status(400).json({ success: false, message: 'id de estudiante requerido' });
+      }
+
+      // Obtener reservas via CQRS
+      const query = new GetReservasByEstudianteQuery(estudianteId);
+      const reservas = await queryBus.execute(query);
+
+      let gatewayBase = 'http://api-gateway:8080';
+      let sent = 0;
+      for (const r of Array.isArray(reservas) ? reservas : []) {
+        const estPayload = {
+          estudianteId: r.estudianteId,
+          estudianteName: r.estudianteName || 'Usuario',
+          maestroId: r.maestroId,
+          maestroName: r.maestroName || 'Sin asignar',
+          materia: r.materia || r.asunto || 'Sin especificar',
+          semestre: r.semestre || '2026-01',
+          paralelo: r.paralelo || 'A',
+          dia: r.dia,
+          inicio: r.inicio,
+          fin: r.fin,
+          modalidad: r.modalidad || 'Virtual',
+          lugarAtencion: r.lugarAtencion || 'Por definir'
+        };
+        try {
+          await httpClient.postSafe(`${gatewayBase}/reportes/estudiantes/registrar`, estPayload);
+          sent++;
+        } catch (e) {
+          logger.warn('replayReportes: failed for reserva', r && r._id, e && e.message);
+        }
+      }
+      return res.status(200).json({ success: true, estudianteId, totalReservas: (reservas || []).length, reenviadas: sent });
+    } catch (err) {
+      logger.error('❌ replayReportesByEstudiante error:', err && err.message ? err.message : err);
+      res.status(500).json({ success: false, message: err.message || 'Error re-emitiendo notificaciones' });
     }
   },
 };

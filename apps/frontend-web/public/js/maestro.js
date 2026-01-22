@@ -21,18 +21,26 @@
     });
   }
 
-  // Load auth and horarios scripts, then call loadHorarios if available
-  Promise.all([
-    loadScript('js/auth.js'),
-    loadScript('js/horarios.js')
-  ]).then(() => {
+  // Load auth and, if needed, horarios script (avoid double include)
+  const loaders = [loadScript('js/auth.js')];
+  if (!(typeof initApp === 'function' || typeof initAppOnce === 'function')) {
+    loaders.push(loadScript('js/horarios.js'));
+  }
+
+  Promise.all(loaders).then(() => {
     console.log('[maestro.js] Dependencies loaded');
 
     const runInit = () => {
       // Call initialization functions only after DOM is ready
+      if (typeof initAppOnce === 'function') {
+        try { initAppOnce(); } catch (err) { console.error('[maestro.js] initAppOnce error', err); }
+        return; // initAppOnce internally triggers loading flows
+      }
       if (typeof initApp === 'function') {
         try { initApp(); } catch (err) { console.error('[maestro.js] initApp error', err); }
+        return; // initApp will handle loading of horarios/reportes
       }
+      // Fallback: call loaders individually if init isn't available
       if (typeof loadHorarios === 'function') {
         try { loadHorarios(); } catch (err) { console.error('[maestro.js] loadHorarios error', err); }
       }

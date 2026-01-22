@@ -113,4 +113,29 @@ module.exports = {
       res.status(err.status || 500).json({ message: err.message });
     }
   },
+
+  // Re-emite notificaciones a servicios de reportes para todas las reservas de un estudiante
+  replayReportesByEstudiante: async (req, res) => {
+    try {
+      const estudianteId = req.params.id;
+      if (!estudianteId) {
+        return res.status(400).json({ success: false, message: 'id de estudiante requerido' });
+      }
+      console.log('🔁 Replaying report notifications for estudiante:', estudianteId);
+      const reservas = await reservasService.getByEstudiante(estudianteId);
+      let sent = 0;
+      for (const r of reservas) {
+        try {
+          await reservasService.notifyReportes(r);
+          sent++;
+        } catch (e) {
+          console.warn('replayReportes: failed for reserva', r && r._id, e && e.message);
+        }
+      }
+      return res.status(200).json({ success: true, estudianteId, totalReservas: reservas.length || 0, reenviadas: sent });
+    } catch (err) {
+      console.error('❌ replayReportesByEstudiante error:', err && err.stack ? err.stack : err);
+      res.status(500).json({ success: false, message: err.message || 'Error re-emitiendo notificaciones' });
+    }
+  },
 };

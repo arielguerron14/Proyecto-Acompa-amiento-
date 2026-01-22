@@ -304,73 +304,91 @@
 
         <!-- ACCIONES FINALES -->
         <div class="panel-actions">
-            <button id="logout-btn" class="btn-secondary logout-btn">
+            <button id="logout-btn-secondary" class="btn-secondary logout-btn">
                 <span class="logout-icon">🚪</span>
                 Cerrar Sesión
             </button>
         </div>
     </main>
 
-    <script src="js/config.js"></script>
+        <!-- Suppress noisy extension errors and set config early -->
+        <script src="js/extension-error-handler.js"></script>
+        <script src="js/config.js"></script>
     <script src="js/auth-manager.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/horarios.js"></script>
     <script>
         // Configurar eventos de navegación
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Verificar rol del usuario
-            const user = await authManager.getUserData();
-            if (!user) {
-                // No hay token, redirigir al login
-                window.location.href = '/';
-                return;
-            }
-            
-            // Usuario autenticado, iniciar refresh automático de tokens
-            console.log('Usuario autenticado, iniciando refresh automático de tokens');
-            authManager.startTokenRefresh();
-            
-            // Verificar que el usuario tenga el rol correcto
-            if (user.role !== 'maestro') {
-                alert('Acceso denegado. Solo maestros pueden acceder a esta página.');
-                window.location.href = '/';
-                return;
-            }
+                document.addEventListener('DOMContentLoaded', async () => {
+                        try {
+                                // Verificar rol del usuario
+                                const user = await authManager.getUserData();
+                                if (!user) {
+                                        // No hay token, redirigir al login
+                                        window.location.href = '/';
+                                        return;
+                                }
+                
+                                // Usuario autenticado, iniciar refresh automático de tokens
+                                console.log('Usuario autenticado, iniciando refresh automático de tokens');
+                                authManager.startTokenRefresh();
+                
+                                // Verificar que el usuario tenga el rol correcto
+                                if (user.role !== 'maestro') {
+                                        alert('Acceso denegado. Solo maestros pueden acceder a esta página.');
+                                        window.location.href = '/';
+                                        return;
+                                }
 
-            // Cargar datos iniciales del maestro
-            await loadHorarios();
-            await loadReportes();
-            await loadMisReservas();
+                                // Cargar datos iniciales del maestro
+                                await loadHorarios();
+                                // loadReportes() ya se ejecuta en initApp() dentro de horarios.js
+                                await loadMisReservas();
 
-            // Configurar eventos de navegación de tabs
-            document.querySelectorAll('.nav-tab').forEach(tab => {
-              tab.addEventListener('click', (e) => {
-                const moduleName = e.currentTarget.dataset.module;
-                switchTab(moduleName);
-                // Recargar datos cuando se abre la sección de reportes
-                if (moduleName === 'reportes') {
-                  loadReportes();
-                  loadMisReservas();
+                                // Configurar eventos de navegación de tabs
+                                document.querySelectorAll('.nav-tab').forEach(tab => {
+                                    tab.addEventListener('click', (e) => {
+                                        const moduleName = e.currentTarget.dataset.module;
+                                        switchTab(moduleName);
+                                        // Recargar datos cuando se abre la sección de reportes
+                                        if (moduleName === 'reportes') {
+                                            loadReportes();
+                                            loadMisReservas();
+                                        }
+                                    });
+                                });
+
+                                // Botón para actualizar reportes
+                                const btnActualizarReportes = document.getElementById('btn-actualizar-reportes');
+                                if (btnActualizarReportes) {
+                                    btnActualizarReportes.addEventListener('click', () => {
+                                        loadReportes();
+                                        loadMisReservas();
+                                    });
+                                }
+                        } catch (err) {
+                                // Evitar "Uncaught (in promise)" por errores externos o 404 controlados
+                                console.debug('[maestro] DOMContentLoaded caught error:', err?.message || err);
+                        }
+                });
+
+                // Logout functionality
+                const logoutPrimary = document.getElementById('logout-btn');
+                if (logoutPrimary) {
+                    logoutPrimary.addEventListener('click', () => {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('refreshToken');
+                        window.location.href = '/';
+                    });
                 }
-              });
-            });
-
-            // Botón para actualizar reportes
-            const btnActualizarReportes = document.getElementById('btn-actualizar-reportes');
-            if (btnActualizarReportes) {
-              btnActualizarReportes.addEventListener('click', () => {
-                loadReportes();
-                loadMisReservas();
-              });
-            }
-        });
-
-        // Logout functionality
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('refreshToken');
-            window.location.href = '/';
-        });
+                const logoutSecondary = document.getElementById('logout-btn-secondary');
+                if (logoutSecondary) {
+                    logoutSecondary.addEventListener('click', () => {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('refreshToken');
+                        window.location.href = '/';
+                    });
+                }
     </script>
 </body>
 </html>

@@ -78,6 +78,7 @@ class CreateReservaCommandHandler {
 
   async notifyReportes(reserva) {
     console.log('[CreateReservaCommandHandler] Notifying reportes services...');
+    const getGatewayUrl = () => sharedConfig.getServiceUrl('gateway');
     const getReportesEstUrl = () => sharedConfig.getServiceUrl('reportes-est');
     const getReportesMaestUrl = () => sharedConfig.getServiceUrl('reportes-maest');
 
@@ -112,8 +113,18 @@ class CreateReservaCommandHandler {
     };
 
     // Fire and forget (no esperamos respuestas)
-    await httpClient.postSafe(`${getReportesEstUrl()}/registrar`, estPayload);
-    await httpClient.postSafe(`${getReportesMaestUrl()}/registrar`, maestPayload);
+    // Prefer gateway when available to avoid container localhost issues
+    let gatewayBase = getGatewayUrl();
+    if (gatewayBase && /localhost:8080/.test(gatewayBase)) {
+      gatewayBase = 'http://api-gateway:8080';
+    }
+    if (gatewayBase) {
+      await httpClient.postSafe(`${gatewayBase}/reportes/estudiantes/registrar`, estPayload);
+      await httpClient.postSafe(`${gatewayBase}/reportes/maestros/registrar`, maestPayload);
+    } else {
+      await httpClient.postSafe(`${getReportesEstUrl()}/reportes/estudiantes/registrar`, estPayload);
+      await httpClient.postSafe(`${getReportesMaestUrl()}/registrar`, maestPayload);
+    }
   }
 }
 

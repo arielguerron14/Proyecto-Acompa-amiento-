@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
+    "start": "node server-simple.cjs",
+    "start:prod": "node server.js",
     "dev": "node server-simple.cjs",
+    "serve": "npx http-server -p 5500 public",
     "lint": "eslint . --ext js --report-unused-disable-directives --max-warnings 0",
     "build": "echo \"Build completed\"",
     "clean": "rm -rf dist build .next"

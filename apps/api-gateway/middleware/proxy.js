@@ -69,6 +69,37 @@ const proxyMiddleware = async (req, res, next) => {
     if (!service.baseUrl.includes(':3000') && keepFullPrefix) {
       targetPath = fullPath;
     }
+
+    // Rewrites for Teacher Reports service (:5004)
+    if (service.baseUrl.includes(':5004')) {
+      // Back-compat rewrite: /reportes-maestros/:id -> /reportes/maestros/reportes/:id
+      const legacy = fullPath.match(/^\/reportes-maestros\/([^/]+)$/);
+      if (legacy && legacy[1]) {
+        targetPath = `/reportes/maestros/reportes/${legacy[1]}`;
+      }
+
+      // Normalize canonical prefix to service's router schema
+      // Service defines routes at:
+      //  - /maestros/registrar
+      //  - /maestros/reportes/:maestroId
+      //  - /maestros/reporte/:id
+      // And legacy:
+      //  - /registrar, /reportes/:maestroId, /reporte/:id
+      if (fullPath.startsWith('/reportes/maestros/')) {
+        const rest = fullPath.replace('/reportes/maestros/', '');
+        // Map known subpaths
+        if (rest.startsWith('registrar')) {
+          targetPath = `/maestros/${rest}`; // /maestros/registrar
+        } else if (rest.startsWith('reportes/')) {
+          targetPath = `/maestros/${rest}`; // /maestros/reportes/:maestroId
+        } else if (rest.startsWith('reporte/')) {
+          targetPath = `/maestros/${rest}`; // /maestros/reporte/:id
+        } else {
+          // Fallback to legacy top-level if unknown
+          targetPath = `/${rest}`;
+        }
+      }
+    }
     
     // Construir URL del microservicio
     const targetUrl = `${service.baseUrl}${targetPath}`;
@@ -103,9 +134,24 @@ const proxyMiddleware = async (req, res, next) => {
     // Log response for debugging
     console.log(`[PROXY_RESPONSE] Status: ${response.status}, Data length: ${JSON.stringify(response.data).length}, Type: ${typeof response.data}`);
 
-    // Retornar la respuesta
+    // Retornar la respuesta (sanitizar headers hop-by-hop)
     res.status(response.status);
-    res.set(response.headers);
+    const forwardedHeaders = { ...response.headers };
+    // Remove headers that can break re-sending by Express
+    delete forwardedHeaders['content-length'];
+    delete forwardedHeaders['transfer-encoding'];
+    delete forwardedHeaders['connection'];
+
+    // If backend returned a JSON object, let Express set JSON headers/length
+    const isJsonObject = response && typeof response.data === 'object' && response.data !== null && !Buffer.isBuffer(response.data);
+    if (isJsonObject) {
+      delete forwardedHeaders['content-type'];
+      res.set(forwardedHeaders);
+      return res.json(response.data);
+    }
+
+    // Otherwise forward as-is
+    res.set(forwardedHeaders);
     res.send(response.data);
 
   } catch (error) {

@@ -85,6 +85,9 @@ let horarios = [];
 let horarioEditando = null;
 let currentTab = 'horarios';
 
+// Marca global para evitar incluir el script dos veces
+window.__horariosScriptLoaded = true;
+
 // Elementos del DOM (defensivos: algunos pueden no existir según la página)
 const tabButtons = document.querySelectorAll('.nav-tab') || [];
 const tabContents = document.querySelectorAll('.module') || [];
@@ -110,9 +113,16 @@ const materiasDemanda = document.getElementById('materias-demanda') || null;
 const btnActualizarReportes = document.getElementById('btn-actualizar-reportes') || null;
 const reportesStatus = document.getElementById('reportes-status') || null;
 
-// Inicialización
-document.addEventListener('DOMContentLoaded', () => {
+// Inicialización (evitar inicialización doble cuando se carga desde maestro.js)
+window.__horariosAppInitialized = window.__horariosAppInitialized || false;
+function initAppOnce() {
+  if (window.__horariosAppInitialized) return;
+  window.__horariosAppInitialized = true;
   initApp();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initAppOnce();
 });
 
 function initApp() {
@@ -154,20 +164,20 @@ function setupEventListeners() {
 // Cargar horarios del backend
 async function loadHorarios() {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    const user = await (window.authManager && window.authManager.getUserData ? window.authManager.getUserData() : Promise.resolve(null));
+    if (!user || !user.userId) {
       showError('No hay sesión activa');
       return;
     }
 
-    // Decodificar token para obtener maestroId (simplificado)
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const maestroId = payload.userId;
-
-    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
-    const response = await fetch(`${apiBase}/horarios/maestro/${maestroId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+    const maestroId = user.userId;
+    const base = (window.authManager && window.authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+    const url = `${String(base).replace(/\/$/, '')}/horarios/maestro/${maestroId}`;
+    console.debug('[horarios.js] GET', url);
+    const response = await fetch(url, {
+      headers: (window.authManager && window.authManager.getAuthHeaders) ? window.authManager.getAuthHeaders() : { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
     });
+    console.debug('[horarios.js] Status', response.status);
 
     const data = await response.json();
     if (data.success) {
@@ -185,20 +195,28 @@ async function loadHorarios() {
 // Cargar reportes
 async function loadReportes() {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    const user = await (window.authManager && window.authManager.getUserData ? window.authManager.getUserData() : Promise.resolve(null));
+    if (!user || !user.userId) {
       if (reportesStatus) reportesStatus.textContent = 'No hay sesión activa';
       return;
     }
 
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const maestroId = payload.userId;
-
-    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
+    const maestroId = user.userId;
+    const base = (window.authManager && window.authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+    // Align to config: reportes-maestros list is /reportes/maestro/:id
+    const url = `${String(base).replace(/\/$/, '')}/reportes/maestro/${maestroId}`;
     if (reportesStatus) reportesStatus.textContent = 'Cargando reportes...';
-    const response = await fetch(`${apiBase}/horarios/reportes/${maestroId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+    console.debug('[horarios.js] GET', url);
+    const response = await fetch(url, {
+      headers: (window.authManager && window.authManager.getAuthHeaders) ? window.authManager.getAuthHeaders() : { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
     });
+    console.debug('[horarios.js] Status', response.status);
+
+      // Si no hay reportes para el maestro, evitar error y mostrar estado amigable
+      if (response.status === 404) {
+        if (reportesStatus) reportesStatus.textContent = 'Sin reportes para este maestro aún';
+        return;
+      }
 
     let data = null;
     try {
@@ -305,21 +323,28 @@ function renderReportes(reportes) {
 // Cargar y mostrar mis reservas como maestro
 async function loadMisReservas() {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.warn('No token, skipping loadMisReservas');
+    const user = await (window.authManager && window.authManager.getUserData ? window.authManager.getUserData() : Promise.resolve(null));
+    if (!user || !user.userId) {
+      console.warn('No hay sesión activa, saltando loadMisReservas');
       return;
     }
 
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const maestroId = payload.userId;
-
-    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
-    
+    const maestroId = user.userId;
+    const base = (window.authManager && window.authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+    // Align to config: reportes-maestros list is /reportes/maestro/:id
+    const url = `${String(base).replace(/\/$/, '')}/reportes/maestro/${maestroId}`;
+    console.debug('[horarios.js] GET', url);
     // Obtener reporte del maestro (que contiene sus reservas)
-    const response = await fetch(`${apiBase}/reportes-maestros/${maestroId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+    const response = await fetch(url, {
+      headers: (window.authManager && window.authManager.getAuthHeaders) ? window.authManager.getAuthHeaders() : { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
     });
+    console.debug('[horarios.js] Status', response.status);
+    // 404 significa que aún no hay reportes para este maestro; manejamos silenciosamente
+    if (response.status === 404) {
+      console.debug('[horarios.js] No hay reportes para este maestro aún (404)');
+      renderMisReservas([], user.name || 'Maestro');
+      return;
+    }
 
     let data = null;
     try {
@@ -535,9 +560,10 @@ async function guardarHorario() {
 
   const duracion = calcularDuracion();
 
+  const user = await (window.authManager && window.authManager.getUserData ? window.authManager.getUserData() : Promise.resolve(null));
   const horarioData = {
-    maestroId: JSON.parse(atob(localStorage.getItem('token').split('.')[1])).userId,
-    maestroName: 'Profesor',
+    maestroId: user && user.userId ? user.userId : null,
+    maestroName: user && user.name ? user.name : 'Profesor',
     semestre: data.semestre,
     materia: `${data.materia} - ${materiaOption.dataset.nombre}`,
     paralelo: data.paralelo || 'A',
@@ -553,9 +579,8 @@ async function guardarHorario() {
 
   let response = null;
   try {
-    const token = localStorage.getItem('token');
-    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
-    const url = horarioEditando ? `${apiBase}/horarios/${horarioEditando}` : `${apiBase}/horarios`;
+    const base = (window.authManager && window.authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+    const url = horarioEditando ? `${String(base).replace(/\/$/, '')}/horarios/${horarioEditando}` : `${String(base).replace(/\/$/, '')}/horarios`;
     const method = horarioEditando ? 'PUT' : 'POST';
 
     if (guardarBtn) {
@@ -568,14 +593,16 @@ async function guardarHorario() {
     console.log('Datos (stringified):', JSON.stringify(horarioData));
 
     try {
+      console.debug('[horarios.js]', method, url);
       response = await fetch(url, {
         method,
-        headers: {
+        headers: (window.authManager && window.authManager.getAuthHeaders) ? window.authManager.getAuthHeaders() : {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify(horarioData)
       });
+      console.debug('[horarios.js] Status', response && response.status);
     } catch (error) {
       // Network error (CORS, backend caído, etc)
       console.error('NetworkError:', error);
@@ -626,21 +653,67 @@ function editarHorario(id) {
   horarioEditando = id;
 
   // Llenar formulario
-  semestreSelect.value = horario.semestre;
-  updateMateriaOptions();
-  // Para materia, necesitamos extraer el código del string "CODIGO - NOMBRE"
-  const materiaMatch = horario.materia.match(/^([A-Z0-9]+) - /);
-  if (materiaMatch) {
-    materiaSelect.value = materiaMatch[1];
+  // Re-query defensively to avoid stale nulls
+  const semestreSelectEl = document.getElementById('semestre');
+  const materiaSelectEl = document.getElementById('materia');
+  const diaEl = document.getElementById('dia');
+  const modalidadEl = document.getElementById('modalidad');
+  const lugarEl = document.getElementById('lugar');
+  const cupoEl = document.getElementById('cupo');
+  const estadoEl = document.getElementById('estado');
+  const observacionesEl = document.getElementById('observaciones');
+
+  // Sync globals if they were null at load time
+  if (!semestreSelect && semestreSelectEl) semestreSelect = semestreSelectEl;
+  if (!materiaSelect && materiaSelectEl) materiaSelect = materiaSelectEl;
+  if (!horaInicioInput) horaInicioInput = document.getElementById('hora-inicio');
+  if (!horaFinInput) horaFinInput = document.getElementById('hora-fin');
+
+  // Set semestre first (ensure string matching option values)
+  if (semestreSelectEl) {
+    semestreSelectEl.value = String(horario.semestre || '');
   }
-  document.getElementById('dia').value = horario.dia;
-  horaInicioInput.value = horario.inicio;
-  horaFinInput.value = horario.fin;
-  document.getElementById('modalidad').value = horario.modalidad;
-  document.getElementById('lugar').value = horario.lugarAtencion;
-  document.getElementById('cupo').value = horario.cupoMaximo;
-  document.getElementById('estado').value = horario.estado;
-  document.getElementById('observaciones').value = horario.observaciones;
+  // Update materia options according to semestre
+  updateMateriaOptions();
+
+  // Select materia robustly: handle "CODIGO - NOMBRE" or just nombre
+  if (materiaSelectEl) {
+    let selectedValue = '';
+    let code = '';
+    let name = '';
+    if (typeof horario.materia === 'string') {
+      const parts = horario.materia.split(' - ');
+      if (parts.length >= 2) {
+        code = parts[0].trim();
+        name = parts.slice(1).join(' - ').trim();
+      } else {
+        // No dash: try to infer code via option dataset or text match
+        name = horario.materia.trim();
+      }
+    }
+
+    if (code) {
+      selectedValue = code;
+    } else if (name) {
+      // Try to find option whose dataset.nombre equals name or text includes name
+      const opts = Array.from(materiaSelectEl.options);
+      const foundByData = opts.find(o => (o.dataset && o.dataset.nombre) && o.dataset.nombre === name);
+      const foundByText = opts.find(o => String(o.textContent || '').includes(name));
+      const found = foundByData || foundByText;
+      if (found) selectedValue = found.value;
+    }
+
+    if (selectedValue) materiaSelectEl.value = selectedValue;
+  }
+
+  if (diaEl) diaEl.value = horario.dia || '';
+  if (horaInicioInput) horaInicioInput.value = horario.inicio || '';
+  if (horaFinInput) horaFinInput.value = horario.fin || '';
+  if (modalidadEl) modalidadEl.value = horario.modalidad || '';
+  if (lugarEl) lugarEl.value = horario.lugarAtencion || '';
+  if (cupoEl) cupoEl.value = String(horario.cupoMaximo || '');
+  if (estadoEl) estadoEl.value = horario.estado || 'Activo';
+  if (observacionesEl) observacionesEl.value = horario.observaciones || '';
 
   calcularDuracion();
   guardarBtn.textContent = 'Actualizar Horario';
@@ -655,12 +728,14 @@ async function eliminarHorario(id) {
   if (!confirm('¿Está seguro de eliminar este horario?')) return;
 
   try {
-    const token = localStorage.getItem('token');
-    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
-    const response = await fetch(`${apiBase}/horarios/${id}`, {
+    const base = (window.authManager && window.authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+    const url = `${String(base).replace(/\/$/, '')}/horarios/${id}`;
+    console.debug('[horarios.js] DELETE', url);
+    const response = await fetch(url, {
       method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: (window.authManager && window.authManager.getAuthHeaders) ? window.authManager.getAuthHeaders() : { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
     });
+    console.debug('[horarios.js] Status', response.status);
 
     const result = await response.json();
 
@@ -685,16 +760,18 @@ async function cambiarEstado(id) {
   const nuevoEstado = horario.estado === 'Activo' ? 'Inactivo' : 'Activo';
 
   try {
-    const token = localStorage.getItem('token');
-    const apiBase = window.API_CONFIG ? window.API_CONFIG.API_BASE : 'http://localhost:8080';
-    const response = await fetch(`${apiBase}/horarios/${id}`, {
+    const base = (window.authManager && window.authManager.baseURL) || (window.API_CONFIG && window.API_CONFIG.API_BASE) || 'http://localhost:8080';
+    const url = `${String(base).replace(/\/$/, '')}/horarios/${id}`;
+    console.debug('[horarios.js] PUT', url, 'body:', { estado: nuevoEstado });
+    const response = await fetch(url, {
       method: 'PUT',
-      headers: {
+      headers: (window.authManager && window.authManager.getAuthHeaders) ? window.authManager.getAuthHeaders() : {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
       },
       body: JSON.stringify({ estado: nuevoEstado })
     });
+    console.debug('[horarios.js] Status', response.status);
 
     const result = await response.json();
 

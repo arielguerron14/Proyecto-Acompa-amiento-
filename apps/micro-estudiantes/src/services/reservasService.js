@@ -89,6 +89,10 @@ class ReservasService {
    */
   async notifyReportes(reserva) {
     console.log('DEBUG: notifyReportes called with reserva:', reserva);
+    let gatewayBase = sharedConfig.getServiceUrl('gateway');
+    if (gatewayBase && /localhost:8080/.test(gatewayBase)) {
+      gatewayBase = 'http://api-gateway:8080';
+    }
     const estPayload = {
       estudianteId: reserva.estudianteId,
       estudianteName: reserva.estudianteName,
@@ -103,7 +107,7 @@ class ReservasService {
       modalidad: reserva.modalidad,
       lugarAtencion: reserva.lugarAtencion
     };
-    console.log('DEBUG: estPayload to send:', estPayload);
+    console.log('DEBUG: estPayload to send (keys):', Object.keys(estPayload));
 
     const maestPayload = {
       maestroId: reserva.maestroId,
@@ -121,8 +125,24 @@ class ReservasService {
     };
 
     // Fire and forget (no esperamos respuestas)
-    await httpClient.postSafe(`${getReportesEstUrl()}/registrar`, estPayload);
-    await httpClient.postSafe(`${getReportesMaestUrl()}/registrar`, maestPayload);
+    // Preferir Gateway si está configurado; fallback a servicios directos
+    try {
+      if (gatewayBase) {
+        const urlEst = `${gatewayBase}/reportes/estudiantes/registrar`;
+        const urlMaest = `${gatewayBase}/reportes/maestros/registrar`;
+        console.log('DEBUG: Notifying via GATEWAY:', { urlEst, urlMaest });
+        await httpClient.postSafe(urlEst, estPayload);
+        await httpClient.postSafe(urlMaest, maestPayload);
+      } else {
+        const directEst = `${getReportesEstUrl()}/reportes/estudiantes/registrar`;
+        const directMaest = `${getReportesMaestUrl()}/registrar`;
+        console.log('DEBUG: Notifying via SERVICES:', { directEst, directMaest });
+        await httpClient.postSafe(directEst, estPayload);
+        await httpClient.postSafe(directMaest, maestPayload);
+      }
+    } catch (e) {
+      console.warn('WARN: notifyReportes failed:', e && e.message);
+    }
   }
 
   /**
