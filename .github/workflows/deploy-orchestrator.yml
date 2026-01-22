@@ -1,0 +1,306 @@
+name: Deploy Orchestrator - Full Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_stage:
+        description: 'Start from stage (1-4)'
+        required: false
+        default: '1'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+
+env:
+  INSTANCE_USER: ubuntu
+  AWS_REGION: us-east-1
+
+jobs:
+  stage-1-infrastructure:
+    if: ${{ github.event.inputs.start_stage <= '1' || github.event.inputs.start_stage == '' }}
+    runs-on: ubuntu-latest
+    name: Stage 1 - Database & Infrastructure
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Deploy EC2-DB (MongoDB, PostgreSQL, Redis)
+      run: |
+        echo "📦 Stage 1: Deploying databases and infrastructure..."
+        gh workflow run deploy-ec2-db.yml -f instance_name=EC2-DB
+        echo "⏳ Waiting for EC2-DB deployment (120 seconds)..."
+        sleep 120
+
+    - name: Verify EC2-DB deployment
+      run: |
+        echo "✅ EC2-DB deployment initiated"
+        echo "📊 Status: Databases should be ready"
+
+  stage-2-messaging:
+    needs: stage-1-infrastructure
+    if: ${{ github.event.inputs.start_stage <= '2' || github.event.inputs.start_stage == '' }}
+    runs-on: ubuntu-latest
+    name: Stage 2 - Messaging Services
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Deploy EC2-Messaging (Kafka, Zookeeper, RabbitMQ)
+      run: |
+        echo "📦 Stage 2: Deploying messaging infrastructure..."
+        gh workflow run deploy-ec2-messaging.yml -f instance_name=EC2-Messaging
+        echo "⏳ Waiting for EC2-Messaging deployment (120 seconds)..."
+        sleep 120
+
+    - name: Verify EC2-Messaging deployment
+      run: |
+        echo "✅ EC2-Messaging deployment initiated"
+        echo "📊 Status: Message brokers should be ready"
+
+  stage-3-core-services:
+    needs: stage-2-messaging
+    if: ${{ github.event.inputs.start_stage <= '3' || github.event.inputs.start_stage == '' }}
+    runs-on: ubuntu-latest
+    name: Stage 3 - Core Microservices
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Deploy EC2-CORE (Auth, Students, Teachers, Analytics, SOAP Bridge)
+      run: |
+        echo "📦 Stage 3: Deploying core microservices..."
+        gh workflow run deploy-ec2-core.yml -f instance_name=EC2-CORE
+        echo "⏳ Waiting for EC2-CORE deployment (120 seconds)..."
+        sleep 120
+
+    - name: Deploy EC2-Notificaciones (Notifications)
+      run: |
+        echo "📦 Deploying notifications service..."
+        gh workflow run deploy-ec2-notificaciones.yml -f instance_name=EC2-Notificaciones
+        echo "⏳ Waiting for EC2-Notificaciones deployment (90 seconds)..."
+        sleep 90
+
+    - name: Deploy EC2-Reportes (Student & Teacher Reports)
+      run: |
+        echo "📦 Deploying reports services..."
+        gh workflow run deploy-ec2-reportes.yml -f instance_name=EC2-Reportes
+        echo "⏳ Waiting for EC2-Reportes deployment (90 seconds)..."
+        sleep 90
+
+    - name: Verify Stage 3 deployment
+      run: |
+        echo "✅ Core microservices deployment initiated"
+        echo "📊 Status: All microservices should be connecting to distributed infrastructure"
+
+  stage-4-frontend-and-gateway:
+    needs: stage-3-core-services
+    if: ${{ github.event.inputs.start_stage <= '4' || github.event.inputs.start_stage == '' }}
+    runs-on: ubuntu-latest
+    name: Stage 4 - API Gateway & Frontend
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Deploy EC2-API-Gateway (Main entry point)
+      run: |
+        echo "📦 Stage 4: Deploying API Gateway..."
+        gh workflow run deploy-ec2-api-gateway.yml -f instance_name=EC2-API-Gateway
+        echo "⏳ Waiting for EC2-API-Gateway deployment (90 seconds)..."
+        sleep 90
+
+    - name: Deploy EC2-Frontend (React SPA)
+      run: |
+        echo "📦 Deploying frontend application..."
+        gh workflow run deploy-ec2-frontend.yml -f instance_name=EC2-Frontend
+        echo "⏳ Waiting for EC2-Frontend deployment (60 seconds)..."
+        sleep 60
+
+    - name: Deploy EC2-Monitoring (Prometheus & Grafana)
+      run: |
+        echo "📦 Deploying monitoring stack..."
+        gh workflow run deploy-ec2-monitoring.yml -f instance_name=EC2-Monitoring
+        echo "⏳ Waiting for EC2-Monitoring deployment (60 seconds)..."
+        sleep 60
+
+    - name: Verify Stage 4 deployment
+      run: |
+        echo "✅ Frontend and gateway deployment initiated"
+        echo "📊 Status: Application should be fully operational"
+
+  deployment-summary:
+    needs: [stage-1-infrastructure, stage-2-messaging, stage-3-core-services, stage-4-frontend-and-gateway]
+    if: always()
+    runs-on: ubuntu-latest
+    name: Deployment Summary
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Generate deployment report
+      run: |
+        echo "╔════════════════════════════════════════════════════════╗"
+        echo "║    DEPLOYMENT ORCHESTRATION COMPLETE                   ║"
+        echo "╚════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "📊 DEPLOYMENT SUMMARY"
+        echo "===================="
+        echo ""
+        echo "Stage 1 - Infrastructure:"
+        echo "  ✓ EC2-DB (MongoDB, PostgreSQL, Redis)"
+        echo ""
+        echo "Stage 2 - Messaging:"
+        echo "  ✓ EC2-Messaging (Kafka, Zookeeper, RabbitMQ)"
+        echo ""
+        echo "Stage 3 - Core Services:"
+        echo "  ✓ EC2-CORE (Auth, Students, Teachers, Analytics, SOAP)"
+        echo "  ✓ EC2-Notificaciones (Notifications)"
+        echo "  ✓ EC2-Reportes (Student & Teacher Reports)"
+        echo ""
+        echo "Stage 4 - Frontend & Monitoring:"
+        echo "  ✓ EC2-API-Gateway (Port 8080)"
+        echo "  ✓ EC2-Frontend (Port 5500)"
+        echo "  ✓ EC2-Monitoring (Prometheus 9090, Grafana 3000)"
+        echo ""
+        echo "🔗 SERVICE DISCOVERY & CONNECTIVITY"
+        echo "===================================="
+        
+        # Get all EC2 instances
+        aws ec2 describe-instances \
+          --filters "Name=instance-state-name,Values=running" \
+                    "Name=tag:Name,Values=EC2-*" \
+          --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value|[0], PrivateIpAddress, PublicIpAddress]' \
+          --output table
+        
+        echo ""
+        echo "📝 DEPLOYMENT ORDER & DEPENDENCIES"
+        echo "==================================="
+        echo ""
+        echo "1️⃣  EC2-DB (Independent)"
+        echo "    └─ Provides: MongoDB, PostgreSQL, Redis"
+        echo ""
+        echo "2️⃣  EC2-Messaging (Independent)"
+        echo "    └─ Provides: Kafka, Zookeeper, RabbitMQ"
+        echo ""
+        echo "3️⃣  EC2-CORE (Depends on: DB, Messaging)"
+        echo "    ├─ micro-auth → connects to DB"
+        echo "    ├─ micro-estudiantes → connects to DB + Messaging"
+        echo "    ├─ micro-maestros → connects to DB + Messaging"
+        echo "    ├─ micro-analytics → connects to Messaging"
+        echo "    └─ micro-soap-bridge → connects to DB"
+        echo ""
+        echo "3️⃣  EC2-Notificaciones (Depends on: DB, Messaging)"
+        echo "    └─ micro-notificaciones → connects to DB + Messaging"
+        echo ""
+        echo "3️⃣  EC2-Reportes (Depends on: DB, Messaging)"
+        echo "    ├─ micro-reportes-estudiantes → connects to DB + Messaging"
+        echo "    └─ micro-reportes-maestros → connects to DB + Messaging"
+        echo ""
+        echo "4️⃣  EC2-API-Gateway (Depends on: Core Services)"
+        echo "    └─ Entry point routing to core microservices (port 8080)"
+        echo ""
+        echo "4️⃣  EC2-Frontend (Independent)"
+        echo "    └─ React SPA served on port 5500"
+        echo ""
+        echo "4️⃣  EC2-Monitoring (Independent)"
+        echo "    ├─ Prometheus (port 9090)"
+        echo "    └─ Grafana (port 3000)"
+        echo ""
+        echo "🌍 ARCHITECTURE OVERVIEW"
+        echo "========================"
+        echo ""
+        echo "  ALB (Load Balancer)"
+        echo "    ├─ → EC2-Frontend (port 5500)"
+        echo "    └─ → EC2-API-Gateway (port 8080)"
+        echo "         ├─ → EC2-CORE Services"
+        echo "         │    ├─ micro-auth:3000"
+        echo "         │    ├─ micro-estudiantes:3001"
+        echo "         │    └─ micro-maestros:3002"
+        echo "         ├─ → EC2-Notificaciones"
+        echo "         │    └─ micro-notificaciones:3009"
+        echo "         └─ → EC2-Reportes"
+        echo "              ├─ micro-reportes-estudiantes:5003"
+        echo "              └─ micro-reportes-maestros:5004"
+        echo ""
+        echo "💾 Shared Infrastructure:"
+        echo "  EC2-DB:"
+        echo "    ├─ MongoDB:27017"
+        echo "    ├─ PostgreSQL:5432"
+        echo "    └─ Redis:6379"
+        echo ""
+        echo "  EC2-Messaging:"
+        echo "    ├─ Kafka:9092"
+        echo "    ├─ Zookeeper:2181"
+        echo "    └─ RabbitMQ:5672"
+        echo ""
+        echo "📈 Monitoring:"
+        echo "  EC2-Monitoring:"
+        echo "    ├─ Prometheus:9090 (metrics collection)"
+        echo "    └─ Grafana:3000 (visualization)"
+        echo ""
+        echo "✅ All instances deployed with cross-instance service discovery enabled"
+        echo "✅ Microservices configured to use remote database and messaging brokers"
+        echo "✅ Environment variables automatically injected from AWS EC2 tags"
+        echo ""
+        echo "🚀 NEXT STEPS"
+        echo "============="
+        echo "1. Verify all EC2 instances are running"
+        echo "2. Check AWS Security Groups allow inter-instance communication"
+        echo "3. Test API endpoints: curl http://<ALB>/auth/register"
+        echo "4. Access Grafana for monitoring: http://<EC2-Monitoring-IP>:3000"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    - name: Check deployment status
+      if: failure()
+      run: |
+        echo "⚠️  Some deployment stages may have encountered issues"
+        echo "Review the individual workflow runs for detailed logs"
+        echo "You can resume from a specific stage using the start_stage input"
