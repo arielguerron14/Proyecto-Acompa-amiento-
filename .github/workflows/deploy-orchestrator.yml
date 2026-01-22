@@ -57,8 +57,8 @@ jobs:
 
   stage-2-messaging:
     needs: stage-1-infrastructure
-    if: ${{ (github.event.inputs.start_stage <= '2' || github.event.inputs.start_stage == '')
-          && (needs.stage-1-infrastructure.result == 'success' || needs.stage-1-infrastructure.result == 'skipped') }}
+    if: ${{ always() && (github.event.inputs.start_stage <= '2' || github.event.inputs.start_stage == '')
+      && (needs.stage-1-infrastructure.result == 'success' || needs.stage-1-infrastructure.result == 'skipped') }}
     runs-on: ubuntu-latest
     name: Stage 2 - Messaging Services
 
@@ -90,8 +90,8 @@ jobs:
 
   stage-3-core-services:
     needs: stage-2-messaging
-    if: ${{ (github.event.inputs.start_stage <= '3' || github.event.inputs.start_stage == '')
-          && (needs.stage-2-messaging.result == 'success' || needs.stage-2-messaging.result == 'skipped') }}
+    if: ${{ always() && (github.event.inputs.start_stage <= '3' || github.event.inputs.start_stage == '')
+      && (needs.stage-2-messaging.result == 'success' || needs.stage-2-messaging.result == 'skipped') }}
     runs-on: ubuntu-latest
     name: Stage 3 - Core Microservices
 
@@ -141,8 +141,8 @@ jobs:
 
   stage-4-frontend-and-gateway:
     needs: stage-3-core-services
-    if: ${{ (github.event.inputs.start_stage <= '4' || github.event.inputs.start_stage == '')
-          && (needs.stage-3-core-services.result == 'success' || needs.stage-3-core-services.result == 'skipped') }}
+    if: ${{ always() && (github.event.inputs.start_stage <= '4' || github.event.inputs.start_stage == '')
+      && (needs.stage-3-core-services.result == 'success' || needs.stage-3-core-services.result == 'skipped') }}
     runs-on: ubuntu-latest
     name: Stage 4 - API Gateway & Frontend
 
@@ -235,13 +235,14 @@ jobs:
         echo ""
         echo "🔗 SERVICE DISCOVERY & CONNECTIVITY"
         echo "===================================="
+        echo "(EC2 instance listing skipped - requires additional IAM permissions)"
         
-        # Get all EC2 instances
-        aws ec2 describe-instances \
-          --filters "Name=instance-state-name,Values=running" \
-                    "Name=tag:Name,Values=EC2-*" \
-          --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value|[0], PrivateIpAddress, PublicIpAddress]' \
-          --output table
+        # Get all EC2 instances - COMMENTED OUT due to voc-cancel-cred policy deny
+        # aws ec2 describe-instances \
+        #   --filters "Name=instance-state-name,Values=running" \
+        #             "Name=tag:Name,Values=EC2-*" \
+        #   --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value|[0], PrivateIpAddress, PublicIpAddress]' \
+        #   --output table
         
         echo ""
         echo "📝 DEPLOYMENT ORDER & DEPENDENCIES"
