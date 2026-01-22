@@ -209,7 +209,7 @@ jobs:
           echo "   CORS_ORIGIN=$CORS_ORIGIN"
           
           # Create .env.local to ensure variables are loaded
-          cat > .env.local << 'ENVEOF'
+          cat > .env.local <<EOF
 CORE_HOST=$CORE_HOST
 REPORTES_HOST=$REPORTES_HOST
 CORS_ORIGIN=$CORS_ORIGIN
@@ -220,7 +220,7 @@ DOCKER_DEPLOYMENT=true
 API_GATEWAY_PORT=8080
 PORT=8080
 LOG_LEVEL=debug
-ENVEOF
+EOF
           
           echo "📝 Created .env.local with:"
           cat .env.local | grep -E "CORE_HOST|REPORTES_HOST|CORS_ORIGIN" || true
