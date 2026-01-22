@@ -128,8 +128,8 @@ jobs:
         aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
 
     - name: Clean up conflicting resources (if exists)
       if: ${{ github.event.inputs.apply == 'true' }}
