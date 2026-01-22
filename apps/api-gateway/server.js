@@ -102,21 +102,26 @@ corsOrigins = [...new Set(corsOrigins)];
 console.log(`\n📌 CORS Origins allowed (${corsOrigins.length}):`);
 corsOrigins.forEach(origin => console.log(`   • ${origin}`));
 
-app.use(cors({
-  origin: corsOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true,
-  optionsSuccessStatus: 200
-}));
+// Allow listed origins, and additionally allow http/https with IP:5500 seen at runtime
+const isIp5500 = (origin = '') => /^(https?:\/\/)\d+\.\d+\.\d+\.\d+:5500$/.test(origin.trim());
 
-app.options('*', cors({
-  origin: corsOrigins,
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow same-origin/no origin
+    if (corsOrigins.includes(origin) || isIp5500(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`CORS blocked origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true,
   optionsSuccessStatus: 200
-}));
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Middleware
 app.use(express.json({ limit: '1mb', type: 'application/json' }));
