@@ -155,7 +155,7 @@ jobs:
           echo "🔓 CORS Origin: $CORS_ORIGIN"
           echo "🌐 Frontend Public IP: $FRONTEND_PUBLIC_IP"
           
-          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} bash -s << 'SSHEOF' "$CORE_HOST" "$REPORTES_HOST" "$CORS_ORIGIN" "$FRONTEND_PUBLIC_IP"
+          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} bash -s "$CORE_HOST" "$REPORTES_HOST" "$CORS_ORIGIN" "$FRONTEND_PUBLIC_IP" << 'SSHEOF'
           CORE_HOST="$1"
           REPORTES_HOST="$2"
           CORS_ORIGIN="$3"
@@ -241,7 +241,7 @@ ENVEOF
 
           echo "✅ Current container status:" && $DC ps
           echo "=== EC2-API-Gateway Deployment Completed ==="
-          SSHEOF "$CORE_HOST" "$REPORTES_HOST" "$CORS_ORIGIN" "$FRONTEND_PUBLIC_IP"
+          SSHEOF
 
       - name: Health check - api-gateway
         if: ${{ github.event.inputs.skip_verification != 'true' }}
