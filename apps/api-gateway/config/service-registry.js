@@ -21,6 +21,14 @@ const getCoreHost = () => {
   return host;
 };
 
+// Allow reportes services to live on a different host (EC2-Reportes)
+const getReportesHost = () => {
+  const host = process.env.REPORTES_HOST || process.env.REPORTES_IP || process.env.EC2_REPORTES_IP || '';
+  if (host.startsWith('http://')) return host.replace('http://', '');
+  if (host.startsWith('https://')) return host.replace('https://', '');
+  return host || getCoreHost();
+};
+
 // Determine if we're in Docker or not
 const isDocker = () => {
   return process.env.NODE_ENV === 'production' || 
@@ -37,6 +45,7 @@ const SERVICE_REGISTRY = {
   // Microservicios disponibles
   get services() {
     const coreHost = getCoreHost();
+    const reportesHost = getReportesHost();
     
     // Usar CORE_HOST si está disponible (producción en AWS)
     // Fallback a nombres de contenedor (desarrollo local)
@@ -44,15 +53,16 @@ const SERVICE_REGISTRY = {
       auth: `http://${coreHost}:3000`,
       estudiantes: `http://${coreHost}:3001`,
       maestros: `http://${coreHost}:3002`,
-      reportesEstudiantes: `http://${coreHost}:5003`,
-      reportesMaestros: `http://${coreHost}:5004`
+      reportesEstudiantes: `http://${reportesHost}:5003`,
+      reportesMaestros: `http://${reportesHost}:5004`
     } : {
-      // Fallback para desarrollo local con docker-compose
+      // Development with docker-compose OR production with REPORTES_HOST set
       auth: 'http://micro-auth:3000',
       estudiantes: 'http://micro-estudiantes:3001',
       maestros: 'http://micro-maestros:3002',
-      reportesEstudiantes: 'http://micro-reportes-estudiantes:5003',
-      reportesMaestros: 'http://micro-reportes-maestros:5004'
+      // Use reportesHost if explicitly set (EC2 deployment), else docker-compose service name
+      reportesEstudiantes: reportesHost && reportesHost !== 'micro-maestros' ? `http://${reportesHost}:5003` : 'http://micro-reportes-estudiantes:5003',
+      reportesMaestros: reportesHost && reportesHost !== 'micro-maestros' ? `http://${reportesHost}:5004` : 'http://micro-reportes-maestros:5004'
     };
 
     return {
