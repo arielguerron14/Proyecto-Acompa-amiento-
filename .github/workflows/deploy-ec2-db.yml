@@ -291,7 +291,7 @@ jobs:
       run: |
         echo "📊 Final service status on ${{ env.INSTANCE_NAME }}:"
         ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF' || true
-        cd ~/projeto-acompanimento
+        cd ~/projeto-acompanimiento
         
         # Detect Docker Compose
         if docker compose version &>/dev/null; then
