@@ -176,27 +176,35 @@ jobs:
 
         echo "🚀 Starting core services with cross-instance configuration..."
         
-        # Create environment override file if using remote instances
-        if [ "${{ env.DB_HOST }}" != "mongo" ] || [ "${{ env.MESSAGING_HOST }}" != "kafka" ]; then
-          echo "📝 Configuring remote instance connectivity..."
-          cat > ~/.env.remote << ENVEOF
-          MONGODB_URI=mongodb://root:example@${{ env.DB_HOST }}:27017/auth?authSource=admin
-          KAFKA_BROKERS=${{ env.MESSAGING_HOST }}:9092
-          RABBITMQ_URL=amqp://guest:guest@${{ env.MESSAGING_HOST }}:5672
-          ENVEOF
-          
-          # Source the environment variables
-          export $(cat ~/.env.remote | xargs)
-        fi
-        
-        # Start microservices with proper environment
-        $DC up -d micro-auth micro-estudiantes micro-maestros micro-soap-bridge micro-analytics
+        # Create .env.local with proper configuration for cross-instance communication
+        echo "📝 Creating .env.local with port publishing configuration..."
+        cat > .env.local << 'ENVEOF'
+NODE_ENV=production
+DOCKER_DEPLOYMENT=true
+MONGODB_URI=mongodb://root:example@mongo:27017/admin?authSource=admin
+KAFKA_BROKERS=kafka:9092
+RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=example
+POSTGRES_DB=acompanimiento
+ENVEOF
 
-        # If using local hosts, also start local dependencies
-        if [ "${{ env.DB_HOST }}" = "mongo" ]; then
-          echo "Starting local database and messaging services..."
-          $DC up -d zookeeper kafka rabbitmq mongo
-        fi
+        # Stop old services to force recreation with new docker-compose.yml ports configuration
+        echo "🛑 Stopping old service containers (preserving volumes)..."
+        $DC down 2>/dev/null || true
+        sleep 3
+        
+        # Start all services fresh
+        echo "✅ Starting all services..."
+        $DC up -d zookeeper kafka rabbitmq mongo postgres redis prometheus grafana
+        sleep 15
+        
+        # Start microservices - these now have ports: [PORT:PORT] for cross-instance access
+        $DC up -d micro-auth micro-estudiantes micro-maestros micro-soap-bridge micro-analytics
+        
+        echo "📡 Services started with exposed ports for cross-instance communication..."
 
         echo "⏳ Waiting for services to initialize (40 seconds)..."
         sleep 40

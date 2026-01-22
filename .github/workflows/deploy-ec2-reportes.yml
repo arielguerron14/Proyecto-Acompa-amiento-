@@ -174,7 +174,32 @@ jobs:
         $DC build zookeeper kafka mongo postgres micro-reportes-estudiantes micro-reportes-maestros --no-cache 2>&1 | tail -20 || echo "⚠️ Build notes"
 
         echo "🚀 Starting reportes services (with deps)..."
-        $DC up -d zookeeper kafka mongo postgres micro-reportes-estudiantes micro-reportes-maestros
+        
+        # Create .env.local with proper configuration
+        echo "📝 Creating .env.local for reportes services..."
+        cat > .env.local << 'ENVEOF'
+NODE_ENV=production
+DOCKER_DEPLOYMENT=true
+MONGODB_URI=mongodb://root:example@mongo:27017/admin?authSource=admin
+KAFKA_BROKERS=kafka:9092
+RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=example
+POSTGRES_DB=acompanamiento
+ENVEOF
+
+        # Stop old services to force recreation
+        $DC down 2>/dev/null || true
+        sleep 3
+        
+        # Start services - ports configuration enables cross-instance access
+        $DC up -d zookeeper kafka mongo postgres
+        sleep 15
+        $DC up -d micro-reportes-estudiantes micro-reportes-maestros
+        
+        echo "📡 Reportes services started with exposed ports for cross-instance communication..."
 
         echo "⏳ Waiting for services to initialize (40 seconds)..."
         sleep 40

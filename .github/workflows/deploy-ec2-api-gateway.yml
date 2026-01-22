@@ -109,6 +109,22 @@ jobs:
           fi
           
           echo "CORE_IP=$CORE_IP" >> $GITHUB_OUTPUT
+
+          echo "🔍 Discovering EC2-Reportes instance..."
+          REPORTES_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=EC2-Reportes" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+            --output text)
+
+          if [ -z "$REPORTES_IP" ] || [ "$REPORTES_IP" == "None" ]; then
+            echo "⚠️ EC2-Reportes not found, defaulting to CORE_IP"
+            REPORTES_IP="$CORE_IP"
+          else
+            echo "✅ Found EC2-Reportes at $REPORTES_IP"
+          fi
+
+          echo "REPORTES_IP=$REPORTES_IP" >> $GITHUB_OUTPUT
           
           echo "🔍 Discovering EC2-Frontend instance..."
           FRONTEND_PUBLIC_IP=$(aws ec2 describe-instances \
@@ -130,17 +146,20 @@ jobs:
       - name: Deploy and configure api-gateway
         run: |
           CORE_HOST="${{ steps.discover_deps.outputs.CORE_IP }}"
+          REPORTES_HOST="${{ steps.discover_deps.outputs.REPORTES_IP }}"
           CORS_ORIGIN="${{ steps.discover_deps.outputs.CORS_ORIGIN }}"
           FRONTEND_PUBLIC_IP="${{ steps.discover_deps.outputs.FRONTEND_PUBLIC_IP }}"
           
           echo "🔗 Routing to EC2-CORE: $CORE_HOST"
+          echo "📑 Routing reportes to: $REPORTES_HOST"
           echo "🔓 CORS Origin: $CORS_ORIGIN"
           echo "🌐 Frontend Public IP: $FRONTEND_PUBLIC_IP"
           
-          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} bash -s << 'SSHEOF' "$CORE_HOST" "$CORS_ORIGIN" "$FRONTEND_PUBLIC_IP"
+          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} bash -s << 'SSHEOF' "$CORE_HOST" "$REPORTES_HOST" "$CORS_ORIGIN" "$FRONTEND_PUBLIC_IP"
           CORE_HOST="$1"
-          CORS_ORIGIN="$2"
-          FRONTEND_PUBLIC_IP="$3"
+          REPORTES_HOST="$2"
+          CORS_ORIGIN="$3"
+          FRONTEND_PUBLIC_IP="$4"
           set -e
 
           echo "=== EC2-API-Gateway Deployment Started ==="
@@ -186,8 +205,32 @@ jobs:
 
           echo "🚀 Starting api-gateway with environment variables..."
           echo "   CORE_HOST=$CORE_HOST"
+          echo "   REPORTES_HOST=$REPORTES_HOST"
           echo "   CORS_ORIGIN=$CORS_ORIGIN"
-          CORE_HOST="$CORE_HOST" CORS_ORIGIN="$CORS_ORIGIN" FRONTEND_PUBLIC_IP="$FRONTEND_PUBLIC_IP" CORS_WHITELIST="$CORS_ORIGIN" $DC up -d api-gateway
+          
+          # Create .env.local to ensure variables are loaded
+          cat > .env.local << ENVEOF
+CORE_HOST=$CORE_HOST
+REPORTES_HOST=$REPORTES_HOST
+CORS_ORIGIN=$CORS_ORIGIN
+CORS_WHITELIST=$CORS_ORIGIN
+FRONTEND_PUBLIC_IP=$FRONTEND_PUBLIC_IP
+NODE_ENV=production
+DOCKER_DEPLOYMENT=true
+API_GATEWAY_PORT=8080
+PORT=8080
+LOG_LEVEL=debug
+ENVEOF
+          
+          echo "📝 Created .env.local with:"
+          cat .env.local | grep -E "CORE_HOST|REPORTES_HOST|CORS_ORIGIN" || true
+          
+          # Stop old container if exists
+          $DC down api-gateway 2>/dev/null || true
+          sleep 2
+          
+          # Start with env files
+          $DC up -d api-gateway
           
           echo "📝 Service discovery configured:"
           echo "   - EC2-CORE routing: $CORE_HOST"
@@ -198,7 +241,7 @@ jobs:
 
           echo "✅ Current container status:" && $DC ps
           echo "=== EC2-API-Gateway Deployment Completed ==="
-          SSHEOF "$CORE_HOST" "$CORS_ORIGIN"
+          SSHEOF "$CORE_HOST" "$REPORTES_HOST" "$CORS_ORIGIN" "$FRONTEND_PUBLIC_IP"
 
       - name: Health check - api-gateway
         if: ${{ github.event.inputs.skip_verification != 'true' }}
