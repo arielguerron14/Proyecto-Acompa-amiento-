@@ -1,4 +1,3 @@
-# Refresh 2026-01-22T02:26:06.8154358-05:00
 name: Deploy EC2-API-Gateway Services (api-gateway)
 
 on:
@@ -110,6 +109,7 @@ jobs:
         fi
         
         echo "CORE_IP=$CORE_IP" >> $GITHUB_OUTPUT
+        
         echo "🔍 Discovering EC2-Frontend instance..."
         FRONTEND_PUBLIC_IP=$(aws ec2 describe-instances \
           --filters "Name=tag:Name,Values=EC2-Frontend" \
@@ -130,17 +130,11 @@ jobs:
     - name: Deploy and configure api-gateway
       env:
         CORE_HOST: ${{ steps.discover_deps.outputs.CORE_IP }}
+        CORS_ORIGIN: ${{ steps.discover_deps.outputs.CORS_ORIGIN }}
       run: |
         echo "🔗 Routing to EC2-CORE: ${{ env.CORE_HOST }}"
-        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << EOF
-            - name: Deploy and configure api-gateway
-              env:
-                CORE_HOST: ${{ steps.discover_deps.outputs.CORE_IP }}
-                CORS_ORIGIN: ${{ steps.discover_deps.outputs.CORS_ORIGIN }}
-              run: |
-                echo "🔗 Routing to EC2-CORE: ${{ env.CORE_HOST }}"
-                echo "🔓 CORS Origin: ${{ env.CORS_ORIGIN }}"
-                ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << EOF
+        echo "🔓 CORS Origin: ${{ env.CORS_ORIGIN }}"
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'SSHEOF'
         set -e
 
         echo "=== EC2-API-Gateway Deployment Started ==="
@@ -171,41 +165,34 @@ jobs:
             export DC="docker-compose"
           }
         fi
-        echo "✅ Using: $DC"
+        echo "✅ Using: \$DC"
 
-        if [ ! -d ~/projeto-acompanamiento ]; then
-          cd ~ && git clone ${{ env.REPO_URL }} projeto-acompanamiento
+        if [ ! -d ~/projeto-acompanimiento ]; then
+          cd ~ && git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git projeto-acompanimiento
         else
-          cd ~/projeto-acompanamiento && git pull origin main
+          cd ~/projeto-acompanimiento && git pull origin main
         fi
 
-        cd ~/projeto-acompanamiento
+        cd ~/projeto-acompanimiento
 
         echo "🔨 Building api-gateway image..."
         \$DC build api-gateway --no-cache 2>&1 | tail -20 || echo "⚠️ Build notes"
 
-        echo "🚀 Starting api-gateway with CORE_HOST=$CORE_HOST..."
-        CORE_HOST=$CORE_HOST \$DC up -d api-gateway
+        echo "🚀 Starting api-gateway with environment variables..."
+        echo "   CORE_HOST=$CORE_HOST"
+        echo "   CORS_ORIGIN=$CORS_ORIGIN"
+        CORE_HOST=$CORE_HOST CORS_ORIGIN=$CORS_ORIGIN \$DC up -d api-gateway
         
-        echo "📝 Service discovery configured: EC2-CORE at $CORE_HOST"
-  echo "🔨 Building api-gateway image..."
-  \$DC build api-gateway --no-cache 2>&1 | tail -20 || echo "⚠️ Build notes"
-
-  echo "🚀 Starting api-gateway with environment variables..."
-  echo "   CORE_HOST=$CORE_HOST"
-  echo "   CORS_ORIGIN=$CORS_ORIGIN"
-  CORE_HOST=$CORE_HOST CORS_ORIGIN=$CORS_ORIGIN \$DC up -d api-gateway
-        
-  echo "📝 Service discovery configured:"
-  echo "   - EC2-CORE routing: $CORE_HOST"
-  echo "   - CORS allowed origin: $CORS_ORIGIN"
+        echo "📝 Service discovery configured:"
+        echo "   - EC2-CORE routing: $CORE_HOST"
+        echo "   - CORS allowed origin: $CORS_ORIGIN"
 
         echo "⏳ Waiting for api-gateway to initialize (25 seconds)..."
         sleep 25
 
-        echo "✅ Current container status:" && $DC ps
+        echo "✅ Current container status:" && \$DC ps
         echo "=== EC2-API-Gateway Deployment Completed ==="
-        EOF
+        SSHEOF
 
     - name: Health check - api-gateway
       if: ${{ github.event.inputs.skip_verification != 'true' }}
@@ -213,7 +200,7 @@ jobs:
       run: |
         echo "🔍 Checking api-gateway container..."
         ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF' || true
-        cd ~/projeto-acompanamiento
+        cd ~/projeto-acompanimiento
         if docker compose version &>/dev/null 2>&1; then DC="docker compose"; elif command -v docker-compose &>/dev/null 2>&1; then DC="docker-compose"; else exit 0; fi
         $DC ps | grep api-gateway || true
         EOF
@@ -223,7 +210,7 @@ jobs:
       run: |
         echo "📊 Final service status on ${{ env.INSTANCE_NAME }}:"
         ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF' || true
-        cd ~/projeto-acompanamiento
+        cd ~/projeto-acompanimiento
 
         if docker compose version &>/dev/null 2>&1; then
           DC="docker compose"
