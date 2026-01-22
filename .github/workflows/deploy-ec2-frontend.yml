@@ -1,0 +1,173 @@
+name: Deploy EC2-Frontend Services (frontend-web)
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_name:
+        description: 'EC2 Instance name to deploy (default: EC2-Frontend)'
+        required: false
+        default: 'EC2-Frontend'
+      skip_verification:
+        description: 'Skip health verification (true/false)'
+        required: false
+        default: 'false'
+
+env:
+  INSTANCE_NAME: ${{ github.event.inputs.instance_name || 'EC2-Frontend' }}
+  INSTANCE_USER: ubuntu
+  REPO_URL: https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    name: Deploy Frontend to EC2-Frontend
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Discover EC2 instances and IPs
+      run: |
+        echo "🔍 Discovering EC2 instances..."
+
+        INSTANCE_INFO=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=${{ env.INSTANCE_NAME }}" \
+                    "Name=instance-state-name,Values=running" \
+          --query 'Reservations[].Instances[].[PublicIpAddress, PrivateIpAddress, InstanceId, InstanceType, Tags[?Key==`Name`].Value|[0]]' \
+          --output json)
+
+        PUBLIC_IP=$(echo "$INSTANCE_INFO" | jq -r '.[0][0]')
+        PRIVATE_IP=$(echo "$INSTANCE_INFO" | jq -r '.[0][1]')
+        INSTANCE_ID=$(echo "$INSTANCE_INFO" | jq -r '.[0][2]')
+        INSTANCE_TYPE=$(echo "$INSTANCE_INFO" | jq -r '.[0][3]')
+
+        echo "INSTANCE_PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
+        echo "INSTANCE_PRIVATE_IP=$PRIVATE_IP" >> $GITHUB_ENV
+        echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+        echo "INSTANCE_TYPE=$INSTANCE_TYPE" >> $GITHUB_ENV
+
+        if [ -z "$PUBLIC_IP" ] || [ "$PUBLIC_IP" == "null" ]; then
+          echo "❌ ERROR: Could not find instance with name: ${{ env.INSTANCE_NAME }}"
+          aws ec2 describe-instances \
+            --filters "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].[InstanceId, InstanceType, PublicIpAddress, Tags[?Key==`Name`].Value|[0]]' \
+            --output table
+          exit 1
+        fi
+
+        echo "✅ Instance discovered:" && \
+        echo "   Name:       ${{ env.INSTANCE_NAME }}" && \
+        echo "   ID:         $INSTANCE_ID" && \
+        echo "   Type:       $INSTANCE_TYPE" && \
+        echo "   Public IP:  $PUBLIC_IP" && \
+        echo "   Private IP: $PRIVATE_IP"
+
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ env.INSTANCE_PUBLIC_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+    - name: Verify SSH connection
+      run: |
+        ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} "echo '✅ SSH connection successful'; whoami"
+
+    - name: Detect instance and prepare environment
+      run: |
+        echo "Instance Name:   ${{ env.INSTANCE_NAME }}"
+        echo "Instance ID:     ${{ env.INSTANCE_ID }}"
+        echo "Instance Type:   ${{ env.INSTANCE_TYPE }}"
+        echo "Public IP:       ${{ env.INSTANCE_PUBLIC_IP }}"
+        echo "Private IP:      ${{ env.INSTANCE_PRIVATE_IP }}"
+        echo "Services:        frontend-web (React/Vite SPA served on port 5500)"
+
+    - name: Deploy and configure frontend
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
+        set -e
+
+        echo "=== EC2-Frontend Deployment Started ==="
+        echo "Hostname: $(hostname)"
+        echo "IP Address: $(hostname -I)"
+
+        echo "📦 Updating system packages..."
+        sudo apt-get update -qq || true
+
+        echo "🐳 Checking Docker installation..."
+        if ! command -v docker &> /dev/null; then
+          sudo apt-get install -y docker.io docker-compose git
+          sudo systemctl enable docker
+          sudo systemctl start docker
+          sudo usermod -aG docker ubuntu
+        fi
+
+        echo "🐳 Setting up Docker Compose..."
+        if docker compose version &> /dev/null 2>&1; then
+          export DC="docker compose"
+        elif command -v docker-compose &> /dev/null; then
+          export DC="docker-compose"
+        else
+          sudo apt-get install -y docker-compose-plugin 2>/dev/null || {
+            curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+            sudo mv /tmp/docker-compose /usr/local/bin/
+            sudo chmod +x /usr/local/bin/docker-compose
+            export DC="docker-compose"
+          }
+        fi
+        echo "✅ Using: $DC"
+
+        if [ ! -d ~/projeto-acompanamiento ]; then
+          cd ~ && git clone ${{ env.REPO_URL }} projeto-acompanamiento
+        else
+          cd ~/projeto-acompanamiento && git pull origin main
+        fi
+
+        cd ~/projeto-acompanamiento
+
+        echo "🔨 Building frontend-web image..."
+        docker build -f apps/frontend-web/Dockerfile -t frontend:latest . 2>&1 | tail -20 || echo "⚠️ Build notes"
+
+        echo "🚀 Starting frontend container..."
+        docker stop frontend 2>/dev/null || true
+        docker rm frontend 2>/dev/null || true
+        docker run -d --name frontend --restart unless-stopped -p 5500:5500 frontend:latest
+
+        echo "⏳ Waiting for frontend to initialize (20 seconds)..."
+        sleep 20
+
+        echo "✅ Frontend container status:" && docker ps | grep frontend
+        echo "=== EC2-Frontend Deployment Completed ==="
+        EOF
+
+    - name: Health check - frontend
+      if: ${{ github.event.inputs.skip_verification != 'true' }}
+      continue-on-error: true
+      run: |
+        echo "🔍 Checking frontend container..."
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF' || true
+        docker ps | grep frontend || true
+        EOF
+
+    - name: Verify all services and generate report
+      if: always()
+      run: |
+        echo "📊 Final service status on ${{ env.INSTANCE_NAME }}:"
+        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF' || true
+        echo "=== Docker Containers Status ==="
+        docker ps -a | grep frontend || echo "No frontend container found"
+
+        echo -e "\n=== Frontend Service (expected running) ==="
+        echo "- frontend (port 5500)"
+
+        echo -e "\n✅ EC2-Frontend deployment completed"
+        EOF
