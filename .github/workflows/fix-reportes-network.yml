@@ -1,0 +1,279 @@
+name: Fix EC2-Reportes Network & Deploy
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  fix-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get EC2-Reportes instance details
+        id: get-instance
+        run: |
+          INSTANCE=$(aws ec2 describe-instances \
+            --region ${{ env.AWS_REGION }} \
+            --filters "Name=tag:Name,Values=EC2-Reportes" \
+            --query 'Reservations[0].Instances[0]')
+          
+          PUBLIC_IP=$(echo $INSTANCE | jq -r '.PublicIpAddress')
+          PRIVATE_IP=$(echo $INSTANCE | jq -r '.PrivateIpAddress')
+          SG_ID=$(echo $INSTANCE | jq -r '.SecurityGroups[0].GroupId')
+          SUBNET_ID=$(echo $INSTANCE | jq -r '.SubnetId')
+          
+          echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
+          echo "private_ip=$PRIVATE_IP" >> $GITHUB_OUTPUT
+          echo "sg_id=$SG_ID" >> $GITHUB_OUTPUT
+          echo "subnet_id=$SUBNET_ID" >> $GITHUB_OUTPUT
+
+      - name: Get Internet Gateway ID
+        id: get-igw
+        run: |
+          # Get VPC ID from subnet
+          VPC_ID=$(aws ec2 describe-subnets \
+            --subnet-ids ${{ steps.get-instance.outputs.subnet_id }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Subnets[0].VpcId' \
+            --output text)
+          
+          # Get Internet Gateway attached to VPC
+          IGW_ID=$(aws ec2 describe-internet-gateways \
+            --region ${{ env.AWS_REGION }} \
+            --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+            --query 'InternetGateways[0].InternetGatewayId' \
+            --output text)
+          
+          echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
+          echo "igw_id=$IGW_ID" >> $GITHUB_OUTPUT
+          echo "✅ VPC: $VPC_ID | IGW: $IGW_ID"
+
+      - name: Get route table for subnet
+        id: get-rt
+        run: |
+          RT_ID=$(aws ec2 describe-route-tables \
+            --region ${{ env.AWS_REGION }} \
+            --filters "Name=association.subnet-id,Values=${{ steps.get-instance.outputs.subnet_id }}" \
+            --query 'RouteTables[0].RouteTableId' \
+            --output text)
+          
+          echo "route_table_id=$RT_ID" >> $GITHUB_OUTPUT
+          echo "✅ Route Table: $RT_ID"
+
+      - name: Check and add default route to IGW
+        run: |
+          RT_ID="${{ steps.get-rt.outputs.route_table_id }}"
+          IGW_ID="${{ steps.get-igw.outputs.igw_id }}"
+          
+          # Check if 0.0.0.0/0 route exists
+          ROUTE_EXISTS=$(aws ec2 describe-route-tables \
+            --route-table-ids $RT_ID \
+            --region ${{ env.AWS_REGION }} \
+            --query "RouteTables[0].Routes[?DestinationCidrBlock=='0.0.0.0/0']" \
+            --output text)
+          
+          if [ -z "$ROUTE_EXISTS" ]; then
+            echo "⚠️  No default route found. Adding 0.0.0.0/0 → IGW..."
+            aws ec2 create-route \
+              --route-table-id $RT_ID \
+              --destination-cidr-block 0.0.0.0/0 \
+              --gateway-id $IGW_ID \
+              --region ${{ env.AWS_REGION }} 2>&1 || echo "Route may already exist"
+            echo "✅ Route added/verified"
+          else
+            echo "✅ Default route already exists"
+          fi
+
+      - name: Check and fix security group egress rules
+        run: |
+          SG_ID="${{ steps.get-instance.outputs.sg_id }}"
+          
+          # Check if 0.0.0.0/0 on 443 exists
+          HTTPS_RULE=$(aws ec2 describe-security-groups \
+            --group-ids $SG_ID \
+            --region ${{ env.AWS_REGION }} \
+            --query "SecurityGroups[0].IpPermissionsEgress[?FromPort==443 && ToPort==443 && IpRanges[0].CidrIp=='0.0.0.0/0']" \
+            --output text)
+          
+          if [ -z "$HTTPS_RULE" ]; then
+            echo "⚠️  No HTTPS egress rule found. Adding..."
+            aws ec2 authorize-security-group-egress \
+              --group-id $SG_ID \
+              --protocol tcp \
+              --port 443 \
+              --cidr 0.0.0.0/0 \
+              --region ${{ env.AWS_REGION }} 2>&1 || echo "HTTPS rule may already exist"
+          fi
+          
+          # Check if DNS (port 53) exists
+          DNS_RULE=$(aws ec2 describe-security-groups \
+            --group-ids $SG_ID \
+            --region ${{ env.AWS_REGION }} \
+            --query "SecurityGroups[0].IpPermissionsEgress[?FromPort==53 && ToPort==53 && IpRanges[0].CidrIp=='0.0.0.0/0']" \
+            --output text)
+          
+          if [ -z "$DNS_RULE" ]; then
+            echo "⚠️  No DNS egress rule found. Adding..."
+            aws ec2 authorize-security-group-egress \
+              --group-id $SG_ID \
+              --protocol udp \
+              --port 53 \
+              --cidr 0.0.0.0/0 \
+              --region ${{ env.AWS_REGION }} 2>&1 || echo "DNS rule may already exist"
+          fi
+          
+          echo "✅ Security group egress rules verified/added"
+
+      - name: Wait for network changes to propagate
+        run: sleep 10
+
+      - name: Deploy EC2-Reportes with GitHub SSH key
+        run: |
+          PUBLIC_IP="${{ steps.get-instance.outputs.public_ip }}"
+          PRIVATE_IP="${{ steps.get-instance.outputs.private_ip }}"
+          
+          echo "🚀 Deploying to EC2-Reportes (${PRIVATE_IP}) via ${PUBLIC_IP}..."
+          
+          # Use GitHub SSH key for deployment
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2_key.pem
+          chmod 600 ~/.ssh/ec2_key.pem
+          
+          # Deploy script
+          bash -c 'ssh -o StrictHostKeyChecking=no \
+            -i ~/.ssh/ec2_key.pem \
+            -o ConnectTimeout=30 \
+            -o StrictHostKeyChecking=no \
+            ubuntu@'"$PUBLIC_IP"' << '"'"'DEPLOY_EOF'"'"'
+          set -e
+          
+          echo "=== EC2-Reportes Network Diagnostic ==="
+          echo "Hostname: $(hostname)"
+          echo "Private IP: $(hostname -I)"
+          
+          # Test DNS first
+          echo "Testing DNS resolution..."
+          nslookup -querytype=A github.com 8.8.8.8 2>&1 || echo "⚠️  DNS test incomplete"
+          
+          echo "Testing internet connectivity..."
+          curl -I --connect-timeout 5 https://github.com 2>&1 | head -3 || echo "⚠️  GitHub unreachable (may need more time)"
+          
+          # Check resolv.conf
+          echo "Current DNS servers:"
+          cat /etc/resolv.conf || echo "/etc/resolv.conf not found"
+          
+          # Add AWS DNS if missing
+          if ! grep -q "169.254.169.253" /etc/resolv.conf 2>/dev/null; then
+            echo "Adding AWS DNS server..."
+            echo "nameserver 169.254.169.253" | sudo tee -a /etc/resolv.conf
+          fi
+          
+          echo ""
+          echo "=== Starting Deployment ==="
+          
+          # Update and install dependencies
+          echo "📦 Updating system packages..."
+          sudo apt-get update -qq 2>&1 | tail -3 || echo "apt-get update had issues (continuing anyway)"
+          
+          # Check Docker
+          echo "🐳 Checking Docker..."
+          if ! command -v docker &> /dev/null; then
+            sudo apt-get install -y docker.io docker-compose git 2>&1 | tail -3
+            sudo systemctl enable docker
+            sudo systemctl start docker
+            sudo usermod -aG docker ubuntu
+          fi
+          
+          # Setup Docker Compose
+          if docker compose version &> /dev/null 2>&1; then
+            export DC="docker compose"
+          elif command -v docker-compose &> /dev/null; then
+            export DC="docker-compose"
+          else
+            echo "Installing docker-compose..."
+            curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose 2>&1 | tail -2
+            sudo mv /tmp/docker-compose /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            export DC="docker-compose"
+          fi
+          echo "✅ Using: $DC"
+          
+          # Clone or update repo
+          if [ ! -d ~/projeto-acompanamiento ]; then
+            echo "📥 Cloning repository..."
+            cd ~ && git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git projeto-acompanamiento 2>&1 | tail -3
+          else
+            echo "📥 Updating repository..."
+            cd ~/projeto-acompanamiento && git pull origin main 2>&1 | tail -3
+          fi
+          
+          cd ~/projeto-acompanamiento
+          
+          echo "🔨 Building images..."
+          $DC build zookeeper kafka mongo postgres micro-reportes-estudiantes micro-reportes-maestros --no-cache 2>&1 | tail -10 || echo "⚠️  Build notes"
+          
+          echo "🚀 Starting reportes services..."
+          
+          # Create .env with production config
+          echo "NODE_ENV=production" > .env
+          echo "DOCKER_DEPLOYMENT=true" >> .env
+          echo "MONGODB_URI=mongodb://mongo:27017/admin?authSource=admin" >> .env
+          echo "KAFKA_BROKERS=kafka:9092" >> .env
+          echo "POSTGRES_HOST=postgres" >> .env
+          echo "POSTGRES_PORT=5432" >> .env
+          echo "POSTGRES_USER=postgres" >> .env
+          echo "POSTGRES_PASSWORD=example" >> .env
+          echo "POSTGRES_DB=acompanamiento" >> .env
+          
+          # Stop old services
+          $DC down 2>/dev/null || true
+          sleep 3
+          
+          # Start all services
+          $DC up -d zookeeper kafka mongo postgres
+          sleep 15
+          $DC up -d micro-reportes-estudiantes micro-reportes-maestros
+          
+          echo "⏳ Waiting for services to initialize (40 seconds)..."
+          sleep 40
+          
+          echo "✅ Service status:"
+          $DC ps
+          
+          echo "✅ EC2-Reportes deployment completed!"
+          DEPLOY_EOF
+          '
+
+      - name: Verify deployment
+        run: |
+          PUBLIC_IP="${{ steps.get-instance.outputs.public_ip }}"
+          
+          echo "🔍 Verifying EC2-Reportes services..."
+          
+          bash -c 'ssh -o StrictHostKeyChecking=no \
+            -i ~/.ssh/ec2_key.pem \
+            ubuntu@'"$PUBLIC_IP"' << '"'"'VERIFY_EOF'"'"'
+          cd ~/projeto-acompanamiento
+          echo "Current docker compose status:"
+          docker-compose ps || docker compose ps
+          VERIFY_EOF
+          '
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/ec2_key.pem
