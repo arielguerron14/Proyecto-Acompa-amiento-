@@ -82,6 +82,96 @@ jobs:
       run: |
         ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} "echo '✅ SSH connection successful'; whoami"
 
+    - name: Fix network configuration (VPC routes and security groups)
+      run: |
+        echo "🔧 Checking and fixing network configuration for EC2-Reportes..."
+        
+        # Get instance details
+        INSTANCE_INFO=$(aws ec2 describe-instances \
+          --instance-ids ${{ env.INSTANCE_ID }} \
+          --region ${{ env.AWS_REGION }} \
+          --query 'Reservations[0].Instances[0]')
+        
+        SG_ID=$(echo "$INSTANCE_INFO" | jq -r '.SecurityGroups[0].GroupId')
+        SUBNET_ID=$(echo "$INSTANCE_INFO" | jq -r '.SubnetId')
+        
+        echo "Security Group: $SG_ID"
+        echo "Subnet: $SUBNET_ID"
+        
+        # Get VPC and IGW
+        VPC_ID=$(aws ec2 describe-subnets \
+          --subnet-ids "$SUBNET_ID" \
+          --region ${{ env.AWS_REGION }} \
+          --query 'Subnets[0].VpcId' \
+          --output text)
+        
+        IGW_ID=$(aws ec2 describe-internet-gateways \
+          --region ${{ env.AWS_REGION }} \
+          --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+          --query 'InternetGateways[0].InternetGatewayId' \
+          --output text)
+        
+        echo "VPC: $VPC_ID | IGW: $IGW_ID"
+        
+        # Get route table
+        RT_ID=$(aws ec2 describe-route-tables \
+          --region ${{ env.AWS_REGION }} \
+          --filters "Name=association.subnet-id,Values=$SUBNET_ID" \
+          --query 'RouteTables[0].RouteTableId' \
+          --output text 2>/dev/null || echo "")
+        
+        if [ -z "$RT_ID" ] || [ "$RT_ID" = "None" ]; then
+          RT_ID=$(aws ec2 describe-route-tables \
+            --region ${{ env.AWS_REGION }} \
+            --filters "Name=vpc-id,Values=$VPC_ID" "Name=association.main,Values=true" \
+            --query 'RouteTables[0].RouteTableId' \
+            --output text)
+        fi
+        
+        echo "Route Table: $RT_ID"
+        
+        # Check and add default route
+        ROUTE_EXISTS=$(aws ec2 describe-route-tables \
+          --route-table-ids "$RT_ID" \
+          --region ${{ env.AWS_REGION }} \
+          --query "RouteTables[0].Routes[?DestinationCidrBlock=='0.0.0.0/0'].GatewayId" \
+          --output text 2>/dev/null || echo "")
+        
+        if [ -z "$ROUTE_EXISTS" ] || [ "$ROUTE_EXISTS" = "None" ]; then
+          echo "⚠️  Adding default route 0.0.0.0/0 → $IGW_ID"
+          aws ec2 create-route \
+            --route-table-id "$RT_ID" \
+            --destination-cidr-block 0.0.0.0/0 \
+            --gateway-id "$IGW_ID" \
+            --region ${{ env.AWS_REGION }} 2>&1 || echo "Route may exist"
+        else
+          echo "✅ Default route exists → $ROUTE_EXISTS"
+        fi
+        
+        # Check and fix security group egress rules
+        echo "Checking security group egress rules..."
+        EGRESS_RULES=$(aws ec2 describe-security-groups \
+          --group-ids "$SG_ID" \
+          --region ${{ env.AWS_REGION }} \
+          --query 'SecurityGroups[0].IpPermissionsEgress' \
+          --output json)
+        
+        ALL_TRAFFIC=$(echo "$EGRESS_RULES" | grep -c '\"IpProtocol\": \"-1\"' || echo "0")
+        
+        if [ "$ALL_TRAFFIC" -gt 0 ]; then
+          echo "✅ Security group allows all outbound traffic"
+        else
+          echo "⚠️  Adding egress rules for HTTPS, HTTP, and DNS..."
+          aws ec2 authorize-security-group-egress --group-id "$SG_ID" --protocol tcp --port 443 --cidr 0.0.0.0/0 --region ${{ env.AWS_REGION }} 2>&1 || true
+          aws ec2 authorize-security-group-egress --group-id "$SG_ID" --protocol tcp --port 80 --cidr 0.0.0.0/0 --region ${{ env.AWS_REGION }} 2>&1 || true
+          aws ec2 authorize-security-group-egress --group-id "$SG_ID" --protocol udp --port 53 --cidr 0.0.0.0/0 --region ${{ env.AWS_REGION }} 2>&1 || true
+          aws ec2 authorize-security-group-egress --group-id "$SG_ID" --protocol tcp --port 53 --cidr 0.0.0.0/0 --region ${{ env.AWS_REGION }} 2>&1 || true
+          echo "✅ Egress rules added"
+        fi
+        
+        echo "⏳ Waiting 10 seconds for network changes to propagate..."
+        sleep 10
+    
     - name: Discover dependent instances IPs
       run: |
         echo "🔍 Discovering IPs of dependency instances..."
@@ -135,6 +225,17 @@ jobs:
         echo "=== EC2-Reportes Deployment Started ==="
         echo "Hostname: $(hostname)"
         echo "IP Address: $(hostname -I)"
+        
+        # Test DNS and fix if needed
+        echo "🧪 Testing DNS resolution..."
+        if ! nslookup -querytype=A github.com 8.8.8.8 >/dev/null 2>&1; then
+          echo "⚠️  DNS not working, adding AWS DNS server..."
+          if ! grep -q "169.254.169.253" /etc/resolv.conf 2>/dev/null; then
+            echo "nameserver 169.254.169.253" | sudo tee -a /etc/resolv.conf
+          fi
+        else
+          echo "✅ DNS working"
+        fi
 
         echo "📦 Updating system packages..."
         sudo apt-get update -qq || true
