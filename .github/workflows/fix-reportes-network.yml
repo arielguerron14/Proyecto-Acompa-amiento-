@@ -66,11 +66,31 @@ jobs:
       - name: Get route table for subnet
         id: get-rt
         run: |
+          SUBNET_ID="${{ steps.get-instance.outputs.subnet_id }}"
+          echo "Looking for route table for subnet: $SUBNET_ID"
+          
+          # First try to find route table with explicit association
           RT_ID=$(aws ec2 describe-route-tables \
             --region ${{ env.AWS_REGION }} \
-            --filters "Name=association.subnet-id,Values=${{ steps.get-instance.outputs.subnet_id }}" \
+            --filters "Name=association.subnet-id,Values=$SUBNET_ID" \
             --query 'RouteTables[0].RouteTableId' \
-            --output text)
+            --output text 2>/dev/null || echo "")
+          
+          # If not found, get the main route table for the VPC
+          if [ -z "$RT_ID" ] || [ "$RT_ID" = "None" ]; then
+            VPC_ID="${{ steps.get-igw.outputs.vpc_id }}"
+            echo "Subnet route table not found, trying main route table for VPC: $VPC_ID"
+            RT_ID=$(aws ec2 describe-route-tables \
+              --region ${{ env.AWS_REGION }} \
+              --filters "Name=vpc-id,Values=$VPC_ID" "Name=association.main,Values=true" \
+              --query 'RouteTables[0].RouteTableId' \
+              --output text 2>/dev/null || echo "")
+          fi
+          
+          if [ -z "$RT_ID" ] || [ "$RT_ID" = "None" ]; then
+            echo "ERROR: Could not find route table"
+            exit 1
+          fi
           
           echo "route_table_id=$RT_ID" >> $GITHUB_OUTPUT
           echo "✅ Route Table: $RT_ID"
@@ -80,23 +100,30 @@ jobs:
           RT_ID="${{ steps.get-rt.outputs.route_table_id }}"
           IGW_ID="${{ steps.get-igw.outputs.igw_id }}"
           
+          if [ -z "$RT_ID" ] || [ "$RT_ID" = "None" ]; then
+            echo "❌ ERROR: Route table ID is empty or None"
+            exit 1
+          fi
+          
+          echo "Checking route table $RT_ID for default route..."
+          
           # Check if 0.0.0.0/0 route exists
           ROUTE_EXISTS=$(aws ec2 describe-route-tables \
-            --route-table-ids $RT_ID \
+            --route-table-ids "$RT_ID" \
             --region ${{ env.AWS_REGION }} \
-            --query "RouteTables[0].Routes[?DestinationCidrBlock=='0.0.0.0/0']" \
-            --output text)
+            --query "RouteTables[0].Routes[?DestinationCidrBlock=='0.0.0.0/0'].GatewayId" \
+            --output text 2>/dev/null || echo "")
           
-          if [ -z "$ROUTE_EXISTS" ]; then
-            echo "⚠️  No default route found. Adding 0.0.0.0/0 → IGW..."
+          if [ -z "$ROUTE_EXISTS" ] || [ "$ROUTE_EXISTS" = "None" ]; then
+            echo "⚠️  No default route found. Adding 0.0.0.0/0 → IGW ($IGW_ID)..."
             aws ec2 create-route \
-              --route-table-id $RT_ID \
+              --route-table-id "$RT_ID" \
               --destination-cidr-block 0.0.0.0/0 \
-              --gateway-id $IGW_ID \
+              --gateway-id "$IGW_ID" \
               --region ${{ env.AWS_REGION }} 2>&1 || echo "Route may already exist"
             echo "✅ Route added/verified"
           else
-            echo "✅ Default route already exists"
+            echo "✅ Default route already exists → $ROUTE_EXISTS"
           fi
 
       - name: Check and fix security group egress rules
