@@ -169,8 +169,8 @@ jobs:
           echo "✅ Egress rules added"
         fi
         
-        echo "⏳ Waiting 10 seconds for network changes to propagate..."
-        sleep 10
+        echo "⏳ Waiting 60 seconds for network changes to propagate..."
+        sleep 60
     
     - name: Discover dependent instances IPs
       run: |
