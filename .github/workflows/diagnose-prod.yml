@@ -39,27 +39,37 @@ jobs:
         run: |
           set -e
           echo "🔍 Discovering instances..."
-          core_ip=$(aws ec2 describe-instances \
+          core_info=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=${{ github.event.inputs.instance_core || 'EC2-CORE' }}" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
-          reportes_ip=$(aws ec2 describe-instances \
+            --query 'Reservations[0].Instances[0].[InstanceId,PrivateIpAddress,Placement.AvailabilityZone]' \
+            --output text)
+          reportes_info=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=${{ github.event.inputs.instance_reportes || 'EC2-Reportes' }}" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
-          gateway_public_ip=$(aws ec2 describe-instances \
+            --query 'Reservations[0].Instances[0].[InstanceId,PrivateIpAddress,Placement.AvailabilityZone]' \
+            --output text)
+          gateway_info=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=${{ github.event.inputs.instance_gateway || 'EC2-API-Gateway' }}" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
-          gateway_private_ip=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=${{ github.event.inputs.instance_gateway || 'EC2-API-Gateway' }}" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
+            --query 'Reservations[0].Instances[0].[InstanceId,PublicIpAddress,PrivateIpAddress,Placement.AvailabilityZone]' \
+            --output text)
+
+          read core_id core_ip core_az <<< "$core_info"
+          read reportes_id reportes_ip reportes_az <<< "$reportes_info"
+          read gateway_id gateway_public_ip gateway_private_ip gateway_az <<< "$gateway_info"
 
           echo "core_ip=$core_ip" >> $GITHUB_OUTPUT
           echo "reportes_ip=$reportes_ip" >> $GITHUB_OUTPUT
           echo "gateway_public_ip=$gateway_public_ip" >> $GITHUB_OUTPUT
           echo "gateway_private_ip=$gateway_private_ip" >> $GITHUB_OUTPUT
+          echo "core_id=$core_id" >> $GITHUB_OUTPUT
+          echo "reportes_id=$reportes_id" >> $GITHUB_OUTPUT
+          echo "gateway_id=$gateway_id" >> $GITHUB_OUTPUT
+          echo "core_az=$core_az" >> $GITHUB_OUTPUT
+          echo "reportes_az=$reportes_az" >> $GITHUB_OUTPUT
+          echo "gateway_az=$gateway_az" >> $GITHUB_OUTPUT
 
-          echo "CORE_IP=$core_ip"
-          echo "REPORTES_IP=$reportes_ip"
-          echo "GATEWAY_PUBLIC_IP=$gateway_public_ip"
+          echo "CORE_IP=$core_ip (id=$core_id az=$core_az)"
+          echo "REPORTES_IP=$reportes_ip (id=$reportes_id az=$reportes_az)"
+          echo "GATEWAY_PUBLIC_IP=$gateway_public_ip (id=$gateway_id az=$gateway_az)"
           echo "GATEWAY_PRIVATE_IP=$gateway_private_ip"
 
       - name: Setup SSH key
@@ -71,6 +81,28 @@ jobs:
           ssh-keyscan -H ${{ steps.discover.outputs.gateway_public_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh-keyscan -H ${{ steps.discover.outputs.core_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh-keyscan -H ${{ steps.discover.outputs.reportes_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Generate public key to push via EC2 Instance Connect
+          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
+
+      - name: Authorize SSH key via EC2 Instance Connect (core/reportes)
+        run: |
+          set -e
+          PUBKEY=$(cat ~/.ssh/id_rsa.pub)
+
+          send_key() {
+            local iid="$1"; local az="$2"; local label="$3";
+            echo "🔑 Sending SSH public key to $label ($iid) via EC2 Instance Connect..."
+            aws ec2-instance-connect send-ssh-public-key \
+              --instance-id "$iid" \
+              --instance-os-user ${{ env.INSTANCE_USER }} \
+              --availability-zone "$az" \
+              --ssh-public-key "$PUBKEY" \
+              >/dev/null && echo "✅ Key sent to $label" || echo "⚠️  Could not send key to $label"
+          }
+
+          send_key "${{ steps.discover.outputs.core_id }}" "${{ steps.discover.outputs.core_az }}" core
+          send_key "${{ steps.discover.outputs.reportes_id }}" "${{ steps.discover.outputs.reportes_az }}" reportes
 
       - name: Gateway + Core + Reportes diagnostics (via gateway hop)
         run: |
