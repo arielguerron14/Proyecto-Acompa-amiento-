@@ -219,93 +219,109 @@ jobs:
 
     - name: Deploy and configure reportes services
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} << 'EOF'
-        set -e
+          DB_HOST="${{ env.DB_HOST }}"
+          MESSAGING_HOST="${{ env.MESSAGING_HOST }}"
+          
+          echo "🗄️  Database host: $DB_HOST"
+          echo "📬 Messaging host: $MESSAGING_HOST"
+          
+          ssh -o StrictHostKeyChecking=no ${{ env.INSTANCE_USER }}@${{ env.INSTANCE_PUBLIC_IP }} bash -s "$DB_HOST" "$MESSAGING_HOST" << 'SSHEOF'
+          DB_HOST="$1"
+          MESSAGING_HOST="$2"
+          set -e
 
-        echo "=== EC2-Reportes Deployment Started ==="
-        echo "Hostname: $(hostname)"
-        echo "IP Address: $(hostname -I)"
-        
-        # Test DNS and fix if needed
-        echo "🧪 Testing DNS resolution..."
-        if ! nslookup -querytype=A github.com 8.8.8.8 >/dev/null 2>&1; then
-          echo "⚠️  DNS not working, adding AWS DNS server..."
-          if ! grep -q "169.254.169.253" /etc/resolv.conf 2>/dev/null; then
-            echo "nameserver 169.254.169.253" | sudo tee -a /etc/resolv.conf
+          # Export so docker compose can substitute these values
+          export DB_HOST MESSAGING_HOST
+
+          echo "=== EC2-Reportes Deployment Started ==="
+          echo "Hostname: $(hostname)"
+          echo "IP Address: $(hostname -I)"
+          
+          # Test DNS and fix if needed
+          echo "🧪 Testing DNS resolution..."
+          if ! nslookup -querytype=A github.com 8.8.8.8 >/dev/null 2>&1; then
+            echo "⚠️  DNS not working, adding AWS DNS server..."
+            if ! grep -q "169.254.169.253" /etc/resolv.conf 2>/dev/null; then
+              echo "nameserver 169.254.169.253" | sudo tee -a /etc/resolv.conf
+            fi
+          else
+            echo "✅ DNS working"
           fi
-        else
-          echo "✅ DNS working"
-        fi
 
-        echo "📦 Updating system packages..."
-        sudo apt-get update -qq || true
+          echo "📦 Updating system packages..."
+          sudo apt-get update -qq || true
 
-        echo "🐳 Checking Docker installation..."
-        if ! command -v docker &> /dev/null; then
-          sudo apt-get install -y docker.io docker-compose git
-          sudo systemctl enable docker
-          sudo systemctl start docker
-          sudo usermod -aG docker ubuntu
-        fi
+          echo "🐳 Checking Docker installation..."
+          if ! command -v docker &> /dev/null; then
+            sudo apt-get install -y docker.io docker-compose git
+            sudo systemctl enable docker
+            sudo systemctl start docker
+            sudo usermod -aG docker ubuntu
+          fi
 
-        echo "🐳 Setting up Docker Compose..."
-        if docker compose version &> /dev/null 2>&1; then
-          export DC="docker compose"
-        elif command -v docker-compose &> /dev/null; then
-          export DC="docker-compose"
-        else
-          sudo apt-get install -y docker-compose-plugin 2>/dev/null || {
-            curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
-            sudo mv /tmp/docker-compose /usr/local/bin/
-            sudo chmod +x /usr/local/bin/docker-compose
+          echo "🐳 Setting up Docker Compose..."
+          if docker compose version &> /dev/null 2>&1; then
+            export DC="docker compose"
+          elif command -v docker-compose &> /dev/null; then
             export DC="docker-compose"
-          }
-        fi
-        echo "✅ Using: $DC"
+          else
+            sudo apt-get install -y docker-compose-plugin 2>/dev/null || {
+              curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+              sudo mv /tmp/docker-compose /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+              export DC="docker-compose"
+            }
+          fi
+          echo "✅ Using: $DC"
 
-        if [ ! -d ~/projeto-acompanamiento ]; then
-          cd ~ && git clone ${{ env.REPO_URL }} projeto-acompanamiento
-        else
-          cd ~/projeto-acompanamiento && git pull origin main
-        fi
+          if [ ! -d ~/projeto-acompanamiento ]; then
+            cd ~ && git clone https://github.com/arielguerron14/Proyecto-Acompa-amiento-.git projeto-acompanamiento
+          else
+            cd ~/projeto-acompanamiento && git pull origin main
+          fi
 
-        cd ~/projeto-acompanamiento
+          cd ~/projeto-acompanamiento
 
-        echo "🔨 Building reportes microservices and deps images..."
-        $DC build zookeeper kafka mongo postgres micro-reportes-estudiantes micro-reportes-maestros --no-cache 2>&1 | tail -20 || echo "⚠️ Build notes"
+          echo "🔨 Building reportes microservices and deps images..."
+          $DC build zookeeper kafka mongo postgres micro-reportes-estudiantes micro-reportes-maestros --no-cache 2>&1 | tail -20 || echo "⚠️ Build notes"
 
-        echo "🚀 Starting reportes services (with deps)..."
-        
-        # Create .env.local with proper configuration
-        echo "📝 Creating .env.local for reportes services..."
-        echo "NODE_ENV=production" > .env.local
-        echo "DOCKER_DEPLOYMENT=true" >> .env.local
-        echo "MONGODB_URI=mongodb://root:example@mongo:27017/admin?authSource=admin" >> .env.local
-        echo "KAFKA_BROKERS=kafka:9092" >> .env.local
-        echo "RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672" >> .env.local
-        echo "POSTGRES_HOST=postgres" >> .env.local
-        echo "POSTGRES_PORT=5432" >> .env.local
-        echo "POSTGRES_USER=postgres" >> .env.local
-        echo "POSTGRES_PASSWORD=example" >> .env.local
-        echo "POSTGRES_DB=acompanamiento" >> .env.local
+          echo "🚀 Starting reportes services (with deps)..."
+          echo "   DB_HOST=$DB_HOST"
+          echo "   MESSAGING_HOST=$MESSAGING_HOST"
+          
+          # Create .env file (docker compose reads .env automatically)
+          echo "NODE_ENV=production" > .env
+          echo "DOCKER_DEPLOYMENT=true" >> .env
+          echo "MONGODB_URI=mongodb://root:example@mongo:27017/admin?authSource=admin" >> .env
+          echo "KAFKA_BROKERS=kafka:9092" >> .env
+          echo "POSTGRES_HOST=postgres" >> .env
+          echo "POSTGRES_PORT=5432" >> .env
+          echo "POSTGRES_USER=postgres" >> .env
+          echo "POSTGRES_PASSWORD=example" >> .env
+          echo "POSTGRES_DB=acompanamiento" >> .env
+          echo "DB_HOST=$DB_HOST" >> .env
+          echo "MESSAGING_HOST=$MESSAGING_HOST" >> .env
+          
+          echo "📝 Created .env with:"
+          cat .env | grep -E "DB_HOST|MESSAGING_HOST|MONGODB_URI|POSTGRES" || true
 
-        # Stop old services to force recreation
-        $DC down 2>/dev/null || true
-        sleep 3
-        
-        # Start services - ports configuration enables cross-instance access
-        $DC up -d zookeeper kafka mongo postgres
-        sleep 15
-        $DC up -d micro-reportes-estudiantes micro-reportes-maestros
-        
-        echo "📡 Reportes services started with exposed ports for cross-instance communication..."
+          # Stop old services to force recreation
+          $DC down 2>/dev/null || true
+          sleep 3
+          
+          # Start services - ports configuration enables cross-instance access
+          $DC up -d zookeeper kafka mongo postgres
+          sleep 15
+          $DC up -d micro-reportes-estudiantes micro-reportes-maestros
+          
+          echo "📡 Reportes services started with exposed ports for cross-instance communication..."
 
-        echo "⏳ Waiting for services to initialize (40 seconds)..."
-        sleep 40
+          echo "⏳ Waiting for services to initialize (40 seconds)..."
+          sleep 40
 
-        echo "✅ Current container status:" && $DC ps
-        echo "=== EC2-Reportes Deployment Completed ==="
-        EOF
+          echo "✅ Current container status:" && $DC ps
+          echo "=== EC2-Reportes Deployment Completed ==="
+          SSHEOF
 
     - name: Health check - micro-reportes-estudiantes
       if: ${{ github.event.inputs.skip_verification != 'true' }}
