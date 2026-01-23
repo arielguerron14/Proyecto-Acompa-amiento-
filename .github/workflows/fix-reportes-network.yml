@@ -130,41 +130,60 @@ jobs:
         run: |
           SG_ID="${{ steps.get-instance.outputs.sg_id }}"
           
-          # Check if 0.0.0.0/0 on 443 exists
-          HTTPS_RULE=$(aws ec2 describe-security-groups \
-            --group-ids $SG_ID \
-            --region ${{ env.AWS_REGION }} \
-            --query "SecurityGroups[0].IpPermissionsEgress[?FromPort==443 && ToPort==443 && IpRanges[0].CidrIp=='0.0.0.0/0']" \
-            --output text)
+          echo "Checking security group $SG_ID egress rules..."
           
-          if [ -z "$HTTPS_RULE" ]; then
-            echo "⚠️  No HTTPS egress rule found. Adding..."
+          # Get all egress rules
+          EGRESS_RULES=$(aws ec2 describe-security-groups \
+            --group-ids "$SG_ID" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'SecurityGroups[0].IpPermissionsEgress' \
+            --output json 2>&1)
+          
+          echo "Current egress rules:"
+          echo "$EGRESS_RULES" | head -20
+          
+          # Check if there's an "allow all" rule (protocol -1)
+          ALL_TRAFFIC=$(echo "$EGRESS_RULES" | grep -c '\"IpProtocol\": \"-1\"' || echo "0")
+          
+          if [ "$ALL_TRAFFIC" -gt 0 ]; then
+            echo "✅ Security group already allows all outbound traffic"
+          else
+            echo "⚠️  No 'allow all' egress rule. Adding HTTPS and DNS rules..."
+            
+            # Add HTTPS (443/tcp)
             aws ec2 authorize-security-group-egress \
-              --group-id $SG_ID \
+              --group-id "$SG_ID" \
               --protocol tcp \
               --port 443 \
               --cidr 0.0.0.0/0 \
-              --region ${{ env.AWS_REGION }} 2>&1 || echo "HTTPS rule may already exist"
-          fi
-          
-          # Check if DNS (port 53) exists
-          DNS_RULE=$(aws ec2 describe-security-groups \
-            --group-ids $SG_ID \
-            --region ${{ env.AWS_REGION }} \
-            --query "SecurityGroups[0].IpPermissionsEgress[?FromPort==53 && ToPort==53 && IpRanges[0].CidrIp=='0.0.0.0/0']" \
-            --output text)
-          
-          if [ -z "$DNS_RULE" ]; then
-            echo "⚠️  No DNS egress rule found. Adding..."
+              --region ${{ env.AWS_REGION }} 2>&1 || echo "(HTTPS rule may exist)"
+            
+            # Add HTTP (80/tcp)
             aws ec2 authorize-security-group-egress \
-              --group-id $SG_ID \
+              --group-id "$SG_ID" \
+              --protocol tcp \
+              --port 80 \
+              --cidr 0.0.0.0/0 \
+              --region ${{ env.AWS_REGION }} 2>&1 || echo "(HTTP rule may exist)"
+            
+            # Add DNS (53/udp)
+            aws ec2 authorize-security-group-egress \
+              --group-id "$SG_ID" \
               --protocol udp \
               --port 53 \
               --cidr 0.0.0.0/0 \
-              --region ${{ env.AWS_REGION }} 2>&1 || echo "DNS rule may already exist"
+              --region ${{ env.AWS_REGION }} 2>&1 || echo "(DNS UDP rule may exist)"
+            
+            # Add DNS (53/tcp)
+            aws ec2 authorize-security-group-egress \
+              --group-id "$SG_ID" \
+              --protocol tcp \
+              --port 53 \
+              --cidr 0.0.0.0/0 \
+              --region ${{ env.AWS_REGION }} 2>&1 || echo "(DNS TCP rule may exist)"
+            
+            echo "✅ Security group egress rules added"
           fi
-          
-          echo "✅ Security group egress rules verified/added"
 
       - name: Wait for network changes to propagate
         run: sleep 10
